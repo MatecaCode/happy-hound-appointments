@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
+import { Github } from 'lucide-react';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -69,7 +69,7 @@ const Register = () => {
                 onClick={() => signInWithGoogle()}
                 disabled={isSubmitting}
               >
-                <Mail className="mr-2 h-4 w-4" />
+                <Github className="mr-2 h-4 w-4" />
                 Registrar com Google
               </Button>
               

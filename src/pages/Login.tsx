@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Mail } from 'lucide-react';
+import { Github } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -55,7 +55,7 @@ const Login = () => {
                 onClick={handleGoogleSignIn}
                 disabled={isSubmitting}
               >
-                <Mail className="mr-2 h-4 w-4" />
+                <Github className="mr-2 h-4 w-4" />
                 Entrar com Google
               </Button>
               
