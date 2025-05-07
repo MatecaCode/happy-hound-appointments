@@ -1,0 +1,295 @@
+
+import React, { useState, useEffect } from 'react';
+import Layout from '@/components/Layout';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+const Profile = () => {
+  const { user } = useAuth();
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pets, setPets] = useState<any[]>([]);
+  const [newPet, setNewPet] = useState({ name: '', breed: '', age: '', notes: '' });
+
+  useEffect(() => {
+    if (user) {
+      setName(user.user_metadata.name || '');
+      setPhone(user.user_metadata.phone || '');
+      
+      // Carregar pets do usuário
+      const fetchPets = async () => {
+        setIsLoading(true);
+        try {
+          const { data, error } = await supabase
+            .from('pets')
+            .select('*')
+            .eq('user_id', user.id);
+          
+          if (error) throw error;
+          setPets(data || []);
+        } catch (error: any) {
+          toast.error(error.message || 'Erro ao carregar seus pets');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchPets();
+    }
+  }, [user]);
+
+  const updateProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { name, phone }
+      });
+      
+      if (error) throw error;
+      toast.success('Perfil atualizado com sucesso!');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao atualizar perfil');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePetInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setNewPet(prev => ({ ...prev, [name]: value }));
+  };
+
+  const addNewPet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      const { data, error } = await supabase
+        .from('pets')
+        .insert([
+          { ...newPet, user_id: user.id }
+        ])
+        .select();
+      
+      if (error) throw error;
+      
+      setPets([...pets, ...data]);
+      setNewPet({ name: '', breed: '', age: '', notes: '' });
+      toast.success('Pet adicionado com sucesso!');
+    } catch (error: any) {
+      toast.error(error.message || 'Erro ao adicionar pet');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  if (!user) {
+    return (
+      <Layout>
+        <div className="py-16 px-6 text-center">
+          <h1>Faça login para acessar seu perfil</h1>
+          <Button asChild className="mt-4">
+            <a href="/login">Entrar</a>
+          </Button>
+        </div>
+      </Layout>
+    );
+  }
+  
+  return (
+    <Layout>
+      <section className="bg-secondary/50 py-16">
+        <div className="max-w-7xl mx-auto px-6 text-center">
+          <h1 className="mb-4">Meu <span className="text-primary">Perfil</span></h1>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Gerencie suas informações pessoais e seus pets
+          </p>
+        </div>
+      </section>
+      
+      <div className="py-16 px-6">
+        <div className="max-w-4xl mx-auto">
+          <Tabs defaultValue="profile">
+            <TabsList className="grid grid-cols-2 w-full mb-8">
+              <TabsTrigger value="profile">Perfil</TabsTrigger>
+              <TabsTrigger value="pets">Meus Pets</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="profile">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Informações de Perfil</CardTitle>
+                  <CardDescription>
+                    Atualize suas informações pessoais aqui
+                  </CardDescription>
+                </CardHeader>
+                
+                <CardContent>
+                  <form onSubmit={updateProfile}>
+                    <div className="grid gap-6">
+                      <div className="grid gap-3">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={user.email || ''}
+                          disabled
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          O email não pode ser alterado
+                        </p>
+                      </div>
+                      
+                      <div className="grid gap-3">
+                        <Label htmlFor="name">Nome</Label>
+                        <Input
+                          id="name"
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                        />
+                      </div>
+                      
+                      <div className="grid gap-3">
+                        <Label htmlFor="phone">Telefone</Label>
+                        <Input
+                          id="phone"
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          placeholder="(11) 99999-9999"
+                        />
+                      </div>
+                      
+                      <Button type="submit" disabled={isSubmitting}>
+                        {isSubmitting ? 'Salvando...' : 'Salvar Alterações'}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="pets">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Meus Pets</CardTitle>
+                  <CardDescription>
+                    Gerencie os pets registrados para tosa
+                  </CardDescription>
+                </CardHeader>
+                
+                <CardContent>
+                  <div className="space-y-6">
+                    {isLoading ? (
+                      <p className="text-center py-4">Carregando seus pets...</p>
+                    ) : pets.length > 0 ? (
+                      <div className="grid gap-4">
+                        {pets.map((pet) => (
+                          <Card key={pet.id}>
+                            <CardContent className="pt-6">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <h3 className="text-lg font-medium">{pet.name}</h3>
+                                  <p className="text-sm text-muted-foreground">Raça: {pet.breed}</p>
+                                </div>
+                                <div>
+                                  <p className="text-sm">Idade: {pet.age}</p>
+                                  {pet.notes && (
+                                    <p className="text-sm text-muted-foreground mt-2">Notas: {pet.notes}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-center py-4">Você ainda não tem pets registrados.</p>
+                    )}
+                    
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Adicionar Novo Pet</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <form onSubmit={addNewPet} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="pet-name">Nome do Pet</Label>
+                              <Input
+                                id="pet-name"
+                                name="name"
+                                value={newPet.name}
+                                onChange={handlePetInputChange}
+                                required
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor="pet-breed">Raça</Label>
+                              <Input
+                                id="pet-breed"
+                                name="breed"
+                                value={newPet.breed}
+                                onChange={handlePetInputChange}
+                                required
+                              />
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="pet-age">Idade</Label>
+                              <Input
+                                id="pet-age"
+                                name="age"
+                                value={newPet.age}
+                                onChange={handlePetInputChange}
+                                required
+                              />
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor="pet-notes">Notas/Observações</Label>
+                              <Input
+                                id="pet-notes"
+                                name="notes"
+                                value={newPet.notes}
+                                onChange={handlePetInputChange}
+                              />
+                            </div>
+                          </div>
+                          
+                          <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? 'Adicionando...' : 'Adicionar Pet'}
+                          </Button>
+                        </form>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
+    </Layout>
+  );
+};
+
+export default Profile;
