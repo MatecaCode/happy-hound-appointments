@@ -4,7 +4,7 @@ import Layout from '@/components/Layout';
 import Hero from '@/components/Hero';
 import ServiceCard from '@/components/ServiceCard';
 import Testimonials from '@/components/Testimonials';
-import { Scissors, Shower, Dog, Sparkles } from 'lucide-react';
+import { Scissors, ShowerHead, Dog, Sparkles } from 'lucide-react';
 
 const Index = () => {
   const services = [
@@ -12,7 +12,7 @@ const Index = () => {
       title: "Basic Bath & Brush",
       description: "Bath, blow dry, brush out, ear cleaning, nail trim, and a spritz of cologne.",
       price: "$40",
-      icon: <Shower className="h-6 w-6" />,
+      icon: <ShowerHead className="h-6 w-6" />,
     },
     {
       title: "Full Grooming",

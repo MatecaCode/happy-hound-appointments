@@ -1,8 +1,7 @@
-
 import React from 'react';
 import Layout from '@/components/Layout';
 import ServiceCard from '@/components/ServiceCard';
-import { Scissors, Shower, Dog, Sparkles, Cut, Smile } from 'lucide-react';
+import { Scissors, ShowerHead, Dog, Sparkles, Cut, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 
@@ -12,7 +11,7 @@ const Services = () => {
       title: "Basic Bath & Brush",
       description: "Bath, blow dry, brush out, ear cleaning, nail trim, and a spritz of cologne.",
       price: "$40",
-      icon: <Shower className="h-6 w-6" />,
+      icon: <ShowerHead className="h-6 w-6" />,
       details: [
         "Warm water bath with gentle shampoo",
         "Complete brush out",
@@ -54,7 +53,7 @@ const Services = () => {
       title: "Nail Trimming",
       description: "Quick nail trimming service to keep your dog's paws healthy.",
       price: "$15",
-      icon: <Cut className="h-6 w-6" />,
+      icon: <Scissors className="h-6 w-6" />,
       details: [
         "Nail trim",
         "Nail filing",
