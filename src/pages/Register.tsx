@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
-import { Github } from 'lucide-react';
+import { Mail } from 'lucide-react';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -69,7 +68,7 @@ const Register = () => {
                 onClick={() => signInWithGoogle()}
                 disabled={isSubmitting}
               >
-                <Github className="mr-2 h-4 w-4" />
+                <Mail className="mr-2 h-4 w-4" />
                 Registrar com Google
               </Button>
               
