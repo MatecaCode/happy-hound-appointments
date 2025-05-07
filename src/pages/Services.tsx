@@ -1,7 +1,7 @@
 import React from 'react';
 import Layout from '@/components/Layout';
 import ServiceCard from '@/components/ServiceCard';
-import { Scissors, ShowerHead, Dog, Sparkles, Cut, Smile } from 'lucide-react';
+import { Scissors, ShowerHead, Dog, Sparkles, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 
