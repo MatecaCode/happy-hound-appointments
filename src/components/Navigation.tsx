@@ -15,24 +15,24 @@ const Navigation: React.FC<NavigationProps> = ({ className }) => {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 text-primary">
           <Dog className="h-8 w-8" />
-          <span className="text-xl font-bold">Happy Hound</span>
+          <span className="text-xl font-bold">Patinha Feliz</span>
         </Link>
         
         <div className="hidden md:flex items-center gap-8">
           <Link to="/" className="text-foreground hover:text-primary transition-colors">
-            Home
+            Início
           </Link>
           <Link to="/services" className="text-foreground hover:text-primary transition-colors">
-            Services
+            Serviços
           </Link>
           <Link to="/appointments" className="text-foreground hover:text-primary transition-colors">
-            My Appointments
+            Meus Agendamentos
           </Link>
         </div>
         
         <div className="flex items-center gap-4">
           <Link to="/book">
-            <Button>Book Appointment</Button>
+            <Button>Agendar Tosa</Button>
           </Link>
         </div>
       </div>

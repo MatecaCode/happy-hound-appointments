@@ -11,52 +11,52 @@ const Footer: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Dog className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">Happy Hound</span>
+              <span className="text-xl font-bold">Patinha Feliz</span>
             </div>
             <p className="text-sm">
-              Premium dog grooming services to keep your furry friend looking their best.
+              Serviços premium de tosa para cães para manter seu amigo peludo com a melhor aparência.
             </p>
           </div>
           
           <div>
-            <h4 className="font-semibold text-lg mb-4">Quick Links</h4>
+            <h4 className="font-semibold text-lg mb-4">Links Rápidos</h4>
             <ul className="space-y-2">
               <li>
                 <Link to="/" className="hover:text-primary transition-colors">
-                  Home
+                  Início
                 </Link>
               </li>
               <li>
                 <Link to="/services" className="hover:text-primary transition-colors">
-                  Services
+                  Serviços
                 </Link>
               </li>
               <li>
                 <Link to="/appointments" className="hover:text-primary transition-colors">
-                  My Appointments
+                  Meus Agendamentos
                 </Link>
               </li>
               <li>
                 <Link to="/book" className="hover:text-primary transition-colors">
-                  Book Appointment
+                  Agendar Tosa
                 </Link>
               </li>
             </ul>
           </div>
           
           <div>
-            <h4 className="font-semibold text-lg mb-4">Contact Us</h4>
+            <h4 className="font-semibold text-lg mb-4">Contato</h4>
             <address className="not-italic">
-              <p>123 Grooming Lane</p>
-              <p>Pet City, PC 12345</p>
-              <p className="mt-2">Email: info@happyhound.com</p>
-              <p>Phone: (555) 123-4567</p>
+              <p>Rua da Tosa, 123</p>
+              <p>Cidade Pet, SP 12345</p>
+              <p className="mt-2">Email: contato@patinhafeliz.com</p>
+              <p>Telefone: (11) 1234-5678</p>
             </address>
           </div>
         </div>
         
         <div className="border-t border-muted mt-10 pt-6 text-sm text-center">
-          <p>&copy; {new Date().getFullYear()} Happy Hound. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Patinha Feliz. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>

@@ -8,38 +8,38 @@ import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dog } from 'lucide-react';
 
-// Sample appointments data
+// Dados de exemplo de agendamentos
 const initialAppointments: Appointment[] = [
   {
     id: '1',
     petName: 'Max',
-    service: 'Full Grooming',
+    service: 'Tosa Completa',
     date: new Date(2023, 11, 28),
-    time: '10:00 AM',
+    time: '10:00',
     status: 'upcoming',
   },
   {
     id: '2',
     petName: 'Bella',
-    service: 'Basic Bath & Brush',
+    service: 'Banho & Escovação Básica',
     date: new Date(2024, 0, 5),
-    time: '2:00 PM',
+    time: '14:00',
     status: 'upcoming',
   },
   {
     id: '3',
     petName: 'Charlie',
-    service: 'Nail Trimming',
+    service: 'Corte de Unhas',
     date: new Date(2023, 10, 15),
-    time: '11:00 AM',
+    time: '11:00',
     status: 'completed',
   },
   {
     id: '4',
     petName: 'Luna',
-    service: 'Deluxe Spa Package',
+    service: 'Pacote Spa Luxo',
     date: new Date(2023, 9, 30),
-    time: '1:00 PM',
+    time: '13:00',
     status: 'cancelled',
   },
 ];
@@ -58,7 +58,7 @@ const Appointments = () => {
     
     const appointment = appointments.find(a => a.id === id);
     if (appointment) {
-      toast.success(`Appointment for ${appointment.petName} has been cancelled.`);
+      toast.success(`Agendamento para ${appointment.petName} foi cancelado.`);
     }
   };
   
@@ -69,9 +69,9 @@ const Appointments = () => {
     <Layout>
       <section className="bg-secondary/50 py-16">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <h1 className="mb-4">My <span className="text-primary">Appointments</span></h1>
+          <h1 className="mb-4">Meus <span className="text-primary">Agendamentos</span></h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            View and manage all your scheduled grooming appointments.
+            Visualize e gerencie todos os seus agendamentos de tosa.
           </p>
         </div>
       </section>
@@ -80,8 +80,8 @@ const Appointments = () => {
         <div className="max-w-7xl mx-auto px-6">
           <Tabs defaultValue="upcoming" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-              <TabsTrigger value="past">Past</TabsTrigger>
+              <TabsTrigger value="upcoming">Próximos</TabsTrigger>
+              <TabsTrigger value="past">Passados</TabsTrigger>
             </TabsList>
             
             <TabsContent value="upcoming">
@@ -98,12 +98,12 @@ const Appointments = () => {
               ) : (
                 <div className="text-center py-20 bg-secondary/30 rounded-lg">
                   <Dog className="w-12 h-12 mx-auto mb-4 text-primary opacity-70" />
-                  <h3 className="text-xl font-bold mb-2">No Upcoming Appointments</h3>
+                  <h3 className="text-xl font-bold mb-2">Nenhum Agendamento Próximo</h3>
                   <p className="text-muted-foreground mb-6">
-                    You don't have any upcoming grooming appointments scheduled.
+                    Você não tem nenhum agendamento de tosa próximo.
                   </p>
                   <Button asChild>
-                    <Link to="/book">Book an Appointment</Link>
+                    <Link to="/book">Agendar uma Tosa</Link>
                   </Button>
                 </div>
               )}
@@ -122,9 +122,9 @@ const Appointments = () => {
               ) : (
                 <div className="text-center py-20 bg-secondary/30 rounded-lg">
                   <Dog className="w-12 h-12 mx-auto mb-4 text-primary opacity-70" />
-                  <h3 className="text-xl font-bold mb-2">No Past Appointments</h3>
+                  <h3 className="text-xl font-bold mb-2">Nenhum Agendamento Passado</h3>
                   <p className="text-muted-foreground mb-6">
-                    Your appointment history will appear here once you've had services with us.
+                    Seu histórico de agendamentos aparecerá aqui depois que você tiver serviços conosco.
                   </p>
                 </div>
               )}

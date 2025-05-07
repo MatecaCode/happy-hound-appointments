@@ -9,22 +9,22 @@ import { Scissors, ShowerHead, Dog, Sparkles } from 'lucide-react';
 const Index = () => {
   const services = [
     {
-      title: "Basic Bath & Brush",
-      description: "Bath, blow dry, brush out, ear cleaning, nail trim, and a spritz of cologne.",
-      price: "$40",
+      title: "Banho & Escovação Básica",
+      description: "Banho, secagem, escovação, limpeza de ouvidos, corte de unhas e borrifada de colônia.",
+      price: "R$40",
       icon: <ShowerHead className="h-6 w-6" />,
     },
     {
-      title: "Full Grooming",
-      description: "Everything in Basic plus haircut styled to your preference.",
-      price: "$60",
+      title: "Tosa Completa",
+      description: "Tudo do pacote básico mais corte de pelo estilizado conforme sua preferência.",
+      price: "R$60",
       icon: <Scissors className="h-6 w-6" />,
       popular: true,
     },
     {
-      title: "Deluxe Spa Package",
-      description: "Full grooming plus specialty shampoo, conditioner, teeth cleaning, and paw treatment.",
-      price: "$80",
+      title: "Pacote Spa Luxo",
+      description: "Tosa completa com shampoo especial, condicionador, limpeza de dentes e tratamento de patas.",
+      price: "R$80",
       icon: <Sparkles className="h-6 w-6" />,
     },
   ];
@@ -37,9 +37,9 @@ const Index = () => {
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
-            <h2 className="mb-4">Our <span className="text-primary">Grooming</span> Services</h2>
+            <h2 className="mb-4">Nossos <span className="text-primary">Serviços</span> de Tosa</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              We offer a range of grooming services to keep your dog looking and feeling their best.
+              Oferecemos uma variedade de serviços de tosa para manter seu cachorro bonito e se sentindo bem.
             </p>
           </div>
           
@@ -58,7 +58,7 @@ const Index = () => {
           
           <div className="mt-12 text-center">
             <p className="text-muted-foreground mb-6">
-              Need something not listed here? Contact us for custom grooming options.
+              Precisa de algo que não está listado aqui? Entre em contato para opções personalizadas.
             </p>
           </div>
         </div>
@@ -73,17 +73,17 @@ const Index = () => {
             <Dog className="h-5 w-5" />
           </div>
           
-          <h2 className="mb-6">Ready to Book Your Pup's Grooming Session?</h2>
+          <h2 className="mb-6">Pronto para Agendar a Tosa do Seu Pet?</h2>
           
           <p className="text-primary-foreground/90 max-w-2xl mx-auto mb-8">
-            Give your dog the pampering they deserve. Our professional groomers are standing by to give your furry friend the best care.
+            Dê ao seu cachorro o carinho que ele merece. Nossos profissionais estão prontos para oferecer o melhor cuidado ao seu amigo peludo.
           </p>
           
           <a 
             href="/book"
             className="inline-flex items-center justify-center rounded-md bg-primary-foreground text-primary px-8 py-3 font-medium"
           >
-            Book Appointment Now
+            Agendar Consulta Agora
           </a>
         </div>
       </section>

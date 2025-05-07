@@ -30,7 +30,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     if (onCancel) {
       onCancel(id);
     } else {
-      toast.success(`Appointment for ${petName} has been cancelled.`);
+      toast.success(`Agendamento para ${petName} foi cancelado.`);
     }
   };
   
@@ -43,13 +43,22 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
     }
   };
   
+  const getStatusText = () => {
+    switch (status) {
+      case 'upcoming': return 'próximo';
+      case 'completed': return 'concluído';
+      case 'cancelled': return 'cancelado';
+      default: return status;
+    }
+  };
+  
   return (
     <Card className={status === 'cancelled' ? 'opacity-70' : ''}>
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
-          <CardTitle>{petName}'s Appointment</CardTitle>
+          <CardTitle>Agendamento de {petName}</CardTitle>
           <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor()}`}>
-            {status}
+            {getStatusText()}
           </div>
         </div>
         <CardDescription>
@@ -61,7 +70,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
         <div className="space-y-3">
           <div className="flex items-center text-sm">
             <CalendarCheck className="mr-2 h-4 w-4 text-primary" />
-            <span>{format(date, 'EEEE, MMMM d, yyyy')}</span>
+            <span>{format(date, 'EEEE, d \'de\' MMMM \'de\' yyyy')}</span>
           </div>
           
           <div className="flex items-center text-sm">
@@ -76,7 +85,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           
           <div className="flex items-center text-sm">
             <Scissors className="mr-2 h-4 w-4 text-primary" />
-            <span>Service: {service}</span>
+            <span>Serviço: {service}</span>
           </div>
         </div>
       </CardContent>
@@ -84,7 +93,7 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
       {status === 'upcoming' && (
         <CardFooter className="pt-0">
           <Button variant="outline" onClick={handleCancel} className="w-full">
-            Cancel Appointment
+            Cancelar Agendamento
           </Button>
         </CardFooter>
       )}

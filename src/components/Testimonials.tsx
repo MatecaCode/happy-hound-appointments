@@ -10,19 +10,19 @@ interface TestimonialProps {
 
 const testimonials: TestimonialProps[] = [
   {
-    name: "Sarah Johnson",
+    name: "Mariana Silva",
     dogName: "Max",
-    text: "Happy Hound transformed my scruffy pup into a stylish gentleman. Their groomers are so patient with my anxious dog!"
+    text: "A Patinha Feliz transformou meu cachorrinho bagunceiro em um verdadeiro cavalheiro. Os tosadores são muito pacientes com meu cão ansioso!"
   },
   {
-    name: "Michael Chen",
+    name: "Miguel Santos",
     dogName: "Bella",
-    text: "The team here is amazing! My Bella gets excited every time we pull up to the salon. The quality of service is consistently excellent."
+    text: "A equipe aqui é incrível! Minha Bella fica animada toda vez que chegamos ao salão. A qualidade do serviço é consistentemente excelente."
   },
   {
-    name: "Jessica Taylor",
+    name: "Júlia Oliveira",
     dogName: "Cooper",
-    text: "Cooper has never looked better! The booking process was so simple, and they really listened to exactly what I wanted."
+    text: "Cooper nunca esteve melhor! O processo de agendamento foi super simples, e eles realmente ouviram exatamente o que eu queria."
   },
 ];
 
@@ -31,9 +31,9 @@ const Testimonials: React.FC = () => {
     <section className="py-16 bg-secondary/50">
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-12">
-          <h2 className="mb-4">What Our <span className="text-primary">Customers</span> Say</h2>
+          <h2 className="mb-4">O que Nossos <span className="text-primary">Clientes</span> Dizem</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Don't just take our word for it. Here's what dog owners in our community have to say about our grooming services.
+            Não acredite apenas em nossa palavra. Veja o que os donos de cães em nossa comunidade dizem sobre nossos serviços de tosa.
           </p>
         </div>
         
@@ -54,7 +54,7 @@ const Testimonials: React.FC = () => {
                   
                   <div>
                     <p className="font-semibold">{testimonial.name}</p>
-                    <p className="text-sm text-muted-foreground">Owner of {testimonial.dogName}</p>
+                    <p className="text-sm text-muted-foreground">Dono(a) de {testimonial.dogName}</p>
                   </div>
                 </div>
               </CardContent>

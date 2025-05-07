@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { format } from 'date-fns';
 import { CalendarIcon, Clock } from 'lucide-react';
 import { toast } from 'sonner';
+import { ptBR } from 'date-fns/locale';
 
 import { Button } from "@/components/ui/button";
 import {
@@ -45,33 +46,33 @@ interface LocationState {
   service?: string;
 }
 
-// Available services and their prices
+// Serviços disponíveis e seus preços
 const services = [
-  { name: "Basic Bath & Brush", price: "$40" },
-  { name: "Full Grooming", price: "$60" },
-  { name: "Deluxe Spa Package", price: "$80" },
-  { name: "Nail Trimming", price: "$15" },
-  { name: "Teeth Cleaning", price: "$25" }
+  { name: "Banho & Escovação Básica", price: "R$40" },
+  { name: "Tosa Completa", price: "R$60" },
+  { name: "Pacote Spa Luxo", price: "R$80" },
+  { name: "Corte de Unhas", price: "R$15" },
+  { name: "Limpeza de Dentes", price: "R$25" }
 ];
 
-// Available time slots
+// Horários disponíveis
 const timeSlots = [
-  "9:00 AM", "10:00 AM", "11:00 AM", 
-  "1:00 PM", "2:00 PM", "3:00 PM", "4:00 PM"
+  "9:00", "10:00", "11:00", 
+  "13:00", "14:00", "15:00", "16:00"
 ];
 
-// Form schema
+// Esquema do formulário
 const formSchema = z.object({
-  ownerName: z.string().min(2, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  phone: z.string().min(10, "Valid phone number required"),
-  petName: z.string().min(1, "Pet name is required"),
-  breed: z.string().min(1, "Breed is required"),
-  service: z.string().min(1, "Please select a service"),
+  ownerName: z.string().min(2, "Nome é obrigatório"),
+  email: z.string().email("Endereço de e-mail inválido"),
+  phone: z.string().min(10, "Número de telefone válido obrigatório"),
+  petName: z.string().min(1, "Nome do pet é obrigatório"),
+  breed: z.string().min(1, "Raça é obrigatória"),
+  service: z.string().min(1, "Por favor selecione um serviço"),
   date: z.date({
-    required_error: "Please select a date",
+    required_error: "Por favor selecione uma data",
   }),
-  time: z.string().min(1, "Please select a time"),
+  time: z.string().min(1, "Por favor selecione um horário"),
   specialRequests: z.string().optional(),
 });
 
@@ -82,17 +83,17 @@ const AppointmentForm = () => {
   const location = useLocation();
   const state = location.state as LocationState;
   
-  // Default to first service or the one passed in state
+  // Padrão para o primeiro serviço ou o que foi passado no state
   const defaultService = state?.service || services[0].name;
   
-  // Disable past dates and Sundays for date picker
+  // Desabilitar datas passadas e domingos no seletor de data
   const disabledDays = (date: Date) => {
     const day = date.getDay();
     const isBeforeToday = date < new Date(new Date().setHours(0, 0, 0, 0));
-    return day === 0 || isBeforeToday; // Sunday or past days
+    return day === 0 || isBeforeToday; // Domingo ou dias passados
   };
   
-  // Form setup
+  // Configuração do formulário
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -102,41 +103,41 @@ const AppointmentForm = () => {
   });
 
   const onSubmit = (data: FormValues) => {
-    // For demo purposes, just show toast and navigate
-    console.log("Appointment data:", data);
+    // Para fins de demonstração, apenas mostrar toast e navegar
+    console.log("Dados do agendamento:", data);
     
-    // Show success message
-    toast.success("Appointment booked successfully!", {
-      description: `Your appointment for ${data.petName} is scheduled for ${format(data.date, 'MMMM d, yyyy')} at ${data.time}.`,
+    // Mostrar mensagem de sucesso
+    toast.success("Agendamento realizado com sucesso!", {
+      description: `Seu agendamento para ${data.petName} está marcado para ${format(data.date, 'd \'de\' MMMM \'de\' yyyy', { locale: ptBR })} às ${data.time}.`,
     });
     
-    // Navigate to confirmation page (we'll create that later)
+    // Navegar para a página de confirmação
     navigate("/confirmation", { state: { appointment: data } });
   };
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
-        <CardTitle>Book a Grooming Appointment</CardTitle>
+        <CardTitle>Agendar uma Tosa</CardTitle>
         <CardDescription>
-          Fill out the form below to schedule a grooming session for your dog.
+          Preencha o formulário abaixo para agendar uma sessão de tosa para seu cachorro.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Owner Information */}
+            {/* Informações do Dono */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Owner Information</h3>
+              <h3 className="text-lg font-medium">Informações do Dono</h3>
               
               <FormField
                 control={form.control}
                 name="ownerName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Your Name</FormLabel>
+                    <FormLabel>Seu Nome</FormLabel>
                     <FormControl>
-                      <Input placeholder="John Doe" {...field} />
+                      <Input placeholder="João Silva" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -151,7 +152,7 @@ const AppointmentForm = () => {
                     <FormItem>
                       <FormLabel>Email</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="you@example.com" {...field} />
+                        <Input type="email" placeholder="voce@exemplo.com" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -163,9 +164,9 @@ const AppointmentForm = () => {
                   name="phone"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Phone Number</FormLabel>
+                      <FormLabel>Número de Telefone</FormLabel>
                       <FormControl>
-                        <Input placeholder="(555) 123-4567" {...field} />
+                        <Input placeholder="(11) 98765-4321" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -174,9 +175,9 @@ const AppointmentForm = () => {
               </div>
             </div>
             
-            {/* Pet Information */}
+            {/* Informações do Pet */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Pet Information</h3>
+              <h3 className="text-lg font-medium">Informações do Pet</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
@@ -184,7 +185,7 @@ const AppointmentForm = () => {
                   name="petName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Pet's Name</FormLabel>
+                      <FormLabel>Nome do Pet</FormLabel>
                       <FormControl>
                         <Input placeholder="Max" {...field} />
                       </FormControl>
@@ -198,7 +199,7 @@ const AppointmentForm = () => {
                   name="breed"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Breed</FormLabel>
+                      <FormLabel>Raça</FormLabel>
                       <FormControl>
                         <Input placeholder="Golden Retriever" {...field} />
                       </FormControl>
@@ -209,23 +210,23 @@ const AppointmentForm = () => {
               </div>
             </div>
             
-            {/* Appointment Details */}
+            {/* Detalhes do Agendamento */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Appointment Details</h3>
+              <h3 className="text-lg font-medium">Detalhes do Agendamento</h3>
               
               <FormField
                 control={form.control}
                 name="service"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Service</FormLabel>
+                    <FormLabel>Serviço</FormLabel>
                     <Select 
                       onValueChange={field.onChange} 
                       defaultValue={field.value}
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select a service" />
+                          <SelectValue placeholder="Selecione um serviço" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -247,7 +248,7 @@ const AppointmentForm = () => {
                   name="date"
                   render={({ field }) => (
                     <FormItem className="flex flex-col">
-                      <FormLabel>Date</FormLabel>
+                      <FormLabel>Data</FormLabel>
                       <Popover>
                         <PopoverTrigger asChild>
                           <FormControl>
@@ -259,9 +260,9 @@ const AppointmentForm = () => {
                               )}
                             >
                               {field.value ? (
-                                format(field.value, "PPP")
+                                format(field.value, "d 'de' MMMM 'de' yyyy", { locale: ptBR })
                               ) : (
-                                <span>Pick a date</span>
+                                <span>Escolha uma data</span>
                               )}
                               <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                             </Button>
@@ -275,6 +276,7 @@ const AppointmentForm = () => {
                             disabled={disabledDays}
                             initialFocus
                             className="p-3 pointer-events-auto"
+                            locale={ptBR}
                           />
                         </PopoverContent>
                       </Popover>
@@ -288,17 +290,17 @@ const AppointmentForm = () => {
                   name="time"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Time</FormLabel>
+                      <FormLabel>Horário</FormLabel>
                       <Select 
                         onValueChange={field.onChange} 
                         defaultValue={field.value}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a time">
+                            <SelectValue placeholder="Selecione um horário">
                               <div className="flex items-center">
                                 <Clock className="mr-2 h-4 w-4" />
-                                {field.value || "Select a time"}
+                                {field.value || "Selecione um horário"}
                               </div>
                             </SelectValue>
                           </SelectTrigger>
@@ -322,10 +324,10 @@ const AppointmentForm = () => {
                 name="specialRequests"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Special Requests</FormLabel>
+                    <FormLabel>Solicitações Especiais</FormLabel>
                     <FormControl>
                       <Textarea 
-                        placeholder="Any special instructions or requests for your pet's grooming session..."
+                        placeholder="Quaisquer instruções ou solicitações especiais para a tosa do seu pet..."
                         className="resize-none"
                         {...field}
                       />
@@ -337,7 +339,7 @@ const AppointmentForm = () => {
             </div>
             
             <Button type="submit" className="w-full">
-              Book Appointment
+              Agendar Tosa
             </Button>
           </form>
         </Form>

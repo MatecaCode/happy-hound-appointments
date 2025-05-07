@@ -13,23 +13,23 @@ const Hero: React.FC = () => {
             <div className="inline-block bg-primary/10 px-4 py-2 rounded-full">
               <div className="flex items-center gap-2 text-primary">
                 <Dog className="h-5 w-5" />
-                <span className="font-medium">Professional Dog Grooming</span>
+                <span className="font-medium">Tosa Profissional para Cães</span>
               </div>
             </div>
             
-            <h1>Pamper Your <span className="text-primary">Pup</span> With Our Premium Grooming</h1>
+            <h1>Cuide do Seu <span className="text-primary">Pet</span> Com Nossa Tosa Premium</h1>
             
             <p className="text-lg text-muted-foreground">
-              Your furry friend deserves the best care. Our professional groomers
-              provide top-quality services to keep your dog looking and feeling great.
+              Seu amigo peludo merece o melhor cuidado. Nossos profissionais especializados
+              oferecem serviços de alta qualidade para manter seu cachorro bonito e se sentindo bem.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
               <Link to="/book">
-                <Button size="lg" className="px-8">Book Appointment</Button>
+                <Button size="lg" className="px-8">Agendar Tosa</Button>
               </Link>
               <Link to="/services">
-                <Button size="lg" variant="outline" className="px-8">View Services</Button>
+                <Button size="lg" variant="outline" className="px-8">Ver Serviços</Button>
               </Link>
             </div>
             
@@ -46,7 +46,7 @@ const Hero: React.FC = () => {
                 </div>
               </div>
               <span className="text-sm text-muted-foreground">
-                <span className="font-semibold">500+</span> happy dogs last month
+                <span className="font-semibold">500+</span> cachorros felizes no último mês
               </span>
             </div>
           </div>
@@ -58,7 +58,7 @@ const Hero: React.FC = () => {
             <div className="relative bg-white p-4 rounded-2xl shadow-lg animate-bounce-slow">
               <img 
                 src="https://images.unsplash.com/photo-1625794084867-8ddd239946b1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80" 
-                alt="Dog being groomed" 
+                alt="Cachorro sendo tosado" 
                 className="rounded-xl w-full h-auto object-cover aspect-square"
               />
             </div>

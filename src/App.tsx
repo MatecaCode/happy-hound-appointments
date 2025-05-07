@@ -25,7 +25,7 @@ const App = () => (
           <Route path="/book" element={<Book />} />
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/confirmation" element={<Confirmation />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          {/* ADICIONE TODAS AS ROTAS PERSONALIZADAS ACIMA DA ROTA CATCH-ALL "*" */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

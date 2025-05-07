@@ -47,7 +47,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
       <CardContent>
         <CardDescription className="min-h-[80px]">{description}</CardDescription>
         <Link to="/book" state={{ service: title }}>
-          <Button className="w-full mt-4">Book Now</Button>
+          <Button className="w-full mt-4">Agendar Agora</Button>
         </Link>
       </CardContent>
     </Card>
