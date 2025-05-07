@@ -15,7 +15,7 @@ const Navigation: React.FC<NavigationProps> = ({ className }) => {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 text-primary">
           <Dog className="h-8 w-8" />
-          <span className="text-xl font-bold">Patinha Feliz</span>
+          <span className="text-xl font-bold">Vettale</span>
         </Link>
         
         <div className="hidden md:flex items-center gap-8">
