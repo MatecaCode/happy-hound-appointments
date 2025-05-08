@@ -1,8 +1,7 @@
-
 import React from 'react';
 import Layout from '@/components/Layout';
 import ServiceCard from '@/components/ServiceCard';
-import { Scissors, ShowerHead, Dog, Sparkles, Smile, Syringe, Heart, Calendar, Pills } from 'lucide-react';
+import { Scissors, ShowerHead, Dog, Sparkles, Smile, Syringe, Heart, Calendar, Pill } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Separator } from "@/components/ui/separator";
@@ -160,7 +159,7 @@ const Services = () => {
       title: "Acupuntura Veterinária",
       description: "Tratamento complementar para dor, problemas articulares e outras condições.",
       price: "R$150 por sessão",
-      icon: <Pills className="h-6 w-6" />,
+      icon: <Pill className="h-6 w-6" />,
       details: [
         "Avaliação da condição do pet",
         "Sessão de 30-45 minutos",
