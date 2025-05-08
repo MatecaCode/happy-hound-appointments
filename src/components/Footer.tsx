@@ -11,10 +11,10 @@ const Footer: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 mb-4">
               <Dog className="h-6 w-6 text-primary" />
-              <span className="text-xl font-bold">Patinha Feliz</span>
+              <span className="text-xl font-bold">Vettale</span>
             </div>
             <p className="text-sm">
-              Serviços premium de tosa para cães para manter seu amigo peludo com a melhor aparência.
+              Serviços premium de saúde e bem-estar para manter seu amigo peludo com a melhor aparência e saúde.
             </p>
           </div>
           
@@ -38,7 +38,7 @@ const Footer: React.FC = () => {
               </li>
               <li>
                 <Link to="/book" className="hover:text-primary transition-colors">
-                  Agendar Tosa
+                  Agendar Consulta
                 </Link>
               </li>
             </ul>
@@ -47,16 +47,16 @@ const Footer: React.FC = () => {
           <div>
             <h4 className="font-semibold text-lg mb-4">Contato</h4>
             <address className="not-italic">
-              <p>Rua da Tosa, 123</p>
-              <p>Cidade Pet, SP 12345</p>
-              <p className="mt-2">Email: contato@patinhafeliz.com</p>
+              <p>Rua da Saúde Pet, 123</p>
+              <p>Atibaia, SP 12345</p>
+              <p className="mt-2">Email: contato@vettale.com</p>
               <p>Telefone: (11) 1234-5678</p>
             </address>
           </div>
         </div>
         
         <div className="border-t border-muted mt-10 pt-6 text-sm text-center">
-          <p>&copy; {new Date().getFullYear()} Patinha Feliz. Todos os direitos reservados.</p>
+          <p>&copy; {new Date().getFullYear()} Vettale. Todos os direitos reservados.</p>
         </div>
       </div>
     </footer>
