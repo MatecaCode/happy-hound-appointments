@@ -27,9 +27,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log("Auth state change event:", event);
         setSession(session);
         setUser(session?.user ?? null);
         setLoading(false);
+        
+        // Handle email confirmation success
+        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+          navigate('/');
+          if (event === 'USER_UPDATED') {
+            toast.success('Email confirmado com sucesso!');
+          }
+        }
       }
     );
 
@@ -41,7 +50,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -54,7 +63,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast.success('Login realizado com sucesso!');
       navigate('/');
     } catch (error: any) {
-      toast.error(error.message || 'Erro ao fazer login');
+      if (error.message === 'Email not confirmed') {
+        toast.error('Por favor, confirme seu email antes de fazer login');
+      } else {
+        toast.error(error.message || 'Erro ao fazer login');
+      }
     }
   };
 
@@ -83,6 +96,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             name,
             role,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 

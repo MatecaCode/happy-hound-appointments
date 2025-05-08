@@ -63,15 +63,7 @@ const VetCalendar = () => {
         if (error) throw error;
         
         if (data) {
-          // Type assertion to ensure data conforms to Appointment[]
-          setAppointments(data.map(item => ({
-            ...item,
-            status: (item.status as 'upcoming' | 'completed' | 'cancelled'),
-            notes: item.notes || null,
-            owner_phone: item.owner_phone || null,
-            provider_id: item.provider_id || null,
-            service_id: item.service_id || null
-          })));
+          setAppointments(data as Appointment[]);
         }
       } catch (error: any) {
         toast.error(error.message || 'Erro ao carregar agendamentos');
