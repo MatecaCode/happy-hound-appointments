@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Calendar } from '@/components/ui/calendar';
@@ -20,9 +19,14 @@ interface Appointment {
   date: string;
   time: string;
   owner_name: string;
-  owner_phone: string;
+  owner_phone: string | null;
   status: 'upcoming' | 'completed' | 'cancelled';
-  notes?: string;
+  notes?: string | null;
+  created_at: string;
+  pet_id: string;
+  service_id: string | null;
+  provider_id: string | null;
+  user_id: string;
 }
 
 const VetCalendar = () => {
@@ -34,7 +38,7 @@ const VetCalendar = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   
   useEffect(() => {
-    // Verificar se o usuário é veterinário
+    // Check if the user is a veterinarian
     if (user && user.user_metadata?.role !== 'vet') {
       toast.error('Você não tem permissão para acessar esta página');
       navigate('/');
@@ -57,7 +61,18 @@ const VetCalendar = () => {
           .order('time');
         
         if (error) throw error;
-        setAppointments(data || []);
+        
+        if (data) {
+          // Type assertion to ensure data conforms to Appointment[]
+          setAppointments(data.map(item => ({
+            ...item,
+            status: (item.status as 'upcoming' | 'completed' | 'cancelled'),
+            notes: item.notes || null,
+            owner_phone: item.owner_phone || null,
+            provider_id: item.provider_id || null,
+            service_id: item.service_id || null
+          })));
+        }
       } catch (error: any) {
         toast.error(error.message || 'Erro ao carregar agendamentos');
       } finally {
@@ -77,7 +92,7 @@ const VetCalendar = () => {
       
       if (error) throw error;
       
-      // Atualizar localmente
+      // Update locally
       setAppointments(appointments.map(apt => 
         apt.id === id ? { ...apt, status } : apt
       ));
@@ -147,7 +162,7 @@ const VetCalendar = () => {
                         <div>
                           <h5 className="text-sm font-medium">Informações do Cliente</h5>
                           <p className="text-sm">Nome: {appointment.owner_name}</p>
-                          <p className="text-sm">Telefone: {appointment.owner_phone}</p>
+                          <p className="text-sm">Telefone: {appointment.owner_phone || 'Não informado'}</p>
                         </div>
                         {appointment.notes && (
                           <div>
