@@ -5,6 +5,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Clock } from 'lucide-react';
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger 
+} from '@/components/ui/tooltip';
 
 export interface TimeSlot {
   id: string;
@@ -48,15 +54,32 @@ const TimeSlotSelector = ({
       <ScrollArea className="h-64 pr-4">
         <div className="grid grid-cols-3 gap-2">
           {timeSlots.map((slot) => (
-            <Button
-              key={slot.id}
-              variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
-              className={!slot.available ? "opacity-50 cursor-not-allowed" : ""}
-              disabled={!slot.available}
-              onClick={() => slot.available && onSelectTimeSlot(slot.id)}
-            >
-              {slot.time}
-            </Button>
+            slot.available ? (
+              <Button
+                key={slot.id}
+                variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
+                onClick={() => onSelectTimeSlot(slot.id)}
+              >
+                {slot.time}
+              </Button>
+            ) : (
+              <TooltipProvider key={slot.id}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="opacity-50 cursor-not-allowed"
+                      disabled
+                    >
+                      {slot.time}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Horário não disponível</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
           ))}
         </div>
       </ScrollArea>
