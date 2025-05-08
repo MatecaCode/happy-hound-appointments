@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Calendar } from '@/components/ui/calendar';
@@ -29,6 +28,7 @@ interface Appointment {
   service_id: string | null;
   provider_id: string | null;
   user_id: string;
+  service_type?: string;
 }
 
 const VetCalendar = () => {
@@ -37,7 +37,6 @@ const VetCalendar = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   
   useEffect(() => {
     // Check if the user is a veterinarian
@@ -58,7 +57,6 @@ const VetCalendar = () => {
           .from('appointments')
           .select('*')
           .eq('date', formattedDate)
-          .eq('provider_id', user.id)
           .eq('service_type', 'veterinary')
           .order('time');
         

@@ -4,8 +4,8 @@ import Layout from '@/components/Layout';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabase';
-import { format, parse } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { ptBR } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
@@ -20,8 +20,15 @@ interface Appointment {
   date: string;
   time: string;
   owner_name: string;
-  owner_phone: string;
+  owner_phone: string | null;
   status: 'upcoming' | 'completed' | 'cancelled';
+  notes?: string | null;
+  created_at: string;
+  pet_id: string;
+  service_id: string | null;
+  provider_id: string | null;
+  user_id: string;
+  service_type?: string;
 }
 
 const GroomerCalendar = () => {
@@ -30,7 +37,6 @@ const GroomerCalendar = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
   
   useEffect(() => {
     // Verificar se o usuário é tosador
@@ -51,6 +57,7 @@ const GroomerCalendar = () => {
           .from('appointments')
           .select('*')
           .eq('date', formattedDate)
+          .eq('service_type', 'grooming')
           .order('time');
         
         if (error) throw error;
@@ -131,11 +138,11 @@ const GroomerCalendar = () => {
                   </div>
                 </div>
                 
-                <Collapsible open={isExpanded}>
+                <Collapsible>
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm" className="w-full mt-2 flex items-center justify-center">
                       <AlignRight className="mr-2 h-4 w-4" />
-                      {isExpanded ? 'Mostrar Menos' : 'Detalhes'}
+                      Detalhes
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>

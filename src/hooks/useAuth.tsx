@@ -41,7 +41,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, []);
 
   // Fix for google authentication redirect loops
   useEffect(() => {
@@ -82,6 +82,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
         },
       });
       
@@ -93,13 +97,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, name: string, role: string = 'client') => {
     try {
+      // Validate role
+      if (!['client', 'groomer', 'vet'].includes(role)) {
+        role = 'client'; // Default to client if invalid role
+      }
+      
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
             name,
-            role,
+            role, // Store role in user metadata
           },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },

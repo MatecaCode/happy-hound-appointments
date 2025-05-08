@@ -12,6 +12,7 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ className }) => {
   const { user, signOut } = useAuth();
+  const userRole = user?.user_metadata?.role || 'client';
   
   return (
     <nav className={cn("w-full py-4 px-6", className)}>
@@ -34,17 +35,17 @@ const Navigation: React.FC<NavigationProps> = ({ className }) => {
           <Link to="/about" className="text-foreground hover:text-primary transition-colors">
             Sobre Nós
           </Link>
-          {user && (
+          {user && userRole === 'client' && (
             <Link to="/appointments" className="text-foreground hover:text-primary transition-colors">
               Meus Agendamentos
             </Link>
           )}
-          {user?.user_metadata?.role === 'groomer' && (
+          {user && userRole === 'groomer' && (
             <Link to="/groomer-calendar" className="text-foreground hover:text-primary transition-colors">
               Calendário de Tosas
             </Link>
           )}
-          {user?.user_metadata?.role === 'vet' && (
+          {user && userRole === 'vet' && (
             <Link to="/vet-calendar" className="text-foreground hover:text-primary transition-colors">
               Calendário Veterinário
             </Link>
@@ -64,7 +65,10 @@ const Navigation: React.FC<NavigationProps> = ({ className }) => {
             <div className="flex items-center gap-4">
               <Link to="/profile" className="flex items-center gap-2">
                 <UserCircle className="h-5 w-5" />
-                <span className="hidden md:inline">{user.user_metadata.name || 'Perfil'}</span>
+                <span className="hidden md:inline">
+                  {user.user_metadata?.name || user.email?.split('@')[0] || 'Perfil'} 
+                  {userRole !== 'client' && ` (${userRole === 'vet' ? 'Veterinário' : 'Tosador'})`}
+                </span>
               </Link>
               <Button variant="outline" onClick={signOut} size="sm">Sair</Button>
             </div>
