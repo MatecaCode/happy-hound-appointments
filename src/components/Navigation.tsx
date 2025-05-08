@@ -3,7 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { UserCircle } from 'lucide-react';
+import { UserCircle, ShoppingCart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 
 interface NavigationProps {
@@ -28,6 +28,9 @@ const Navigation: React.FC<NavigationProps> = ({ className }) => {
           <Link to="/services" className="text-foreground hover:text-primary transition-colors">
             Serviços
           </Link>
+          <Link to="/shop" className="text-foreground hover:text-primary transition-colors">
+            Loja
+          </Link>
           <Link to="/about" className="text-foreground hover:text-primary transition-colors">
             Sobre Nós
           </Link>
@@ -38,12 +41,25 @@ const Navigation: React.FC<NavigationProps> = ({ className }) => {
           )}
           {user?.user_metadata?.role === 'groomer' && (
             <Link to="/groomer-calendar" className="text-foreground hover:text-primary transition-colors">
-              Calendário
+              Calendário de Tosas
+            </Link>
+          )}
+          {user?.user_metadata?.role === 'vet' && (
+            <Link to="/vet-calendar" className="text-foreground hover:text-primary transition-colors">
+              Calendário Veterinário
             </Link>
           )}
         </div>
         
         <div className="flex items-center gap-4">
+          {user && (
+            <Link to="/cart" className="flex items-center">
+              <Button variant="ghost" size="icon">
+                <ShoppingCart className="h-5 w-5" />
+              </Button>
+            </Link>
+          )}
+          
           {user ? (
             <div className="flex items-center gap-4">
               <Link to="/profile" className="flex items-center gap-2">

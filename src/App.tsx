@@ -13,6 +13,9 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import GroomerCalendar from "./pages/GroomerCalendar";
+import VetCalendar from "./pages/VetCalendar";
+import Shop from "./pages/Shop";
+import Cart from "./pages/Cart";
 import About from "./pages/About";
 import { AuthProvider } from "./hooks/useAuth";
 
@@ -35,7 +38,9 @@ const App = () => (
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/groomer-calendar" element={<GroomerCalendar />} />
-            {/* ADICIONE TODAS AS ROTAS PERSONALIZADAS ACIMA DA ROTA CATCH-ALL "*" */}
+            <Route path="/vet-calendar" element={<VetCalendar />} />
+            <Route path="/shop" element={<Shop />} />
+            <Route path="/cart" element={<Cart />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
