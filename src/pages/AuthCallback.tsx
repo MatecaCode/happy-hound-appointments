@@ -10,11 +10,6 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleCallback = async () => {
       try {
-        // Extract hash params from URL if present
-        const hashParams = window.location.hash && Object.fromEntries(
-          window.location.hash.substring(1).split('&').map(pair => pair.split('='))
-        );
-
         // Extract error from URL query params if present
         const queryParams = new URLSearchParams(window.location.search);
         const error = queryParams.get('error');
@@ -39,7 +34,11 @@ const AuthCallback = () => {
         if (data?.session) {
           console.log("Session found:", data.session);
           toast.success('Autenticação realizada com sucesso!');
-          navigate('/', { replace: true });
+          
+          // Use setTimeout to avoid the redirect loop
+          setTimeout(() => {
+            navigate('/', { replace: true });
+          }, 0);
           return;
         }
 

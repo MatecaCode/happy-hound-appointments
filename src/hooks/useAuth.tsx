@@ -26,27 +26,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        console.log("Auth state change event:", event);
-        setSession(session);
-        setUser(session?.user ?? null);
+      (_event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
         setLoading(false);
-        
-        // Handle email confirmation success
-        if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-          if (event === 'USER_UPDATED' && session?.user?.email_confirmed_at) {
-            toast.success('Email confirmado com sucesso!');
-            navigate('/', { replace: true });
-          }
-        }
       }
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
       setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  // Fix for google authentication redirect loops
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        // Use setTimeout to avoid calling navigate during render
+        setTimeout(() => {
+          navigate('/', { replace: true });
+        }, 0);
+      }
     });
 
     return () => subscription.unsubscribe();

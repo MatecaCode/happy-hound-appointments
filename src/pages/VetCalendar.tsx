@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlignRight } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
-// Define the appointment type explicitly to avoid circular references
+// Define the appointment type explicitly
 interface Appointment {
   id: string;
   pet_name: string;
@@ -143,11 +143,11 @@ const VetCalendar = () => {
                   </div>
                 </div>
                 
-                <Collapsible open={isExpanded}>
+                <Collapsible>
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm" className="w-full mt-2 flex items-center justify-center">
                       <AlignRight className="mr-2 h-4 w-4" />
-                      {isExpanded ? 'Mostrar Menos' : 'Detalhes'}
+                      Detalhes
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>

@@ -12,16 +12,11 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    storage: localStorage,
+    flowType: 'pkce'
   }
 });
 
-// Set site URL for redirects - this is important for email confirmations
-if (typeof window !== 'undefined') {
-  supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
-      console.log("User confirmed email, redirecting to home");
-      window.location.href = '/';
-    }
-  });
-}
+// Remove the automatic redirection that could cause loops
+// and instead let our AuthProvider handle redirects
