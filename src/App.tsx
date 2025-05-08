@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import GroomerCalendar from "./pages/GroomerCalendar";
+import About from "./pages/About";
 import { AuthProvider } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/services" element={<Services />} />
+            <Route path="/about" element={<About />} />
             <Route path="/book" element={<Book />} />
             <Route path="/appointments" element={<Appointments />} />
             <Route path="/confirmation" element={<Confirmation />} />

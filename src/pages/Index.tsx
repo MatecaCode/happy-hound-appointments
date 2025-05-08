@@ -4,7 +4,9 @@ import Layout from '@/components/Layout';
 import Hero from '@/components/Hero';
 import ServiceCard from '@/components/ServiceCard';
 import Testimonials from '@/components/Testimonials';
-import { Scissors, ShowerHead, Dog, Sparkles } from 'lucide-react';
+import { Scissors, ShowerHead, Dog, Sparkles, Syringe, Heart } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 const Index = () => {
   const services = [
@@ -15,17 +17,17 @@ const Index = () => {
       icon: <ShowerHead className="h-6 w-6" />,
     },
     {
-      title: "Tosa Completa",
-      description: "Tudo do pacote básico mais corte de pelo estilizado conforme sua preferência.",
-      price: "R$60",
-      icon: <Scissors className="h-6 w-6" />,
+      title: "Consulta Veterinária",
+      description: "Avaliação completa da saúde do seu pet com médico veterinário especializado.",
+      price: "R$120",
+      icon: <Syringe className="h-6 w-6" />,
       popular: true,
     },
     {
-      title: "Pacote Spa Luxo",
-      description: "Tosa completa com shampoo especial, condicionador, limpeza de dentes e tratamento de patas.",
-      price: "R$80",
-      icon: <Sparkles className="h-6 w-6" />,
+      title: "Vacinação",
+      description: "Imunização do seu pet com as principais vacinas necessárias para sua proteção.",
+      price: "A partir de R$80",
+      icon: <Heart className="h-6 w-6" />,
     },
   ];
 
@@ -33,13 +35,40 @@ const Index = () => {
     <Layout>
       <Hero />
       
+      {/* História Breve */}
+      <section className="py-20 bg-secondary/30">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+            <div>
+              <h2 className="mb-4">Tradição e <span className="text-primary">Inovação</span> desde 1990</h2>
+              <p className="text-muted-foreground mb-6">
+                Há mais de 40 anos, a Vettale é referência em cuidados veterinários em Atibaia. 
+                Iniciamos como a primeira clínica veterinária da cidade totalmente dedicada ao bem-estar dos animais 
+                e hoje somos um centro completo de saúde, estética e comportamento pet.
+              </p>
+              
+              <Link to="/about">
+                <Button variant="outline">Conheça Nossa História</Button>
+              </Link>
+            </div>
+            <div>
+              <img 
+                src="/placeholder.svg" 
+                alt="Nossa clínica" 
+                className="rounded-lg shadow-lg h-80 w-full object-cover"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+      
       {/* Services Section */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
-            <h2 className="mb-4">Nossos <span className="text-primary">Serviços</span> de Tosa</h2>
+            <h2 className="mb-4">Nossos <span className="text-primary">Serviços</span> Principais</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">
-              Oferecemos uma variedade de serviços de tosa para manter seu cachorro bonito e se sentindo bem.
+              Oferecemos uma variedade de serviços veterinários e de estética para manter seu pet saudável e bonito.
             </p>
           </div>
           
@@ -57,9 +86,9 @@ const Index = () => {
           </div>
           
           <div className="mt-12 text-center">
-            <p className="text-muted-foreground mb-6">
-              Precisa de algo que não está listado aqui? Entre em contato para opções personalizadas.
-            </p>
+            <Link to="/services">
+              <Button variant="outline">Ver Todos os Serviços</Button>
+            </Link>
           </div>
         </div>
       </section>
@@ -73,18 +102,22 @@ const Index = () => {
             <Dog className="h-5 w-5" />
           </div>
           
-          <h2 className="mb-6">Pronto para Agendar a Tosa do Seu Pet?</h2>
+          <h2 className="mb-6">Pronto para Cuidar da Saúde do Seu Pet?</h2>
           
           <p className="text-primary-foreground/90 max-w-2xl mx-auto mb-8">
-            Dê ao seu cachorro o carinho que ele merece. Nossos profissionais estão prontos para oferecer o melhor cuidado ao seu amigo peludo.
+            Dê ao seu pet o cuidado que ele merece. Nossos profissionais estão prontos para oferecer o melhor atendimento ao seu amigo de quatro patas.
           </p>
           
-          <a 
-            href="/book"
-            className="inline-flex items-center justify-center rounded-md bg-primary-foreground text-primary px-8 py-3 font-medium"
-          >
-            Agendar Consulta Agora
-          </a>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Link to="/book">
+              <Button size="lg" variant="secondary">Agendar Consulta</Button>
+            </Link>
+            <Link to="/services">
+              <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white/20">
+                Conhecer Serviços
+              </Button>
+            </Link>
+          </div>
         </div>
       </section>
     </Layout>
