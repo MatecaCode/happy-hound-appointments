@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Calendar } from '@/components/ui/calendar';
@@ -12,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { AlignRight } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
+// Define the appointment type explicitly to avoid circular references
 interface Appointment {
   id: string;
   pet_name: string;
