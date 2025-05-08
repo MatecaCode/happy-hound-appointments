@@ -97,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, name: string, role: string = 'client') => {
     try {
-      // Validate role
+      // Validate role to ensure it's one of the allowed values
       if (!['client', 'groomer', 'vet'].includes(role)) {
         role = 'client'; // Default to client if invalid role
       }
@@ -127,7 +127,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await supabase.auth.signOut();
       toast.success('Você saiu com sucesso');
-      navigate('/');
+      // Use setTimeout to avoid navigation during render
+      setTimeout(() => {
+        navigate('/');
+      }, 0);
     } catch (error: any) {
       toast.error(error.message || 'Erro ao fazer logout');
     }

@@ -70,7 +70,7 @@ const Navigation: React.FC<NavigationProps> = ({ className }) => {
                   {userRole !== 'client' && ` (${userRole === 'vet' ? 'Veterinário' : 'Tosador'})`}
                 </span>
               </Link>
-              <Button variant="outline" onClick={signOut} size="sm">Sair</Button>
+              <Button variant="outline" onClick={() => signOut()} size="sm">Sair</Button>
             </div>
           ) : (
             <div className="flex items-center gap-4">

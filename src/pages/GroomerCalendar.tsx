@@ -12,7 +12,9 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { AlignRight } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { addMonths, subMonths } from 'date-fns';
 
+// Define the appointment type explicitly
 interface Appointment {
   id: string;
   pet_name: string;
@@ -38,6 +40,10 @@ const GroomerCalendar = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
+  // Define date range for calendar (3 months)
+  const fromDate = subMonths(new Date(), 1);
+  const toDate = addMonths(new Date(), 2);
+  
   useEffect(() => {
     // Verificar se o usuário é tosador
     if (user && user.user_metadata?.role !== 'groomer') {
@@ -61,7 +67,9 @@ const GroomerCalendar = () => {
           .order('time');
         
         if (error) throw error;
-        setAppointments(data || []);
+        
+        // Cast the returned data to ensure type safety
+        setAppointments((data || []) as Appointment[]);
       } catch (error: any) {
         toast.error(error.message || 'Erro ao carregar agendamentos');
       } finally {
@@ -151,8 +159,14 @@ const GroomerCalendar = () => {
                         <div>
                           <h5 className="text-sm font-medium">Informações do Cliente</h5>
                           <p className="text-sm">Nome: {appointment.owner_name}</p>
-                          <p className="text-sm">Telefone: {appointment.owner_phone}</p>
+                          <p className="text-sm">Telefone: {appointment.owner_phone || 'Não informado'}</p>
                         </div>
+                        {appointment.notes && (
+                          <div>
+                            <h5 className="text-sm font-medium">Observações</h5>
+                            <p className="text-sm">{appointment.notes}</p>
+                          </div>
+                        )}
                       </div>
                       
                       {appointment.status === 'upcoming' && (
@@ -220,8 +234,10 @@ const GroomerCalendar = () => {
                     mode="single"
                     selected={date}
                     onSelect={(date) => date && setDate(date)}
-                    className="mx-auto"
+                    className="mx-auto pointer-events-auto"
                     locale={ptBR}
+                    fromDate={fromDate}
+                    toDate={toDate}
                   />
                 </CardContent>
               </Card>

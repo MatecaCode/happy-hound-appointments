@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Calendar } from '@/components/ui/calendar';
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { AlignRight } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { addMonths, subMonths } from 'date-fns';
 
 // Define the appointment type explicitly
 interface Appointment {
@@ -38,6 +40,10 @@ const VetCalendar = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
+  // Define date range for calendar (3 months)
+  const fromDate = subMonths(new Date(), 1);
+  const toDate = addMonths(new Date(), 2);
+  
   useEffect(() => {
     // Check if the user is a veterinarian
     if (user && user.user_metadata?.role !== 'vet') {
@@ -62,9 +68,8 @@ const VetCalendar = () => {
         
         if (error) throw error;
         
-        if (data) {
-          setAppointments(data as Appointment[]);
-        }
+        // Cast the returned data to ensure type safety
+        setAppointments((data || []) as Appointment[]);
       } catch (error: any) {
         toast.error(error.message || 'Erro ao carregar agendamentos');
       } finally {
@@ -158,7 +163,7 @@ const VetCalendar = () => {
                         </div>
                         {appointment.notes && (
                           <div>
-                            <h5 className="text-sm font-medium">Notas</h5>
+                            <h5 className="text-sm font-medium">Observações</h5>
                             <p className="text-sm">{appointment.notes}</p>
                           </div>
                         )}
@@ -231,6 +236,8 @@ const VetCalendar = () => {
                     onSelect={(date) => date && setDate(date)}
                     className="mx-auto pointer-events-auto"
                     locale={ptBR}
+                    fromDate={fromDate}
+                    toDate={toDate}
                   />
                 </CardContent>
               </Card>
