@@ -14,8 +14,34 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     persistSession: true,
     autoRefreshToken: true,
     flowType: 'pkce',
-    detectSessionInUrl: true, 
-    // Set the redirect URLs to the current domain rather than localhost
-    redirectTo: `${currentUrl}/auth/callback`,
+    detectSessionInUrl: true,
+    // Configure redirect URL properly
+    cookieOptions: {
+      path: '/',
+      sameSite: 'lax',
+    }
   }
 });
+
+// Set site URL for redirects - this is important for email confirmations
+if (typeof window !== 'undefined') {
+  supabase.auth.setSession({
+    access_token: '',
+    refresh_token: ''
+  }).then(({ error }) => {
+    if (error) console.error('Error refreshing session:', error);
+  });
+}
+
+// Configure auth redirects
+if (typeof window !== 'undefined') {
+  supabase.auth.onAuthStateChange((event, session) => {
+    console.log("Auth state change:", event);
+    
+    // Handle email confirmations
+    if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
+      console.log("User confirmed email, redirecting to home");
+      window.location.href = '/';
+    }
+  });
+}

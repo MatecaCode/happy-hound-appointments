@@ -8,17 +8,46 @@ const AuthCallback = () => {
   const navigate = useNavigate();
   
   useEffect(() => {
-    // Parse the URL to extract hash params
     const handleCallback = async () => {
       try {
-        // This will attempt to exchange the auth code for a session
-        const { error } = await supabase.auth.getSession();
+        // Extract hash params from URL if present
+        const hashParams = window.location.hash && Object.fromEntries(
+          window.location.hash.substring(1).split('&').map(pair => pair.split('='))
+        );
+
+        // Extract error from URL query params if present
+        const queryParams = new URLSearchParams(window.location.search);
+        const error = queryParams.get('error');
+        const errorDescription = queryParams.get('error_description');
+
+        // Handle errors from the URL
+        if (error) {
+          console.error("Auth error:", error, errorDescription);
+          toast.error(errorDescription || 'Authentication error');
+          navigate('/login', { replace: true });
+          return;
+        }
+
+        // Handle session from the hash or cookie
+        const { data, error: sessionError } = await supabase.auth.getSession();
         
-        if (error) throw error;
-        
-        // Redirect to the home page on successful auth
-        navigate('/', { replace: true });
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          throw sessionError;
+        }
+
+        if (data?.session) {
+          console.log("Session found:", data.session);
+          toast.success('Autenticação realizada com sucesso!');
+          navigate('/', { replace: true });
+          return;
+        }
+
+        // No session found, redirect to login
+        toast.error('Sessão não encontrada');
+        navigate('/login', { replace: true });
       } catch (error: any) {
+        console.error("Auth callback error:", error);
         toast.error(error.message || 'Erro na autenticação');
         navigate('/login', { replace: true });
       }

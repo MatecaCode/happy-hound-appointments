@@ -34,9 +34,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         // Handle email confirmation success
         if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-          navigate('/');
-          if (event === 'USER_UPDATED') {
+          if (event === 'USER_UPDATED' && session?.user?.email_confirmed_at) {
             toast.success('Email confirmado com sucesso!');
+            navigate('/', { replace: true });
           }
         }
       }
@@ -101,6 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       if (error) throw error;
+      
       toast.success('Registro realizado com sucesso! Verifique seu e-mail para confirmar.');
       navigate('/login');
     } catch (error: any) {
