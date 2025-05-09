@@ -26,6 +26,13 @@ const GroomerSelectionForm: React.FC<GroomerSelectionFormProps> = ({
 }) => {
   const providerType = serviceType === 'grooming' ? 'tosador' : 'veterinário';
   
+  // If there are no groomers, set a default one for demo purposes
+  React.useEffect(() => {
+    if (groomers.length > 0 && !selectedGroomerId) {
+      setSelectedGroomerId(groomers[0].id);
+    }
+  }, [groomers, selectedGroomerId, setSelectedGroomerId]);
+  
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -83,7 +90,7 @@ const GroomerSelectionForm: React.FC<GroomerSelectionFormProps> = ({
         <CardFooter className="flex justify-end">
           <Button 
             onClick={onNext} 
-            disabled={!selectedGroomerId}
+            disabled={!selectedGroomerId || groomers.length === 0}
           >
             Continuar
           </Button>

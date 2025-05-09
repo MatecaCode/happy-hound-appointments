@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -39,8 +38,10 @@ export interface TimeSlot {
 export interface NextAvailable {
   date: Date;
   time: string;
+  timeSlot: string;
   providerId: string;
   providerName: string;
+  groomer?: Provider;
 }
 
 export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'grooming') => {
@@ -189,8 +190,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
           setNextAvailable({
             date,
             time: nextAvailableSlot.time,
+            timeSlot: nextAvailableSlot.id,
             providerId: selectedGroomerId,
-            providerName: provider?.name || 'Profissional'
+            providerName: provider?.name || 'Profissional',
+            groomer: provider
           });
         } else {
           setNextAvailable(null);
