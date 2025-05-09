@@ -1,30 +1,33 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from './useAuth';
 
 export interface Pet {
   id: string;
   name: string;
-  breed: string;
+  breed?: string;
+  age?: string;
 }
 
 export interface Service {
   id: string;
   name: string;
   price: number;
+  duration: number;
+  service_type: string;
 }
 
-export interface Groomer {
+export interface Provider {
   id: string;
   name: string;
-  bio: string;
-  rating: number;
-  imageUrl: string;
-  specialties?: string[];
+  role: string;
+  profile_image?: string;
+  rating?: number;
+  specialty?: string;
 }
 
 export interface TimeSlot {
@@ -35,324 +38,275 @@ export interface TimeSlot {
 
 export interface NextAvailable {
   date: Date;
-  timeSlot: {
-    id: string;
-    time: string;
-  };
-  groomer: {
-    id: string;
-    name: string;
-  };
+  time: string;
+  providerId: string;
+  providerName: string;
 }
 
-export const useAppointmentForm = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  
+export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'grooming') => {
   const [date, setDate] = useState<Date>(new Date());
-  const [selectedGroomerId, setSelectedGroomerId] = useState<string | null>(null);
+  const [selectedGroomerId, setSelectedGroomerId] = useState<string>('');
   const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(null);
   const [selectedPet, setSelectedPet] = useState<string>('');
   const [selectedService, setSelectedService] = useState<string>('');
-  const [ownerName, setOwnerName] = useState<string>('');
-  const [ownerPhone, setOwnerPhone] = useState<string>('');
-  const [notes, setNotes] = useState<string>('');
-  
+  const [ownerName, setOwnerName] = useState('');
+  const [ownerPhone, setOwnerPhone] = useState('');
+  const [notes, setNotes] = useState('');
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [nextAvailable, setNextAvailable] = useState<NextAvailable | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('calendar');
-  const [formStep, setFormStep] = useState<number>(1);
+  const [activeTab, setActiveTab] = useState('calendar');
+  const [formStep, setFormStep] = useState(1);
   
-  // Sample data that will be replaced with API calls
-  const [userPets, setUserPets] = useState<Pet[]>([
-    { id: '1', name: 'Max', breed: 'Golden Retriever' },
-    { id: '2', name: 'Bella', breed: 'Poodle' },
-    { id: '3', name: 'Charlie', breed: 'Beagle' },
-  ]);
+  // Data states
+  const [userPets, setUserPets] = useState<Pet[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
+  const [groomers, setGroomers] = useState<Provider[]>([]);
   
-  const [services, setServices] = useState<Service[]>([
-    { id: '1', name: 'Tosa Completa', price: 80 },
-    { id: '2', name: 'Banho & Escovação', price: 50 },
-    { id: '3', name: 'Corte de Unhas', price: 25 },
-    { id: '4', name: 'Pacote Spa Luxo', price: 120 },
-  ]);
+  const navigate = useNavigate();
+  const { user } = useAuth();
   
-  const [groomers, setGroomers] = useState<Groomer[]>([
-    {
-      id: '1',
-      name: 'João Silva',
-      bio: 'Especialista em tosa de raças pequenas, com 5 anos de experiência.',
-      rating: 4.8,
-      imageUrl: '/placeholder.svg',
-      specialties: ['Raças pequenas', 'Yorkshire', 'Shih Tzu']
-    },
-    {
-      id: '2',
-      name: 'Maria Oliveira',
-      bio: 'Especializada em tosa higiênica e banhos para cães de qualquer porte.',
-      rating: 4.5,
-      imageUrl: '/placeholder.svg',
-      specialties: ['Todas as raças', 'Tosa higiênica']
-    },
-    {
-      id: '3',
-      name: 'Pedro Santos',
-      bio: 'Tosador profissional com experiência em exposições caninas.',
-      rating: 4.9,
-      imageUrl: '/placeholder.svg',
-      specialties: ['Raças grandes', 'Tosa para exibição']
-    },
-  ]);
-  
-  // Fetch pets if user is logged in
+  // Fetch user pets
   useEffect(() => {
-    if (user) {
-      setOwnerName(user.user_metadata?.name || '');
+    const fetchUserPets = async () => {
+      if (!user) return;
       
-      // Fetch user pets
-      const fetchUserPets = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('pets')
-            .select('*')
-            .eq('user_id', user.id);
-            
-          if (error) throw error;
-          if (data && data.length > 0) {
-            setUserPets(data);
-            setSelectedPet(data[0].id);
-          }
-        } catch (error) {
-          console.error('Error fetching pets:', error);
-        }
-      };
-      
-      fetchUserPets();
-    }
-    
-    // Fetch services
-    const fetchServices = async () => {
       try {
         const { data, error } = await supabase
-          .from('services')
-          .select('*')
-          .eq('service_type', 'grooming');
-          
-        if (error) throw error;
-        if (data && data.length > 0) {
-          setServices(data);
-          setSelectedService(data[0].id);
-        }
-      } catch (error) {
-        console.error('Error fetching services:', error);
-      }
-    };
-    
-    fetchServices();
-    
-    // Fetch groomers (profiles with role 'groomer')
-    const fetchGroomers = async () => {
-      try {
-        // First check if the necessary columns exist in the profiles table
-        const { data: profileColumns, error: columnsError } = await supabase
-          .from('profiles')
-          .select('id')
-          .limit(1);
-          
-        if (columnsError) {
-          console.error('Error checking profiles table:', columnsError);
-          return;
-        }
+          .from('pets')
+          .select('id, name, breed, age')
+          .eq('user_id', user.id);
         
-        // Now fetch groomers using the existing columns
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, name, role, phone, email')
-          .eq('role', 'groomer');
-          
         if (error) throw error;
-        if (data && data.length > 0) {
-          // Transform the data to match the Groomer interface
-          const formattedGroomers = data.map(g => ({
-            id: g.id,
-            name: g.name || 'Groomer',
-            bio: 'Professional groomer with experience in pet care',  // Default bio
-            rating: 4.5,  // Default rating
-            imageUrl: '/placeholder.svg',  // Default image
-            specialties: ['All breeds', 'Pet grooming']  // Default specialties
-          }));
-          setGroomers(formattedGroomers);
-        }
-      } catch (error) {
-        console.error('Error fetching groomers:', error);
+        setUserPets(data || []);
+      } catch (error: any) {
+        console.error('Error fetching pets:', error);
       }
     };
     
-    fetchGroomers();
+    fetchUserPets();
   }, [user]);
   
-  // Generate time slots based on date and selected groomer
+  // Fetch services based on service type
+  const fetchServices = useCallback(async (type: string = serviceType) => {
+    try {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('service_type', type);
+      
+      if (error) throw error;
+      setServices(data || []);
+      
+      // Reset selected service if the current one isn't in the new list
+      if (data && selectedService && !data.some(service => service.id === selectedService)) {
+        setSelectedService('');
+      }
+    } catch (error: any) {
+      console.error('Error fetching services:', error);
+    }
+  }, [selectedService, serviceType]);
+  
+  // Fetch appropriate providers based on serviceType
   useEffect(() => {
-    if (!date || !selectedGroomerId) return;
-    
-    const fetchAvailableSlots = async () => {
-      setIsLoading(true);
+    const fetchProviders = async () => {
       try {
-        // Start time 9:00, end time 17:00, 30 min intervals
-        const startHour = 9;
-        const endHour = 17;
-        const interval = 30; // minutes
+        const role = serviceType === 'grooming' ? 'groomer' : 'vet';
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, name, role')
+          .eq('role', role);
         
-        const formattedDate = format(date, 'yyyy-MM-dd');
-        
-        // Fetch existing appointments for this groomer on this date
-        const { data: existingAppointments, error } = await supabase
-          .from('appointments')
-          .select('time')
-          .eq('date', formattedDate)
-          .eq('provider_id', selectedGroomerId);
-          
         if (error) throw error;
         
-        // Generate all possible time slots
-        const allTimeSlots: TimeSlot[] = [];
+        // Add dummy details for UI presentation
+        const enhancedProviders = (data || []).map(provider => ({
+          ...provider,
+          profile_image: `/placeholder.svg`,
+          rating: 4.5 + Math.random() * 0.5,
+          specialty: serviceType === 'grooming' 
+            ? ['Tosa Higiênica', 'Banho e Tosa', 'Tosa Especializada'][Math.floor(Math.random() * 3)] 
+            : ['Clínica Geral', 'Dermatologia', 'Ortopedia'][Math.floor(Math.random() * 3)]
+        }));
         
+        setGroomers(enhancedProviders);
+      } catch (error: any) {
+        console.error('Error fetching providers:', error);
+      }
+    };
+    
+    fetchProviders();
+  }, [serviceType]);
+  
+  // Fetch time slots
+  useEffect(() => {
+    const fetchTimeSlots = async () => {
+      if (!selectedGroomerId || !date) return;
+      
+      setIsLoading(true);
+      try {
+        const dateStr = format(date, 'yyyy-MM-dd');
+        
+        // For demo purposes, we'll generate time slots
+        // In a real app, you'd fetch from backend based on provider's availability
+        const startHour = 9; // 9 AM
+        const endHour = serviceType === 'grooming' ? 17 : 18; // 5 PM or 6 PM
+        const interval = serviceType === 'grooming' ? 30 : 45; // minutes
+        
+        const slots: TimeSlot[] = [];
+        
+        // Check existing appointments for this provider on this date
+        const { data: existingAppointments, error: appointmentsError } = await supabase
+          .from('appointments')
+          .select('time')
+          .eq('date', dateStr)
+          .eq('provider_id', selectedGroomerId);
+        
+        if (appointmentsError) throw appointmentsError;
+        
+        // Generate all possible time slots
         for (let hour = startHour; hour < endHour; hour++) {
           for (let minute = 0; minute < 60; minute += interval) {
-            const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-            const isBooked = existingAppointments?.some(app => app.time === timeString) || false;
+            const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
             
-            allTimeSlots.push({
-              id: `${formattedDate}-${timeString}`,
-              time: timeString,
+            // Check if this time slot is already booked
+            const isBooked = existingAppointments?.some(apt => apt.time === timeStr);
+            
+            slots.push({
+              id: `${dateStr}-${timeStr}`,
+              time: timeStr,
               available: !isBooked
             });
           }
         }
         
-        setTimeSlots(allTimeSlots);
+        setTimeSlots(slots);
         
-        // Find next available slot
-        const nextAvailableSlot = allTimeSlots.find(slot => slot.available);
-        if (nextAvailableSlot && selectedGroomerId) {
-          const groomer = groomers.find(g => g.id === selectedGroomerId);
-          if (groomer) {
-            setNextAvailable({
-              date: date,
-              timeSlot: {
-                id: nextAvailableSlot.id,
-                time: nextAvailableSlot.time
-              },
-              groomer: {
-                id: groomer.id,
-                name: groomer.name
-              }
-            });
-          }
+        // Find next available time slot for quick select
+        const nextAvailableSlot = slots.find(slot => slot.available);
+        if (nextAvailableSlot) {
+          const provider = groomers.find(g => g.id === selectedGroomerId);
+          setNextAvailable({
+            date,
+            time: nextAvailableSlot.time,
+            providerId: selectedGroomerId,
+            providerName: provider?.name || 'Profissional'
+          });
         } else {
           setNextAvailable(null);
         }
       } catch (error: any) {
-        console.error('Error fetching available slots:', error);
-        toast.error('Erro ao buscar horários disponíveis');
+        console.error('Error fetching time slots:', error);
+        toast.error('Erro ao carregar horários disponíveis');
       } finally {
         setIsLoading(false);
       }
     };
     
-    fetchAvailableSlots();
-  }, [date, selectedGroomerId, groomers]);
+    fetchTimeSlots();
+  }, [date, selectedGroomerId, groomers, serviceType]);
+  
+  // Set initial owner name from user data
+  useEffect(() => {
+    if (user && user.user_metadata?.name) {
+      setOwnerName(user.user_metadata.name);
+    }
+    
+    if (user && user.user_metadata?.phone) {
+      setOwnerPhone(user.user_metadata.phone);
+    }
+  }, [user]);
   
   const handleNextAvailableSelect = () => {
     if (!nextAvailable) return;
     
+    setSelectedTimeSlotId(`${format(nextAvailable.date, 'yyyy-MM-dd')}-${nextAvailable.time}`);
     setDate(nextAvailable.date);
-    setSelectedTimeSlotId(nextAvailable.timeSlot.id);
-    setSelectedGroomerId(nextAvailable.groomer.id);
-    setActiveTab('calendar'); // Switch to calendar tab
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate form
-    if (!selectedPet) {
-      toast.error('Por favor, selecione um pet');
+    if (!selectedPet || !selectedService || !selectedGroomerId || !selectedTimeSlotId || !ownerName) {
+      toast.error('Por favor preencha todos os campos obrigatórios');
       return;
     }
     
-    if (!selectedService) {
-      toast.error('Por favor, selecione um serviço');
-      return;
-    }
-    
-    if (!date || !selectedTimeSlotId || !selectedGroomerId) {
-      toast.error('Por favor, selecione data, horário e profissional');
-      return;
-    }
-    
-    if (!ownerName) {
-      toast.error('Por favor, informe o nome do proprietário');
-      return;
-    }
+    setIsLoading(true);
     
     try {
-      setIsLoading(true);
+      // Get pet and service details
+      const { data: petData } = await supabase
+        .from('pets')
+        .select('name')
+        .eq('id', selectedPet)
+        .single();
       
-      const formattedDate = format(date, 'yyyy-MM-dd');
-      const selectedTime = timeSlots.find(slot => slot.id === selectedTimeSlotId)?.time || '';
-      const petDetails = userPets.find(pet => pet.id === selectedPet);
-      const serviceDetails = services.find(service => service.id === selectedService);
+      const { data: serviceData } = await supabase
+        .from('services')
+        .select('name')
+        .eq('id', selectedService)
+        .single();
+      
+      if (!petData || !serviceData) {
+        throw new Error('Dados do pet ou serviço não encontrados');
+      }
+      
+      // Parse the time from the selected time slot ID
+      const timeSlotParts = selectedTimeSlotId.split('-');
+      const time = timeSlotParts[timeSlotParts.length - 1];
       
       // Create appointment
-      const { data, error } = await supabase.from('appointments').insert({
+      const appointmentData = {
         user_id: user?.id || '',
         pet_id: selectedPet,
-        pet_name: petDetails?.name || '',
+        pet_name: petData.name,
         service_id: selectedService,
-        service: serviceDetails?.name || '',
-        date: formattedDate,
-        time: selectedTime,
-        provider_id: selectedGroomerId,
+        service: serviceData.name,
+        date: format(date, 'yyyy-MM-dd'),
+        time,
         owner_name: ownerName,
         owner_phone: ownerPhone,
-        notes: notes,
-        status: 'upcoming'
-      }).select();
+        provider_id: selectedGroomerId,
+        notes,
+        service_type: serviceType
+      };
+      
+      const { error } = await supabase
+        .from('appointments')
+        .insert([appointmentData]);
       
       if (error) throw error;
       
       toast.success('Agendamento realizado com sucesso!');
       navigate('/confirmation', { 
         state: { 
-          appointmentId: data[0].id,
-          petName: petDetails?.name,
-          serviceName: serviceDetails?.name,
-          date: formattedDate,
-          time: selectedTime
-        } 
+          appointment: {
+            ...appointmentData,
+            serviceType
+          }
+        }
       });
     } catch (error: any) {
       console.error('Error creating appointment:', error);
-      toast.error(`Erro ao criar agendamento: ${error.message}`);
+      toast.error('Erro ao criar agendamento. Tente novamente.');
     } finally {
       setIsLoading(false);
     }
   };
-
+  
   return {
     date,
     setDate,
     selectedGroomerId,
     setSelectedGroomerId,
-    selectedTimeSlotId, 
+    selectedTimeSlotId,
     setSelectedTimeSlotId,
     selectedPet,
     setSelectedPet,
     selectedService,
     setSelectedService,
-    ownerName, 
+    ownerName,
     setOwnerName,
     ownerPhone,
     setOwnerPhone,
@@ -369,8 +323,7 @@ export const useAppointmentForm = () => {
     services,
     groomers,
     handleNextAvailableSelect,
-    handleSubmit
+    handleSubmit,
+    fetchServices
   };
 };
-
-export default useAppointmentForm;

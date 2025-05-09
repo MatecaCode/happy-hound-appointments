@@ -5,7 +5,11 @@ import BasicInfoForm from './appointment/BasicInfoForm';
 import GroomerSelectionForm from './appointment/GroomerSelectionForm';
 import DateTimeForm from './appointment/DateTimeForm';
 
-const AppointmentForm = () => {
+interface AppointmentFormProps {
+  serviceType: 'grooming' | 'veterinary';
+}
+
+const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'grooming' }) => {
   const {
     date,
     setDate,
@@ -34,8 +38,14 @@ const AppointmentForm = () => {
     services,
     groomers,
     handleNextAvailableSelect,
-    handleSubmit
-  } = useAppointmentForm();
+    handleSubmit,
+    fetchServices,
+  } = useAppointmentForm(serviceType);
+
+  // Fetch appropriate services when service type changes
+  React.useEffect(() => {
+    fetchServices(serviceType);
+  }, [serviceType, fetchServices]);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -52,6 +62,7 @@ const AppointmentForm = () => {
           ownerPhone={ownerPhone}
           setOwnerPhone={setOwnerPhone}
           onNext={() => setFormStep(2)}
+          serviceType={serviceType}
         />
       )}
       
@@ -62,6 +73,7 @@ const AppointmentForm = () => {
           setSelectedGroomerId={setSelectedGroomerId}
           onNext={() => setFormStep(3)}
           onBack={() => setFormStep(1)}
+          serviceType={serviceType}
         />
       )}
       

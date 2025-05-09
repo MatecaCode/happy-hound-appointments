@@ -44,6 +44,14 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   onBack,
   onSubmit
 }) => {
+  // Get dates for the 3-month range
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  
+  // Set the from date to today and to date to 3 months from today
+  const toDate = new Date();
+  toDate.setMonth(today.getMonth() + 3);
+  
   return (
     <>
       <div className="space-y-6">
@@ -69,10 +77,10 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                     className="mx-auto pointer-events-auto"
                     locale={ptBR}
                     disabled={(date) => {
-                      const today = new Date();
-                      today.setHours(0, 0, 0, 0);
                       return date < today;
                     }}
+                    fromDate={today}
+                    toDate={toDate}
                   />
                 </CardContent>
               </Card>
