@@ -14,7 +14,7 @@ import { AlignRight } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { addMonths, subMonths } from 'date-fns';
 
-// Define the appointment type explicitly
+// Define the appointment type explicitly without circular references
 interface Appointment {
   id: string;
   pet_name: string;
@@ -59,6 +59,7 @@ const GroomerCalendar = () => {
       try {
         const formattedDate = format(date, 'yyyy-MM-dd');
         
+        // Type-safe database query
         const { data, error } = await supabase
           .from('appointments')
           .select('*')
@@ -68,8 +69,8 @@ const GroomerCalendar = () => {
         
         if (error) throw error;
         
-        // Cast the returned data to ensure type safety
-        setAppointments((data || []) as Appointment[]);
+        // Safely assign the data to the appointments state
+        setAppointments(data as Appointment[]);
       } catch (error: any) {
         toast.error(error.message || 'Erro ao carregar agendamentos');
       } finally {
