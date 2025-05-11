@@ -18,7 +18,15 @@ function Calendar({
 }: CalendarProps) {
   const [currentYear, setCurrentYear] = React.useState(getYear(new Date()));
   
-  function CustomDropdowns(props: DropdownProps) {
+  // Define an extended type that includes the properties we need
+  interface CustomDropdownProps extends DropdownProps {
+    currentMonth: Date;
+    fromYear?: number;
+    toYear?: number;
+    goToMonth: (date: Date) => void;
+  }
+  
+  function CustomDropdowns(props: CustomDropdownProps) {
     const { currentMonth, fromYear, toYear } = props;
     
     // Years array
@@ -130,7 +138,7 @@ function Calendar({
       components={{
         IconLeft: ({ ..._props }) => <ChevronLeft className="h-4 w-4" />,
         IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
-        Dropdown: props => <CustomDropdowns {...props} />
+        Dropdown: (props) => <CustomDropdowns {...props as CustomDropdownProps} />
       }}
       {...props}
     />
