@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -18,7 +17,6 @@ const Navigation: React.FC<NavigationProps> = ({ className }) => {
     <nav className={cn("w-full py-4 px-6", className)}>
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 text-primary">
-          <img src="/logo-vettale.png" alt="Vettale Logo" className="h-10" />
           <span className="text-xl font-bold">Vettale</span>
         </Link>
         
