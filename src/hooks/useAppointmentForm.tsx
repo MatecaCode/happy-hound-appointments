@@ -286,7 +286,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
         owner_phone: ownerPhone,
         provider_id: selectedGroomerId,
         notes,
-        service_type: serviceType,
         status: 'upcoming'
       };
       

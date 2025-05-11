@@ -94,12 +94,11 @@ const GroomerCalendar = () => {
     const fetchAppointments = async () => {
       setIsLoading(true);
       try {
-        // Only fetch appointments for this groomer
+        // Only fetch appointments for this groomer, without filtering on service_type
         const { data, error } = await supabase
           .from('appointments')
           .select('*')
-          .eq('provider_id', user.id)
-          .eq('service_type', 'grooming');
+          .eq('provider_id', user.id);
         
         if (error) {
           throw error;
@@ -170,8 +169,8 @@ const GroomerCalendar = () => {
         owner_name: newAppointment.owner_name,
         owner_phone: newAppointment.owner_phone || null,
         notes: newAppointment.notes || null,
-        status: 'upcoming',
-        service_type: 'grooming'
+        status: 'upcoming'
+        // Removed service_type field as it doesn't exist in the database
       };
       
       const { error } = await supabase
@@ -200,8 +199,7 @@ const GroomerCalendar = () => {
       const { data, error: fetchError } = await supabase
         .from('appointments')
         .select('*')
-        .eq('provider_id', user?.id)
-        .eq('service_type', 'grooming');
+        .eq('provider_id', user?.id);
       
       if (fetchError) throw fetchError;
       setAppointments(data || []);
@@ -270,7 +268,7 @@ const GroomerCalendar = () => {
   );
   
   // Check if user has groomer role
-  if (!user || user.user_metadata.role !== 'groomer') {
+  if (!user || user.user_metadata?.role !== 'groomer') {
     return (
       <Layout>
         <div className="py-16 px-6 text-center">
@@ -593,7 +591,7 @@ const GroomerProfileUpdate = () => {
           setProfileData({
             name: data.name || '',
             phone: data.phone || '',
-            specialty: user.user_metadata.specialty || ''
+            specialty: user.user_metadata?.specialty || ''
           });
         }
       } catch (error: any) {
