@@ -29,6 +29,11 @@ function Calendar({
   function CustomDropdowns(props: CustomDropdownProps) {
     const { currentMonth, fromYear, toYear } = props;
     
+    // Check if currentMonth exists before using it
+    if (!currentMonth) {
+      return null;
+    }
+    
     // Years array
     const years = React.useMemo(() => {
       if (!fromYear || !toYear) return [];
