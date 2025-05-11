@@ -1,42 +1,25 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Get environment variables for Supabase connection
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Use the actual Supabase URL and anon key from the integrations file
+const supabaseUrl = "https://dyldadfeptrokxluwnhf.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5bGRhZGZlcHRyb2t4bHV3bmhmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDY2NzI4ODYsImV4cCI6MjA2MjI0ODg4Nn0.IygF9-eM5npIe268DspCDSOsEdjV3jBIJOULdlpluRI";
 
-// Initialize Supabase client variable
+// Initialize Supabase client
 let supabaseClient;
 
-// Check if environment variables are properly configured
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('⚠️ Erro: As variáveis de ambiente do Supabase não estão configuradas.');
-  console.log('📌 Como configurar:');
-  console.log('1. Acesse o dashboard do seu projeto no Supabase');
-  console.log('2. Vá em Settings > API');
-  console.log('3. Copie o "Project URL" e a "anon public" key');
-  console.log('4. No Lovable, vá em Project > Settings > Environment Variables');
-  console.log('5. Adicione as variáveis VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY com os valores copiados');
+try {
+  // Create Supabase client with configured values
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  console.log('✅ Supabase conectado com sucesso!');
+} catch (error) {
+  console.error('❌ Erro ao conectar com Supabase:', error);
   
-  // Use placeholder values to allow the app to compile without errors
+  // Fallback to placeholder client to prevent app crashes
   supabaseClient = createClient(
     'https://placeholder-url.supabase.co',
     'placeholder-key'
   );
-} else {
-  try {
-    // Create Supabase client with configured environment variables
-    supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
-    console.log('✅ Supabase conectado com sucesso!');
-  } catch (error) {
-    console.error('❌ Erro ao conectar com Supabase:', error);
-    
-    // Fallback to placeholder client to prevent app crashes
-    supabaseClient = createClient(
-      'https://placeholder-url.supabase.co',
-      'placeholder-key'
-    );
-  }
 }
 
 export const supabase = supabaseClient;

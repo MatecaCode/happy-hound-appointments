@@ -11,10 +11,11 @@ import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from 'date-fns';
+import { format, setYear, getYear } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -30,6 +31,15 @@ const Profile = () => {
     notes: '',
     birthday: null as Date | null
   });
+  // Calendar year picker state
+  const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
+  const [yearPickerOpen, setYearPickerOpen] = useState(false);
+
+  // Generate array of years from current year back to 25 years ago
+  const yearsArray = Array.from(
+    { length: 25 }, 
+    (_, i) => new Date().getFullYear() - i
+  );
 
   useEffect(() => {
     if (user) {
@@ -49,6 +59,7 @@ const Profile = () => {
           setPets(data || []);
         } catch (error: any) {
           toast.error(error.message || 'Erro ao carregar seus pets');
+          console.error('Error fetching pets:', error);
         } finally {
           setIsLoading(false);
         }
@@ -73,6 +84,7 @@ const Profile = () => {
       toast.success('Perfil atualizado com sucesso!');
     } catch (error: any) {
       toast.error(error.message || 'Erro ao atualizar perfil');
+      console.error('Error updating profile:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -87,6 +99,19 @@ const Profile = () => {
     setNewPet(prev => ({ ...prev, birthday: date }));
   };
 
+  const handleYearChange = (year: string) => {
+    if (newPet.birthday) {
+      const newDate = setYear(newPet.birthday, parseInt(year));
+      setNewPet(prev => ({ ...prev, birthday: newDate }));
+    } else {
+      // If no date is selected yet, create one with the selected year
+      const currentDate = new Date();
+      const newDate = setYear(currentDate, parseInt(year));
+      setNewPet(prev => ({ ...prev, birthday: newDate }));
+    }
+    setYearPickerOpen(false);
+  };
+
   const addNewPet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -94,6 +119,12 @@ const Profile = () => {
     setIsSubmitting(true);
     
     try {
+      if (!newPet.name.trim()) {
+        toast.error('Por favor, informe o nome do pet');
+        setIsSubmitting(false);
+        return;
+      }
+      
       // Prepare pet data with birthday field
       const petData = {
         ...newPet,
@@ -273,7 +304,7 @@ const Profile = () => {
                         <form onSubmit={addNewPet} className="space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label htmlFor="pet-name">Nome do Pet</Label>
+                              <Label htmlFor="pet-name">Nome do Pet *</Label>
                               <Input
                                 id="pet-name"
                                 name="name"
@@ -307,32 +338,66 @@ const Profile = () => {
                             
                             <div className="space-y-2">
                               <Label htmlFor="pet-birthday">Aniversário</Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    className={cn(
-                                      "w-full justify-start text-left font-normal",
-                                      !newPet.birthday && "text-muted-foreground"
-                                    )}
-                                  >
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {newPet.birthday ? (
-                                      format(newPet.birthday, "dd/MM/yyyy", { locale: ptBR })
-                                    ) : (
-                                      <span>Selecione uma data</span>
-                                    )}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={newPet.birthday || undefined}
-                                    onSelect={handleBirthdayChange}
-                                    initialFocus
-                                  />
-                                </PopoverContent>
-                              </Popover>
+                              <div className="flex items-center gap-2">
+                                <Popover open={yearPickerOpen} onOpenChange={setYearPickerOpen}>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className="w-[100px]"
+                                    >
+                                      {newPet.birthday ? getYear(newPet.birthday) : "Ano"}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-52 p-0 h-[300px] overflow-y-auto" align="start">
+                                    <div className="grid grid-cols-1">
+                                      {yearsArray.map((year) => (
+                                        <Button
+                                          key={year}
+                                          variant="ghost"
+                                          className="justify-start font-normal"
+                                          onClick={() => handleYearChange(year.toString())}
+                                        >
+                                          {year}
+                                        </Button>
+                                      ))}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className={cn(
+                                        "w-full justify-start text-left font-normal",
+                                        !newPet.birthday && "text-muted-foreground"
+                                      )}
+                                    >
+                                      <CalendarIcon className="mr-2 h-4 w-4" />
+                                      {newPet.birthday ? (
+                                        format(newPet.birthday, "dd/MM/yyyy", { locale: ptBR })
+                                      ) : (
+                                        <span>Selecione uma data</span>
+                                      )}
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-auto p-0" align="start">
+                                    <Calendar
+                                      mode="single"
+                                      selected={newPet.birthday || undefined}
+                                      onSelect={handleBirthdayChange}
+                                      initialFocus
+                                      className={cn("p-3 pointer-events-auto")}
+                                      captionLayout="dropdown-buttons"
+                                      fromYear={1990}
+                                      toYear={new Date().getFullYear()}
+                                      classNames={{
+                                        caption_dropdowns: "flex flex-col space-y-1",
+                                      }}
+                                    />
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
                             </div>
                           </div>
                           
