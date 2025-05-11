@@ -10,7 +10,11 @@ let supabaseClient;
 
 try {
   // Create Supabase client with configured values
-  supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+  supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+    db: {
+      schema: 'public',
+    },
+  });
   console.log('✅ Supabase conectado com sucesso!');
 } catch (error) {
   console.error('❌ Erro ao conectar com Supabase:', error);

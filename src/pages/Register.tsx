@@ -50,30 +50,32 @@ const Register = () => {
     if (!codeRequired) return true;
     
     try {
-      const { data, error } = await supabase
-        .from('registration_codes')
-        .select('*')
-        .eq('code', registrationCode)
-        .eq('role', role)
-        .eq('is_used', false)
-        .single();
+      // Use raw SQL query with Supabase's rpc function to validate the code
+      const { data, error } = await supabase.rpc('validate_registration_code', {
+        code_value: registrationCode,
+        role_value: role
+      });
       
-      if (error || !data) {
+      if (error) {
+        console.error('Error validating code:', error);
+        setError('Erro ao validar código de registro.');
+        return false;
+      }
+      
+      // If data is not truthy, the code is invalid
+      if (!data) {
         setError(`Código de registro inválido para ${role === 'groomer' ? 'tosador' : 'veterinário'}.`);
         return false;
       }
       
-      // Mark code as used
-      await supabase
-        .from('registration_codes')
-        .update({
-          is_used: true,
-          used_at: new Date().toISOString()
-        })
-        .eq('id', data.id);
+      // Mark code as used via rpc function
+      await supabase.rpc('mark_code_as_used', {
+        code_value: registrationCode
+      });
       
       return true;
     } catch (error) {
+      console.error('Exception during code validation:', error);
       setError('Erro ao validar código de registro.');
       return false;
     }
