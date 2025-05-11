@@ -2,7 +2,7 @@
 import * as React from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { DayPicker, DropdownProps } from "react-day-picker";
-import { format, getYear } from "date-fns";
+import { format, getYear, differenceInYears } from "date-fns";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
@@ -16,8 +16,6 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: CalendarProps) {
-  const [currentYear, setCurrentYear] = React.useState(getYear(new Date()));
-  
   // Define an extended type that includes the properties we need
   interface CustomDropdownProps extends DropdownProps {
     currentMonth: Date;

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,11 +10,25 @@ import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format, setYear, getYear } from 'date-fns';
+import { format, setYear, getYear, differenceInYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+const calculateAge = (birthday: Date | null): string => {
+  if (!birthday) return '';
+  
+  const years = differenceInYears(new Date(), birthday);
+  
+  if (years < 1) {
+    return 'Menos de 1 ano';
+  } else if (years === 1) {
+    return '1 ano';
+  } else {
+    return `${years} anos`;
+  }
+};
 
 const Profile = () => {
   const { user } = useAuth();
@@ -56,7 +69,17 @@ const Profile = () => {
             .eq('user_id', user.id);
           
           if (error) throw error;
-          setPets(data || []);
+          
+          // Calculate age for pets with birthday
+          const petsWithCalculatedAge = data?.map(pet => {
+            if (pet.birthday) {
+              const calculatedAge = calculateAge(new Date(pet.birthday));
+              return { ...pet, calculatedAge };
+            }
+            return pet;
+          }) || [];
+          
+          setPets(petsWithCalculatedAge);
         } catch (error: any) {
           toast.error(error.message || 'Erro ao carregar seus pets');
           console.error('Error fetching pets:', error);
@@ -125,12 +148,19 @@ const Profile = () => {
         return;
       }
       
+      // Calculate age if birthday exists
+      let calculatedAge = '';
+      if (newPet.birthday) {
+        calculatedAge = calculateAge(newPet.birthday);
+      }
+      
       // Prepare pet data with birthday field
       const petData = {
         ...newPet,
         user_id: user.id,
         // Format birthday to YYYY-MM-DD if it exists
-        birthday: newPet.birthday ? format(newPet.birthday, 'yyyy-MM-dd') : null
+        birthday: newPet.birthday ? format(newPet.birthday, 'yyyy-MM-dd') : null,
+        age: calculatedAge || newPet.age // Use calculated age if available, otherwise use manual input
       };
       
       const { data, error } = await supabase
@@ -281,7 +311,10 @@ const Profile = () => {
                                   <p className="text-sm text-muted-foreground">Raça: {pet.breed || 'Não informada'}</p>
                                 </div>
                                 <div>
-                                  <p className="text-sm">Idade: {pet.age || 'Não informada'}</p>
+                                  <p className="text-sm">
+                                    Idade: {pet.calculatedAge || pet.age || 'Não informada'}
+                                    {pet.birthday && !pet.calculatedAge && ' (calculada a partir da data de nascimento)'}
+                                  </p>
                                   <p className="text-sm">Aniversário: {formatBirthday(pet.birthday)}</p>
                                   {pet.notes && (
                                     <p className="text-sm text-muted-foreground mt-2">Notas: {pet.notes}</p>
@@ -333,7 +366,14 @@ const Profile = () => {
                                 name="age"
                                 value={newPet.age}
                                 onChange={handlePetInputChange}
+                                placeholder="Calculada automaticamente se data de nascimento for informada"
+                                disabled={!!newPet.birthday}
                               />
+                              {newPet.birthday && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Idade calculada: {calculateAge(newPet.birthday)}
+                                </p>
+                              )}
                             </div>
                             
                             <div className="space-y-2">

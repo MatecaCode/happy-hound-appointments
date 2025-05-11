@@ -1,11 +1,14 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Provider } from "@/hooks/useAppointmentForm";
 import { StarIcon } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface GroomerSelectionFormProps {
   groomers: Provider[];
@@ -25,13 +28,18 @@ const GroomerSelectionForm: React.FC<GroomerSelectionFormProps> = ({
   serviceType
 }) => {
   const providerType = serviceType === 'grooming' ? 'tosador' : 'veterinário';
+  const navigate = useNavigate();
   
   // If there are no groomers, set a default one for demo purposes
-  React.useEffect(() => {
+  useEffect(() => {
     if (groomers.length > 0 && !selectedGroomerId) {
       setSelectedGroomerId(groomers[0].id);
     }
   }, [groomers, selectedGroomerId, setSelectedGroomerId]);
+
+  const handleLoginAsGroomer = () => {
+    navigate('/login', { state: { suggestGroomerRole: true } });
+  };
   
   return (
     <div className="space-y-6">
@@ -78,11 +86,25 @@ const GroomerSelectionForm: React.FC<GroomerSelectionFormProps> = ({
               ))}
             </RadioGroup>
           ) : (
-            <div className="text-center py-8">
-              <p>Nenhum {providerType} disponível no momento.</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Por favor, tente novamente mais tarde.
-              </p>
+            <div className="space-y-4">
+              <div className="text-center py-6">
+                <p className="font-medium">Nenhum {providerType} disponível no momento.</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Por favor, tente novamente mais tarde.
+                </p>
+              </div>
+              
+              <Alert variant="default">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Informação</AlertTitle>
+                <AlertDescription>
+                  Se você é um {providerType} e deseja se cadastrar para atender clientes,{' '}
+                  <Button variant="link" className="p-0 h-auto" onClick={handleLoginAsGroomer}>
+                    faça login como {providerType}
+                  </Button>{' '}
+                  ou registre uma nova conta com o perfil de {providerType}.
+                </AlertDescription>
+              </Alert>
             </div>
           )}
         </CardContent>
