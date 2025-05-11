@@ -293,6 +293,39 @@ export type Database = {
         }
         Relationships: []
       }
+      registration_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_used: boolean | null
+          role: string
+          used_at: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_used?: boolean | null
+          role: string
+          used_at?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_used?: boolean | null
+          role?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       services: {
         Row: {
           created_at: string

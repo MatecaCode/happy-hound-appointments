@@ -117,26 +117,34 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
     const fetchProviders = async () => {
       try {
         const role = serviceType === 'grooming' ? 'groomer' : 'vet';
-        const { data, error } = await supabase
+        const { data: providerData, error } = await supabase
           .from('profiles')
-          .select('id, name, role')
+          .select('id, name, role, phone')
           .eq('role', role);
         
         if (error) throw error;
         
-        // Add dummy details for UI presentation
-        const enhancedProviders = (data || []).map(provider => ({
-          ...provider,
-          profile_image: `/placeholder.svg`,
-          rating: 4.5 + Math.random() * 0.5,
-          specialty: serviceType === 'grooming' 
-            ? ['Tosa Higiênica', 'Banho e Tosa', 'Tosa Especializada'][Math.floor(Math.random() * 3)] 
-            : ['Clínica Geral', 'Dermatologia', 'Ortopedia'][Math.floor(Math.random() * 3)]
-        }));
-        
-        setGroomers(enhancedProviders);
+        // Get user data for additional info like specialty from user metadata
+        if (providerData && providerData.length > 0) {
+          // Add placeholder data for UI presentation
+          const enhancedProviders = providerData.map(provider => {
+            return {
+              ...provider,
+              profile_image: `/placeholder.svg`,
+              rating: 4.5 + Math.random() * 0.5,
+              specialty: provider.role === 'groomer'
+                ? ['Tosa Higiênica', 'Banho e Tosa', 'Tosa Especializada'][Math.floor(Math.random() * 3)]
+                : ['Clínica Geral', 'Dermatologia', 'Ortopedia'][Math.floor(Math.random() * 3)]
+            };
+          });
+          
+          setGroomers(enhancedProviders);
+        } else {
+          setGroomers([]);
+        }
       } catch (error: any) {
         console.error('Error fetching providers:', error);
+        setGroomers([]);
       }
     };
     
@@ -152,11 +160,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
       try {
         const dateStr = format(date, 'yyyy-MM-dd');
         
-        // For demo purposes, we'll generate time slots
-        // In a real app, you'd fetch from backend based on provider's availability
+        // Get time slot interval based on service type
+        const interval = serviceType === 'grooming' ? 30 : 45; // minutes
         const startHour = 9; // 9 AM
         const endHour = serviceType === 'grooming' ? 17 : 18; // 5 PM or 6 PM
-        const interval = serviceType === 'grooming' ? 30 : 45; // minutes
         
         const slots: TimeSlot[] = [];
         
@@ -279,7 +286,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
         owner_phone: ownerPhone,
         provider_id: selectedGroomerId,
         notes,
-        service_type: serviceType
+        service_type: serviceType,
+        status: 'upcoming'
       };
       
       const { error } = await supabase
@@ -298,7 +306,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
         }
       });
     } catch (error: any) {
-      console.error('Error creating appointment:', error);
+      console.error('Error creating appointment:', error.message);
       toast.error('Erro ao criar agendamento. Tente novamente.');
     } finally {
       setIsLoading(false);
