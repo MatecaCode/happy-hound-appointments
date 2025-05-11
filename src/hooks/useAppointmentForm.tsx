@@ -127,9 +127,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
         if (error) throw error;
         
         if (providerData && providerData.length > 0) {
-          // Get user data to get additional metadata like specialty, about, profile_image
+          // Get additional metadata for each provider
           const enhancedProviders = await Promise.all(providerData.map(async (provider) => {
-            const { data: userData } = await supabase.auth.admin.getUserById(provider.id);
+            // Get user data to get additional metadata like specialty, about, profile_image
+            const { data: userData } = await supabase.auth.getUser(provider.id);
             
             const metadata = userData?.user?.user_metadata || {};
             
@@ -146,6 +147,11 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
           }));
           
           setGroomers(enhancedProviders);
+          
+          // Auto-select first groomer if there's only one
+          if (enhancedProviders.length === 1 && !selectedGroomerId) {
+            setSelectedGroomerId(enhancedProviders[0].id);
+          }
         } else {
           setGroomers([]);
         }
@@ -156,7 +162,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
     };
     
     fetchProviders();
-  }, [serviceType]);
+  }, [serviceType, selectedGroomerId]);
   
   // Fetch time slots
   useEffect(() => {
@@ -182,6 +188,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
           .eq('provider_id', selectedGroomerId);
         
         if (appointmentsError) throw appointmentsError;
+        
+        console.log(`Found ${existingAppointments?.length || 0} appointments for ${dateStr} with provider ${selectedGroomerId}`);
         
         // Generate all possible time slots
         for (let hour = startHour; hour < endHour; hour++) {

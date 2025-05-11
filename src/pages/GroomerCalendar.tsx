@@ -155,9 +155,13 @@ const GroomerCalendar = () => {
       // Format date to ISO string format needed for the database
       const formattedDate = format(date, 'yyyy-MM-dd');
       
+      // Create a dummy pet ID for manually created appointments
+      const dummyPetId = '00000000-0000-0000-0000-000000000000';
+      
       const appointmentData = {
         user_id: user?.id || '', // Provider ID as user_id for manually added appointments
         provider_id: user?.id, // The current logged in groomer
+        pet_id: dummyPetId, // Using dummy pet_id to satisfy the not null constraint
         pet_name: newAppointment.pet_name,
         service_id: newAppointment.service_id || null,
         service: newAppointment.service,
