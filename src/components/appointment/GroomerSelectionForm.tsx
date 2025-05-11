@@ -13,6 +13,7 @@ interface Provider {
   profile_image?: string;
   rating?: number;
   specialty?: string;
+  about?: string;
 }
 
 interface GroomerSelectionFormProps {
@@ -75,12 +76,12 @@ const GroomerSelectionForm = ({
             >
               <CardContent className="p-4 space-y-4">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
+                  <Avatar className="h-16 w-16 border">
                     <AvatarImage src={groomer.profile_image} alt={groomer.name} />
                     <AvatarFallback>{groomer.name.substring(0, 2).toUpperCase()}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="font-medium">{groomer.name}</h3>
+                    <h3 className="font-medium text-lg">{groomer.name}</h3>
                     <div className="flex items-center gap-1">
                       {renderRating(groomer.rating || 4.5)}
                       <span className="text-xs text-muted-foreground ml-1">
@@ -94,6 +95,13 @@ const GroomerSelectionForm = ({
                   <div className="text-sm">
                     <Label>Especialidade</Label>
                     <p className="text-muted-foreground">{groomer.specialty}</p>
+                  </div>
+                )}
+                
+                {groomer.about && (
+                  <div className="text-sm">
+                    <Label>Sobre</Label>
+                    <p className="text-muted-foreground line-clamp-3">{groomer.about}</p>
                   </div>
                 )}
                 

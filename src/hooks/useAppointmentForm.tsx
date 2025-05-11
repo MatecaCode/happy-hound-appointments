@@ -28,6 +28,7 @@ export interface Provider {
   profile_image?: string;
   rating?: number;
   specialty?: string;
+  about?: string;
 }
 
 export interface TimeSlot {
@@ -55,7 +56,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
   const [selectedPet, setSelectedPet] = useState<string>('');
   const [selectedService, setSelectedService] = useState<string>('');
   const [ownerName, setOwnerName] = useState('');
-  const [ownerPhone, setOwnerPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -117,26 +117,33 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
     const fetchProviders = async () => {
       try {
         const role = serviceType === 'grooming' ? 'groomer' : 'vet';
+        
+        // First get profile IDs with the correct role
         const { data: providerData, error } = await supabase
           .from('profiles')
-          .select('id, name, role, phone')
+          .select('id, name, role')
           .eq('role', role);
         
         if (error) throw error;
         
-        // Get user data for additional info like specialty from user metadata
         if (providerData && providerData.length > 0) {
-          // Add placeholder data for UI presentation
-          const enhancedProviders = providerData.map(provider => {
+          // Get user data to get additional metadata like specialty, about, profile_image
+          const enhancedProviders = await Promise.all(providerData.map(async (provider) => {
+            const { data: userData } = await supabase.auth.admin.getUserById(provider.id);
+            
+            const metadata = userData?.user?.user_metadata || {};
+            
+            // Default rating for demo purposes (would be calculated from real reviews in production)
+            const rating = 4.5 + Math.random() * 0.5;
+            
             return {
               ...provider,
-              profile_image: `/placeholder.svg`,
-              rating: 4.5 + Math.random() * 0.5,
-              specialty: provider.role === 'groomer'
-                ? ['Tosa Higiênica', 'Banho e Tosa', 'Tosa Especializada'][Math.floor(Math.random() * 3)]
-                : ['Clínica Geral', 'Dermatologia', 'Ortopedia'][Math.floor(Math.random() * 3)]
+              profile_image: metadata.profile_image || `/placeholder.svg`,
+              about: metadata.about || '',
+              specialty: metadata.specialty || '',
+              rating
             };
-          });
+          }));
           
           setGroomers(enhancedProviders);
         } else {
@@ -228,10 +235,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
     if (user && user.user_metadata?.name) {
       setOwnerName(user.user_metadata.name);
     }
-    
-    if (user && user.user_metadata?.phone) {
-      setOwnerPhone(user.user_metadata.phone);
-    }
   }, [user]);
   
   const handleNextAvailableSelect = () => {
@@ -283,7 +286,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
         date: format(date, 'yyyy-MM-dd'),
         time,
         owner_name: ownerName,
-        owner_phone: ownerPhone,
         provider_id: selectedGroomerId,
         notes,
         status: 'upcoming'
@@ -325,8 +327,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
     setSelectedService,
     ownerName,
     setOwnerName,
-    ownerPhone,
-    setOwnerPhone,
     notes,
     setNotes,
     timeSlots,

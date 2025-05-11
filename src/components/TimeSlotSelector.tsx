@@ -65,17 +65,24 @@ const TimeSlotSelector = ({
                 </Button>
               );
             } else {
-              // For unavailable slots, use a disabled button without the TooltipProvider
               return (
-                <Button
-                  key={slot.id}
-                  variant="outline"
-                  className="opacity-50 cursor-not-allowed"
-                  disabled
-                >
-                  {slot.time}
-                  <span className="sr-only">Horário não disponível</span>
-                </Button>
+                <TooltipProvider key={slot.id}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="opacity-50 cursor-not-allowed"
+                        disabled
+                      >
+                        {slot.time}
+                        <span className="sr-only">Horário não disponível</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Horário não disponível</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               );
             }
           })}

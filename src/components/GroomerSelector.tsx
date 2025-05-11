@@ -7,10 +7,10 @@ import { Star } from 'lucide-react';
 export interface Groomer {
   id: string;
   name: string;
-  bio: string;
+  about?: string;
   rating: number;
-  imageUrl: string;
-  specialties?: string[];
+  profile_image?: string;
+  specialty?: string;
 }
 
 interface GroomerSelectorProps {
@@ -41,8 +41,8 @@ const GroomerSelector = ({ groomers, selectedGroomerId, onSelect }: GroomerSelec
           >
             <CardHeader className="pb-2">
               <div className="flex items-center space-x-4">
-                <Avatar className="h-12 w-12 border">
-                  <AvatarImage src={groomer.imageUrl} alt={groomer.name} />
+                <Avatar className="h-14 w-14 border">
+                  <AvatarImage src={groomer.profile_image} alt={groomer.name} />
                   <AvatarFallback>{groomer.name.substring(0, 2)}</AvatarFallback>
                 </Avatar>
                 <div>
@@ -55,15 +55,13 @@ const GroomerSelector = ({ groomers, selectedGroomerId, onSelect }: GroomerSelec
               </div>
             </CardHeader>
             <CardContent>
-              <CardDescription className="line-clamp-3">{groomer.bio}</CardDescription>
-              {groomer.specialties && (
-                <div className="flex flex-wrap gap-1 mt-2">
-                  {groomer.specialties.map((specialty, index) => (
-                    <span key={index} className="bg-secondary text-xs px-2 py-1 rounded">
-                      {specialty}
-                    </span>
-                  ))}
+              {groomer.specialty && (
+                <div className="mb-2">
+                  <span className="font-medium">Especialidade:</span> {groomer.specialty}
                 </div>
+              )}
+              {groomer.about && (
+                <CardDescription className="line-clamp-3 mt-1">{groomer.about}</CardDescription>
               )}
             </CardContent>
             <CardFooter className="pt-2 pb-4">

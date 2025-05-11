@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusCircle, Clock, Edit, Trash2 } from "lucide-react";
+import { PlusCircle, Clock, Edit, Trash2, Image } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 // Define the Appointment interface explicitly
@@ -54,13 +54,11 @@ const GroomerCalendar = () => {
   
   // Form states for adding appointment
   const [newAppointment, setNewAppointment] = useState({
-    pet_id: '',
     pet_name: '',
     service_id: '',
     service: '',
     time: '',
     owner_name: '',
-    owner_phone: '',
     notes: ''
   });
   
@@ -158,19 +156,16 @@ const GroomerCalendar = () => {
       const formattedDate = format(date, 'yyyy-MM-dd');
       
       const appointmentData = {
-        user_id: user?.id || '', // This would be the client user ID in a real scenario
+        user_id: user?.id || '', // Provider ID as user_id for manually added appointments
         provider_id: user?.id, // The current logged in groomer
-        pet_id: newAppointment.pet_id || null,
         pet_name: newAppointment.pet_name,
         service_id: newAppointment.service_id || null,
         service: newAppointment.service,
         date: formattedDate,
         time: newAppointment.time,
         owner_name: newAppointment.owner_name,
-        owner_phone: newAppointment.owner_phone || null,
         notes: newAppointment.notes || null,
         status: 'upcoming'
-        // Removed service_type field as it doesn't exist in the database
       };
       
       const { error } = await supabase
@@ -183,13 +178,11 @@ const GroomerCalendar = () => {
       
       // Reset form and refresh appointments
       setNewAppointment({
-        pet_id: '',
         pet_name: '',
         service_id: '',
         service: '',
         time: '',
         owner_name: '',
-        owner_phone: '',
         notes: ''
       });
       
@@ -397,31 +390,17 @@ const GroomerCalendar = () => {
                         </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-2">
-                          <Label htmlFor="ownerName">Nome do Cliente</Label>
-                          <Input
-                            id="ownerName"
-                            value={newAppointment.owner_name}
-                            onChange={(e) => setNewAppointment({
-                              ...newAppointment,
-                              owner_name: e.target.value
-                            })}
-                            placeholder="Nome do cliente"
-                          />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label htmlFor="ownerPhone">Telefone do Cliente</Label>
-                          <Input
-                            id="ownerPhone"
-                            value={newAppointment.owner_phone}
-                            onChange={(e) => setNewAppointment({
-                              ...newAppointment,
-                              owner_phone: e.target.value
-                            })}
-                            placeholder="(00) 00000-0000"
-                          />
-                        </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="ownerName">Nome do Cliente</Label>
+                        <Input
+                          id="ownerName"
+                          value={newAppointment.owner_name}
+                          onChange={(e) => setNewAppointment({
+                            ...newAppointment,
+                            owner_name: e.target.value
+                          })}
+                          placeholder="Nome do cliente"
+                        />
                       </div>
                       
                       <div className="grid gap-2">
@@ -523,9 +502,6 @@ const GroomerCalendar = () => {
                             
                             <div className="col-span-2">
                               <p className="text-sm">Cliente: {appointment.owner_name}</p>
-                              {appointment.owner_phone && (
-                                <p className="text-sm">Telefone: {appointment.owner_phone}</p>
-                              )}
                               {appointment.notes && (
                                 <p className="text-sm text-muted-foreground mt-2">
                                   <strong>Observações:</strong> {appointment.notes}
@@ -569,8 +545,9 @@ const GroomerProfileUpdate = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [profileData, setProfileData] = useState({
     name: '',
-    phone: '',
-    specialty: ''
+    specialty: '',
+    about: '',
+    profile_image: ''
   });
   
   // Fetch current profile data
@@ -581,7 +558,7 @@ const GroomerProfileUpdate = () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('name, phone')
+          .select('name')
           .eq('id', user.id)
           .single();
         
@@ -590,8 +567,9 @@ const GroomerProfileUpdate = () => {
         if (data) {
           setProfileData({
             name: data.name || '',
-            phone: data.phone || '',
-            specialty: user.user_metadata?.specialty || ''
+            specialty: user.user_metadata?.specialty || '',
+            about: user.user_metadata?.about || '',
+            profile_image: user.user_metadata?.profile_image || ''
           });
         }
       } catch (error: any) {
@@ -612,7 +590,6 @@ const GroomerProfileUpdate = () => {
         .from('profiles')
         .update({
           name: profileData.name,
-          phone: profileData.phone,
           updated_at: new Date().toISOString()
         })
         .eq('id', user.id);
@@ -623,8 +600,9 @@ const GroomerProfileUpdate = () => {
       const { error: userError } = await supabase.auth.updateUser({
         data: {
           name: profileData.name,
-          phone: profileData.phone,
-          specialty: profileData.specialty
+          specialty: profileData.specialty,
+          about: profileData.about,
+          profile_image: profileData.profile_image
         }
       });
       
@@ -663,31 +641,53 @@ const GroomerProfileUpdate = () => {
               onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="phone">Telefone</Label>
-            <Input
-              id="phone"
-              value={profileData.phone}
-              onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
-              placeholder="(00) 00000-0000"
-            />
-          </div>
+          
           <div className="space-y-2">
             <Label htmlFor="specialty">Especialidade</Label>
-            <Select
+            <Input
+              id="specialty"
               value={profileData.specialty}
-              onValueChange={(value) => setProfileData(prev => ({ ...prev, specialty: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione sua especialidade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Tosa Higiênica">Tosa Higiênica</SelectItem>
-                <SelectItem value="Banho e Tosa">Banho e Tosa</SelectItem>
-                <SelectItem value="Tosa Especializada">Tosa Especializada</SelectItem>
-              </SelectContent>
-            </Select>
+              onChange={(e) => setProfileData(prev => ({ ...prev, specialty: e.target.value }))}
+              placeholder="Exemplo: Tosa Higiênica, Banho e Tosa, etc."
+            />
           </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="about">Sobre</Label>
+            <Textarea
+              id="about"
+              value={profileData.about}
+              onChange={(e) => setProfileData(prev => ({ ...prev, about: e.target.value }))}
+              placeholder="Descreva sua experiência e especialidades"
+              className="min-h-[100px]"
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="profile_image">URL da Imagem de Perfil</Label>
+            <div className="flex gap-2">
+              <Input
+                id="profile_image"
+                value={profileData.profile_image}
+                onChange={(e) => setProfileData(prev => ({ ...prev, profile_image: e.target.value }))}
+                placeholder="https://exemplo.com/imagem.jpg"
+              />
+            </div>
+            {profileData.profile_image && (
+              <div className="mt-2 rounded-md overflow-hidden w-20 h-20 bg-secondary">
+                <img 
+                  src={profileData.profile_image} 
+                  alt="Pré-visualização" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.src = "/placeholder.svg";
+                  }}
+                />
+              </div>
+            )}
+          </div>
+          
           <Button 
             className="w-full mt-4" 
             onClick={handleUpdateProfile}
