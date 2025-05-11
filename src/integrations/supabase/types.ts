@@ -328,7 +328,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      mark_code_as_used: {
+        Args: { code_value: string }
+        Returns: undefined
+      }
+      validate_registration_code: {
+        Args: { code_value: string; role_value: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
