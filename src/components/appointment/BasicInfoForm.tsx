@@ -32,8 +32,6 @@ interface BasicInfoFormProps {
   setSelectedService: (serviceId: string) => void;
   ownerName: string;
   setOwnerName: (name: string) => void;
-  ownerPhone: string;
-  setOwnerPhone: (phone: string) => void;
   onNext: () => void;
   serviceType: 'grooming' | 'veterinary';
 }
@@ -47,8 +45,6 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   setSelectedService,
   ownerName,
   setOwnerName,
-  ownerPhone,
-  setOwnerPhone,
   onNext,
   serviceType
 }) => {
@@ -161,16 +157,6 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
               placeholder="Seu nome completo"
               value={ownerName}
               onChange={(e) => setOwnerName(e.target.value)}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="phone">Telefone</Label>
-            <Input
-              id="phone"
-              placeholder="(11) 99999-9999"
-              value={ownerPhone}
-              onChange={(e) => setOwnerPhone(e.target.value)}
             />
           </div>
         </CardContent>
