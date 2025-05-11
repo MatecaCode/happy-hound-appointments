@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import { format } from 'date-fns';
+import { format, isWeekend } from 'date-fns';
 import { toast } from 'sonner';
 import { useAuth } from './useAuth';
 
@@ -115,6 +115,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
   // Fetch appropriate providers based on serviceType
   useEffect(() => {
     const fetchProviders = async () => {
+      setIsLoading(true);
       try {
         const role = serviceType === 'grooming' ? 'groomer' : 'vet';
         
@@ -154,10 +155,14 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
           }
         } else {
           setGroomers([]);
+          toast.error(`Não foram encontrados ${role === 'groomer' ? 'tosadores' : 'veterinários'} disponíveis`);
         }
       } catch (error: any) {
         console.error('Error fetching providers:', error);
         setGroomers([]);
+        toast.error(`Erro ao buscar profissionais: ${error.message}`);
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -170,8 +175,17 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
       if (!selectedGroomerId || !date) return;
       
       setIsLoading(true);
+      setTimeSlots([]);
+      
       try {
         const dateStr = format(date, 'yyyy-MM-dd');
+        
+        // Don't fetch time slots for Sundays
+        if (date.getDay() === 0) { // 0 is Sunday
+          setTimeSlots([]);
+          setIsLoading(false);
+          return;
+        }
         
         // Get time slot interval based on service type
         const interval = serviceType === 'grooming' ? 30 : 45; // minutes
@@ -209,30 +223,106 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
         
         setTimeSlots(slots);
         
-        // Find next available time slot for quick select
-        const nextAvailableSlot = slots.find(slot => slot.available);
-        if (nextAvailableSlot) {
-          const provider = groomers.find(g => g.id === selectedGroomerId);
-          setNextAvailable({
-            date,
-            timeSlot: {
-              id: nextAvailableSlot.id,
-              time: nextAvailableSlot.time
-            },
-            groomer: {
-              id: selectedGroomerId,
-              name: provider?.name || 'Profissional'
+        // Find next available date starting from today
+        if (slots.length === 0 || !slots.some(slot => slot.available)) {
+          // If no slots are available for the selected date, try to find one in the next 14 days
+          const nextDate = findNextAvailableDate(date, selectedGroomerId);
+          nextDate.then((nextAvailableDateResult) => {
+            if (nextAvailableDateResult) {
+              const provider = groomers.find(g => g.id === selectedGroomerId);
+              setNextAvailable({
+                date: nextAvailableDateResult.date,
+                timeSlot: {
+                  id: nextAvailableDateResult.slotId,
+                  time: nextAvailableDateResult.time
+                },
+                groomer: {
+                  id: selectedGroomerId,
+                  name: provider?.name || 'Profissional'
+                }
+              });
+            } else {
+              setNextAvailable(null);
             }
           });
         } else {
-          setNextAvailable(null);
+          // Find next available time slot for quick select
+          const nextAvailableSlot = slots.find(slot => slot.available);
+          if (nextAvailableSlot) {
+            const provider = groomers.find(g => g.id === selectedGroomerId);
+            setNextAvailable({
+              date,
+              timeSlot: {
+                id: nextAvailableSlot.id,
+                time: nextAvailableSlot.time
+              },
+              groomer: {
+                id: selectedGroomerId,
+                name: provider?.name || 'Profissional'
+              }
+            });
+          } else {
+            setNextAvailable(null);
+          }
         }
       } catch (error: any) {
         console.error('Error fetching time slots:', error);
         toast.error('Erro ao carregar horários disponíveis');
+        setTimeSlots([]);
       } finally {
         setIsLoading(false);
       }
+    };
+    
+    // Function to find the next available date with an available time slot
+    const findNextAvailableDate = async (startDate: Date, groomerId: string) => {
+      // Try the next 14 days
+      for (let i = 1; i <= 14; i++) {
+        const nextDate = new Date(startDate);
+        nextDate.setDate(nextDate.getDate() + i);
+        
+        // Skip Sundays
+        if (nextDate.getDay() === 0) {
+          continue;
+        }
+        
+        const dateStr = format(nextDate, 'yyyy-MM-dd');
+        
+        // Get time slot interval based on service type
+        const interval = serviceType === 'grooming' ? 30 : 45;
+        const startHour = 9;
+        const endHour = serviceType === 'grooming' ? 17 : 18;
+        
+        // Check existing appointments for this date
+        const { data: existingAppointments, error } = await supabase
+          .from('appointments')
+          .select('time')
+          .eq('date', dateStr)
+          .eq('provider_id', groomerId);
+        
+        if (error) continue;
+        
+        // Generate possible time slots for this date
+        for (let hour = startHour; hour < endHour; hour++) {
+          for (let minute = 0; minute < 60; minute += interval) {
+            const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
+            
+            // Check if this slot is available
+            const isBooked = existingAppointments?.some(apt => apt.time === timeStr);
+            
+            if (!isBooked) {
+              return {
+                date: nextDate,
+                time: timeStr,
+                slotId: `${dateStr}-${timeStr}`
+              };
+            }
+          }
+        }
+      }
+      
+      // No available slots found in the next 14 days
+      return null;
     };
     
     fetchTimeSlots();
@@ -250,6 +340,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary' = 'gro
     
     setSelectedTimeSlotId(nextAvailable.timeSlot.id);
     setDate(nextAvailable.date);
+    setActiveTab('calendar'); // Switch to calendar tab to show the selected date and time
   };
   
   const handleSubmit = async (e: React.FormEvent) => {

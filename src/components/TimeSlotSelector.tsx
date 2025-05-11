@@ -2,9 +2,9 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { format } from 'date-fns';
+import { format, isWeekend } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Clock, AlertTriangle } from 'lucide-react';
+import { Clock, AlertTriangle, Calendar as CalendarIcon } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -33,6 +33,17 @@ const TimeSlotSelector = ({
 }: TimeSlotSelectorProps) => {
   // Check if there are any available time slots
   const hasAvailableSlots = timeSlots.some(slot => slot.available);
+  const isWeekendDay = isWeekend(date);
+
+  if (isWeekendDay && date.getDay() === 0) { // Sunday
+    return (
+      <div className="text-center py-8">
+        <CalendarIcon className="mx-auto h-8 w-8 text-amber-500 mb-2" />
+        <p className="font-medium">Não atendemos aos domingos</p>
+        <p className="text-muted-foreground mt-1">Por favor, selecione outro dia para seu agendamento</p>
+      </div>
+    );
+  }
 
   if (timeSlots.length === 0) {
     return (

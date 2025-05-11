@@ -63,7 +63,7 @@ const NextAvailableAppointment = ({
         <span>{nextAvailable.timeSlot.time} com {nextAvailable.groomer.name}</span>
       </div>
       <Button onClick={onSelect} className="w-full">
-        Agendar este Horário
+        Agendar
       </Button>
     </div>
   );
