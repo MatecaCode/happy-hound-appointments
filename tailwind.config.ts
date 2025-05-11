@@ -64,9 +64,13 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				brand: {
-					purple: '#8B5CF6',
-					'light-purple': '#D6BCFA',
-					'dark-purple': '#7E69AB',
+					blue: '#2B70B2',
+					'light-blue': '#6BAEDB',
+					'dark-blue': '#1A4670',
+					gold: '#E8B74B',
+					'light-gold': '#F7E3B0',
+					sage: '#8FBF9F',
+					'light-sage': '#D5EAD8',
 				}
 			},
 			borderRadius: {
@@ -100,6 +104,10 @@ export default {
 				'accordion-down': 'accordion-down 0.2s ease-out',
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'bounce-slow': 'bounce-slow 3s ease-in-out infinite',
+			},
+			fontFamily: {
+				nunito: ['Nunito', 'system-ui', 'sans-serif'],
+				quicksand: ['Quicksand', 'system-ui', 'sans-serif'],
 			}
 		}
 	},

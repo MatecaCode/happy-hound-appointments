@@ -52,17 +52,17 @@ const NextAvailableAppointment = ({
   const formattedDate = format(nextAvailable.date, "EEEE, d 'de' MMMM", { locale: ptBR });
 
   return (
-    <div className="bg-secondary/40 p-4 rounded-lg">
-      <h3 className="font-medium text-lg mb-2">Próximo Horário Disponível</h3>
+    <div className="bg-secondary/40 p-4 rounded-lg border border-brand-light-gold">
+      <h3 className="font-medium text-lg mb-2 text-brand-blue">Próximo Horário Disponível</h3>
       <div className="flex items-center text-sm mb-1">
-        <Calendar className="mr-2 h-4 w-4" />
+        <Calendar className="mr-2 h-4 w-4 text-brand-blue" />
         <span>{formattedDate}</span>
       </div>
       <div className="flex items-center text-sm mb-3">
-        <Clock className="mr-2 h-4 w-4" />
+        <Clock className="mr-2 h-4 w-4 text-brand-blue" />
         <span>{nextAvailable.timeSlot.time} com {nextAvailable.groomer.name}</span>
       </div>
-      <Button onClick={onSelect} className="w-full">
+      <Button onClick={onSelect} className="w-full bg-brand-blue hover:bg-brand-dark-blue">
         Agendar
       </Button>
     </div>
