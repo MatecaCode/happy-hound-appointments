@@ -9,6 +9,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const Profile = () => {
   const { user } = useAuth();
@@ -17,7 +23,13 @@ const Profile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pets, setPets] = useState<any[]>([]);
-  const [newPet, setNewPet] = useState({ name: '', breed: '', age: '', notes: '' });
+  const [newPet, setNewPet] = useState({ 
+    name: '', 
+    breed: '', 
+    age: '', 
+    notes: '',
+    birthday: null as Date | null
+  });
 
   useEffect(() => {
     if (user) {
@@ -71,6 +83,10 @@ const Profile = () => {
     setNewPet(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleBirthdayChange = (date: Date | null) => {
+    setNewPet(prev => ({ ...prev, birthday: date }));
+  };
+
   const addNewPet = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -78,19 +94,35 @@ const Profile = () => {
     setIsSubmitting(true);
     
     try {
+      // Prepare pet data with birthday field
+      const petData = {
+        ...newPet,
+        user_id: user.id,
+        // Format birthday to YYYY-MM-DD if it exists
+        birthday: newPet.birthday ? format(newPet.birthday, 'yyyy-MM-dd') : null
+      };
+      
       const { data, error } = await supabase
         .from('pets')
-        .insert([
-          { ...newPet, user_id: user.id }
-        ])
+        .insert([petData])
         .select();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error inserting pet:', error);
+        throw error;
+      }
       
       setPets([...pets, ...data]);
-      setNewPet({ name: '', breed: '', age: '', notes: '' });
+      setNewPet({ 
+        name: '', 
+        breed: '', 
+        age: '', 
+        notes: '',
+        birthday: null
+      });
       toast.success('Pet adicionado com sucesso!');
     } catch (error: any) {
+      console.error('Error in addNewPet:', error);
       toast.error(error.message || 'Erro ao adicionar pet');
     } finally {
       setIsSubmitting(false);
@@ -109,6 +141,16 @@ const Profile = () => {
       </Layout>
     );
   }
+  
+  const formatBirthday = (birthdayStr: string | null) => {
+    if (!birthdayStr) return 'Não informado';
+    
+    try {
+      return format(new Date(birthdayStr), 'dd/MM/yyyy', { locale: ptBR });
+    } catch (e) {
+      return 'Data inválida';
+    }
+  };
   
   return (
     <Layout>
@@ -205,10 +247,11 @@ const Profile = () => {
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                   <h3 className="text-lg font-medium">{pet.name}</h3>
-                                  <p className="text-sm text-muted-foreground">Raça: {pet.breed}</p>
+                                  <p className="text-sm text-muted-foreground">Raça: {pet.breed || 'Não informada'}</p>
                                 </div>
                                 <div>
-                                  <p className="text-sm">Idade: {pet.age}</p>
+                                  <p className="text-sm">Idade: {pet.age || 'Não informada'}</p>
+                                  <p className="text-sm">Aniversário: {formatBirthday(pet.birthday)}</p>
                                   {pet.notes && (
                                     <p className="text-sm text-muted-foreground mt-2">Notas: {pet.notes}</p>
                                   )}
@@ -247,7 +290,6 @@ const Profile = () => {
                                 name="breed"
                                 value={newPet.breed}
                                 onChange={handlePetInputChange}
-                                required
                               />
                             </div>
                           </div>
@@ -260,19 +302,48 @@ const Profile = () => {
                                 name="age"
                                 value={newPet.age}
                                 onChange={handlePetInputChange}
-                                required
                               />
                             </div>
                             
                             <div className="space-y-2">
-                              <Label htmlFor="pet-notes">Notas/Observações</Label>
-                              <Input
-                                id="pet-notes"
-                                name="notes"
-                                value={newPet.notes}
-                                onChange={handlePetInputChange}
-                              />
+                              <Label htmlFor="pet-birthday">Aniversário</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      "w-full justify-start text-left font-normal",
+                                      !newPet.birthday && "text-muted-foreground"
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {newPet.birthday ? (
+                                      format(newPet.birthday, "dd/MM/yyyy", { locale: ptBR })
+                                    ) : (
+                                      <span>Selecione uma data</span>
+                                    )}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={newPet.birthday || undefined}
+                                    onSelect={handleBirthdayChange}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
                             </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <Label htmlFor="pet-notes">Notas/Observações</Label>
+                            <Input
+                              id="pet-notes"
+                              name="notes"
+                              value={newPet.notes}
+                              onChange={handlePetInputChange}
+                            />
                           </div>
                           
                           <Button type="submit" disabled={isSubmitting}>
