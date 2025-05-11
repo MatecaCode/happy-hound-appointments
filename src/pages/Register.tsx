@@ -9,6 +9,8 @@ import { useAuth } from '@/hooks/useAuth';
 import Layout from '@/components/Layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 const Register = () => {
   const [name, setName] = useState('');
@@ -16,8 +18,10 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<'client' | 'groomer' | 'vet'>('client');
+  const [registrationCode, setRegistrationCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [codeRequired, setCodeRequired] = useState(false);
   
   const { signUp, user } = useAuth();
   const navigate = useNavigate();
@@ -27,6 +31,7 @@ const Register = () => {
   useEffect(() => {
     if (suggestGroomerRole) {
       setRole('groomer');
+      setCodeRequired(true);
     }
   }, [suggestGroomerRole]);
   
@@ -35,6 +40,44 @@ const Register = () => {
       navigate('/');
     }
   }, [user, navigate]);
+
+  // Update code requirement when role changes
+  useEffect(() => {
+    setCodeRequired(role === 'groomer' || role === 'vet');
+  }, [role]);
+  
+  const validateRegistrationCode = async () => {
+    if (!codeRequired) return true;
+    
+    try {
+      const { data, error } = await supabase
+        .from('registration_codes')
+        .select('*')
+        .eq('code', registrationCode)
+        .eq('role', role)
+        .eq('is_used', false)
+        .single();
+      
+      if (error || !data) {
+        setError(`Código de registro inválido para ${role === 'groomer' ? 'tosador' : 'veterinário'}.`);
+        return false;
+      }
+      
+      // Mark code as used
+      await supabase
+        .from('registration_codes')
+        .update({
+          is_used: true,
+          used_at: new Date().toISOString()
+        })
+        .eq('id', data.id);
+      
+      return true;
+    } catch (error) {
+      setError('Erro ao validar código de registro.');
+      return false;
+    }
+  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,10 +93,25 @@ const Register = () => {
       return;
     }
     
+    if (codeRequired && !registrationCode) {
+      setError(`Código de registro é obrigatório para ${role === 'groomer' ? 'tosadores' : 'veterinários'}.`);
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
+      // Validate registration code if required
+      if (codeRequired) {
+        const isValid = await validateRegistrationCode();
+        if (!isValid) {
+          setIsLoading(false);
+          return;
+        }
+      }
+      
       await signUp(email, password, name, role);
+      toast.success('Registro realizado! Verifique seu email para confirmar a conta.');
       // Signup function will navigate to login
     } catch (error: any) {
       setError(error.message || 'Erro ao criar conta.');
@@ -155,6 +213,23 @@ const Register = () => {
                     </Alert>
                   )}
                 </div>
+                
+                {codeRequired && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="registrationCode">Código de Registro</Label>
+                    <Input
+                      id="registrationCode"
+                      type="text"
+                      placeholder={`Insira o código de registro de ${role === 'groomer' ? 'tosador' : 'veterinário'}`}
+                      value={registrationCode}
+                      onChange={(e) => setRegistrationCode(e.target.value)}
+                      required
+                    />
+                    <p className="text-sm text-muted-foreground">
+                      Código fornecido pelo pet shop para registro de profissionais
+                    </p>
+                  </div>
+                )}
                 
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? 'Registrando...' : 'Registrar'}

@@ -102,7 +102,10 @@ const GroomerSelectionForm: React.FC<GroomerSelectionFormProps> = ({
                   <Button variant="link" className="p-0 h-auto" onClick={handleLoginAsGroomer}>
                     faça login como {providerType}
                   </Button>{' '}
-                  ou registre uma nova conta com o perfil de {providerType}.
+                  ou registre uma nova conta com o perfil de {providerType}. 
+                  <p className="mt-1">
+                    Você precisará de um código de registro válido fornecido pelo pet shop.
+                  </p>
                 </AlertDescription>
               </Alert>
             </div>

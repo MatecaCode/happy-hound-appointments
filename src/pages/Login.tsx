@@ -64,7 +64,7 @@ const Login = () => {
                   <Link to="/register" className="font-medium underline" state={{ suggestGroomerRole }}>
                     registre uma nova conta
                   </Link>{" "}
-                  selecionando o perfil adequado.
+                  selecionando o perfil adequado e fornecendo um código de registro válido.
                 </AlertDescription>
               </Alert>
             )}
