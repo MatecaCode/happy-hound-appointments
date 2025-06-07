@@ -54,7 +54,7 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   const canProceed = selectedPet && selectedService && ownerName.trim();
 
   const handleAddNewPet = () => {
-    navigate('/profile', { state: { openPetsTab: true } });
+    navigate('/pets');
   };
   
   return (

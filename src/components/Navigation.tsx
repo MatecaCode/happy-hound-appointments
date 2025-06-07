@@ -1,88 +1,113 @@
+
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { UserCircle, ShoppingCart } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { User, ChevronDown } from 'lucide-react';
 
-interface NavigationProps {
-  className?: string;
-}
-
-const Navigation: React.FC<NavigationProps> = ({ className }) => {
+const Navigation = () => {
+  const location = useLocation();
   const { user, signOut } = useAuth();
-  const userRole = user?.user_metadata?.role || 'client';
-  
+
+  const isActive = (path: string) => location.pathname === path;
+
   return (
-    <nav className={cn("w-full py-4 px-6", className)}>
-      <div className="max-w-7xl mx-auto flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 text-primary">
-          <span className="text-xl font-bold">Vettale</span>
-        </Link>
-        
-        <div className="hidden md:flex items-center gap-8">
-          <Link to="/" className="text-foreground hover:text-primary transition-colors">
-            Início
+    <nav className="bg-white shadow-sm sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="flex justify-between items-center h-16">
+          <Link to="/" className="flex items-center space-x-2">
+            <img src="/logo-vettale.png" alt="VetTale" className="h-8 w-8" />
+            <span className="text-xl font-bold text-primary">VetTale</span>
           </Link>
-          <Link to="/services" className="text-foreground hover:text-primary transition-colors">
-            Serviços
-          </Link>
-          <Link to="/shop" className="text-foreground hover:text-primary transition-colors">
-            Loja
-          </Link>
-          <Link to="/about" className="text-foreground hover:text-primary transition-colors">
-            Sobre Nós
-          </Link>
-          {user && userRole === 'client' && (
-            <Link to="/appointments" className="text-foreground hover:text-primary transition-colors">
-              Meus Agendamentos
-            </Link>
-          )}
-          {user && userRole === 'groomer' && (
-            <Link to="/groomer-calendar" className="text-foreground hover:text-primary transition-colors">
-              Calendário de Tosas
-            </Link>
-          )}
-          {user && userRole === 'vet' && (
-            <Link to="/vet-calendar" className="text-foreground hover:text-primary transition-colors">
-              Calendário Veterinário
-            </Link>
-          )}
-        </div>
-        
-        <div className="flex items-center gap-4">
-          {user && (
-            <Link to="/cart" className="flex items-center">
-              <Button variant="ghost" size="icon">
-                <ShoppingCart className="h-5 w-5" />
-              </Button>
-            </Link>
-          )}
           
-          {user ? (
-            <div className="flex items-center gap-4">
-              <Link to="/profile" className="flex items-center gap-2">
-                <UserCircle className="h-5 w-5" />
-                <span className="hidden md:inline">
-                  {user.user_metadata?.name || user.email?.split('@')[0] || 'Perfil'} 
-                  {userRole !== 'client' && ` (${userRole === 'vet' ? 'Veterinário' : 'Tosador'})`}
-                </span>
-              </Link>
-              <Button variant="outline" onClick={() => signOut()} size="sm">Sair</Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-4">
-              <Link to="/login">
-                <Button variant="outline" size="sm">Entrar</Button>
-              </Link>
-              <Link to="/register">
-                <Button size="sm">Registrar</Button>
-              </Link>
-            </div>
-          )}
-          <Link to="/book">
-            <Button>Agendar</Button>
-          </Link>
+          <div className="hidden md:flex items-center space-x-8">
+            <Link 
+              to="/" 
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                isActive('/') ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              Início
+            </Link>
+            <Link 
+              to="/services" 
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                isActive('/services') ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              Serviços
+            </Link>
+            <Link 
+              to="/about" 
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                isActive('/about') ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              Sobre
+            </Link>
+            <Link 
+              to="/book" 
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                isActive('/book') ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              Agendar
+            </Link>
+            <Link 
+              to="/shop" 
+              className={`text-sm font-medium transition-colors hover:text-primary ${
+                isActive('/shop') ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              Loja
+            </Link>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="flex items-center space-x-2">
+                    <User className="h-4 w-4" />
+                    <span className="hidden md:inline">Minha Conta</span>
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile">Perfil</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/pets">Meus Pets</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/appointments">Agendamentos</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/cart">Carrinho</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={signOut}>
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center space-x-2">
+                <Button variant="ghost" asChild>
+                  <Link to="/login">Entrar</Link>
+                </Button>
+                <Button asChild>
+                  <Link to="/register">Cadastrar</Link>
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </nav>

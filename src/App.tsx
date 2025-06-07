@@ -12,6 +12,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import Pets from "./pages/Pets";
 import GroomerCalendar from "./pages/GroomerCalendar";
 import VetCalendar from "./pages/VetCalendar";
 import Shop from "./pages/Shop";
@@ -38,6 +39,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/pets" element={<Pets />} />
             <Route path="/groomer-calendar" element={<GroomerCalendar />} />
             <Route path="/vet-calendar" element={<VetCalendar />} />
             <Route path="/shop" element={<Shop />} />
