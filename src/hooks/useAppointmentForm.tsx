@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -71,53 +72,34 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       const targetRole = type === 'grooming' ? 'groomer' : 'vet';
       const dateStr = selectedDate.toISOString().split('T')[0];
       
-      console.log('🚀 FIXED fetchAvailableProviders - START');
-      console.log('📋 Service type:', type);
-      console.log('🎯 Target role:', targetRole);
-      console.log('📅 Date:', dateStr);
+      console.log('Fetching providers for role:', targetRole, 'on date:', dateStr);
       
-      // STEP 1: Get ALL profiles first
-      console.log('🔍 Fetching ALL profiles...');
+      // Get ALL profiles first
       const { data: allProfiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
 
       if (profilesError) {
-        console.error('❌ Error fetching profiles:', profilesError);
+        console.error('Error fetching profiles:', profilesError);
         throw profilesError;
       }
 
-      console.log('📊 PROFILES FOUND:', allProfiles?.length || 0);
-      if (allProfiles && allProfiles.length > 0) {
-        allProfiles.forEach((profile, index) => {
-          console.log(`${index + 1}. "${profile.name}" - Role: "${profile.role}"`);
-        });
-      }
-
       if (!allProfiles || allProfiles.length === 0) {
-        console.log('❌ NO PROFILES FOUND');
+        console.log('No profiles found');
         setGroomers([]);
         return;
       }
 
-      // STEP 2: Filter by role (simplified logic)
-      console.log('🔍 Filtering for role:', targetRole);
-      const matchingProviders = allProfiles.filter(profile => {
-        const matches = profile.role === targetRole;
-        console.log(`   "${profile.name}" role="${profile.role}" === "${targetRole}"? ${matches}`);
-        return matches;
-      });
-
-      console.log('✅ MATCHING PROVIDERS:', matchingProviders.length);
+      // Filter by role
+      const matchingProviders = allProfiles.filter(profile => profile.role === targetRole);
       
       if (matchingProviders.length === 0) {
-        console.log('❌ NO PROVIDERS MATCH THE ROLE');
-        console.log('💡 Available roles:', [...new Set(allProfiles.map(p => p.role))]);
+        console.log('No providers match the role:', targetRole);
         setGroomers([]);
         return;
       }
 
-      // STEP 3: Transform for UI (skip availability check for now to test)
+      // Transform for UI (with default values)
       const transformedProviders: Provider[] = matchingProviders.map(provider => ({
         id: provider.id,
         name: provider.name,
@@ -127,13 +109,11 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         about: `${type === 'grooming' ? 'Tosador' : 'Veterinário'} experiente.`
       }));
 
-      console.log('🎉 FINAL PROVIDERS:', transformedProviders.length);
-      transformedProviders.forEach(p => console.log(`   - ${p.name}`));
-      
+      console.log('Found providers:', transformedProviders.length);
       setGroomers(transformedProviders);
       
     } catch (error: any) {
-      console.error('💥 ERROR in fetchAvailableProviders:', error);
+      console.error('Error in fetchAvailableProviders:', error);
       toast.error('Erro ao carregar profissionais');
       setGroomers([]);
     }
@@ -307,7 +287,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   // Fetch available providers when date changes (for step 3)
   useEffect(() => {
     if (formStep === 3 && date) {
-      console.log('🔄 useEffect triggered: Fetching providers for date:', date, 'Step:', formStep);
+      console.log('Fetching providers for step 3, date:', date);
       fetchAvailableProviders(serviceType, date);
     }
   }, [formStep, date, serviceType, fetchAvailableProviders]);
