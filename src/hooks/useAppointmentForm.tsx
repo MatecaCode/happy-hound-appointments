@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -77,30 +78,60 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       console.log('   📅 Date string:', dateStr);
       console.log('   📅 Original date:', selectedDate);
       
-      // Step 1: Get ALL profiles to see what's in the database
+      // Step 1: Get ALL profiles with detailed query
       console.log('🔍 STEP 1: Fetching ALL profiles from database...');
-      const { data: allProfiles, error: allProfilesError } = await supabase
+      
+      const { data: allProfiles, error: allProfilesError, count } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('name');
+
+      console.log('📊 QUERY RESULT:');
+      console.log('   - Error:', allProfilesError);
+      console.log('   - Count:', count);
+      console.log('   - Data length:', allProfiles?.length || 0);
+      console.log('   - Raw data:', allProfiles);
 
       if (allProfilesError) {
         console.error('❌ Error fetching all profiles:', allProfilesError);
         throw allProfilesError;
       }
 
-      console.log('📊 ALL PROFILES IN DATABASE:', allProfiles?.length || 0);
-      if (allProfiles && allProfiles.length > 0) {
-        allProfiles.forEach((profile, index) => {
-          console.log(`   ${index + 1}. ID: ${profile.id}, Name: "${profile.name}", Role: "${profile.role}"`);
-        });
-      } else {
-        console.log('⚠️ NO PROFILES FOUND AT ALL - Database might be empty');
+      if (!allProfiles || allProfiles.length === 0) {
+        console.log('⚠️ NO PROFILES RETURNED FROM DATABASE');
+        console.log('🔍 Attempting alternative query...');
+        
+        // Try alternative query without ordering
+        const { data: alternativeProfiles, error: altError } = await supabase
+          .from('profiles')
+          .select('*');
+          
+        console.log('📊 ALTERNATIVE QUERY RESULT:');
+        console.log('   - Error:', altError);
+        console.log('   - Data:', alternativeProfiles);
+        
+        if (altError || !alternativeProfiles || alternativeProfiles.length === 0) {
+          console.log('❌ NO PROFILES FOUND WITH ANY QUERY');
+          setGroomers([]);
+          return;
+        }
+        
+        // Use alternative results
+        allProfiles.length = 0;
+        allProfiles.push(...alternativeProfiles);
       }
+
+      console.log('📊 ALL PROFILES IN DATABASE:', allProfiles.length);
+      allProfiles.forEach((profile, index) => {
+        console.log(`   ${index + 1}. ID: ${profile.id}, Name: "${profile.name}", Role: "${profile.role}"`);
+      });
 
       // Step 2: Filter by target role
       console.log('🔍 STEP 2: Filtering profiles by role:', targetRole);
-      const providersWithRole = allProfiles?.filter(profile => profile.role === targetRole) || [];
+      const providersWithRole = allProfiles.filter(profile => {
+        console.log(`   - Checking profile: ${profile.name} (role: "${profile.role}") === "${targetRole}"?`, profile.role === targetRole);
+        return profile.role === targetRole;
+      });
 
       console.log('📊 PROVIDERS WITH CORRECT ROLE:', providersWithRole.length);
       if (providersWithRole.length > 0) {
@@ -109,7 +140,15 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         });
       } else {
         console.log('⚠️ NO PROVIDERS FOUND with role:', targetRole);
-        console.log('💡 Available roles in database:', [...new Set(allProfiles?.map(p => p.role) || [])]);
+        const availableRoles = [...new Set(allProfiles.map(p => p.role))];
+        console.log('💡 Available roles in database:', availableRoles);
+        console.log('🔍 Let\'s check exact role matches:');
+        allProfiles.forEach(profile => {
+          console.log(`   - "${profile.role}" === "${targetRole}"?`, profile.role === targetRole);
+          console.log(`   - Role type:`, typeof profile.role);
+          console.log(`   - Role length:`, profile.role?.length);
+          console.log(`   - Has whitespace?`, /\s/.test(profile.role || ''));
+        });
       }
 
       if (providersWithRole.length === 0) {
