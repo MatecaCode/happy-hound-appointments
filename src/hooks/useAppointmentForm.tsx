@@ -94,7 +94,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     const fetchProviders = async () => {
       try {
         const targetRole = serviceType === 'grooming' ? 'groomer' : 'vet';
-        console.log('Fetching providers with role:', targetRole);
+        console.log('🔍 Fetching providers with role:', targetRole);
         
         const { data, error } = await supabase
           .from('profiles')
@@ -102,14 +102,21 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
           .eq('role', targetRole);
           
         if (error) {
-          console.error('Error fetching providers:', error);
+          console.error('❌ Error fetching providers:', error);
           throw error;
         }
         
-        console.log('Found providers:', data);
+        console.log('✅ Found providers:', data);
+        console.log('📊 Provider count:', data?.length || 0);
+        
+        if (!data || data.length === 0) {
+          console.log('⚠️ No providers found for role:', targetRole);
+          console.log('💡 Make sure there are profiles with role =', targetRole, 'in the database');
+        }
+        
         setGroomers(data || []);
       } catch (error) {
-        console.error('Error fetching providers:', error);
+        console.error('❌ Error fetching providers:', error);
         toast.error('Erro ao carregar profissionais');
       }
     };
@@ -155,6 +162,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       setIsLoading(true);
       const dateStr = date.toISOString().split('T')[0];
       
+      console.log('🕐 Fetching time slots for provider:', selectedGroomerId, 'on date:', dateStr);
+      
       // Get provider availability - use direct query instead of RPC
       const { data: availability, error: availError } = await supabase
         .from('provider_availability')
@@ -165,6 +174,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       if (availError && availError.code !== 'PGRST116') {
         console.error('Error fetching availability:', availError);
       }
+
+      console.log('📅 Provider availability data:', availability);
 
       // Get existing appointments for this provider and date
       const { data: appointments, error: apptError } = await supabase
@@ -177,6 +188,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       if (apptError) {
         console.error('Error fetching appointments:', apptError);
       }
+
+      console.log('📋 Existing appointments:', appointments);
 
       // Generate all possible time slots
       const allSlots: TimeSlot[] = [];
@@ -210,6 +223,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         };
       });
 
+      console.log('✅ Final available slots:', availableSlots.filter(s => s.available).length, 'out of', availableSlots.length);
       setTimeSlots(availableSlots);
     } catch (error) {
       console.error('Error fetching time slots:', error);

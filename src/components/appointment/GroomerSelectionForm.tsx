@@ -36,9 +36,19 @@ const GroomerSelectionForm = ({
   const providerLabel = serviceType === 'grooming' ? 'Tosador' : 'Veterinário';
   const providersLabel = serviceType === 'grooming' ? 'Tosadores' : 'Veterinários';
   
+  // Debug logging
+  useEffect(() => {
+    console.log('🎯 GroomerSelectionForm rendered');
+    console.log('📋 Service type:', serviceType);
+    console.log('👥 Groomers received:', groomers);
+    console.log('📊 Groomers count:', groomers.length);
+    console.log('🔍 Selected groomer ID:', selectedGroomerId);
+  }, [groomers, selectedGroomerId, serviceType]);
+  
   // Auto-select first groomer if there's only one and none is selected
   useEffect(() => {
     if (groomers.length === 1 && !selectedGroomerId) {
+      console.log('🎯 Auto-selecting single groomer:', groomers[0]);
       setSelectedGroomerId(groomers[0].id);
     }
   }, [groomers, selectedGroomerId, setSelectedGroomerId]);
@@ -60,6 +70,10 @@ const GroomerSelectionForm = ({
         <p className="text-sm text-muted-foreground">
           Selecione um {providerLabel.toLowerCase()} para realizar o serviço
         </p>
+        {/* Debug info */}
+        <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
+          <strong>Debug:</strong> Encontrados {groomers.length} {providersLabel.toLowerCase()} para o tipo "{serviceType}"
+        </div>
       </div>
 
       {groomers.length > 0 ? (
@@ -67,7 +81,10 @@ const GroomerSelectionForm = ({
           {groomers.map((groomer) => (
             <Card 
               key={groomer.id}
-              onClick={() => setSelectedGroomerId(groomer.id)}
+              onClick={() => {
+                console.log('🎯 Groomer selected:', groomer);
+                setSelectedGroomerId(groomer.id);
+              }}
               className={`cursor-pointer transition-colors duration-200 ${
                 selectedGroomerId === groomer.id 
                   ? 'border-primary ring-2 ring-primary/20' 
@@ -82,6 +99,8 @@ const GroomerSelectionForm = ({
                   </Avatar>
                   <div>
                     <h3 className="font-medium text-lg">{groomer.name}</h3>
+                    <p className="text-xs text-gray-500">ID: {groomer.id.substring(0, 8)}...</p>
+                    <p className="text-xs text-gray-500">Role: {groomer.role}</p>
                     <div className="flex items-center gap-1">
                       {renderRating(groomer.rating || 4.5)}
                       <span className="text-xs text-muted-foreground ml-1">
@@ -121,8 +140,18 @@ const GroomerSelectionForm = ({
           <p className="font-medium">Nenhum {providerLabel.toLowerCase()} disponível no momento</p>
           <p className="text-sm text-muted-foreground mt-1">Por favor, tente novamente mais tarde</p>
           
+          <div className="bg-red-50 border border-red-200 mt-6 p-4 rounded-lg text-left">
+            <p className="text-sm font-medium text-red-800">Informação de Debug</p>
+            <p className="text-sm text-red-600 mt-1">
+              Não foram encontrados perfis com role = "{serviceType === 'grooming' ? 'groomer' : 'vet'}" na tabela profiles.
+            </p>
+            <p className="text-sm text-red-600 mt-1">
+              Para resolver: Certifique-se de que há pelo menos um perfil na tabela profiles com o role correto.
+            </p>
+          </div>
+          
           <div className="bg-secondary/70 mt-6 p-4 rounded-lg text-left">
-            <p className="text-sm font-medium">Informação</p>
+            <p className="text-sm font-medium">Como resolver</p>
             <p className="text-sm text-muted-foreground mt-1">
               Se você é um {providerLabel.toLowerCase()} e deseja se cadastrar para atender clientes,{' '}
               <a href="/register" className="text-primary hover:underline">faça login</a> ou registre uma
