@@ -122,7 +122,7 @@ export const useAppointmentData = () => {
       console.log('🔍 DEBUG: Date string:', dateStr);
       
       // Step 1: Get providers with the target role
-      const { data: providers, error: profilesError } = await supabase
+      let { data: providers, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
         .eq('role', targetRole);
