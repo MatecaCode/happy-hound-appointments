@@ -135,7 +135,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, []);
 
-  // Fetch user's pets
+  // Fetch user's pets - re-enable real functionality
   const fetchUserPets = useCallback(async () => {
     if (!user) return;
     
@@ -215,12 +215,15 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   };
 
-  // Submit appointment
+  // Submit appointment - use real user
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // For testing: use mock user ID
-    const mockUserId = '550e8400-e29b-41d4-a716-446655440000';
+    if (!user) {
+      toast.error('Você precisa estar logado para fazer um agendamento');
+      navigate('/login');
+      return;
+    }
     
     if (!selectedPet || !selectedService || !selectedGroomerId || !date || !selectedTimeSlotId) {
       toast.error('Por favor, preencha todos os campos obrigatórios');
@@ -248,11 +251,18 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         .eq('id', selectedGroomerId)
         .single();
 
-      // Create appointment with mock user
+      // Get user profile for owner name
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+
+      // Create appointment with real user
       const { error } = await supabase
         .from('appointments')
         .insert({
-          user_id: mockUserId,
+          user_id: user.id,
           pet_id: selectedPet,
           service_id: selectedService,
           provider_id: selectedGroomerId,
@@ -260,7 +270,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
           time: selectedTimeSlotId,
           service: service?.name || '',
           pet_name: pet?.name || '',
-          owner_name: 'Test User', // Mock name for testing
+          owner_name: userProfile?.name || user.email || 'Usuário',
           notes: notes || null
         });
 
@@ -276,39 +286,12 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   };
 
-  // Load initial data
+  // Load initial data - re-enable real data fetching
   useEffect(() => {
-    // For testing: create mock pets if none exist
-    const createMockPets = async () => {
-      const mockUserId = '550e8400-e29b-41d4-a716-446655440000';
-      
-      // Check if mock pets already exist
-      const { data: existingPets } = await supabase
-        .from('pets')
-        .select('*')
-        .eq('user_id', mockUserId);
-        
-      if (!existingPets || existingPets.length === 0) {
-        // Create mock pets
-        await supabase
-          .from('pets')
-          .insert([
-            { user_id: mockUserId, name: 'Rex', breed: 'Golden Retriever', age: '3 anos' },
-            { user_id: mockUserId, name: 'Luna', breed: 'Poodle', age: '2 anos' }
-          ]);
-      }
-      
-      // Fetch pets for UI
-      const { data: pets } = await supabase
-        .from('pets')
-        .select('*')
-        .eq('user_id', mockUserId);
-        
-      setUserPets(pets || []);
-    };
-    
-    createMockPets();
-  }, []);
+    if (user) {
+      fetchUserPets();
+    }
+  }, [user, fetchUserPets]);
 
   // Fetch available providers when date changes (for step 3)
   useEffect(() => {

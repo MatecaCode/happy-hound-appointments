@@ -17,75 +17,107 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock user for testing purposes
-const mockUser = {
-  id: '550e8400-e29b-41d4-a716-446655440000',
-  email: 'test@example.com',
-  user_metadata: { name: 'Test User' },
-  aud: 'authenticated',
-  role: 'authenticated',
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-  app_metadata: {},
-  identities: [],
-  confirmation_sent_at: null,
-  confirmed_at: new Date().toISOString(),
-  email_confirmed_at: new Date().toISOString(),
-  phone: null,
-  phone_confirmed_at: null,
-  last_sign_in_at: new Date().toISOString(),
-  recovery_sent_at: null,
-  new_email: null,
-  new_phone: null,
-  invited_at: null,
-  action_link: null,
-  email_change_sent_at: null,
-  phone_change_sent_at: null,
-  is_anonymous: false,
-} as User;
-
-const mockSession = {
-  access_token: 'mock-token',
-  refresh_token: 'mock-refresh',
-  expires_in: 3600,
-  expires_at: Math.floor(Date.now() / 1000) + 3600,
-  token_type: 'bearer',
-  user: mockUser,
-} as Session;
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  // For testing: always return a mock authenticated user
-  const [user, setUser] = useState<User | null>(mockUser);
-  const [session, setSession] = useState<Session | null>(mockSession);
-  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Skip real auth setup for testing
-    console.log('🧪 AUTH DISABLED FOR TESTING - Using mock user');
-    setLoading(false);
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('🔐 Auth state changed:', event, session?.user?.email);
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('🔐 Initial session:', session?.user?.email);
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  // Mock auth functions for testing
   const signIn = async (email: string, password: string) => {
-    toast.success('Login simulado - auth desabilitado para testes');
-    navigate('/');
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      
+      toast.success('Login realizado com sucesso!');
+      navigate('/');
+    } catch (error: any) {
+      console.error('Sign in error:', error);
+      toast.error(error.message || 'Erro ao fazer login');
+      throw error;
+    }
   };
 
   const signInWithGoogle = async () => {
-    toast.success('Login Google simulado - auth desabilitado para testes');
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) throw error;
+    } catch (error: any) {
+      console.error('Google sign in error:', error);
+      toast.error(error.message || 'Erro ao fazer login com Google');
+      throw error;
+    }
   };
 
   const signUp = async (email: string, password: string, name: string, role: string = 'client') => {
-    toast.success('Registro simulado - auth desabilitado para testes');
-    navigate('/login');
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            role,
+          },
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (error) throw error;
+      
+      toast.success('Conta criada com sucesso! Verifique seu email.');
+      navigate('/login');
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      toast.error(error.message || 'Erro ao criar conta');
+      throw error;
+    }
   };
 
   const signOut = async () => {
-    toast.success('Logout simulado - auth desabilitado para testes');
-    setTimeout(() => {
-      navigate('/');
-    }, 0);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      toast.success('Logout realizado com sucesso!');
+      setTimeout(() => {
+        navigate('/');
+      }, 0);
+    } catch (error: any) {
+      console.error('Sign out error:', error);
+      toast.error(error.message || 'Erro ao fazer logout');
+    }
   };
 
   return (

@@ -14,13 +14,39 @@ const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // For testing: always use 'client' role
-  const userRole = 'client';
-
-  // Disable professional redirects for testing
+  // Re-enable role-based redirects
   useEffect(() => {
-    console.log('🧪 LAYOUT: Auth disabled for testing, skipping role-based redirects');
-  }, [user, userRole, location.pathname, navigate]);
+    const fetchUserRole = async () => {
+      if (!user) return;
+      
+      try {
+        const { supabase } = await import('@/integrations/supabase/client');
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) throw error;
+        
+        const userRole = data?.role;
+        console.log('🔍 Layout Debug - User role:', userRole, 'Current path:', location.pathname);
+        
+        // Redirect professionals to their dashboards if they're on the main page
+        if (location.pathname === '/') {
+          if (userRole === 'groomer') {
+            navigate('/groomer-dashboard');
+          } else if (userRole === 'vet') {
+            navigate('/vet-calendar');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user role:', error);
+      }
+    };
+    
+    fetchUserRole();
+  }, [user, location.pathname, navigate]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
