@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
@@ -47,7 +46,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   const navigate = useNavigate();
   
   // Form state
-  const [date, setDate] = useState<Date | undefined>();
+  const [date, setDate] = useState<Date>(new Date());
   const [selectedGroomerId, setSelectedGroomerId] = useState<string>('');
   const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string>('');
   const [selectedPet, setSelectedPet] = useState<string>('');
@@ -70,49 +69,93 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   const fetchProviders = useCallback(async (type: 'grooming' | 'veterinary') => {
     try {
       const targetRole = type === 'grooming' ? 'groomer' : 'vet';
-      console.log('🔍 Fetching providers with role:', targetRole);
-      console.log('🔍 Service type parameter:', type);
+      console.log('🔍 DETAILED FETCH - Service type:', type);
+      console.log('🔍 DETAILED FETCH - Target role:', targetRole);
       
-      // First, let's see what's in the profiles table
+      // First, let's get ALL profiles without any filtering to see what's in the database
+      console.log('📊 Step 1: Fetching ALL profiles to see what exists...');
       const { data: allProfiles, error: allError } = await supabase
         .from('profiles')
-        .select('id, name, role')
+        .select('*')
         .order('created_at', { ascending: false });
         
-      console.log('📊 All profiles in database:', allProfiles);
-      console.log('📊 Profile query error (if any):', allError);
+      console.log('📊 ALL PROFILES QUERY RESULT:');
+      console.log('   - Error:', allError);
+      console.log('   - Data count:', allProfiles?.length || 0);
+      console.log('   - Raw data:', allProfiles);
       
-      if (allProfiles) {
-        console.log('📋 Profiles breakdown:');
-        allProfiles.forEach(profile => {
-          console.log(`   - ID: ${profile.id.substring(0, 8)}..., Name: ${profile.name}, Role: "${profile.role}"`);
+      if (allProfiles && allProfiles.length > 0) {
+        console.log('📋 DETAILED PROFILE BREAKDOWN:');
+        allProfiles.forEach((profile, index) => {
+          console.log(`   ${index + 1}. ID: ${profile.id.substring(0, 8)}...`);
+          console.log(`      Name: "${profile.name}"`);
+          console.log(`      Role: "${profile.role}" (type: ${typeof profile.role})`);
+          console.log(`      Role === "groomer": ${profile.role === 'groomer'}`);
+          console.log(`      Role === "vet": ${profile.role === 'vet'}`);
+          console.log(`      Role length: ${profile.role?.length || 'null'}`);
+          console.log(`      Role charCodes: ${profile.role ? Array.from(profile.role).map(c => c.charCodeAt(0)).join(',') : 'null'}`);
+          console.log('      ---');
         });
         
-        const groomerProfiles = allProfiles.filter(p => p.role === 'groomer');
-        const vetProfiles = allProfiles.filter(p => p.role === 'vet');
-        console.log(`📊 Found ${groomerProfiles.length} groomers and ${vetProfiles.length} vets`);
+        // Count by role
+        const groomers = allProfiles.filter(p => p.role === 'groomer');
+        const vets = allProfiles.filter(p => p.role === 'vet');
+        const clients = allProfiles.filter(p => p.role === 'client');
+        const others = allProfiles.filter(p => !['groomer', 'vet', 'client'].includes(p.role));
+        
+        console.log(`📊 ROLE COUNTS:`);
+        console.log(`   - Groomers: ${groomers.length}`);
+        console.log(`   - Vets: ${vets.length}`);
+        console.log(`   - Clients: ${clients.length}`);
+        console.log(`   - Others: ${others.length}`);
+        
+        if (others.length > 0) {
+          console.log(`   - Other roles found:`, others.map(p => `"${p.role}"`));
+        }
       }
       
-      // Now fetch the specific role we need
+      // Now try the targeted query
+      console.log(`📊 Step 2: Targeted query for role = "${targetRole}"`);
       const { data: providers, error } = await supabase
         .from('profiles')
-        .select('id, name, role')
+        .select('*')
         .eq('role', targetRole)
         .order('name');
 
-      console.log('🎯 Targeted query for role:', targetRole);
-      console.log('✅ Found providers:', providers);
-      console.log('📊 Provider count:', providers?.length || 0);
-      console.log('❌ Query error:', error);
+      console.log('🎯 TARGETED QUERY RESULT:');
+      console.log('   - Target role:', targetRole);
+      console.log('   - Error:', error);
+      console.log('   - Found providers:', providers?.length || 0);
+      console.log('   - Provider data:', providers);
 
       if (error) {
-        console.error('❌ Error fetching providers:', error);
+        console.error('❌ Error in targeted query:', error);
         throw error;
       }
 
       if (!providers || providers.length === 0) {
-        console.log('⚠️ No providers found for role:', targetRole);
-        console.log('💡 Make sure there are profiles with role =', targetRole, 'in the database');
+        console.log('⚠️ NO PROVIDERS FOUND');
+        console.log(`💡 Expected to find profiles with role = "${targetRole}"`);
+        
+        // Try alternative queries to debug
+        console.log('🔍 Trying alternative queries...');
+        
+        // Case insensitive search
+        const { data: caseInsensitive } = await supabase
+          .from('profiles')
+          .select('*')
+          .ilike('role', targetRole);
+          
+        console.log(`   - Case insensitive search for "${targetRole}":`, caseInsensitive?.length || 0);
+        
+        // Search with LIKE
+        const { data: likeSearch } = await supabase
+          .from('profiles')
+          .select('*')
+          .like('role', `%${targetRole}%`);
+          
+        console.log(`   - LIKE search for "%${targetRole}%":`, likeSearch?.length || 0);
+        
         setGroomers([]);
         return;
       }
@@ -127,11 +170,14 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         about: `${type === 'grooming' ? 'Tosador' : 'Veterinário'} experiente com anos de experiência.`
       }));
 
-      console.log('🔄 Transformed providers:', transformedProviders);
+      console.log('✅ FINAL RESULT:');
+      console.log('   - Transformed providers:', transformedProviders.length);
+      console.log('   - Provider details:', transformedProviders);
+      
       setGroomers(transformedProviders);
       
     } catch (error: any) {
-      console.error('💥 Error in fetchProviders:', error);
+      console.error('💥 FETCH PROVIDERS ERROR:', error);
       toast.error('Erro ao carregar profissionais');
       setGroomers([]);
     }
