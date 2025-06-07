@@ -1,27 +1,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from './useAuth';
+import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
-export interface Pet {
-  id: string;
-  name: string;
-  breed?: string;
-  age?: string;
-}
-
-export interface Service {
-  id: string;
-  name: string;
-  price: number;
-  duration: number;
-  service_type: 'grooming' | 'veterinary';
-  description?: string;
-}
-
-export interface Provider {
+interface Provider {
   id: string;
   name: string;
   role: string;
@@ -31,153 +15,186 @@ export interface Provider {
   about?: string;
 }
 
-export interface TimeSlot {
+interface Pet {
+  id: string;
+  name: string;
+  breed?: string;
+  age?: string;
+}
+
+interface Service {
+  id: string;
+  name: string;
+  price: number;
+  duration: number;
+  service_type: string;
+}
+
+interface TimeSlot {
   id: string;
   time: string;
   available: boolean;
 }
 
-export interface NextAvailable {
-  date: Date;
+interface NextAvailable {
+  date: string;
   time: string;
-  timeSlot: string;
-  groomer: string;
+  provider_name: string;
 }
 
 export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
-  const navigate = useNavigate();
   const { user } = useAuth();
+  const navigate = useNavigate();
   
-  // Form states
-  const [date, setDate] = useState<Date>(new Date());
-  const [selectedGroomerId, setSelectedGroomerId] = useState('');
-  const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(null);
-  const [selectedPet, setSelectedPet] = useState('');
-  const [selectedService, setSelectedService] = useState('');
-  const [notes, setNotes] = useState('');
+  // Form state
+  const [date, setDate] = useState<Date | undefined>();
+  const [selectedGroomerId, setSelectedGroomerId] = useState<string>('');
+  const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string>('');
+  const [selectedPet, setSelectedPet] = useState<string>('');
+  const [selectedService, setSelectedService] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
   
-  // Data states
+  // Data state
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [nextAvailable, setNextAvailable] = useState<NextAvailable | null>(null);
   const [userPets, setUserPets] = useState<Pet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   
-  // UI states
-  const [isLoading, setIsLoading] = useState(false);
+  // UI state
+  const [activeTab, setActiveTab] = useState<'calendar' | 'next-available'>('calendar');
   const [formStep, setFormStep] = useState(1);
-  const [activeTab, setActiveTab] = useState('calendar');
-  const [nextAvailable, setNextAvailable] = useState<NextAvailable | null>(null);
 
-  // Fetch user's pets
-  useEffect(() => {
-    const fetchUserPets = async () => {
-      if (!user) return;
+  // Fetch providers (groomers or vets)
+  const fetchProviders = useCallback(async (type: 'grooming' | 'veterinary') => {
+    try {
+      const targetRole = type === 'grooming' ? 'groomer' : 'vet';
+      console.log('🔍 Fetching providers with role:', targetRole);
+      console.log('🔍 Service type parameter:', type);
       
-      try {
-        const { data, error } = await supabase
-          .from('pets')
-          .select('*')
-          .eq('user_id', user.id);
-          
-        if (error) throw error;
-        setUserPets(data || []);
-      } catch (error) {
-        console.error('Error fetching pets:', error);
+      // First, let's see what's in the profiles table
+      const { data: allProfiles, error: allError } = await supabase
+        .from('profiles')
+        .select('id, name, role')
+        .order('created_at', { ascending: false });
+        
+      console.log('📊 All profiles in database:', allProfiles);
+      console.log('📊 Profile query error (if any):', allError);
+      
+      if (allProfiles) {
+        console.log('📋 Profiles breakdown:');
+        allProfiles.forEach(profile => {
+          console.log(`   - ID: ${profile.id.substring(0, 8)}..., Name: ${profile.name}, Role: "${profile.role}"`);
+        });
+        
+        const groomerProfiles = allProfiles.filter(p => p.role === 'groomer');
+        const vetProfiles = allProfiles.filter(p => p.role === 'vet');
+        console.log(`📊 Found ${groomerProfiles.length} groomers and ${vetProfiles.length} vets`);
       }
-    };
-    
-    fetchUserPets();
-  }, [user]);
+      
+      // Now fetch the specific role we need
+      const { data: providers, error } = await supabase
+        .from('profiles')
+        .select('id, name, role')
+        .eq('role', targetRole)
+        .order('name');
 
-  // Fetch providers (groomers/vets)
-  useEffect(() => {
-    const fetchProviders = async () => {
-      try {
-        const targetRole = serviceType === 'grooming' ? 'groomer' : 'vet';
-        console.log('🔍 Fetching providers with role:', targetRole);
-        
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, name, role, phone')
-          .eq('role', targetRole);
-          
-        if (error) {
-          console.error('❌ Error fetching providers:', error);
-          throw error;
-        }
-        
-        console.log('✅ Found providers:', data);
-        console.log('📊 Provider count:', data?.length || 0);
-        
-        if (!data || data.length === 0) {
-          console.log('⚠️ No providers found for role:', targetRole);
-          console.log('💡 Make sure there are profiles with role =', targetRole, 'in the database');
-        }
-        
-        setGroomers(data || []);
-      } catch (error) {
+      console.log('🎯 Targeted query for role:', targetRole);
+      console.log('✅ Found providers:', providers);
+      console.log('📊 Provider count:', providers?.length || 0);
+      console.log('❌ Query error:', error);
+
+      if (error) {
         console.error('❌ Error fetching providers:', error);
-        toast.error('Erro ao carregar profissionais');
+        throw error;
       }
-    };
-    
-    fetchProviders();
-  }, [serviceType]);
 
+      if (!providers || providers.length === 0) {
+        console.log('⚠️ No providers found for role:', targetRole);
+        console.log('💡 Make sure there are profiles with role =', targetRole, 'in the database');
+        setGroomers([]);
+        return;
+      }
+
+      // Transform the data to match our Provider interface
+      const transformedProviders: Provider[] = providers.map(provider => ({
+        id: provider.id,
+        name: provider.name,
+        role: provider.role,
+        rating: 4.5, // Default rating
+        specialty: type === 'grooming' ? 'Tosa geral' : 'Clínica geral',
+        about: `${type === 'grooming' ? 'Tosador' : 'Veterinário'} experiente com anos de experiência.`
+      }));
+
+      console.log('🔄 Transformed providers:', transformedProviders);
+      setGroomers(transformedProviders);
+      
+    } catch (error: any) {
+      console.error('💥 Error in fetchProviders:', error);
+      toast.error('Erro ao carregar profissionais');
+      setGroomers([]);
+    }
+  }, []);
+
+  // Fetch services based on service type
   const fetchServices = useCallback(async (type: 'grooming' | 'veterinary') => {
     try {
       const { data, error } = await supabase
         .from('services')
         .select('*')
-        .eq('service_type', type);
-        
+        .eq('service_type', type)
+        .order('name');
+
       if (error) throw error;
-      
-      const mappedServices: Service[] = (data || []).map(service => ({
-        id: service.id,
-        name: service.name,
-        price: service.price,
-        duration: service.duration,
-        service_type: service.service_type as 'grooming' | 'veterinary',
-        description: service.description || undefined
-      }));
-      
-      setServices(mappedServices);
-    } catch (error) {
+      setServices(data || []);
+    } catch (error: any) {
       console.error('Error fetching services:', error);
+      toast.error('Erro ao carregar serviços');
     }
   }, []);
 
-  // Fetch available time slots for selected groomer and date
-  useEffect(() => {
-    if (selectedGroomerId && date) {
-      fetchAvailableTimeSlots();
-    }
-  }, [selectedGroomerId, date]);
-
-  const fetchAvailableTimeSlots = async () => {
-    if (!selectedGroomerId || !date) return;
+  // Fetch user's pets
+  const fetchUserPets = useCallback(async () => {
+    if (!user) return;
     
     try {
-      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('pets')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name');
+
+      if (error) throw error;
+      setUserPets(data || []);
+    } catch (error: any) {
+      console.error('Error fetching pets:', error);
+      toast.error('Erro ao carregar pets');
+    }
+  }, [user]);
+
+  // Fetch available time slots for selected date and groomer
+  const fetchTimeSlots = useCallback(async () => {
+    if (!date || !selectedGroomerId) {
+      setTimeSlots([]);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
       const dateStr = date.toISOString().split('T')[0];
       
-      console.log('🕐 Fetching time slots for provider:', selectedGroomerId, 'on date:', dateStr);
-      
-      // Get provider availability - use direct query instead of RPC
+      // Get provider availability
       const { data: availability, error: availError } = await supabase
         .from('provider_availability')
         .select('*')
         .eq('provider_id', selectedGroomerId)
-        .eq('date', dateStr);
+        .eq('date', dateStr)
+        .eq('available', true);
 
-      if (availError && availError.code !== 'PGRST116') {
-        console.error('Error fetching availability:', availError);
-      }
+      if (availError) throw availError;
 
-      console.log('📅 Provider availability data:', availability);
-
-      // Get existing appointments for this provider and date
+      // Get existing appointments
       const { data: appointments, error: apptError } = await supabase
         .from('appointments')
         .select('time')
@@ -185,133 +202,124 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         .eq('date', dateStr)
         .eq('status', 'upcoming');
 
-      if (apptError) {
-        console.error('Error fetching appointments:', apptError);
-      }
+      if (apptError) throw apptError;
 
-      console.log('📋 Existing appointments:', appointments);
-
-      // Generate all possible time slots
-      const allSlots: TimeSlot[] = [];
-      for (let hour = 8; hour < 17; hour++) {
-        allSlots.push({
-          id: `${hour}:00`,
-          time: `${hour}:00`,
+      // Create time slots from availability, excluding booked times
+      const bookedTimes = appointments?.map(apt => apt.time) || [];
+      const slots: TimeSlot[] = (availability || [])
+        .filter(slot => !bookedTimes.includes(slot.time_slot))
+        .map(slot => ({
+          id: slot.time_slot,
+          time: slot.time_slot,
           available: true
-        });
-        if (hour < 16) {
-          allSlots.push({
-            id: `${hour}:30`,
-            time: `${hour}:30`,
-            available: true
-          });
-        }
-      }
+        }))
+        .sort((a, b) => a.time.localeCompare(b.time));
 
-      // Check availability based on provider's schedule
-      const availableSlots = allSlots.map(slot => {
-        // Check if provider has set this time as available
-        const providerAvailability = availability?.find(a => a.time_slot === slot.time);
-        const isProviderAvailable = providerAvailability ? providerAvailability.available : true; // Default to available
-
-        // Check if slot is already booked
-        const isBooked = appointments?.some(apt => apt.time === slot.time);
-
-        return {
-          ...slot,
-          available: isProviderAvailable && !isBooked
-        };
-      });
-
-      console.log('✅ Final available slots:', availableSlots.filter(s => s.available).length, 'out of', availableSlots.length);
-      setTimeSlots(availableSlots);
-    } catch (error) {
+      setTimeSlots(slots);
+    } catch (error: any) {
       console.error('Error fetching time slots:', error);
       toast.error('Erro ao carregar horários disponíveis');
+      setTimeSlots([]);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [date, selectedGroomerId]);
 
+  // Handle next available appointment selection
   const handleNextAvailableSelect = () => {
     if (nextAvailable) {
-      setDate(nextAvailable.date);
-      setSelectedTimeSlotId(nextAvailable.timeSlot);
-      setSelectedGroomerId(nextAvailable.groomer);
+      setDate(new Date(nextAvailable.date));
+      setSelectedTimeSlotId(nextAvailable.time);
+      setActiveTab('calendar');
     }
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) {
-      e.preventDefault();
-    }
+  // Submit appointment
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
     if (!user) {
       toast.error('Você precisa estar logado para agendar');
       return;
     }
 
-    if (!selectedPet || !selectedService || !selectedGroomerId || !selectedTimeSlotId) {
+    if (!selectedPet || !selectedService || !selectedGroomerId || !date || !selectedTimeSlotId) {
       toast.error('Por favor, preencha todos os campos obrigatórios');
       return;
     }
 
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
       // Get pet and service details
-      const selectedPetData = userPets.find(p => p.id === selectedPet);
-      const selectedServiceData = services.find(s => s.id === selectedService);
-      
-      if (!selectedPetData || !selectedServiceData) {
-        throw new Error('Pet ou serviço não encontrado');
-      }
-
-      // Get user profile for owner name
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
+      const { data: pet } = await supabase
+        .from('pets')
         .select('name')
-        .eq('id', user.id)
+        .eq('id', selectedPet)
         .single();
 
-      if (profileError) throw profileError;
+      const { data: service } = await supabase
+        .from('services')
+        .select('name')
+        .eq('id', selectedService)
+        .single();
 
-      // Create the appointment
-      const { error: appointmentError } = await supabase
+      const { data: provider } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', selectedGroomerId)
+        .single();
+
+      // Create appointment
+      const { error } = await supabase
         .from('appointments')
         .insert({
           user_id: user.id,
-          pet_id: selectedPetData.id,
-          pet_name: selectedPetData.name,
-          service_id: selectedServiceData.id,
-          service: selectedServiceData.name,
+          pet_id: selectedPet,
+          service_id: selectedService,
           provider_id: selectedGroomerId,
           date: date.toISOString().split('T')[0],
           time: selectedTimeSlotId,
-          owner_name: profileData.name,
-          notes: notes || null,
-          status: 'upcoming'
+          service: service?.name || '',
+          pet_name: pet?.name || '',
+          owner_name: user.user_metadata?.name || user.email || '',
+          notes: notes || null
         });
 
-      if (appointmentError) throw appointmentError;
+      if (error) throw error;
 
       toast.success('Agendamento realizado com sucesso!');
-      navigate('/appointments');
+      navigate('/confirmation');
     } catch (error: any) {
       console.error('Error creating appointment:', error);
-      toast.error(error.message || 'Erro ao criar agendamento');
+      toast.error('Erro ao criar agendamento');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Load initial data
+  useEffect(() => {
+    fetchUserPets();
+  }, [fetchUserPets]);
+
+  // Fetch providers when service type changes
+  useEffect(() => {
+    console.log('🔄 Service type changed to:', serviceType);
+    fetchProviders(serviceType);
+  }, [serviceType, fetchProviders]);
+
+  // Fetch time slots when date or groomer changes
+  useEffect(() => {
+    fetchTimeSlots();
+  }, [fetchTimeSlots]);
+
   return {
-    // Form states
+    // State
     date,
     setDate,
     selectedGroomerId,
     setSelectedGroomerId,
-    selectedTimeSlotId, 
+    selectedTimeSlotId,
     setSelectedTimeSlotId,
     selectedPet,
     setSelectedPet,
@@ -319,22 +327,18 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     setSelectedService,
     notes,
     setNotes,
-    
-    // Data
     timeSlots,
-    userPets,
-    services,
-    groomers,
-    
-    // UI states
     isLoading,
     nextAvailable,
     activeTab,
     setActiveTab,
     formStep,
     setFormStep,
+    userPets,
+    services,
+    groomers,
     
-    // Functions
+    // Actions
     handleNextAvailableSelect,
     handleSubmit,
     fetchServices,
