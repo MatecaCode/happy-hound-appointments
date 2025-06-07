@@ -53,7 +53,7 @@ const Index = () => {
             </div>
             <div>
               <img 
-                src="/placeholder.svg" 
+                src="https://images.unsplash.com/photo-1721322800607-8c38375eef04?w=400&h=320&fit=crop&crop=center" 
                 alt="Nossa clínica" 
                 className="rounded-lg shadow-lg h-80 w-full object-cover"
               />

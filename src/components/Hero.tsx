@@ -47,7 +47,7 @@ const Hero = () => {
           
           <div className="relative">
             <img 
-              src="/placeholder.svg" 
+              src="https://images.unsplash.com/photo-1582562124811-c09040d0a901?w=500&h=500&fit=crop&crop=faces" 
               alt="Veterinário cuidando de um cachorro" 
               className="rounded-lg shadow-2xl w-full h-[500px] object-cover"
             />

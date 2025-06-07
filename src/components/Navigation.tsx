@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -73,7 +74,7 @@ const Navigation = () => {
       );
     }
 
-    // Default client navigation
+    // Default client navigation - this was missing!
     return (
       <>
         <Link 
@@ -180,8 +181,8 @@ const Navigation = () => {
       <div className="max-w-7xl mx-auto px-6">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex items-center space-x-2">
-            <img src="/logo-vettale.png" alt="VetTale" className="h-8 w-8" />
-            <span className="text-xl font-bold text-primary">VetTale</span>
+            <img src="/logo-vettale.png" alt="Vettale" className="h-8 w-8" />
+            <span className="text-xl font-bold text-primary">Vettale</span>
           </Link>
           
           <div className="hidden md:flex items-center space-x-8">
@@ -198,7 +199,27 @@ const Navigation = () => {
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                {renderUserMenu()}
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile">Perfil</Link>
+                  </DropdownMenuItem>
+                  {userRole === 'client' && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link to="/pets">Meus Pets</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/appointments">Agendamentos</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/cart">Carrinho</Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuItem onClick={signOut}>
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <div className="flex items-center space-x-2">
