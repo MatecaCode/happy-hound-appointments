@@ -14,32 +14,56 @@ const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Re-enable role-based redirects
+  // Re-enable role-based redirects using the new table structure
   useEffect(() => {
     const fetchUserRole = async () => {
       if (!user) return;
       
       try {
         const { supabase } = await import('@/integrations/supabase/client');
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
+        
+        // Check clients table first
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('user_id', user.id)
           .single();
           
-        if (error) throw error;
+        if (clientData) {
+          console.log('🔍 Layout Debug - User role: client, Current path:', location.pathname);
+          return; // Client stays on current page
+        }
         
-        const userRole = data?.role;
-        console.log('🔍 Layout Debug - User role:', userRole, 'Current path:', location.pathname);
-        
-        // Redirect professionals to their dashboards if they're on the main page
-        if (location.pathname === '/') {
-          if (userRole === 'groomer') {
+        // Check groomers table
+        const { data: groomerData } = await supabase
+          .from('groomers')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+          
+        if (groomerData) {
+          console.log('🔍 Layout Debug - User role: groomer, Current path:', location.pathname);
+          if (location.pathname === '/') {
             navigate('/groomer-dashboard');
-          } else if (userRole === 'vet') {
+          }
+          return;
+        }
+        
+        // Check veterinarians table
+        const { data: vetData } = await supabase
+          .from('veterinarians')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+          
+        if (vetData) {
+          console.log('🔍 Layout Debug - User role: vet, Current path:', location.pathname);
+          if (location.pathname === '/') {
             navigate('/vet-calendar');
           }
+          return;
         }
+        
       } catch (error) {
         console.error('Error fetching user role:', error);
       }

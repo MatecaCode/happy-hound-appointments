@@ -13,29 +13,29 @@ const CreateTestData = () => {
     try {
       console.log('🔧 Creating test data...');
 
-      // Create test groomers
+      // Create test groomers directly in groomers table
       const groomers = [
-        { id: 'groomer-1', name: 'Ana Santos', role: 'groomer' },
-        { id: 'groomer-2', name: 'Carlos Silva', role: 'groomer' },
-        { id: 'groomer-3', name: 'Maria Oliveira', role: 'groomer' }
+        { id: 'groomer-1', name: 'Ana Santos' },
+        { id: 'groomer-2', name: 'Carlos Silva' },
+        { id: 'groomer-3', name: 'Maria Oliveira' }
       ];
 
-      // Create test vets
+      // Create test vets directly in veterinarians table
       const vets = [
-        { id: 'vet-1', name: 'Dr. João Costa', role: 'vet' },
-        { id: 'vet-2', name: 'Dra. Paula Lima', role: 'vet' }
+        { id: 'vet-1', name: 'Dr. João Costa' },
+        { id: 'vet-2', name: 'Dra. Paula Lima' }
       ];
 
-      // Insert groomers
+      // Insert groomers into groomers table
       const { error: groomerError } = await supabase
-        .from('profiles')
+        .from('groomers')
         .upsert(groomers, { onConflict: 'id' });
 
       if (groomerError) throw groomerError;
 
-      // Insert vets
+      // Insert vets into veterinarians table
       const { error: vetError } = await supabase
-        .from('profiles')
+        .from('veterinarians')
         .upsert(vets, { onConflict: 'id' });
 
       if (vetError) throw vetError;

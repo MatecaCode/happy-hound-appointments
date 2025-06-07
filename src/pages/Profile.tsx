@@ -89,14 +89,26 @@ const Profile = () => {
         updated_at: new Date().toISOString()
       };
 
-      let tableName = 'clients';
-      if (userRole === 'groomer') tableName = 'groomers';
-      if (userRole === 'vet') tableName = 'veterinarians';
-
-      const { error } = await supabase
-        .from(tableName)
-        .update(updateData)
-        .eq('user_id', user.id);
+      let error;
+      if (userRole === 'client') {
+        const result = await supabase
+          .from('clients')
+          .update(updateData)
+          .eq('user_id', user.id);
+        error = result.error;
+      } else if (userRole === 'groomer') {
+        const result = await supabase
+          .from('groomers')
+          .update(updateData)
+          .eq('user_id', user.id);
+        error = result.error;
+      } else if (userRole === 'vet') {
+        const result = await supabase
+          .from('veterinarians')
+          .update(updateData)
+          .eq('user_id', user.id);
+        error = result.error;
+      }
 
       if (error) throw error;
       
