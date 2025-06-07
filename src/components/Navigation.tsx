@@ -74,7 +74,7 @@ const Navigation = () => {
       );
     }
 
-    // Default client navigation - this was missing!
+    // Default client navigation
     return (
       <>
         <Link 
@@ -118,61 +118,6 @@ const Navigation = () => {
           Loja
         </Link>
       </>
-    );
-  };
-
-  const renderUserMenu = () => {
-    if (userRole === 'groomer') {
-      return (
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link to="/profile">Perfil</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/groomer-dashboard">Meu Painel</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={signOut}>
-            Sair
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      );
-    }
-
-    if (userRole === 'vet') {
-      return (
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem asChild>
-            <Link to="/profile">Perfil</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/vet-calendar">Consultas</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={signOut}>
-            Sair
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      );
-    }
-
-    // Default client menu
-    return (
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem asChild>
-          <Link to="/profile">Perfil</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/pets">Meus Pets</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/appointments">Agendamentos</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/cart">Carrinho</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={signOut}>
-          Sair
-        </DropdownMenuItem>
-      </DropdownMenuContent>
     );
   };
 

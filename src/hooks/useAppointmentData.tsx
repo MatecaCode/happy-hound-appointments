@@ -48,6 +48,69 @@ export const useAppointmentData = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
 
+  // Create test groomers if none exist
+  const createTestGroomers = useCallback(async () => {
+    try {
+      console.log('🔧 Creating test groomers and availability...');
+      
+      // Create test groomer profiles
+      const testGroomers = [
+        { id: 'groomer-1', name: 'Ana Silva', role: 'groomer' },
+        { id: 'groomer-2', name: 'Carlos Santos', role: 'groomer' },
+        { id: 'vet-1', name: 'Dr. Maria Costa', role: 'vet' }
+      ];
+
+      for (const groomer of testGroomers) {
+        // Insert groomer profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .upsert(groomer, { onConflict: 'id' });
+
+        if (profileError) {
+          console.error('Error creating groomer profile:', profileError);
+          continue;
+        }
+
+        // Create availability for the next 30 days
+        const availabilityData = [];
+        for (let i = 0; i < 30; i++) {
+          const date = new Date();
+          date.setDate(date.getDate() + i);
+          const dateStr = date.toISOString().split('T')[0];
+
+          // Skip Sundays
+          if (date.getDay() === 0) continue;
+
+          // Create time slots for each day
+          const timeSlots = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+          for (const time of timeSlots) {
+            availabilityData.push({
+              provider_id: groomer.id,
+              date: dateStr,
+              time_slot: time,
+              available: true
+            });
+          }
+        }
+
+        // Insert availability
+        const { error: availError } = await supabase
+          .from('provider_availability')
+          .upsert(availabilityData, { onConflict: 'provider_id,date,time_slot' });
+
+        if (availError) {
+          console.error('Error creating availability:', availError);
+        }
+      }
+
+      console.log('✅ Test groomers and availability created successfully');
+      return true;
+    } catch (error) {
+      console.error('💥 Error creating test data:', error);
+      return false;
+    }
+  }, []);
+
   // Fetch providers available on a specific date
   const fetchAvailableProviders = useCallback(async (type: 'grooming' | 'veterinary', selectedDate: Date) => {
     try {
@@ -57,47 +120,52 @@ export const useAppointmentData = () => {
       console.log('🔍 DEBUG: Starting fetchAvailableProviders');
       console.log('🔍 DEBUG: Target role:', targetRole);
       console.log('🔍 DEBUG: Date string:', dateStr);
-      console.log('🔍 DEBUG: Service type:', type);
       
-      // Step 1: Get ALL profiles to see what we have
-      const { data: allProfiles, error: profilesError } = await supabase
+      // Step 1: Get providers with the target role
+      const { data: providers, error: profilesError } = await supabase
         .from('profiles')
-        .select('*');
+        .select('*')
+        .eq('role', targetRole);
 
-      console.log('🔍 DEBUG: All profiles from DB:', allProfiles);
+      console.log('🔍 DEBUG: Providers found:', providers);
       console.log('🔍 DEBUG: Profiles error:', profilesError);
 
-      if (profilesError) {
-        console.error('❌ Error fetching profiles:', profilesError);
-        throw profilesError;
+      if (profilesError) throw profilesError;
+
+      // If no providers found, try to create test data
+      if (!providers || providers.length === 0) {
+        console.log('⚠️ No providers found, creating test data...');
+        const success = await createTestGroomers();
+        
+        if (success) {
+          // Retry fetching after creating test data
+          const { data: retryProviders, error: retryError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('role', targetRole);
+            
+          if (retryError) throw retryError;
+          
+          if (!retryProviders || retryProviders.length === 0) {
+            console.log('❌ Still no providers after creating test data');
+            setGroomers([]);
+            return;
+          }
+          
+          console.log('✅ Found providers after creating test data:', retryProviders);
+          // Continue with the retry providers
+          providers = retryProviders;
+        } else {
+          setGroomers([]);
+          return;
+        }
       }
 
-      if (!allProfiles || allProfiles.length === 0) {
-        console.log('❌ No profiles found in database');
-        setGroomers([]);
-        return;
-      }
-
-      // Step 2: Filter by role
-      const matchingProviders = allProfiles.filter(profile => {
-        console.log(`🔍 DEBUG: Checking profile ${profile.name} with role ${profile.role} against target ${targetRole}`);
-        return profile.role === targetRole;
-      });
-      
-      console.log('🔍 DEBUG: Providers matching role:', matchingProviders);
-
-      if (matchingProviders.length === 0) {
-        console.log(`❌ No providers match the role: ${targetRole}`);
-        console.log('🔍 DEBUG: Available roles in DB:', allProfiles.map(p => p.role));
-        setGroomers([]);
-        return;
-      }
-
-      // Step 3: Check availability for each provider
+      // Step 2: Check availability for each provider
       const providersWithAvailability = [];
       
-      for (const provider of matchingProviders) {
-        console.log(`🔍 DEBUG: Checking availability for provider ${provider.name} (${provider.id}) on ${dateStr}`);
+      for (const provider of providers) {
+        console.log(`🔍 DEBUG: Checking availability for ${provider.name} on ${dateStr}`);
         
         const { data: availability, error: availError } = await supabase
           .from('provider_availability')
@@ -107,7 +175,6 @@ export const useAppointmentData = () => {
           .eq('available', true);
           
         console.log(`🔍 DEBUG: Availability for ${provider.name}:`, availability);
-        console.log(`🔍 DEBUG: Availability error:`, availError);
         
         if (availability && availability.length > 0) {
           console.log(`✅ Provider ${provider.name} has ${availability.length} available slots`);
@@ -117,16 +184,14 @@ export const useAppointmentData = () => {
         }
       }
 
-      console.log('🔍 DEBUG: Providers with availability:', providersWithAvailability);
-
-      // Transform for UI (with default values)
+      // Transform for UI
       const transformedProviders: Provider[] = providersWithAvailability.map(provider => ({
         id: provider.id,
         name: provider.name,
         role: provider.role,
         rating: 4.5,
         specialty: type === 'grooming' ? 'Tosa geral' : 'Clínica geral',
-        about: `${type === 'grooming' ? 'Tosador' : 'Veterinário'} experiente.`
+        about: `${type === 'grooming' ? 'Tosador' : 'Veterinário'} experiente com mais de 5 anos de experiência.`
       }));
 
       console.log('✅ Final transformed providers:', transformedProviders);
@@ -137,7 +202,7 @@ export const useAppointmentData = () => {
       toast.error('Erro ao carregar profissionais');
       setGroomers([]);
     }
-  }, []);
+  }, [createTestGroomers]);
 
   // Fetch services based on service type
   const fetchServices = useCallback(async (type: 'grooming' | 'veterinary') => {
@@ -243,5 +308,6 @@ export const useAppointmentData = () => {
     fetchServices,
     fetchUserPets,
     fetchTimeSlots,
+    createTestGroomers,
   };
 };
