@@ -9,7 +9,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -30,8 +29,6 @@ interface BasicInfoFormProps {
   setSelectedPet: (petId: string) => void;
   selectedService: string;
   setSelectedService: (serviceId: string) => void;
-  ownerName: string;
-  setOwnerName: (name: string) => void;
   onNext: () => void;
   serviceType: 'grooming' | 'veterinary';
 }
@@ -43,15 +40,13 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   setSelectedPet,
   selectedService,
   setSelectedService,
-  ownerName,
-  setOwnerName,
   onNext,
   serviceType
 }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  const canProceed = selectedPet && selectedService && ownerName.trim();
+  const canProceed = selectedPet && selectedService;
 
   const handleAddNewPet = () => {
     navigate('/pets');
@@ -138,26 +133,6 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
                 )}
               </SelectContent>
             </Select>
-          </div>
-        </CardContent>
-      </Card>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle>Informações do Dono</CardTitle>
-          <CardDescription>
-            Dados para contato
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nome</Label>
-            <Input
-              id="name"
-              placeholder="Seu nome completo"
-              value={ownerName}
-              onChange={(e) => setOwnerName(e.target.value)}
-            />
           </div>
         </CardContent>
         <CardFooter className="flex justify-end">

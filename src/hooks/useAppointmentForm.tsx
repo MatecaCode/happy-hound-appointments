@@ -54,7 +54,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(null);
   const [selectedPet, setSelectedPet] = useState('');
   const [selectedService, setSelectedService] = useState('');
-  const [ownerName, setOwnerName] = useState('');
   const [notes, setNotes] = useState('');
   
   // Data states
@@ -95,15 +94,23 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     const fetchProviders = async () => {
       try {
         const targetRole = serviceType === 'grooming' ? 'groomer' : 'vet';
+        console.log('Fetching providers with role:', targetRole);
+        
         const { data, error } = await supabase
           .from('profiles')
           .select('id, name, role, phone')
           .eq('role', targetRole);
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching providers:', error);
+          throw error;
+        }
+        
+        console.log('Found providers:', data);
         setGroomers(data || []);
       } catch (error) {
         console.error('Error fetching providers:', error);
+        toast.error('Erro ao carregar profissionais');
       }
     };
     
@@ -119,7 +126,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         
       if (error) throw error;
       
-      // Map the database response to our Service interface
       const mappedServices: Service[] = (data || []).map(service => ({
         id: service.id,
         name: service.name,
@@ -175,7 +181,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       return;
     }
 
-    if (!selectedPet || !selectedService || !selectedGroomerId || !selectedTimeSlotId || !ownerName.trim()) {
+    if (!selectedPet || !selectedService || !selectedGroomerId || !selectedTimeSlotId) {
       toast.error('Por favor, preencha todos os campos obrigatórios');
       return;
     }
@@ -191,6 +197,15 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         throw new Error('Pet ou serviço não encontrado');
       }
 
+      // Get user profile for owner name
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+
+      if (profileError) throw profileError;
+
       // Create the appointment
       const { error: appointmentError } = await supabase
         .from('appointments')
@@ -203,7 +218,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
           provider_id: selectedGroomerId,
           date: date.toISOString().split('T')[0],
           time: selectedTimeSlotId,
-          owner_name: ownerName,
+          owner_name: profileData.name,
           notes: notes || null,
           status: 'upcoming'
         });
@@ -232,8 +247,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     setSelectedPet,
     selectedService,
     setSelectedService,
-    ownerName, 
-    setOwnerName,
     notes,
     setNotes,
     
