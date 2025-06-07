@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -22,6 +21,7 @@ import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import { AuthProvider } from "./hooks/useAuth";
+import TestDataPage from "./pages/TestDataPage";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +54,7 @@ const App = () => {
               <Route path="/shop" element={<Shop />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/test-data" element={<TestDataPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </AuthProvider>
