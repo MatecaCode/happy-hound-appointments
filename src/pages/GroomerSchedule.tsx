@@ -55,40 +55,20 @@ const GroomerSchedule = () => {
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
       
-      // Use raw query to access the new table until types are updated
+      // Direct query to provider_availability table
       const { data, error } = await supabase
-        .rpc('get_provider_availability', {
-          provider_id: user.id,
-          availability_date: dateStr
-        });
+        .from('provider_availability')
+        .select('*')
+        .eq('provider_id', user.id)
+        .eq('date', dateStr);
 
-      // If RPC doesn't exist, fall back to direct query
-      if (error && error.message?.includes('function')) {
-        const { data: directData, error: directError } = await supabase
-          .from('provider_availability' as any)
-          .select('*')
-          .eq('provider_id', user.id)
-          .eq('date', dateStr);
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching availability:', error);
+      }
 
-        if (directError && directError.code !== 'PGRST116') {
-          throw directError;
-        }
-
-        if (directData && directData.length > 0) {
-          const slots = generateDefaultSlots().map(slot => {
-            const dbSlot = directData.find((d: any) => d.time_slot === slot.time);
-            return {
-              ...slot,
-              available: dbSlot ? dbSlot.available : true
-            };
-          });
-          setAvailabilitySlots(slots);
-        } else {
-          setAvailabilitySlots(generateDefaultSlots());
-        }
-      } else if (data && data.length > 0) {
+      if (data && data.length > 0) {
         const slots = generateDefaultSlots().map(slot => {
-          const dbSlot = data.find((d: any) => d.time_slot === slot.time);
+          const dbSlot = data.find(d => d.time_slot === slot.time);
           return {
             ...slot,
             available: dbSlot ? dbSlot.available : true
@@ -117,9 +97,9 @@ const GroomerSchedule = () => {
     const newAvailability = !currentSlot.available;
 
     try {
-      // Use raw query to insert into the new table
+      // Use direct query to insert into the provider_availability table
       const { error } = await supabase
-        .from('provider_availability' as any)
+        .from('provider_availability')
         .upsert({
           provider_id: user.id,
           date: dateStr,

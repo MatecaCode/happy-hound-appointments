@@ -155,15 +155,15 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       setIsLoading(true);
       const dateStr = date.toISOString().split('T')[0];
       
-      // Get provider availability
+      // Get provider availability - use direct query instead of RPC
       const { data: availability, error: availError } = await supabase
-        .from('provider_availability' as any)
+        .from('provider_availability')
         .select('*')
         .eq('provider_id', selectedGroomerId)
         .eq('date', dateStr);
 
       if (availError && availError.code !== 'PGRST116') {
-        throw availError;
+        console.error('Error fetching availability:', availError);
       }
 
       // Get existing appointments for this provider and date
@@ -174,7 +174,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         .eq('date', dateStr)
         .eq('status', 'upcoming');
 
-      if (apptError) throw apptError;
+      if (apptError) {
+        console.error('Error fetching appointments:', apptError);
+      }
 
       // Generate all possible time slots
       const allSlots: TimeSlot[] = [];
@@ -196,7 +198,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       // Check availability based on provider's schedule
       const availableSlots = allSlots.map(slot => {
         // Check if provider has set this time as available
-        const providerAvailability = availability?.find((a: any) => a.time_slot === slot.time);
+        const providerAvailability = availability?.find(a => a.time_slot === slot.time);
         const isProviderAvailable = providerAvailability ? providerAvailability.available : true; // Default to available
 
         // Check if slot is already booked
