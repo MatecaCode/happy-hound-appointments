@@ -97,12 +97,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, name: string, role: string = 'client') => {
     try {
+      console.log('🔍 SignUp Debug - Starting registration with:', { email, name, role });
+      
       // Validate role to ensure it's one of the allowed values
       if (!['client', 'groomer', 'vet'].includes(role)) {
         role = 'client'; // Default to client if invalid role
       }
       
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -116,9 +118,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) throw error;
       
+      console.log('✅ SignUp Debug - User created:', data);
+      console.log('📋 SignUp Debug - User metadata:', data.user?.user_metadata);
+      
+      // Check if profile was created
+      if (data.user) {
+        setTimeout(async () => {
+          const { data: profileData, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id);
+          
+          console.log('👤 SignUp Debug - Profile check:', { profileData, profileError });
+        }, 2000);
+      }
+      
       toast.success('Registro realizado com sucesso! Verifique seu e-mail para confirmar.');
       navigate('/login');
     } catch (error: any) {
+      console.error('❌ SignUp Debug - Error:', error);
       toast.error(error.message || 'Erro ao criar conta');
     }
   };

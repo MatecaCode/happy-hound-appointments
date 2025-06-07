@@ -29,6 +29,7 @@ const Layout = ({ children }: LayoutProps) => {
           .single();
           
         if (error) throw error;
+        console.log('🔍 Layout Debug - User role:', data?.role);
         setUserRole(data?.role || 'client');
       } catch (error) {
         console.error('Error fetching user role:', error);
@@ -39,11 +40,11 @@ const Layout = ({ children }: LayoutProps) => {
     fetchUserRole();
   }, [user]);
 
-  // Redirect groomers and vets to their calendars when accessing home page
+  // Redirect groomers and vets to their dashboards when accessing home page
   useEffect(() => {
     if (user && userRole && location.pathname === '/') {
       if (userRole === 'groomer') {
-        navigate('/groomer-calendar');
+        navigate('/groomer-dashboard');
       } else if (userRole === 'vet') {
         navigate('/vet-calendar');
       }

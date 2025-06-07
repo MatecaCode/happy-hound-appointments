@@ -13,9 +13,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import Pets from "./pages/Pets";
-import GroomerCalendar from "./pages/GroomerCalendar";
+import GroomerDashboard from "./pages/GroomerDashboard";
 import VetCalendar from "./pages/VetCalendar";
-import GroomerSchedule from "./pages/GroomerSchedule";
 import Shop from "./pages/Shop";
 import Cart from "./pages/Cart";
 import About from "./pages/About";
@@ -45,8 +44,9 @@ const App = () => (
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/pets" element={<Pets />} />
-            <Route path="/groomer-calendar" element={<GroomerCalendar />} />
-            <Route path="/groomer-schedule" element={<GroomerSchedule />} />
+            <Route path="/groomer-calendar" element={<GroomerDashboard />} />
+            <Route path="/groomer-schedule" element={<GroomerDashboard />} />
+            <Route path="/groomer-dashboard" element={<GroomerDashboard />} />
             <Route path="/vet-calendar" element={<VetCalendar />} />
             <Route path="/shop" element={<Shop />} />
             <Route path="/cart" element={<Cart />} />

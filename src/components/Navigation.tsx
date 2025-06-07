@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -30,6 +29,7 @@ const Navigation = () => {
           .single();
           
         if (error) throw error;
+        console.log('🔍 Navigation Debug - User role:', data?.role);
         setUserRole(data?.role || 'client');
       } catch (error) {
         console.error('Error fetching user role:', error);
@@ -47,20 +47,12 @@ const Navigation = () => {
       return (
         <>
           <Link 
-            to="/groomer-calendar" 
+            to="/groomer-dashboard" 
             className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive('/groomer-calendar') ? 'text-primary' : 'text-muted-foreground'
+              isActive('/groomer-dashboard') || isActive('/groomer-calendar') || isActive('/groomer-schedule') ? 'text-primary' : 'text-muted-foreground'
             }`}
           >
-            Agendamentos
-          </Link>
-          <Link 
-            to="/groomer-schedule" 
-            className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive('/groomer-schedule') ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            Minha Agenda
+            Meu Painel
           </Link>
         </>
       );
@@ -136,10 +128,7 @@ const Navigation = () => {
             <Link to="/profile">Perfil</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link to="/groomer-calendar">Agendamentos</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/groomer-schedule">Minha Agenda</Link>
+            <Link to="/groomer-dashboard">Meu Painel</Link>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={signOut}>
             Sair
