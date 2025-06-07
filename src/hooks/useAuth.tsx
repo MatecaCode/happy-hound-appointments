@@ -17,208 +17,75 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Mock user for testing purposes
+const mockUser = {
+  id: '550e8400-e29b-41d4-a716-446655440000',
+  email: 'test@example.com',
+  user_metadata: { name: 'Test User' },
+  aud: 'authenticated',
+  role: 'authenticated',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  app_metadata: {},
+  identities: [],
+  confirmation_sent_at: null,
+  confirmed_at: new Date().toISOString(),
+  email_confirmed_at: new Date().toISOString(),
+  phone: null,
+  phone_confirmed_at: null,
+  last_sign_in_at: new Date().toISOString(),
+  recovery_sent_at: null,
+  new_email: null,
+  new_phone: null,
+  invited_at: null,
+  action_link: null,
+  email_change_sent_at: null,
+  phone_change_sent_at: null,
+  is_anonymous: false,
+} as User;
+
+const mockSession = {
+  access_token: 'mock-token',
+  refresh_token: 'mock-refresh',
+  expires_in: 3600,
+  expires_at: Math.floor(Date.now() / 1000) + 3600,
+  token_type: 'bearer',
+  user: mockUser,
+} as Session;
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  // For testing: always return a mock authenticated user
+  const [user, setUser] = useState<User | null>(mockUser);
+  const [session, setSession] = useState<Session | null>(mockSession);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        setLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
-      setSession(currentSession);
-      setUser(currentSession?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    // Skip real auth setup for testing
+    console.log('🧪 AUTH DISABLED FOR TESTING - Using mock user');
+    setLoading(false);
   }, []);
 
-  // Fix for google authentication redirect loops
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN') {
-        // Use setTimeout to avoid calling navigate during render
-        setTimeout(() => {
-          navigate('/', { replace: true });
-        }, 0);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, [navigate]);
-
+  // Mock auth functions for testing
   const signIn = async (email: string, password: string) => {
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-      toast.success('Login realizado com sucesso!');
-      navigate('/');
-    } catch (error: any) {
-      if (error.message === 'Email not confirmed') {
-        toast.error('Por favor, confirme seu email antes de fazer login');
-      } else {
-        toast.error(error.message || 'Erro ao fazer login');
-      }
-    }
+    toast.success('Login simulado - auth desabilitado para testes');
+    navigate('/');
   };
 
   const signInWithGoogle = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
-        },
-      });
-      
-      if (error) throw error;
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao fazer login com Google');
-    }
-  };
-
-  const initializeGroomerAvailability = async (userId: string) => {
-    console.log('🔧 Initializing groomer availability for user:', userId);
-    
-    try {
-      // Generate availability for the next 3 months
-      const availabilityEntries = [];
-      const today = new Date();
-      const endDate = new Date();
-      endDate.setMonth(today.getMonth() + 3);
-
-      // Generate time slots (8am to 5pm, 30-min intervals)
-      const timeSlots = [];
-      for (let hour = 8; hour < 17; hour++) {
-        timeSlots.push(`${hour}:00`);
-        if (hour < 16) {
-          timeSlots.push(`${hour}:30`);
-        }
-      }
-
-      // Loop through each day for the next 3 months
-      for (let date = new Date(today); date <= endDate; date.setDate(date.getDate() + 1)) {
-        // Skip Sundays (day 0)
-        if (date.getDay() === 0) continue;
-
-        const dateStr = date.toISOString().split('T')[0];
-        
-        // Add all time slots for this date
-        for (const timeSlot of timeSlots) {
-          availabilityEntries.push({
-            provider_id: userId,
-            date: dateStr,
-            time_slot: timeSlot,
-            available: true
-          });
-        }
-      }
-
-      console.log(`📊 Creating ${availabilityEntries.length} availability entries for new groomer...`);
-
-      // Insert all availability entries in batches
-      const batchSize = 100;
-      for (let i = 0; i < availabilityEntries.length; i += batchSize) {
-        const batch = availabilityEntries.slice(i, i + batchSize);
-        const { error: insertError } = await supabase
-          .from('provider_availability')
-          .insert(batch);
-
-        if (insertError) {
-          console.error('Error inserting availability batch:', insertError);
-          // Don't throw here, as we don't want to fail registration
-        }
-      }
-
-      console.log('✅ Groomer availability initialized successfully');
-    } catch (error: any) {
-      console.error('❌ Error initializing groomer availability:', error);
-      // Don't throw here, as we don't want to fail registration
-    }
+    toast.success('Login Google simulado - auth desabilitado para testes');
   };
 
   const signUp = async (email: string, password: string, name: string, role: string = 'client') => {
-    try {
-      console.log('🔍 SignUp Debug - Starting registration with:', { email, name, role });
-      
-      // Validate role to ensure it's one of the allowed values
-      if (!['client', 'groomer', 'vet'].includes(role)) {
-        role = 'client'; // Default to client if invalid role
-      }
-      
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            role, // Store role in user metadata
-          },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
-      
-      console.log('✅ SignUp Debug - User created:', data);
-      console.log('📋 SignUp Debug - User metadata:', data.user?.user_metadata);
-      
-      // Check if profile was created and initialize groomer availability if needed
-      if (data.user) {
-        setTimeout(async () => {
-          const { data: profileData, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', data.user.id)
-            .single();
-          
-          console.log('👤 SignUp Debug - Profile check:', { profileData, profileError });
-          
-          // If the user is a groomer, initialize their availability
-          if (profileData && profileData.role === 'groomer') {
-            console.log('🏥 New groomer detected, initializing availability...');
-            await initializeGroomerAvailability(data.user.id);
-          }
-        }, 3000); // Wait a bit longer for the profile trigger to complete
-      }
-      
-      toast.success('Registro realizado com sucesso! Verifique seu e-mail para confirmar.');
-      navigate('/login');
-    } catch (error: any) {
-      console.error('❌ SignUp Debug - Error:', error);
-      toast.error(error.message || 'Erro ao criar conta');
-    }
+    toast.success('Registro simulado - auth desabilitado para testes');
+    navigate('/login');
   };
 
   const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      toast.success('Você saiu com sucesso');
-      // Use setTimeout to avoid navigation during render
-      setTimeout(() => {
-        navigate('/');
-      }, 0);
-    } catch (error: any) {
-      toast.error(error.message || 'Erro ao fazer logout');
-    }
+    toast.success('Logout simulado - auth desabilitado para testes');
+    setTimeout(() => {
+      navigate('/');
+    }, 0);
   };
 
   return (
