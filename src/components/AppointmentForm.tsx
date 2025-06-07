@@ -2,8 +2,8 @@
 import React from 'react';
 import { useAppointmentForm } from '@/hooks/useAppointmentForm';
 import BasicInfoForm from './appointment/BasicInfoForm';
-import GroomerSelectionForm from './appointment/GroomerSelectionForm';
 import DateTimeForm from './appointment/DateTimeForm';
+import GroomerSelectionForm from './appointment/GroomerSelectionForm';
 
 interface AppointmentFormProps {
   serviceType: 'grooming' | 'veterinary';
@@ -59,17 +59,6 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
       )}
       
       {formStep === 2 && (
-        <GroomerSelectionForm
-          groomers={groomers}
-          selectedGroomerId={selectedGroomerId}
-          setSelectedGroomerId={setSelectedGroomerId}
-          onNext={() => setFormStep(3)}
-          onBack={() => setFormStep(1)}
-          serviceType={serviceType}
-        />
-      )}
-      
-      {formStep === 3 && (
         <DateTimeForm
           date={date}
           setDate={setDate}
@@ -83,8 +72,44 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setActiveTab={(tab: 'calendar' | 'next-available') => setActiveTab(tab)}
           notes={notes}
           setNotes={setNotes}
+          onBack={() => setFormStep(1)}
+          onNext={() => setFormStep(3)}
+          showTimeSlots={false}
+          showSubmitButton={false}
+        />
+      )}
+      
+      {formStep === 3 && (
+        <GroomerSelectionForm
+          groomers={groomers}
+          selectedGroomerId={selectedGroomerId}
+          setSelectedGroomerId={setSelectedGroomerId}
+          date={date}
+          onNext={() => setFormStep(4)}
           onBack={() => setFormStep(2)}
+          serviceType={serviceType}
+        />
+      )}
+      
+      {formStep === 4 && (
+        <DateTimeForm
+          date={date}
+          setDate={setDate}
+          timeSlots={timeSlots}
+          selectedTimeSlotId={selectedTimeSlotId}
+          setSelectedTimeSlotId={setSelectedTimeSlotId}
+          nextAvailable={nextAvailable}
+          handleNextAvailableSelect={handleNextAvailableSelect}
+          isLoading={isLoading}
+          activeTab={activeTab}
+          setActiveTab={(tab: 'calendar' | 'next-available') => setActiveTab(tab)}
+          notes={notes}
+          setNotes={setNotes}
+          onBack={() => setFormStep(3)}
           onSubmit={handleSubmit}
+          showTimeSlots={true}
+          showSubmitButton={true}
+          stepTitle="4. Confirme o Horário"
         />
       )}
     </form>

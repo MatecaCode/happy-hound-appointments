@@ -32,7 +32,11 @@ interface DateTimeFormProps {
   notes: string;
   setNotes: (notes: string) => void;
   onBack: () => void;
-  onSubmit: (e: React.FormEvent) => void;
+  onNext?: () => void;
+  onSubmit?: (e: React.FormEvent) => void;
+  showTimeSlots?: boolean;
+  showSubmitButton?: boolean;
+  stepTitle?: string;
 }
 
 const DateTimeForm: React.FC<DateTimeFormProps> = ({
@@ -49,7 +53,11 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   notes,
   setNotes,
   onBack,
-  onSubmit
+  onNext,
+  onSubmit,
+  showTimeSlots = true,
+  showSubmitButton = true,
+  stepTitle = "2. Escolha da Data"
 }) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -61,107 +69,143 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     <>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h2 className="text-xl font-semibold">3. Escolha da Data e Hora</h2>
+          <h2 className="text-xl font-semibold">{stepTitle}</h2>
           <Button variant="ghost" size="sm" onClick={onBack}>Voltar</Button>
         </div>
         
-        <Tabs defaultValue="calendar" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="calendar">Calendário</TabsTrigger>
-            <TabsTrigger value="next">Próximo Disponível</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="calendar">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardContent className="p-4">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={(newDate) => newDate && setDate(newDate)}
-                    className="mx-auto pointer-events-auto"
-                    locale={ptBR}
-                    disabled={(date) => {
-                      return date < today;
-                    }}
-                    fromDate={today}
-                    toDate={toDate}
-                  />
-                </CardContent>
-              </Card>
-              
-              <div>
+        {!showTimeSlots ? (
+          // Date-only selection for step 2
+          <Card>
+            <CardContent className="p-4">
+              <h3 className="font-semibold mb-4">
+                Selecione uma data para ver os profissionais disponíveis
+              </h3>
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={(newDate) => newDate && setDate(newDate)}
+                className="mx-auto pointer-events-auto"
+                locale={ptBR}
+                disabled={(date) => {
+                  return date < today;
+                }}
+                fromDate={today}
+                toDate={toDate}
+              />
+            </CardContent>
+          </Card>
+        ) : (
+          // Full date/time selection for step 4
+          <Tabs defaultValue="calendar" value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="calendar">Calendário</TabsTrigger>
+              <TabsTrigger value="next">Próximo Disponível</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="calendar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card>
                   <CardContent className="p-4">
-                    <h3 className="font-semibold mb-4">
-                      Horários para {format(date, 'dd/MM/yyyy', { locale: ptBR })}
-                    </h3>
-                    
-                    {isLoading ? (
-                      <p className="text-center text-muted-foreground">Carregando horários...</p>
-                    ) : timeSlots.length === 0 ? (
-                      <p className="text-center text-muted-foreground">
-                        Selecione um tosador primeiro para ver os horários disponíveis
-                      </p>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                        {timeSlots.map((slot) => (
-                          <Button
-                            key={slot.id}
-                            variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
-                            size="sm"
-                            disabled={!slot.available}
-                            onClick={() => setSelectedTimeSlotId(slot.id)}
-                            className="justify-center"
-                          >
-                            {slot.time}
-                            {!slot.available && (
-                              <Badge variant="secondary" className="ml-2 text-xs">
-                                Ocupado
-                              </Badge>
-                            )}
-                          </Button>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {timeSlots.filter(slot => slot.available).length === 0 && timeSlots.length > 0 && (
-                      <p className="text-center text-muted-foreground mt-4">
-                        Não há horários disponíveis para esta data. Tente outra data ou use "Próximo Disponível".
-                      </p>
-                    )}
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={(newDate) => newDate && setDate(newDate)}
+                      className="mx-auto pointer-events-auto"
+                      locale={ptBR}
+                      disabled={(date) => {
+                        return date < today;
+                      }}
+                      fromDate={today}
+                      toDate={toDate}
+                    />
                   </CardContent>
                 </Card>
+                
+                <div>
+                  <Card>
+                    <CardContent className="p-4">
+                      <h3 className="font-semibold mb-4">
+                        Horários para {format(date, 'dd/MM/yyyy', { locale: ptBR })}
+                      </h3>
+                      
+                      {isLoading ? (
+                        <p className="text-center text-muted-foreground">Carregando horários...</p>
+                      ) : timeSlots.length === 0 ? (
+                        <p className="text-center text-muted-foreground">
+                          Selecione um profissional primeiro para ver os horários disponíveis
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                          {timeSlots.map((slot) => (
+                            <Button
+                              key={slot.id}
+                              variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
+                              size="sm"
+                              disabled={!slot.available}
+                              onClick={() => setSelectedTimeSlotId(slot.id)}
+                              className="justify-center"
+                            >
+                              {slot.time}
+                              {!slot.available && (
+                                <Badge variant="secondary" className="ml-2 text-xs">
+                                  Ocupado
+                                </Badge>
+                              )}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {timeSlots.filter(slot => slot.available).length === 0 && timeSlots.length > 0 && (
+                        <p className="text-center text-muted-foreground mt-4">
+                          Não há horários disponíveis para esta data. Tente outra data ou use "Próximo Disponível".
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="next">
-            <div className="py-6">
-              <NextAvailableAppointment
-                nextAvailable={nextAvailable}
-                onSelect={handleNextAvailableSelect}
-                loading={isLoading}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+            
+            <TabsContent value="next">
+              <div className="py-6">
+                <NextAvailableAppointment
+                  nextAvailable={nextAvailable}
+                  onSelect={handleNextAvailableSelect}
+                  loading={isLoading}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
         
-        <div>
-          <Label htmlFor="notes">Observações (opcional)</Label>
-          <Textarea
-            id="notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Alguma observação importante sobre o pet?"
-            rows={3}
-          />
-        </div>
+        {showTimeSlots && (
+          <div>
+            <Label htmlFor="notes">Observações (opcional)</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Alguma observação importante sobre o pet?"
+              rows={3}
+            />
+          </div>
+        )}
       </div>
       
-      <Button type="submit" disabled={isLoading || !selectedTimeSlotId} onClick={onSubmit}>
-        {isLoading ? 'Agendando...' : 'Concluir Agendamento'}
-      </Button>
+      <div className="flex justify-between">
+        {!showTimeSlots && (
+          <Button onClick={onNext} disabled={!date}>
+            Continuar
+          </Button>
+        )}
+        
+        {showSubmitButton && onSubmit && (
+          <Button type="submit" disabled={isLoading || !selectedTimeSlotId} onClick={onSubmit}>
+            {isLoading ? 'Agendando...' : 'Concluir Agendamento'}
+          </Button>
+        )}
+      </div>
     </>
   );
 };

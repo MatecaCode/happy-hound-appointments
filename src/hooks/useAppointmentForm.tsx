@@ -65,103 +65,69 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   const [activeTab, setActiveTab] = useState<'calendar' | 'next-available'>('calendar');
   const [formStep, setFormStep] = useState(1);
 
-  // Fetch providers (groomers or vets)
-  const fetchProviders = useCallback(async (type: 'grooming' | 'veterinary') => {
+  // Fetch providers available on a specific date
+  const fetchAvailableProviders = useCallback(async (type: 'grooming' | 'veterinary', selectedDate: Date) => {
     try {
       const targetRole = type === 'grooming' ? 'groomer' : 'vet';
-      console.log('🔍 DETAILED FETCH - Service type:', type);
-      console.log('🔍 DETAILED FETCH - Target role:', targetRole);
+      const dateStr = selectedDate.toISOString().split('T')[0];
       
-      // First, let's get ALL profiles without any filtering to see what's in the database
-      console.log('📊 Step 1: Fetching ALL profiles to see what exists...');
-      const { data: allProfiles, error: allError } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      console.log('📊 ALL PROFILES QUERY RESULT:');
-      console.log('   - Error:', allError);
-      console.log('   - Data count:', allProfiles?.length || 0);
-      console.log('   - Raw data:', allProfiles);
+      console.log('🔍 FETCHING AVAILABLE PROVIDERS');
+      console.log('   - Service type:', type);
+      console.log('   - Target role:', targetRole);
+      console.log('   - Date:', dateStr);
       
-      if (allProfiles && allProfiles.length > 0) {
-        console.log('📋 DETAILED PROFILE BREAKDOWN:');
-        allProfiles.forEach((profile, index) => {
-          console.log(`   ${index + 1}. ID: ${profile.id.substring(0, 8)}...`);
-          console.log(`      Name: "${profile.name}"`);
-          console.log(`      Role: "${profile.role}" (type: ${typeof profile.role})`);
-          console.log(`      Role === "groomer": ${profile.role === 'groomer'}`);
-          console.log(`      Role === "vet": ${profile.role === 'vet'}`);
-          console.log(`      Role length: ${profile.role?.length || 'null'}`);
-          console.log(`      Role charCodes: ${profile.role ? Array.from(profile.role).map(c => c.charCodeAt(0)).join(',') : 'null'}`);
-          console.log('      ---');
-        });
-        
-        // Count by role
-        const groomers = allProfiles.filter(p => p.role === 'groomer');
-        const vets = allProfiles.filter(p => p.role === 'vet');
-        const clients = allProfiles.filter(p => p.role === 'client');
-        const others = allProfiles.filter(p => !['groomer', 'vet', 'client'].includes(p.role));
-        
-        console.log(`📊 ROLE COUNTS:`);
-        console.log(`   - Groomers: ${groomers.length}`);
-        console.log(`   - Vets: ${vets.length}`);
-        console.log(`   - Clients: ${clients.length}`);
-        console.log(`   - Others: ${others.length}`);
-        
-        if (others.length > 0) {
-          console.log(`   - Other roles found:`, others.map(p => `"${p.role}"`));
-        }
-      }
-      
-      // Now try the targeted query
-      console.log(`📊 Step 2: Targeted query for role = "${targetRole}"`);
-      const { data: providers, error } = await supabase
+      // First get all providers with the target role
+      const { data: allProviders, error: providersError } = await supabase
         .from('profiles')
         .select('*')
         .eq('role', targetRole)
         .order('name');
 
-      console.log('🎯 TARGETED QUERY RESULT:');
-      console.log('   - Target role:', targetRole);
-      console.log('   - Error:', error);
-      console.log('   - Found providers:', providers?.length || 0);
-      console.log('   - Provider data:', providers);
-
-      if (error) {
-        console.error('❌ Error in targeted query:', error);
-        throw error;
+      if (providersError) {
+        console.error('❌ Error fetching providers:', providersError);
+        throw providersError;
       }
 
-      if (!providers || providers.length === 0) {
-        console.log('⚠️ NO PROVIDERS FOUND');
-        console.log(`💡 Expected to find profiles with role = "${targetRole}"`);
-        
-        // Try alternative queries to debug
-        console.log('🔍 Trying alternative queries...');
-        
-        // Case insensitive search
-        const { data: caseInsensitive } = await supabase
-          .from('profiles')
-          .select('*')
-          .ilike('role', targetRole);
-          
-        console.log(`   - Case insensitive search for "${targetRole}":`, caseInsensitive?.length || 0);
-        
-        // Search with LIKE
-        const { data: likeSearch } = await supabase
-          .from('profiles')
-          .select('*')
-          .like('role', `%${targetRole}%`);
-          
-        console.log(`   - LIKE search for "%${targetRole}%":`, likeSearch?.length || 0);
-        
+      console.log('📊 All providers found:', allProviders?.length || 0);
+
+      if (!allProviders || allProviders.length === 0) {
+        console.log('⚠️ NO PROVIDERS FOUND with role:', targetRole);
         setGroomers([]);
         return;
       }
 
+      // Then check which providers have availability on the selected date
+      const { data: availability, error: availError } = await supabase
+        .from('provider_availability')
+        .select('provider_id')
+        .eq('date', dateStr)
+        .eq('available', true);
+
+      if (availError) {
+        console.error('❌ Error fetching availability:', availError);
+        // If no availability data exists, show all providers as potentially available
+        console.log('📝 No availability data found, showing all providers');
+      }
+
+      console.log('📅 Availability data:', availability?.length || 0, 'slots found');
+
+      // Filter providers based on availability or show all if no availability data
+      let availableProviders: Provider[];
+      
+      if (availability && availability.length > 0) {
+        const availableProviderIds = availability.map(a => a.provider_id);
+        availableProviders = allProviders.filter(provider => 
+          availableProviderIds.includes(provider.id)
+        );
+        console.log('✅ Filtered by availability:', availableProviders.length, 'providers');
+      } else {
+        // If no availability data, show all providers as potentially available
+        availableProviders = allProviders;
+        console.log('📋 Showing all providers (no availability constraints):', availableProviders.length);
+      }
+
       // Transform the data to match our Provider interface
-      const transformedProviders: Provider[] = providers.map(provider => ({
+      const transformedProviders: Provider[] = availableProviders.map(provider => ({
         id: provider.id,
         name: provider.name,
         role: provider.role,
@@ -170,15 +136,12 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         about: `${type === 'grooming' ? 'Tosador' : 'Veterinário'} experiente com anos de experiência.`
       }));
 
-      console.log('✅ FINAL RESULT:');
-      console.log('   - Transformed providers:', transformedProviders.length);
-      console.log('   - Provider details:', transformedProviders);
-      
+      console.log('✅ FINAL AVAILABLE PROVIDERS:', transformedProviders.length);
       setGroomers(transformedProviders);
       
     } catch (error: any) {
-      console.error('💥 FETCH PROVIDERS ERROR:', error);
-      toast.error('Erro ao carregar profissionais');
+      console.error('💥 FETCH AVAILABLE PROVIDERS ERROR:', error);
+      toast.error('Erro ao carregar profissionais disponíveis');
       setGroomers([]);
     }
   }, []);
@@ -348,16 +311,20 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     fetchUserPets();
   }, [fetchUserPets]);
 
-  // Fetch providers when service type changes
+  // Fetch available providers when date changes (for step 3)
   useEffect(() => {
-    console.log('🔄 Service type changed to:', serviceType);
-    fetchProviders(serviceType);
-  }, [serviceType, fetchProviders]);
+    if (formStep === 3 && date) {
+      console.log('🔄 Fetching providers for date:', date);
+      fetchAvailableProviders(serviceType, date);
+    }
+  }, [formStep, date, serviceType, fetchAvailableProviders]);
 
   // Fetch time slots when date or groomer changes
   useEffect(() => {
-    fetchTimeSlots();
-  }, [fetchTimeSlots]);
+    if (formStep === 4) {
+      fetchTimeSlots();
+    }
+  }, [formStep, fetchTimeSlots]);
 
   return {
     // State

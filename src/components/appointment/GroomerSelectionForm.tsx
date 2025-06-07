@@ -4,7 +4,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Star } from "lucide-react";
+import { Star, Calendar } from "lucide-react";
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface Provider {
   id: string;
@@ -20,6 +22,7 @@ interface GroomerSelectionFormProps {
   groomers: Provider[];
   selectedGroomerId: string;
   setSelectedGroomerId: (id: string) => void;
+  date: Date;
   onNext: () => void;
   onBack: () => void;
   serviceType: 'grooming' | 'veterinary';
@@ -29,6 +32,7 @@ const GroomerSelectionForm = ({
   groomers,
   selectedGroomerId,
   setSelectedGroomerId,
+  date,
   onNext,
   onBack,
   serviceType
@@ -40,10 +44,11 @@ const GroomerSelectionForm = ({
   useEffect(() => {
     console.log('🎯 GroomerSelectionForm rendered');
     console.log('📋 Service type:', serviceType);
+    console.log('📅 Selected date:', format(date, 'dd/MM/yyyy', { locale: ptBR }));
     console.log('👥 Groomers received:', groomers);
     console.log('📊 Groomers count:', groomers.length);
     console.log('🔍 Selected groomer ID:', selectedGroomerId);
-  }, [groomers, selectedGroomerId, serviceType]);
+  }, [groomers, selectedGroomerId, serviceType, date]);
   
   // Auto-select first groomer if there's only one and none is selected
   useEffect(() => {
@@ -66,14 +71,14 @@ const GroomerSelectionForm = ({
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="text-xl font-semibold">2. Escolha o {providerLabel}</h2>
-        <p className="text-sm text-muted-foreground">
-          Selecione um {providerLabel.toLowerCase()} para realizar o serviço
-        </p>
-        {/* Debug info */}
-        <div className="text-xs text-gray-500 p-2 bg-gray-50 rounded">
-          <strong>Debug:</strong> Encontrados {groomers.length} {providersLabel.toLowerCase()} para o tipo "{serviceType}"
+        <h2 className="text-xl font-semibold">3. Escolha o {providerLabel}</h2>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Calendar className="h-4 w-4" />
+          <span>Disponíveis para {format(date, 'dd/MM/yyyy', { locale: ptBR })}</span>
         </div>
+        <p className="text-sm text-muted-foreground">
+          Selecione um {providerLabel.toLowerCase()} disponível para a data escolhida
+        </p>
       </div>
 
       {groomers.length > 0 ? (
@@ -99,14 +104,13 @@ const GroomerSelectionForm = ({
                   </Avatar>
                   <div>
                     <h3 className="font-medium text-lg">{groomer.name}</h3>
-                    <p className="text-xs text-gray-500">ID: {groomer.id.substring(0, 8)}...</p>
-                    <p className="text-xs text-gray-500">Role: {groomer.role}</p>
                     <div className="flex items-center gap-1">
                       {renderRating(groomer.rating || 4.5)}
                       <span className="text-xs text-muted-foreground ml-1">
                         {groomer.rating?.toFixed(1) || "4.5"}
                       </span>
                     </div>
+                    <p className="text-xs text-green-600 font-medium">✓ Disponível</p>
                   </div>
                 </div>
                 
@@ -137,28 +141,15 @@ const GroomerSelectionForm = ({
         </div>
       ) : (
         <div className="bg-secondary/50 p-6 rounded-lg text-center">
-          <p className="font-medium">Nenhum {providerLabel.toLowerCase()} disponível no momento</p>
-          <p className="text-sm text-muted-foreground mt-1">Por favor, tente novamente mais tarde</p>
+          <p className="font-medium">Nenhum {providerLabel.toLowerCase()} disponível para esta data</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Tente selecionar uma data diferente no passo anterior
+          </p>
           
-          <div className="bg-red-50 border border-red-200 mt-6 p-4 rounded-lg text-left">
-            <p className="text-sm font-medium text-red-800">Informação de Debug</p>
-            <p className="text-sm text-red-600 mt-1">
-              Não foram encontrados perfis com role = "{serviceType === 'grooming' ? 'groomer' : 'vet'}" na tabela profiles.
-            </p>
-            <p className="text-sm text-red-600 mt-1">
-              Para resolver: Certifique-se de que há pelo menos um perfil na tabela profiles com o role correto.
-            </p>
-          </div>
-          
-          <div className="bg-secondary/70 mt-6 p-4 rounded-lg text-left">
-            <p className="text-sm font-medium">Como resolver</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Se você é um {providerLabel.toLowerCase()} e deseja se cadastrar para atender clientes,{' '}
-              <a href="/register" className="text-primary hover:underline">faça login</a> ou registre uma
-              nova conta com o perfil de {providerLabel.toLowerCase()}.
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Você precisará de um código de registro válido fornecido pelo pet shop.
+          <div className="bg-blue-50 border border-blue-200 mt-6 p-4 rounded-lg text-left">
+            <p className="text-sm font-medium text-blue-800">💡 Dica</p>
+            <p className="text-sm text-blue-600 mt-1">
+              Volte ao passo anterior e escolha uma data diferente para ver mais opções de profissionais disponíveis.
             </p>
           </div>
         </div>
@@ -170,7 +161,7 @@ const GroomerSelectionForm = ({
           onClick={onNext} 
           disabled={!selectedGroomerId || groomers.length === 0}
         >
-          Continuar
+          Continuar para Horário
         </Button>
       </div>
     </div>
