@@ -71,35 +71,73 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       const targetRole = type === 'grooming' ? 'groomer' : 'vet';
       const dateStr = selectedDate.toISOString().split('T')[0];
       
-      console.log('Fetching providers for role:', targetRole, 'on date:', dateStr);
+      console.log('🔍 DEBUG: Starting fetchAvailableProviders');
+      console.log('🔍 DEBUG: Target role:', targetRole);
+      console.log('🔍 DEBUG: Date string:', dateStr);
+      console.log('🔍 DEBUG: Service type:', type);
       
-      // Get ALL profiles first
+      // Step 1: Get ALL profiles to see what we have
       const { data: allProfiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*');
 
+      console.log('🔍 DEBUG: All profiles from DB:', allProfiles);
+      console.log('🔍 DEBUG: Profiles error:', profilesError);
+
       if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
+        console.error('❌ Error fetching profiles:', profilesError);
         throw profilesError;
       }
 
       if (!allProfiles || allProfiles.length === 0) {
-        console.log('No profiles found');
+        console.log('❌ No profiles found in database');
         setGroomers([]);
         return;
       }
 
-      // Filter by role
-      const matchingProviders = allProfiles.filter(profile => profile.role === targetRole);
+      // Step 2: Filter by role
+      const matchingProviders = allProfiles.filter(profile => {
+        console.log(`🔍 DEBUG: Checking profile ${profile.name} with role ${profile.role} against target ${targetRole}`);
+        return profile.role === targetRole;
+      });
       
+      console.log('🔍 DEBUG: Providers matching role:', matchingProviders);
+
       if (matchingProviders.length === 0) {
-        console.log('No providers match the role:', targetRole);
+        console.log(`❌ No providers match the role: ${targetRole}`);
+        console.log('🔍 DEBUG: Available roles in DB:', allProfiles.map(p => p.role));
         setGroomers([]);
         return;
       }
+
+      // Step 3: Check availability for each provider
+      const providersWithAvailability = [];
+      
+      for (const provider of matchingProviders) {
+        console.log(`🔍 DEBUG: Checking availability for provider ${provider.name} (${provider.id}) on ${dateStr}`);
+        
+        const { data: availability, error: availError } = await supabase
+          .from('provider_availability')
+          .select('*')
+          .eq('provider_id', provider.id)
+          .eq('date', dateStr)
+          .eq('available', true);
+          
+        console.log(`🔍 DEBUG: Availability for ${provider.name}:`, availability);
+        console.log(`🔍 DEBUG: Availability error:`, availError);
+        
+        if (availability && availability.length > 0) {
+          console.log(`✅ Provider ${provider.name} has ${availability.length} available slots`);
+          providersWithAvailability.push(provider);
+        } else {
+          console.log(`❌ Provider ${provider.name} has no available slots on ${dateStr}`);
+        }
+      }
+
+      console.log('🔍 DEBUG: Providers with availability:', providersWithAvailability);
 
       // Transform for UI (with default values)
-      const transformedProviders: Provider[] = matchingProviders.map(provider => ({
+      const transformedProviders: Provider[] = providersWithAvailability.map(provider => ({
         id: provider.id,
         name: provider.name,
         role: provider.role,
@@ -108,11 +146,11 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         about: `${type === 'grooming' ? 'Tosador' : 'Veterinário'} experiente.`
       }));
 
-      console.log('Found providers:', transformedProviders.length);
+      console.log('✅ Final transformed providers:', transformedProviders);
       setGroomers(transformedProviders);
       
     } catch (error: any) {
-      console.error('Error in fetchAvailableProviders:', error);
+      console.error('💥 Error in fetchAvailableProviders:', error);
       toast.error('Erro ao carregar profissionais');
       setGroomers([]);
     }
@@ -296,7 +334,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   // Fetch available providers when date changes (for step 3)
   useEffect(() => {
     if (formStep === 3 && date) {
-      console.log('Fetching providers for step 3, date:', date);
+      console.log('🔍 DEBUG: useEffect triggered for step 3, date:', date);
       fetchAvailableProviders(serviceType, date);
     }
   }, [formStep, date, serviceType, fetchAvailableProviders]);
