@@ -314,33 +314,6 @@ export type Database = {
         }
         Relationships: []
       }
-      profiles: {
-        Row: {
-          created_at: string | null
-          id: string
-          name: string
-          phone: string | null
-          role: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id: string
-          name: string
-          phone?: string | null
-          role: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          name?: string
-          phone?: string | null
-          role?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       provider_availability: {
         Row: {
           available: boolean

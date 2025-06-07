@@ -16,22 +16,52 @@ const Navigation = () => {
   const { user, signOut } = useAuth();
   const [userRole, setUserRole] = React.useState<string | null>(null);
 
-  // Fetch user role
+  // Fetch user role from the appropriate table
   React.useEffect(() => {
     const fetchUserRole = async () => {
       if (!user) return;
       
       try {
         const { supabase } = await import('@/integrations/supabase/client');
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
+        
+        // Check clients table first
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('user_id', user.id)
           .single();
           
-        if (error) throw error;
-        console.log('🔍 Navigation Debug - User role:', data?.role);
-        setUserRole(data?.role || 'client');
+        if (clientData) {
+          setUserRole('client');
+          return;
+        }
+        
+        // Check groomers table
+        const { data: groomerData } = await supabase
+          .from('groomers')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+          
+        if (groomerData) {
+          setUserRole('groomer');
+          return;
+        }
+        
+        // Check veterinarians table
+        const { data: vetData } = await supabase
+          .from('veterinarians')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+          
+        if (vetData) {
+          setUserRole('vet');
+          return;
+        }
+        
+        // Default to client if no role found
+        setUserRole('client');
       } catch (error) {
         console.error('Error fetching user role:', error);
         setUserRole('client');

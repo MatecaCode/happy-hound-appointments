@@ -14,6 +14,7 @@ const Profile = () => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [userRole, setUserRole] = useState<string>('client');
   const [profile, setProfile] = useState<any>(null);
 
   useEffect(() => {
@@ -26,18 +27,49 @@ const Profile = () => {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
-        .from('profiles')
+      // Check clients table first
+      const { data: clientData } = await supabase
+        .from('clients')
         .select('*')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
-
-      if (error) throw error;
+        
+      if (clientData) {
+        setProfile(clientData);
+        setUserRole('client');
+        setName(clientData.name || '');
+        setPhone(clientData.phone || '');
+        return;
+      }
       
-      if (data) {
-        setProfile(data);
-        setName(data.name || '');
-        setPhone(data.phone || '');
+      // Check groomers table
+      const { data: groomerData } = await supabase
+        .from('groomers')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+        
+      if (groomerData) {
+        setProfile(groomerData);
+        setUserRole('groomer');
+        setName(groomerData.name || '');
+        setPhone(groomerData.phone || '');
+        return;
+      }
+      
+      // Check veterinarians table
+      const { data: vetData } = await supabase
+        .from('veterinarians')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+        
+      if (vetData) {
+        setProfile(vetData);
+        setUserRole('vet');
+        setName(vetData.name || '');
+        setPhone(vetData.phone || '');
+        return;
       }
     } catch (error: any) {
       console.error('Error fetching profile:', error);
@@ -51,14 +83,20 @@ const Profile = () => {
 
     setIsLoading(true);
     try {
+      const updateData = {
+        name,
+        phone,
+        updated_at: new Date().toISOString()
+      };
+
+      let tableName = 'clients';
+      if (userRole === 'groomer') tableName = 'groomers';
+      if (userRole === 'vet') tableName = 'veterinarians';
+
       const { error } = await supabase
-        .from('profiles')
-        .update({
-          name,
-          phone,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', user.id);
+        .from(tableName)
+        .update(updateData)
+        .eq('user_id', user.id);
 
       if (error) throw error;
       
@@ -132,20 +170,18 @@ const Profile = () => {
                 />
               </div>
 
-              {profile && (
-                <div>
-                  <Label>Tipo de Conta</Label>
-                  <Input
-                    value={
-                      profile.role === 'client' ? 'Cliente' :
-                      profile.role === 'groomer' ? 'Tosador' :
-                      profile.role === 'vet' ? 'Veterinário' : profile.role
-                    }
-                    disabled
-                    className="bg-muted"
-                  />
-                </div>
-              )}
+              <div>
+                <Label>Tipo de Conta</Label>
+                <Input
+                  value={
+                    userRole === 'client' ? 'Cliente' :
+                    userRole === 'groomer' ? 'Tosador' :
+                    userRole === 'vet' ? 'Veterinário' : userRole
+                  }
+                  disabled
+                  className="bg-muted"
+                />
+              </div>
               
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? 'Salvando...' : 'Salvar Alterações'}

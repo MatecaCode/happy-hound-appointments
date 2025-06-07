@@ -47,12 +47,41 @@ export const createAppointment = async (
       }
     }
 
-    // Get user profile for owner name from the profiles table
-    const { data: userProfile } = await supabase
-      .from('profiles')
+    // Get user profile for owner name from the appropriate table
+    let ownerName = 'Usuário';
+    
+    // Check clients table first
+    const { data: clientProfile } = await supabase
+      .from('clients')
       .select('name')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .single();
+      
+    if (clientProfile) {
+      ownerName = clientProfile.name;
+    } else {
+      // Check groomers table
+      const { data: groomerProfile } = await supabase
+        .from('groomers')
+        .select('name')
+        .eq('user_id', userId)
+        .single();
+        
+      if (groomerProfile) {
+        ownerName = groomerProfile.name;
+      } else {
+        // Check veterinarians table
+        const { data: vetProfile } = await supabase
+          .from('veterinarians')
+          .select('name')
+          .eq('user_id', userId)
+          .single();
+          
+        if (vetProfile) {
+          ownerName = vetProfile.name;
+        }
+      }
+    }
 
     // Create appointment
     const { error } = await supabase
@@ -66,7 +95,7 @@ export const createAppointment = async (
         time: selectedTimeSlotId,
         service: service?.name || '',
         pet_name: pet?.name || '',
-        owner_name: userProfile?.name || 'Usuário',
+        owner_name: ownerName,
         notes: notes || null
       });
 
