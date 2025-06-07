@@ -80,7 +80,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           handleNextAvailableSelect={handleNextAvailableSelect}
           isLoading={isLoading}
           activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          setActiveTab={(tab: 'calendar' | 'next-available') => setActiveTab(tab)}
           notes={notes}
           setNotes={setNotes}
           onBack={() => setFormStep(2)}

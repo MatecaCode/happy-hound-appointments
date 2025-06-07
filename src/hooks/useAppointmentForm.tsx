@@ -5,7 +5,7 @@ import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 
-interface Provider {
+export interface Provider {
   id: string;
   name: string;
   role: string;
@@ -15,14 +15,14 @@ interface Provider {
   about?: string;
 }
 
-interface Pet {
+export interface Pet {
   id: string;
   name: string;
   breed?: string;
   age?: string;
 }
 
-interface Service {
+export interface Service {
   id: string;
   name: string;
   price: number;
@@ -30,13 +30,13 @@ interface Service {
   service_type: string;
 }
 
-interface TimeSlot {
+export interface TimeSlot {
   id: string;
   time: string;
   available: boolean;
 }
 
-interface NextAvailable {
+export interface NextAvailable {
   date: string;
   time: string;
   provider_name: string;

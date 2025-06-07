@@ -9,7 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import NextAvailableAppointment, { NextAvailable } from '../NextAvailableAppointment';
+import NextAvailableAppointment from '../NextAvailableAppointment';
+import { NextAvailable } from '@/hooks/useAppointmentForm';
 
 export interface TimeSlot {
   id: string;
@@ -26,8 +27,8 @@ interface DateTimeFormProps {
   nextAvailable: NextAvailable | null;
   handleNextAvailableSelect: () => void;
   isLoading: boolean;
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
+  activeTab: 'calendar' | 'next-available';
+  setActiveTab: (tab: 'calendar' | 'next-available') => void;
   notes: string;
   setNotes: (notes: string) => void;
   onBack: () => void;

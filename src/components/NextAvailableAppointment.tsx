@@ -5,13 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Calendar, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-export interface NextAvailable {
-  date: Date;
-  time: string;
-  timeSlot: string;
-  groomer: string;
-}
+import { NextAvailable } from '@/hooks/useAppointmentForm';
 
 interface NextAvailableAppointmentProps {
   nextAvailable: NextAvailable | null;
@@ -69,7 +63,7 @@ const NextAvailableAppointment = ({
           <div className="flex items-center gap-3">
             <Calendar className="h-4 w-4 text-muted-foreground" />
             <span className="font-medium">
-              {format(nextAvailable.date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              {format(new Date(nextAvailable.date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
             </span>
           </div>
           
@@ -80,7 +74,7 @@ const NextAvailableAppointment = ({
           
           <div className="flex items-center gap-3">
             <User className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">{nextAvailable.groomer}</span>
+            <span className="font-medium">{nextAvailable.provider_name}</span>
           </div>
         </div>
         
