@@ -9,13 +9,70 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          phone: string | null
+          role: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          name: string
+          phone?: string | null
+          role: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          role?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      registration_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          id: string
+          is_used: boolean | null
+          role: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          id?: string
+          is_used?: boolean | null
+          role: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          id?: string
+          is_used?: boolean | null
+          role?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      mark_code_as_used: {
+        Args: { code_value: string }
+        Returns: undefined
+      }
+      validate_registration_code: {
+        Args: { code_value: string; role_value: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never
