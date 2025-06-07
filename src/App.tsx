@@ -25,38 +25,42 @@ import { AuthProvider } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/book" element={<Book />} />
-            <Route path="/appointments" element={<Appointments />} />
-            <Route path="/confirmation" element={<Confirmation />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/pets" element={<Pets />} />
-            <Route path="/groomer-calendar" element={<GroomerDashboard />} />
-            <Route path="/groomer-schedule" element={<GroomerDashboard />} />
-            <Route path="/groomer-dashboard" element={<GroomerDashboard />} />
-            <Route path="/vet-calendar" element={<VetCalendar />} />
-            <Route path="/shop" element={<Shop />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route path="/auth/callback" element={<AuthCallback />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  console.log('🚀 App component rendered');
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/book" element={<Book />} />
+              <Route path="/appointments" element={<Appointments />} />
+              <Route path="/confirmation" element={<Confirmation />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/pets" element={<Pets />} />
+              <Route path="/groomer-calendar" element={<GroomerDashboard />} />
+              <Route path="/groomer-schedule" element={<GroomerDashboard />} />
+              <Route path="/groomer-dashboard" element={<GroomerDashboard />} />
+              <Route path="/vet-calendar" element={<VetCalendar />} />
+              <Route path="/shop" element={<Shop />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
