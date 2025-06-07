@@ -1,71 +1,94 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Calendar, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calendar, Clock } from 'lucide-react';
 
 export interface NextAvailable {
   date: Date;
-  timeSlot: {
-    id: string;
-    time: string;
-  };
-  groomer: {
-    id: string;
-    name: string;
-  };
+  time: string;
+  timeSlot: string;
+  groomer: string;
 }
 
 interface NextAvailableAppointmentProps {
   nextAvailable: NextAvailable | null;
   onSelect: () => void;
-  loading?: boolean;
+  loading: boolean;
 }
 
-const NextAvailableAppointment = ({
-  nextAvailable,
-  onSelect,
-  loading = false
+const NextAvailableAppointment = ({ 
+  nextAvailable, 
+  onSelect, 
+  loading 
 }: NextAvailableAppointmentProps) => {
   if (loading) {
     return (
-      <div className="bg-secondary/40 p-4 rounded-lg animate-pulse">
-        <div className="h-6 bg-secondary rounded w-3/4 mb-4"></div>
-        <div className="h-4 bg-secondary rounded w-1/2 mb-2"></div>
-        <div className="h-4 bg-secondary rounded w-2/3 mb-4"></div>
-        <div className="h-10 bg-secondary rounded"></div>
-      </div>
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Buscando próximo horário disponível...</p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   if (!nextAvailable) {
     return (
-      <div className="bg-secondary/40 p-4 rounded-lg">
-        <p className="text-muted-foreground">
-          Não há horários disponíveis no momento. Por favor, entre em contato conosco.
-        </p>
-      </div>
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+            <p className="font-medium">Nenhum horário disponível encontrado</p>
+            <p className="text-muted-foreground text-sm mt-1">
+              Tente selecionar uma data específica no calendário
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
-  const formattedDate = format(nextAvailable.date, "EEEE, d 'de' MMMM", { locale: ptBR });
-
   return (
-    <div className="bg-secondary/40 p-4 rounded-lg border border-brand-light-gold">
-      <h3 className="font-medium text-lg mb-2 text-brand-blue">Próximo Horário Disponível</h3>
-      <div className="flex items-center text-sm mb-1">
-        <Calendar className="mr-2 h-4 w-4 text-brand-blue" />
-        <span>{formattedDate}</span>
-      </div>
-      <div className="flex items-center text-sm mb-3">
-        <Clock className="mr-2 h-4 w-4 text-brand-blue" />
-        <span>{nextAvailable.timeSlot.time} com {nextAvailable.groomer.name}</span>
-      </div>
-      <Button onClick={onSelect} className="w-full bg-brand-blue hover:bg-brand-dark-blue">
-        Agendar
-      </Button>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="h-5 w-5" />
+          Próximo Horário Disponível
+        </CardTitle>
+        <CardDescription>
+          O próximo horário livre para agendamento
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">
+              {format(nextAvailable.date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">{nextAvailable.time}</span>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">{nextAvailable.groomer}</span>
+          </div>
+        </div>
+        
+        <Button onClick={onSelect} className="w-full">
+          Selecionar Este Horário
+        </Button>
+      </CardContent>
+    </Card>
   );
 };
 

@@ -21,10 +21,14 @@ export interface Service {
   description?: string;
 }
 
-export interface Groomer {
+export interface Provider {
   id: string;
   name: string;
   role: string;
+  profile_image?: string;
+  rating?: number;
+  specialty?: string;
+  about?: string;
 }
 
 export interface TimeSlot {
@@ -33,68 +37,37 @@ export interface TimeSlot {
   available: boolean;
 }
 
-export interface AppointmentFormData {
-  petName: string;
-  ownerName: string;
-  service: string;
-  serviceId: string;
-  groomerId: string;
-  date: Date | null;
+export interface NextAvailable {
+  date: Date;
   time: string;
-  notes?: string;
+  timeSlot: string;
+  groomer: string;
 }
 
 export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // Form data state
-  const [formData, setFormData] = useState<AppointmentFormData>({
-    petName: '',
-    ownerName: '',
-    service: '',
-    serviceId: '',
-    groomerId: '',
-    date: null,
-    time: '',
-    notes: ''
-  });
-
-  // Individual form states for compatibility
-  const [date, setDate] = useState<Date | null>(null);
+  // Form states
+  const [date, setDate] = useState<Date>(new Date());
   const [selectedGroomerId, setSelectedGroomerId] = useState('');
-  const [selectedTimeSlotId, setSelectedTimeSlotId] = useState('');
-  const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
-  const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(null);
+  const [selectedPet, setSelectedPet] = useState('');
+  const [selectedService, setSelectedService] = useState('');
   const [ownerName, setOwnerName] = useState('');
   const [notes, setNotes] = useState('');
   
   // Data states
   const [userPets, setUserPets] = useState<Pet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [groomers, setGroomers] = useState<Groomer[]>([]);
+  const [groomers, setGroomers] = useState<Provider[]>([]);
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   
   // UI states
   const [isLoading, setIsLoading] = useState(false);
   const [formStep, setFormStep] = useState(1);
   const [activeTab, setActiveTab] = useState('calendar');
-  const [nextAvailable, setNextAvailable] = useState<{date: Date, time: string} | null>(null);
-
-  // Update formData when individual states change
-  useEffect(() => {
-    setFormData(prev => ({
-      ...prev,
-      date,
-      groomerId: selectedGroomerId,
-      time: selectedTimeSlotId,
-      petName: selectedPet?.name || '',
-      service: selectedService?.name || '',
-      serviceId: selectedService?.id || '',
-      ownerName,
-      notes
-    }));
-  }, [date, selectedGroomerId, selectedTimeSlotId, selectedPet, selectedService, ownerName, notes]);
+  const [nextAvailable, setNextAvailable] = useState<NextAvailable | null>(null);
 
   // Fetch user's pets
   useEffect(() => {
@@ -117,14 +90,14 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     fetchUserPets();
   }, [user]);
 
-  // Fetch groomers/vets
+  // Fetch providers (groomers/vets)
   useEffect(() => {
     const fetchProviders = async () => {
       try {
         const targetRole = serviceType === 'grooming' ? 'groomer' : 'vet';
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, name, role')
+          .select('id, name, role, phone')
           .eq('role', targetRole);
           
         if (error) throw error;
@@ -145,7 +118,18 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         .eq('service_type', type);
         
       if (error) throw error;
-      setServices(data || []);
+      
+      // Map the database response to our Service interface
+      const mappedServices: Service[] = (data || []).map(service => ({
+        id: service.id,
+        name: service.name,
+        price: service.price,
+        duration: service.duration,
+        service_type: service.service_type as 'grooming' | 'veterinary',
+        description: service.description || undefined
+      }));
+      
+      setServices(mappedServices);
     } catch (error) {
       console.error('Error fetching services:', error);
     }
@@ -173,14 +157,11 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [date]);
 
-  const updateFormData = (updates: Partial<AppointmentFormData>) => {
-    setFormData(prev => ({ ...prev, ...updates }));
-  };
-
   const handleNextAvailableSelect = () => {
     if (nextAvailable) {
       setDate(nextAvailable.date);
-      setSelectedTimeSlotId(nextAvailable.time);
+      setSelectedTimeSlotId(nextAvailable.timeSlot);
+      setSelectedGroomerId(nextAvailable.groomer);
     }
   };
 
@@ -194,65 +175,37 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       return;
     }
 
+    if (!selectedPet || !selectedService || !selectedGroomerId || !selectedTimeSlotId || !ownerName.trim()) {
+      toast.error('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+
     try {
       setIsLoading(true);
-      await submitAppointment(user.id);
-    } catch (error) {
-      console.error('Error submitting appointment:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const submitAppointment = async (userId: string) => {
-    try {
-      if (!formData.date || !formData.time || !formData.serviceId || !formData.groomerId) {
-        throw new Error('Por favor, preencha todos os campos obrigatórios');
-      }
-
-      // First, create or get the pet
-      const { data: existingPet, error: petFetchError } = await supabase
-        .from('pets')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('name', formData.petName)
-        .single();
-
-      let petId: string;
       
-      if (petFetchError && petFetchError.code === 'PGRST116') {
-        // Pet doesn't exist, create it
-        const { data: newPet, error: petCreateError } = await supabase
-          .from('pets')
-          .insert({
-            user_id: userId,
-            name: formData.petName
-          })
-          .select('id')
-          .single();
-
-        if (petCreateError) throw petCreateError;
-        petId = newPet.id;
-      } else if (petFetchError) {
-        throw petFetchError;
-      } else {
-        petId = existingPet.id;
+      // Get pet and service details
+      const selectedPetData = userPets.find(p => p.id === selectedPet);
+      const selectedServiceData = services.find(s => s.id === selectedService);
+      
+      if (!selectedPetData || !selectedServiceData) {
+        throw new Error('Pet ou serviço não encontrado');
       }
 
       // Create the appointment
       const { error: appointmentError } = await supabase
         .from('appointments')
         .insert({
-          user_id: userId,
-          pet_id: petId,
-          pet_name: formData.petName,
-          service_id: formData.serviceId,
-          service: formData.service,
-          provider_id: formData.groomerId,
-          date: formData.date.toISOString().split('T')[0],
-          time: formData.time,
-          owner_name: formData.ownerName,
-          notes: formData.notes || null
+          user_id: user.id,
+          pet_id: selectedPetData.id,
+          pet_name: selectedPetData.name,
+          service_id: selectedServiceData.id,
+          service: selectedServiceData.name,
+          provider_id: selectedGroomerId,
+          date: date.toISOString().split('T')[0],
+          time: selectedTimeSlotId,
+          owner_name: ownerName,
+          notes: notes || null,
+          status: 'upcoming'
         });
 
       if (appointmentError) throw appointmentError;
@@ -262,17 +215,13 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     } catch (error: any) {
       console.error('Error creating appointment:', error);
       toast.error(error.message || 'Erro ao criar agendamento');
-      throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return {
-    // Form data
-    formData,
-    updateFormData,
-    submitAppointment,
-    
-    // Individual states for compatibility
+    // Form states
     date,
     setDate,
     selectedGroomerId,
