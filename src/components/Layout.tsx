@@ -41,8 +41,10 @@ const Layout = ({ children }: LayoutProps) => {
   }, [user]);
 
   // Redirect groomers and vets to their dashboards when accessing home page
+  // BUT only redirect if they're on the exact home route, not booking routes
   useEffect(() => {
     if (user && userRole && location.pathname === '/') {
+      // Only redirect professionals from the home page, allow them to use booking
       if (userRole === 'groomer') {
         navigate('/groomer-dashboard');
       } else if (userRole === 'vet') {

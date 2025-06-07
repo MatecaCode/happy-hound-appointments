@@ -1,71 +1,61 @@
 
 import React from 'react';
-import { Button } from "@/components/ui/button";
+import { Button } from '@/components/ui/button';
+import { Calendar, Heart, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Dog } from 'lucide-react';
 
-const Hero: React.FC = () => {
+const Hero = () => {
   return (
-    <div className="relative bg-gradient-to-br from-background to-secondary">
-      <div className="max-w-7xl mx-auto px-6 py-20 md:py-32">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-6">
-            <div className="inline-block bg-primary/10 px-4 py-2 rounded-full">
-              <div className="flex items-center gap-2 text-primary">
-                <Dog className="h-5 w-5" />
-                <span className="font-medium">Tosa Profissional para Cães</span>
-              </div>
+    <section className="relative bg-gradient-to-br from-primary/5 to-secondary/10 py-20">
+      <div className="max-w-7xl mx-auto px-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <h1 className="text-4xl md:text-6xl font-bold leading-tight">
+                Cuidado Completo para seu <span className="text-primary">Pet</span>
+              </h1>
+              <p className="text-xl text-muted-foreground">
+                Serviços veterinários e de estética com qualidade profissional. 
+                Agende online e garante o melhor cuidado para seu amigo de quatro patas.
+              </p>
             </div>
-            
-            <h1>Cuide do Seu <span className="text-primary">Pet</span> Com Nossa Tosa Premium</h1>
-            
-            <p className="text-lg text-muted-foreground">
-              Seu amigo peludo merece o melhor cuidado. Nossos profissionais especializados
-              oferecem serviços de alta qualidade para manter seu cachorro bonito e se sentindo bem.
-            </p>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link to="/book">
-                <Button size="lg" className="px-8">Agendar Tosa</Button>
-              </Link>
-              <Link to="/services">
-                <Button size="lg" variant="outline" className="px-8">Ver Serviços</Button>
-              </Link>
+              <Button size="lg" asChild>
+                <Link to="/book">Agendar Consulta</Link>
+              </Button>
+              <Button size="lg" variant="outline" asChild>
+                <Link to="/services">Nossos Serviços</Link>
+              </Button>
             </div>
             
-            <div className="flex items-center gap-4 mt-8">
-              <div className="flex -space-x-2">
-                <div className="w-8 h-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-xs">
-                  🐕
-                </div>
-                <div className="w-8 h-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-xs">
-                  🐩
-                </div>
-                <div className="w-8 h-8 rounded-full bg-secondary border-2 border-background flex items-center justify-center text-xs">
-                  🦮
-                </div>
+            <div className="flex items-center gap-8 pt-8">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                <span className="text-sm">Agendamento Online</span>
               </div>
-              <span className="text-sm text-muted-foreground">
-                <span className="font-semibold">500+</span> cachorros felizes no último mês
-              </span>
+              <div className="flex items-center gap-2">
+                <Heart className="h-5 w-5 text-primary" />
+                <span className="text-sm">Cuidado Personalizado</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                <span className="text-sm">Segurança Total</span>
+              </div>
             </div>
           </div>
           
           <div className="relative">
-            <div className="absolute -top-12 -right-12 w-64 h-64 bg-primary/20 rounded-full blur-3xl"></div>
-            <div className="absolute -bottom-12 -left-12 w-64 h-64 bg-brand-light-purple/30 rounded-full blur-3xl"></div>
-            
-            <div className="relative bg-white p-4 rounded-2xl shadow-lg animate-bounce-slow">
-              <img 
-                src="https://images.unsplash.com/photo-1625794084867-8ddd239946b1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80" 
-                alt="Cachorro sendo tosado" 
-                className="rounded-xl w-full h-auto object-cover aspect-square"
-              />
-            </div>
+            <img 
+              src="/placeholder.svg" 
+              alt="Veterinário cuidando de um cachorro" 
+              className="rounded-lg shadow-2xl w-full h-[500px] object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-lg"></div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

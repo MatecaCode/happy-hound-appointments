@@ -109,14 +109,12 @@ const Index = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/book">
-              <Button size="lg" variant="secondary">Agendar Consulta</Button>
-            </Link>
-            <Link to="/services">
-              <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white/20">
-                Conhecer Serviços
-              </Button>
-            </Link>
+            <Button size="lg" variant="secondary" asChild>
+              <Link to="/book">Agendar Consulta</Link>
+            </Button>
+            <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white/20" asChild>
+              <Link to="/services">Conhecer Serviços</Link>
+            </Button>
           </div>
         </div>
       </section>
