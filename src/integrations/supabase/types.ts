@@ -275,6 +275,44 @@ export type Database = {
         }
         Relationships: []
       }
+      provider_availability: {
+        Row: {
+          available: boolean
+          created_at: string
+          date: string
+          id: string
+          provider_id: string
+          time_slot: string
+          updated_at: string
+        }
+        Insert: {
+          available?: boolean
+          created_at?: string
+          date: string
+          id?: string
+          provider_id: string
+          time_slot: string
+          updated_at?: string
+        }
+        Update: {
+          available?: boolean
+          created_at?: string
+          date?: string
+          id?: string
+          provider_id?: string
+          time_slot?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_availability_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registration_codes: {
         Row: {
           code: string

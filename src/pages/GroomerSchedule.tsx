@@ -54,20 +54,41 @@ const GroomerSchedule = () => {
     setIsLoading(true);
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
+      
+      // Use raw query to access the new table until types are updated
       const { data, error } = await supabase
-        .from('provider_availability')
-        .select('*')
-        .eq('provider_id', user.id)
-        .eq('date', dateStr);
+        .rpc('get_provider_availability', {
+          provider_id: user.id,
+          availability_date: dateStr
+        });
 
-      if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-        throw error;
-      }
+      // If RPC doesn't exist, fall back to direct query
+      if (error && error.message?.includes('function')) {
+        const { data: directData, error: directError } = await supabase
+          .from('provider_availability' as any)
+          .select('*')
+          .eq('provider_id', user.id)
+          .eq('date', dateStr);
 
-      if (data && data.length > 0) {
-        // Convert database data to slots format
+        if (directError && directError.code !== 'PGRST116') {
+          throw directError;
+        }
+
+        if (directData && directData.length > 0) {
+          const slots = generateDefaultSlots().map(slot => {
+            const dbSlot = directData.find((d: any) => d.time_slot === slot.time);
+            return {
+              ...slot,
+              available: dbSlot ? dbSlot.available : true
+            };
+          });
+          setAvailabilitySlots(slots);
+        } else {
+          setAvailabilitySlots(generateDefaultSlots());
+        }
+      } else if (data && data.length > 0) {
         const slots = generateDefaultSlots().map(slot => {
-          const dbSlot = data.find(d => d.time_slot === slot.time);
+          const dbSlot = data.find((d: any) => d.time_slot === slot.time);
           return {
             ...slot,
             available: dbSlot ? dbSlot.available : true
@@ -75,13 +96,11 @@ const GroomerSchedule = () => {
         });
         setAvailabilitySlots(slots);
       } else {
-        // No data found, use default availability
         setAvailabilitySlots(generateDefaultSlots());
       }
     } catch (error: any) {
       console.error('Error fetching availability:', error);
       toast.error('Erro ao carregar disponibilidade');
-      // Use default slots on error
       setAvailabilitySlots(generateDefaultSlots());
     } finally {
       setIsLoading(false);
@@ -98,8 +117,9 @@ const GroomerSchedule = () => {
     const newAvailability = !currentSlot.available;
 
     try {
+      // Use raw query to insert into the new table
       const { error } = await supabase
-        .from('provider_availability')
+        .from('provider_availability' as any)
         .upsert({
           provider_id: user.id,
           date: dateStr,
@@ -148,7 +168,7 @@ const GroomerSchedule = () => {
                 selected={selectedDate}
                 onSelect={setSelectedDate}
                 className="rounded-md border"
-                disabled={(date) => date < new Date() || date.getDay() === 0} // Disable past dates and Sundays
+                disabled={(date) => date < new Date() || date.getDay() === 0}
               />
             </CardContent>
           </Card>
@@ -188,7 +208,6 @@ const GroomerSchedule = () => {
                     <Button 
                       variant="outline" 
                       onClick={() => {
-                        // Toggle all slots
                         const allAvailable = availabilitySlots.every(slot => slot.available);
                         availabilitySlots.forEach(slot => {
                           if (slot.available === allAvailable) {

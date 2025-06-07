@@ -141,27 +141,81 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, []);
 
-  // Generate time slots for selected date
+  // Fetch available time slots for selected groomer and date
   useEffect(() => {
-    if (date) {
-      const slots: TimeSlot[] = [];
-      for (let hour = 9; hour < 17; hour++) {
-        slots.push({
+    if (selectedGroomerId && date) {
+      fetchAvailableTimeSlots();
+    }
+  }, [selectedGroomerId, date]);
+
+  const fetchAvailableTimeSlots = async () => {
+    if (!selectedGroomerId || !date) return;
+    
+    try {
+      setIsLoading(true);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // Get provider availability
+      const { data: availability, error: availError } = await supabase
+        .from('provider_availability' as any)
+        .select('*')
+        .eq('provider_id', selectedGroomerId)
+        .eq('date', dateStr);
+
+      if (availError && availError.code !== 'PGRST116') {
+        throw availError;
+      }
+
+      // Get existing appointments for this provider and date
+      const { data: appointments, error: apptError } = await supabase
+        .from('appointments')
+        .select('time')
+        .eq('provider_id', selectedGroomerId)
+        .eq('date', dateStr)
+        .eq('status', 'upcoming');
+
+      if (apptError) throw apptError;
+
+      // Generate all possible time slots
+      const allSlots: TimeSlot[] = [];
+      for (let hour = 8; hour < 17; hour++) {
+        allSlots.push({
           id: `${hour}:00`,
           time: `${hour}:00`,
           available: true
         });
         if (hour < 16) {
-          slots.push({
+          allSlots.push({
             id: `${hour}:30`,
             time: `${hour}:30`,
             available: true
           });
         }
       }
-      setTimeSlots(slots);
+
+      // Check availability based on provider's schedule
+      const availableSlots = allSlots.map(slot => {
+        // Check if provider has set this time as available
+        const providerAvailability = availability?.find((a: any) => a.time_slot === slot.time);
+        const isProviderAvailable = providerAvailability ? providerAvailability.available : true; // Default to available
+
+        // Check if slot is already booked
+        const isBooked = appointments?.some(apt => apt.time === slot.time);
+
+        return {
+          ...slot,
+          available: isProviderAvailable && !isBooked
+        };
+      });
+
+      setTimeSlots(availableSlots);
+    } catch (error) {
+      console.error('Error fetching time slots:', error);
+      toast.error('Erro ao carregar horários disponíveis');
+    } finally {
+      setIsLoading(false);
     }
-  }, [date]);
+  };
 
   const handleNextAvailableSelect = () => {
     if (nextAvailable) {

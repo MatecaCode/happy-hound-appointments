@@ -8,8 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import TimeSlotSelector, { TimeSlot } from '../TimeSlotSelector';
+import { Badge } from "@/components/ui/badge";
 import NextAvailableAppointment, { NextAvailable } from '../NextAvailableAppointment';
+
+export interface TimeSlot {
+  id: string;
+  time: string;
+  available: boolean;
+}
 
 interface DateTimeFormProps {
   date: Date;
@@ -44,11 +50,9 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   onBack,
   onSubmit
 }) => {
-  // Get dates for the 3-month range
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
-  // Set the from date to today and to date to 3 months from today
   const toDate = new Date();
   toDate.setMonth(today.getMonth() + 3);
   
@@ -86,12 +90,47 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               </Card>
               
               <div>
-                <TimeSlotSelector
-                  date={date}
-                  timeSlots={timeSlots}
-                  selectedTimeSlotId={selectedTimeSlotId}
-                  onSelectTimeSlot={setSelectedTimeSlotId}
-                />
+                <Card>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold mb-4">
+                      Horários para {format(date, 'dd/MM/yyyy', { locale: ptBR })}
+                    </h3>
+                    
+                    {isLoading ? (
+                      <p className="text-center text-muted-foreground">Carregando horários...</p>
+                    ) : timeSlots.length === 0 ? (
+                      <p className="text-center text-muted-foreground">
+                        Selecione um tosador primeiro para ver os horários disponíveis
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
+                        {timeSlots.map((slot) => (
+                          <Button
+                            key={slot.id}
+                            variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
+                            size="sm"
+                            disabled={!slot.available}
+                            onClick={() => setSelectedTimeSlotId(slot.id)}
+                            className="justify-center"
+                          >
+                            {slot.time}
+                            {!slot.available && (
+                              <Badge variant="secondary" className="ml-2 text-xs">
+                                Ocupado
+                              </Badge>
+                            )}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {timeSlots.filter(slot => slot.available).length === 0 && timeSlots.length > 0 && (
+                      <p className="text-center text-muted-foreground mt-4">
+                        Não há horários disponíveis para esta data. Tente outra data ou use "Próximo Disponível".
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </TabsContent>
