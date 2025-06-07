@@ -107,6 +107,72 @@ export type Database = {
           },
         ]
       }
+      clients: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          phone: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      groomers: {
+        Row: {
+          about: string | null
+          created_at: string | null
+          id: string
+          name: string
+          phone: string | null
+          profile_image: string | null
+          rating: number | null
+          specialty: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          about?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          profile_image?: string | null
+          rating?: number | null
+          specialty?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          about?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          profile_image?: string | null
+          rating?: number | null
+          specialty?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string | null
@@ -282,6 +348,7 @@ export type Database = {
           date: string
           id: string
           provider_id: string
+          provider_type: string | null
           time_slot: string
           updated_at: string
         }
@@ -291,6 +358,7 @@ export type Database = {
           date: string
           id?: string
           provider_id: string
+          provider_type?: string | null
           time_slot: string
           updated_at?: string
         }
@@ -300,18 +368,11 @@ export type Database = {
           date?: string
           id?: string
           provider_id?: string
+          provider_type?: string | null
           time_slot?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "provider_availability_provider_id_fkey"
-            columns: ["provider_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       registration_codes: {
         Row: {
@@ -364,6 +425,45 @@ export type Database = {
           name?: string
           price?: number
           service_type?: string
+        }
+        Relationships: []
+      }
+      veterinarians: {
+        Row: {
+          about: string | null
+          created_at: string | null
+          id: string
+          name: string
+          phone: string | null
+          profile_image: string | null
+          rating: number | null
+          specialty: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          about?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          profile_image?: string | null
+          rating?: number | null
+          specialty?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          about?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          profile_image?: string | null
+          rating?: number | null
+          specialty?: string | null
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }

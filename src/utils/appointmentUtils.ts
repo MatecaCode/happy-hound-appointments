@@ -25,13 +25,29 @@ export const createAppointment = async (
       .eq('id', selectedService)
       .single();
 
-    const { data: provider } = await supabase
-      .from('profiles')
+    // Try to get provider name from groomers table first, then veterinarians
+    let providerName = 'Profissional';
+    const { data: groomer } = await supabase
+      .from('groomers')
       .select('name')
       .eq('id', selectedGroomerId)
       .single();
 
-    // Get user profile for owner name
+    if (groomer) {
+      providerName = groomer.name;
+    } else {
+      const { data: vet } = await supabase
+        .from('veterinarians')
+        .select('name')
+        .eq('id', selectedGroomerId)
+        .single();
+      
+      if (vet) {
+        providerName = vet.name;
+      }
+    }
+
+    // Get user profile for owner name from the profiles table
     const { data: userProfile } = await supabase
       .from('profiles')
       .select('name')
