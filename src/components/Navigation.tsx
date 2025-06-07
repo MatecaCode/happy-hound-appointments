@@ -13,7 +13,7 @@ import { User, ChevronDown } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const [userRole, setUserRole] = React.useState<string | null>(null);
 
   // Fetch user role
@@ -52,7 +52,15 @@ const Navigation = () => {
               isActive('/groomer-calendar') ? 'text-primary' : 'text-muted-foreground'
             }`}
           >
-            Meu Calendário
+            Agendamentos
+          </Link>
+          <Link 
+            to="/groomer-schedule" 
+            className={`text-sm font-medium transition-colors hover:text-primary ${
+              isActive('/groomer-schedule') ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            Minha Agenda
           </Link>
         </>
       );
@@ -67,7 +75,7 @@ const Navigation = () => {
               isActive('/vet-calendar') ? 'text-primary' : 'text-muted-foreground'
             }`}
           >
-            Meu Calendário
+            Consultas
           </Link>
         </>
       );
@@ -121,16 +129,33 @@ const Navigation = () => {
   };
 
   const renderUserMenu = () => {
-    if (userRole === 'groomer' || userRole === 'vet') {
+    if (userRole === 'groomer') {
       return (
         <DropdownMenuContent align="end">
           <DropdownMenuItem asChild>
             <Link to="/profile">Perfil</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link to={userRole === 'groomer' ? '/groomer-calendar' : '/vet-calendar'}>
-              Meu Calendário
-            </Link>
+            <Link to="/groomer-calendar">Agendamentos</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/groomer-schedule">Minha Agenda</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={signOut}>
+            Sair
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      );
+    }
+
+    if (userRole === 'vet') {
+      return (
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem asChild>
+            <Link to="/profile">Perfil</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/vet-calendar">Consultas</Link>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={signOut}>
             Sair
@@ -160,8 +185,6 @@ const Navigation = () => {
       </DropdownMenuContent>
     );
   };
-
-  const { signOut } = useAuth();
 
   return (
     <nav className="bg-white shadow-sm sticky top-0 z-50">

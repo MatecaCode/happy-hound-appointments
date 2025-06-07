@@ -1,8 +1,10 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Navigation from './Navigation';
 import Footer from './Footer';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -10,6 +12,43 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [userRole, setUserRole] = React.useState<string | null>(null);
+
+  // Fetch user role
+  React.useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) throw error;
+        setUserRole(data?.role || 'client');
+      } catch (error) {
+        console.error('Error fetching user role:', error);
+        setUserRole('client');
+      }
+    };
+    
+    fetchUserRole();
+  }, [user]);
+
+  // Redirect groomers and vets to their calendars when accessing home page
+  useEffect(() => {
+    if (user && userRole && location.pathname === '/') {
+      if (userRole === 'groomer') {
+        navigate('/groomer-calendar');
+      } else if (userRole === 'vet') {
+        navigate('/vet-calendar');
+      }
+    }
+  }, [user, userRole, location.pathname, navigate]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

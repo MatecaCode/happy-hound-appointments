@@ -15,10 +15,13 @@ import Profile from "./pages/Profile";
 import Pets from "./pages/Pets";
 import GroomerCalendar from "./pages/GroomerCalendar";
 import VetCalendar from "./pages/VetCalendar";
+import GroomerSchedule from "./pages/GroomerSchedule";
 import Shop from "./pages/Shop";
 import Cart from "./pages/Cart";
 import About from "./pages/About";
 import AuthCallback from "./pages/AuthCallback";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import { AuthProvider } from "./hooks/useAuth";
 
 const queryClient = new QueryClient();
@@ -38,9 +41,12 @@ const App = () => (
             <Route path="/confirmation" element={<Confirmation />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/pets" element={<Pets />} />
             <Route path="/groomer-calendar" element={<GroomerCalendar />} />
+            <Route path="/groomer-schedule" element={<GroomerSchedule />} />
             <Route path="/vet-calendar" element={<VetCalendar />} />
             <Route path="/shop" element={<Shop />} />
             <Route path="/cart" element={<Cart />} />

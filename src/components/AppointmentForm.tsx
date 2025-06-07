@@ -21,8 +21,6 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     setSelectedPet,
     selectedService,
     setSelectedService,
-    ownerName, 
-    setOwnerName,
     notes,
     setNotes,
     timeSlots,
@@ -55,8 +53,6 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setSelectedPet={setSelectedPet}
           selectedService={selectedService}
           setSelectedService={setSelectedService}
-          ownerName={ownerName}
-          setOwnerName={setOwnerName}
           onNext={() => setFormStep(2)}
           serviceType={serviceType}
         />
