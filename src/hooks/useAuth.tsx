@@ -95,6 +95,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const initializeGroomerAvailability = async (userId: string) => {
+    console.log('🔧 Initializing groomer availability for user:', userId);
+    
+    try {
+      // Generate availability for the next 3 months
+      const availabilityEntries = [];
+      const today = new Date();
+      const endDate = new Date();
+      endDate.setMonth(today.getMonth() + 3);
+
+      // Generate time slots (8am to 5pm, 30-min intervals)
+      const timeSlots = [];
+      for (let hour = 8; hour < 17; hour++) {
+        timeSlots.push(`${hour}:00`);
+        if (hour < 16) {
+          timeSlots.push(`${hour}:30`);
+        }
+      }
+
+      // Loop through each day for the next 3 months
+      for (let date = new Date(today); date <= endDate; date.setDate(date.getDate() + 1)) {
+        // Skip Sundays (day 0)
+        if (date.getDay() === 0) continue;
+
+        const dateStr = date.toISOString().split('T')[0];
+        
+        // Add all time slots for this date
+        for (const timeSlot of timeSlots) {
+          availabilityEntries.push({
+            provider_id: userId,
+            date: dateStr,
+            time_slot: timeSlot,
+            available: true
+          });
+        }
+      }
+
+      console.log(`📊 Creating ${availabilityEntries.length} availability entries for new groomer...`);
+
+      // Insert all availability entries in batches
+      const batchSize = 100;
+      for (let i = 0; i < availabilityEntries.length; i += batchSize) {
+        const batch = availabilityEntries.slice(i, i + batchSize);
+        const { error: insertError } = await supabase
+          .from('provider_availability')
+          .insert(batch);
+
+        if (insertError) {
+          console.error('Error inserting availability batch:', insertError);
+          // Don't throw here, as we don't want to fail registration
+        }
+      }
+
+      console.log('✅ Groomer availability initialized successfully');
+    } catch (error: any) {
+      console.error('❌ Error initializing groomer availability:', error);
+      // Don't throw here, as we don't want to fail registration
+    }
+  };
+
   const signUp = async (email: string, password: string, name: string, role: string = 'client') => {
     try {
       console.log('🔍 SignUp Debug - Starting registration with:', { email, name, role });
@@ -121,16 +181,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('✅ SignUp Debug - User created:', data);
       console.log('📋 SignUp Debug - User metadata:', data.user?.user_metadata);
       
-      // Check if profile was created
+      // Check if profile was created and initialize groomer availability if needed
       if (data.user) {
         setTimeout(async () => {
           const { data: profileData, error: profileError } = await supabase
             .from('profiles')
             .select('*')
-            .eq('id', data.user.id);
+            .eq('id', data.user.id)
+            .single();
           
           console.log('👤 SignUp Debug - Profile check:', { profileData, profileError });
-        }, 2000);
+          
+          // If the user is a groomer, initialize their availability
+          if (profileData && profileData.role === 'groomer') {
+            console.log('🏥 New groomer detected, initializing availability...');
+            await initializeGroomerAvailability(data.user.id);
+          }
+        }, 3000); // Wait a bit longer for the profile trigger to complete
       }
       
       toast.success('Registro realizado com sucesso! Verifique seu e-mail para confirmar.');
