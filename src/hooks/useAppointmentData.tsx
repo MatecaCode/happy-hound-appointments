@@ -48,14 +48,17 @@ export const useAppointmentData = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
 
-  // Fetch providers available on a specific date using the new separate tables
+  // Fetch providers available on a specific date using the new resource availability system
   const fetchAvailableProviders = useCallback(async (type: 'grooming' | 'veterinary', selectedDate: Date) => {
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
       
-      console.log('🔍 DEBUG: Starting fetchAvailableProviders');
+      console.log('🔍 DEBUG: Starting fetchAvailableProviders with new system');
       console.log('🔍 DEBUG: Service type:', type);
       console.log('🔍 DEBUG: Date string:', dateStr);
+      
+      // Determine resource type based on service type
+      const resourceType = type === 'grooming' ? 'groomer' : 'veterinary';
       
       // Step 1: Get providers from the appropriate table
       const tableName = type === 'grooming' ? 'groomers' : 'veterinarians';
@@ -74,18 +77,19 @@ export const useAppointmentData = () => {
         return;
       }
 
-      // Step 2: Check availability for each provider
+      // Step 2: Check availability using the new service_availability table
       const providersWithAvailability = [];
       
       for (const provider of providers) {
         console.log(`🔍 DEBUG: Checking availability for ${provider.name} on ${dateStr}`);
         
         const { data: availability, error: availError } = await supabase
-          .from('provider_availability')
+          .from('service_availability')
           .select('*')
+          .eq('resource_type', resourceType)
           .eq('provider_id', provider.id)
           .eq('date', dateStr)
-          .eq('available', true);
+          .gt('available_capacity', 0);
           
         console.log(`🔍 DEBUG: Availability for ${provider.name}:`, availability);
         
@@ -152,7 +156,7 @@ export const useAppointmentData = () => {
     }
   }, []);
 
-  // Fetch available time slots for selected date and groomer
+  // Fetch available time slots using the new availability system
   const fetchTimeSlots = useCallback(async (selectedDate: Date, selectedGroomerId: string, setIsLoading: (loading: boolean) => void) => {
     if (!selectedDate || !selectedGroomerId) {
       setTimeSlots([]);
@@ -163,36 +167,38 @@ export const useAppointmentData = () => {
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
       
-      // Get provider availability
+      // Determine if this is a groomer or vet to know which resource type to check
+      let resourceType = 'groomer';
+      
+      // Check if it's a vet
+      const { data: vetCheck } = await supabase
+        .from('veterinarians')
+        .select('id')
+        .eq('id', selectedGroomerId)
+        .single();
+        
+      if (vetCheck) {
+        resourceType = 'veterinary';
+      }
+      
+      // Get available slots from service_availability
       const { data: availability, error: availError } = await supabase
-        .from('provider_availability')
+        .from('service_availability')
         .select('*')
+        .eq('resource_type', resourceType)
         .eq('provider_id', selectedGroomerId)
         .eq('date', dateStr)
-        .eq('available', true);
+        .gt('available_capacity', 0)
+        .order('time_slot');
 
       if (availError) throw availError;
 
-      // Get existing appointments
-      const { data: appointments, error: apptError } = await supabase
-        .from('appointments')
-        .select('time')
-        .eq('provider_id', selectedGroomerId)
-        .eq('date', dateStr)
-        .eq('status', 'upcoming');
-
-      if (apptError) throw apptError;
-
-      // Create time slots from availability, excluding booked times
-      const bookedTimes = appointments?.map(apt => apt.time) || [];
-      const slots: TimeSlot[] = (availability || [])
-        .filter(slot => !bookedTimes.includes(slot.time_slot))
-        .map(slot => ({
-          id: slot.time_slot,
-          time: slot.time_slot,
-          available: true
-        }))
-        .sort((a, b) => a.time.localeCompare(b.time));
+      // Transform to TimeSlot format
+      const slots: TimeSlot[] = (availability || []).map(slot => ({
+        id: slot.time_slot,
+        time: slot.time_slot,
+        available: slot.available_capacity > 0
+      }));
 
       setTimeSlots(slots);
     } catch (error: any) {

@@ -21,12 +21,14 @@ export const createAppointment = async (
 
     const { data: service } = await supabase
       .from('services')
-      .select('name')
+      .select('name, service_type')
       .eq('id', selectedService)
       .single();
 
     // Try to get provider name from groomers table first, then veterinarians
     let providerName = 'Profissional';
+    let resourceType = 'groomer'; // default
+    
     const { data: groomer } = await supabase
       .from('groomers')
       .select('name')
@@ -35,6 +37,7 @@ export const createAppointment = async (
 
     if (groomer) {
       providerName = groomer.name;
+      resourceType = 'groomer';
     } else {
       const { data: vet } = await supabase
         .from('veterinarians')
@@ -44,7 +47,13 @@ export const createAppointment = async (
       
       if (vet) {
         providerName = vet.name;
+        resourceType = 'veterinary';
       }
+    }
+
+    // If it's a grooming service, also use shower resource
+    if (service?.service_type === 'grooming') {
+      resourceType = 'groomer'; // Primary resource is groomer for grooming services
     }
 
     // Get user profile for owner name from the appropriate table
@@ -84,7 +93,7 @@ export const createAppointment = async (
     }
 
     // Create appointment
-    const { error } = await supabase
+    const { data: appointment, error: appointmentError } = await supabase
       .from('appointments')
       .insert({
         user_id: userId,
@@ -96,10 +105,41 @@ export const createAppointment = async (
         service: service?.name || '',
         pet_name: pet?.name || '',
         owner_name: ownerName,
-        notes: notes || null
+        notes: notes || null,
+        resource_type: resourceType
+      })
+      .select()
+      .single();
+
+    if (appointmentError) throw appointmentError;
+
+    // Create booking capacity entry to track resource usage
+    const { error: capacityError } = await supabase
+      .from('booking_capacity')
+      .insert({
+        appointment_id: appointment.id,
+        resource_type: resourceType,
+        provider_id: selectedGroomerId,
+        date: date.toISOString().split('T')[0],
+        time_slot: selectedTimeSlotId
       });
 
-    if (error) throw error;
+    if (capacityError) throw capacityError;
+
+    // If it's a grooming service, also book shower capacity
+    if (service?.service_type === 'grooming') {
+      const { error: showerCapacityError } = await supabase
+        .from('booking_capacity')
+        .insert({
+          appointment_id: appointment.id,
+          resource_type: 'shower',
+          provider_id: null, // Shared resource
+          date: date.toISOString().split('T')[0],
+          time_slot: selectedTimeSlotId
+        });
+
+      if (showerCapacityError) throw showerCapacityError;
+    }
 
     toast.success('Agendamento realizado com sucesso!');
     return true;

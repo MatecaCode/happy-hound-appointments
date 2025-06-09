@@ -40,43 +40,47 @@ const CreateTestData = () => {
 
       if (vetError) throw vetError;
 
-      // Create availability for June 9, 2025
-      const availabilities = [];
+      // Create availability using the new system for June 9, 2025
       const targetDate = '2025-06-09';
-      const timeSlots = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
 
-      // Add availability for groomers
+      // Create availability for groomers using the new function
       for (const groomer of groomers) {
-        for (const timeSlot of timeSlots) {
-          availabilities.push({
-            provider_id: groomer.id,
-            date: targetDate,
-            time_slot: timeSlot,
-            available: true
-          });
-        }
+        const { error: groomerAvailError } = await supabase.rpc('create_availability_slots', {
+          p_resource_type: 'groomer',
+          p_date: targetDate,
+          p_provider_id: groomer.id,
+          p_start_time: '09:00',
+          p_end_time: '17:00'
+        });
+
+        if (groomerAvailError) throw groomerAvailError;
       }
 
-      // Add availability for vets
+      // Create availability for vets using the new function
       for (const vet of vets) {
-        for (const timeSlot of timeSlots) {
-          availabilities.push({
-            provider_id: vet.id,
-            date: targetDate,
-            time_slot: timeSlot,
-            available: true
-          });
-        }
+        const { error: vetAvailError } = await supabase.rpc('create_availability_slots', {
+          p_resource_type: 'veterinary',
+          p_date: targetDate,
+          p_provider_id: vet.id,
+          p_start_time: '09:00',
+          p_end_time: '17:00'
+        });
+
+        if (vetAvailError) throw vetAvailError;
       }
 
-      // Insert availability
-      const { error: availError } = await supabase
-        .from('provider_availability')
-        .upsert(availabilities, { onConflict: 'provider_id,date,time_slot' });
+      // Create shared shower availability (no specific provider)
+      const { error: showerAvailError } = await supabase.rpc('create_availability_slots', {
+        p_resource_type: 'shower',
+        p_date: targetDate,
+        p_provider_id: null,
+        p_start_time: '09:00',
+        p_end_time: '17:00'
+      });
 
-      if (availError) throw availError;
+      if (showerAvailError) throw showerAvailError;
 
-      console.log('✅ Test data created successfully');
+      console.log('✅ Test data created successfully with new availability system');
       toast.success('Dados de teste criados com sucesso!');
 
     } catch (error: any) {

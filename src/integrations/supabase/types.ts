@@ -19,6 +19,7 @@ export type Database = {
           pet_id: string
           pet_name: string
           provider_id: string
+          resource_type: string | null
           service: string
           service_id: string
           status: string
@@ -35,6 +36,7 @@ export type Database = {
           pet_id: string
           pet_name: string
           provider_id: string
+          resource_type?: string | null
           service: string
           service_id: string
           status?: string
@@ -51,6 +53,7 @@ export type Database = {
           pet_id?: string
           pet_name?: string
           provider_id?: string
+          resource_type?: string | null
           service?: string
           service_id?: string
           status?: string
@@ -67,11 +70,63 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "appointments_resource_type_fkey"
+            columns: ["resource_type"]
+            isOneToOne: false
+            referencedRelation: "resource_types"
+            referencedColumns: ["name"]
+          },
+          {
             foreignKeyName: "appointments_service_id_fkey"
             columns: ["service_id"]
             isOneToOne: false
             referencedRelation: "services"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_capacity: {
+        Row: {
+          appointment_id: string
+          created_at: string | null
+          date: string
+          id: string
+          provider_id: string | null
+          resource_type: string
+          time_slot: string
+        }
+        Insert: {
+          appointment_id: string
+          created_at?: string | null
+          date: string
+          id?: string
+          provider_id?: string | null
+          resource_type: string
+          time_slot: string
+        }
+        Update: {
+          appointment_id?: string
+          created_at?: string | null
+          date?: string
+          id?: string
+          provider_id?: string | null
+          resource_type?: string
+          time_slot?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_capacity_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: true
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_capacity_resource_type_fkey"
+            columns: ["resource_type"]
+            isOneToOne: false
+            referencedRelation: "resource_types"
+            referencedColumns: ["name"]
           },
         ]
       }
@@ -371,6 +426,77 @@ export type Database = {
         }
         Relationships: []
       }
+      resource_types: {
+        Row: {
+          capacity_per_slot: number
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          slot_duration_minutes: number
+        }
+        Insert: {
+          capacity_per_slot?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          slot_duration_minutes?: number
+        }
+        Update: {
+          capacity_per_slot?: number
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          slot_duration_minutes?: number
+        }
+        Relationships: []
+      }
+      service_availability: {
+        Row: {
+          available_capacity: number
+          created_at: string | null
+          date: string
+          id: string
+          max_capacity: number
+          provider_id: string | null
+          resource_type: string
+          time_slot: string
+          updated_at: string | null
+        }
+        Insert: {
+          available_capacity?: number
+          created_at?: string | null
+          date: string
+          id?: string
+          max_capacity?: number
+          provider_id?: string | null
+          resource_type: string
+          time_slot: string
+          updated_at?: string | null
+        }
+        Update: {
+          available_capacity?: number
+          created_at?: string | null
+          date?: string
+          id?: string
+          max_capacity?: number
+          provider_id?: string | null
+          resource_type?: string
+          time_slot?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_availability_resource_type_fkey"
+            columns: ["resource_type"]
+            isOneToOne: false
+            referencedRelation: "resource_types"
+            referencedColumns: ["name"]
+          },
+        ]
+      }
       services: {
         Row: {
           created_at: string | null
@@ -445,6 +571,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_availability_slots: {
+        Args: {
+          p_resource_type: string
+          p_date: string
+          p_provider_id?: string
+          p_start_time?: string
+          p_end_time?: string
+        }
+        Returns: undefined
+      }
+      get_available_capacity: {
+        Args: {
+          p_resource_type: string
+          p_provider_id: string
+          p_date: string
+          p_time_slot: string
+        }
+        Returns: number
+      }
       mark_code_as_used: {
         Args: { code_value: string }
         Returns: undefined
