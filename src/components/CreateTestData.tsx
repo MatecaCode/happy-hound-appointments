@@ -220,7 +220,7 @@ const CreateTestData = () => {
             {isCreating ? 'Criando...' : 'Criar Disponibilidade'}
           </Button>
         </CardContent>
-      </CardContent>
+      </Card>
     </div>
   );
 };

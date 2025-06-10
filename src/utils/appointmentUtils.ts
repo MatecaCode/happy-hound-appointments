@@ -51,11 +51,6 @@ export const createAppointment = async (
       }
     }
 
-    // If it's a grooming service, also use shower resource
-    if (service?.service_type === 'grooming') {
-      resourceType = 'groomer'; // Primary resource is groomer for grooming services
-    }
-
     // Get user profile for owner name from the appropriate table
     let ownerName = 'Usuário';
     
@@ -113,32 +108,33 @@ export const createAppointment = async (
 
     if (appointmentError) throw appointmentError;
 
-    // Create booking capacity entry to track resource usage
-    const { error: capacityError } = await supabase
-      .from('booking_capacity')
-      .insert({
-        appointment_id: appointment.id,
-        resource_type: resourceType,
-        provider_id: selectedGroomerId,
-        date: date.toISOString().split('T')[0],
-        time_slot: selectedTimeSlotId
+    // Update availability by reducing capacity
+    const dateStr = date.toISOString().split('T')[0];
+    
+    // Reduce provider availability
+    const { error: providerError } = await supabase.rpc('reduce_availability_capacity', {
+      p_resource_type: resourceType,
+      p_provider_id: selectedGroomerId,
+      p_date: dateStr,
+      p_time_slot: selectedTimeSlotId
+    });
+
+    if (providerError) {
+      console.error('Error reducing provider availability:', providerError);
+    }
+
+    // If it's a grooming service that requires a bath, also reduce shower capacity
+    if (service?.service_type === 'grooming' && service?.name?.toLowerCase().includes('banho')) {
+      const { error: showerError } = await supabase.rpc('reduce_availability_capacity', {
+        p_resource_type: 'shower',
+        p_provider_id: null,
+        p_date: dateStr,
+        p_time_slot: selectedTimeSlotId
       });
 
-    if (capacityError) throw capacityError;
-
-    // If it's a grooming service, also book shower capacity
-    if (service?.service_type === 'grooming') {
-      const { error: showerCapacityError } = await supabase
-        .from('booking_capacity')
-        .insert({
-          appointment_id: appointment.id,
-          resource_type: 'shower',
-          provider_id: null, // Shared resource
-          date: date.toISOString().split('T')[0],
-          time_slot: selectedTimeSlotId
-        });
-
-      if (showerCapacityError) throw showerCapacityError;
+      if (showerError) {
+        console.error('Error reducing shower availability:', showerError);
+      }
     }
 
     toast.success('Agendamento realizado com sucesso!');
