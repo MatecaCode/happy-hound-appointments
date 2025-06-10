@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -10,6 +9,7 @@ import Layout from '@/components/Layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
+import { useGroomerRegistration } from '@/hooks/useGroomerRegistration';
 import { toast } from 'sonner';
 
 const Register = () => {
@@ -24,6 +24,7 @@ const Register = () => {
   const [codeRequired, setCodeRequired] = useState(false);
   
   const { signUp, user } = useAuth();
+  const { setupNewGroomer } = useGroomerRegistration();
   const navigate = useNavigate();
   const location = useLocation();
   const suggestGroomerRole = location.state?.suggestGroomerRole;
@@ -112,7 +113,24 @@ const Register = () => {
         }
       }
       
+      // Create the user account
       await signUp(email, password, name, role);
+      
+      // If this is a groomer registration, set up initial availability
+      if (role === 'groomer') {
+        // Wait a bit for the trigger to create the groomer profile
+        setTimeout(async () => {
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+              await setupNewGroomer(user.id);
+            }
+          } catch (error) {
+            console.error('Error setting up groomer:', error);
+          }
+        }, 2000);
+      }
+      
       toast.success('Registro realizado! Verifique seu email para confirmar a conta.');
       // Signup function will navigate to login
     } catch (error: any) {
@@ -211,6 +229,7 @@ const Register = () => {
                         Ao se cadastrar como {role === 'groomer' ? 'tosador' : 'veterinário'}, 
                         você terá acesso ao calendário de agendamentos e será listado como 
                         profissional disponível para os clientes.
+                        {role === 'groomer' && ' Sua disponibilidade inicial será configurada automaticamente.'}
                       </AlertDescription>
                     </Alert>
                   )}

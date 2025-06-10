@@ -40,47 +40,65 @@ const CreateTestData = () => {
 
       if (vetError) throw vetError;
 
-      // Create availability using the new system for June 9, 2025
-      const targetDate = '2025-06-09';
+      // Create availability using the new system for the next 7 days
+      const today = new Date();
+      const dates = [];
+      for (let i = 0; i < 7; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        dates.push(date.toISOString().split('T')[0]);
+      }
 
       // Create availability for groomers using the new function
       for (const groomer of groomers) {
-        const { error: groomerAvailError } = await supabase.rpc('create_availability_slots', {
-          p_resource_type: 'groomer',
-          p_date: targetDate,
-          p_provider_id: groomer.id,
-          p_start_time: '09:00',
-          p_end_time: '17:00'
-        });
+        for (const dateStr of dates) {
+          const { error: groomerAvailError } = await supabase.rpc('create_availability_slots', {
+            p_resource_type: 'groomer',
+            p_date: dateStr,
+            p_provider_id: groomer.id,
+            p_start_time: '09:00',
+            p_end_time: '17:00'
+          });
 
-        if (groomerAvailError) throw groomerAvailError;
+          if (groomerAvailError) {
+            console.error(`Error creating groomer availability for ${groomer.name} on ${dateStr}:`, groomerAvailError);
+          }
+        }
       }
 
       // Create availability for vets using the new function
       for (const vet of vets) {
-        const { error: vetAvailError } = await supabase.rpc('create_availability_slots', {
-          p_resource_type: 'veterinary',
-          p_date: targetDate,
-          p_provider_id: vet.id,
+        for (const dateStr of dates) {
+          const { error: vetAvailError } = await supabase.rpc('create_availability_slots', {
+            p_resource_type: 'veterinary',
+            p_date: dateStr,
+            p_provider_id: vet.id,
+            p_start_time: '09:00',
+            p_end_time: '17:00'
+          });
+
+          if (vetAvailError) {
+            console.error(`Error creating vet availability for ${vet.name} on ${dateStr}:`, vetAvailError);
+          }
+        }
+      }
+
+      // Create shared shower availability (no specific provider)
+      for (const dateStr of dates) {
+        const { error: showerAvailError } = await supabase.rpc('create_availability_slots', {
+          p_resource_type: 'shower',
+          p_date: dateStr,
+          p_provider_id: null,
           p_start_time: '09:00',
           p_end_time: '17:00'
         });
 
-        if (vetAvailError) throw vetAvailError;
+        if (showerAvailError) {
+          console.error(`Error creating shower availability for ${dateStr}:`, showerAvailError);
+        }
       }
 
-      // Create shared shower availability (no specific provider)
-      const { error: showerAvailError } = await supabase.rpc('create_availability_slots', {
-        p_resource_type: 'shower',
-        p_date: targetDate,
-        p_provider_id: null,
-        p_start_time: '09:00',
-        p_end_time: '17:00'
-      });
-
-      if (showerAvailError) throw showerAvailError;
-
-      console.log('✅ Test data created successfully with new availability system');
+      console.log('✅ Test data created successfully with availability for next 7 days');
       toast.success('Dados de teste criados com sucesso!');
 
     } catch (error: any) {
@@ -91,24 +109,119 @@ const CreateTestData = () => {
     }
   };
 
+  const createGroomerAvailability = async () => {
+    setIsCreating(true);
+    try {
+      console.log('🔧 Creating availability for all registered groomers...');
+
+      // Get all registered groomers from the database
+      const { data: registeredGroomers, error: groomerFetchError } = await supabase
+        .from('groomers')
+        .select('id, name');
+
+      if (groomerFetchError) throw groomerFetchError;
+
+      if (!registeredGroomers || registeredGroomers.length === 0) {
+        toast.info('Nenhum tosador encontrado no sistema');
+        return;
+      }
+
+      // Create availability for the next 14 days
+      const today = new Date();
+      const dates = [];
+      for (let i = 0; i < 14; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() + i);
+        dates.push(date.toISOString().split('T')[0]);
+      }
+
+      console.log(`📅 Creating availability for ${registeredGroomers.length} groomers for next 14 days`);
+
+      // Create availability for all registered groomers
+      for (const groomer of registeredGroomers) {
+        console.log(`👨‍💼 Processing groomer: ${groomer.name} (${groomer.id})`);
+        
+        for (const dateStr of dates) {
+          const { error: groomerAvailError } = await supabase.rpc('create_availability_slots', {
+            p_resource_type: 'groomer',
+            p_date: dateStr,
+            p_provider_id: groomer.id,
+            p_start_time: '09:00',
+            p_end_time: '17:00'
+          });
+
+          if (groomerAvailError) {
+            console.error(`❌ Error creating availability for ${groomer.name} on ${dateStr}:`, groomerAvailError);
+          }
+        }
+      }
+
+      // Also create shower availability for grooming services
+      console.log('🚿 Creating shower availability...');
+      for (const dateStr of dates) {
+        const { error: showerAvailError } = await supabase.rpc('create_availability_slots', {
+          p_resource_type: 'shower',
+          p_date: dateStr,
+          p_provider_id: null,
+          p_start_time: '09:00',
+          p_end_time: '17:00'
+        });
+
+        if (showerAvailError) {
+          console.error(`❌ Error creating shower availability for ${dateStr}:`, showerAvailError);
+        }
+      }
+
+      console.log('✅ Availability created for all registered groomers');
+      toast.success(`Disponibilidade criada para ${registeredGroomers.length} tosadores!`);
+
+    } catch (error: any) {
+      console.error('💥 Error creating groomer availability:', error);
+      toast.error('Erro ao criar disponibilidade: ' + error.message);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle>Criar Dados de Teste</CardTitle>
-        <CardDescription>
-          Criar tosadores e veterinários de teste com disponibilidade para 09/06/2025
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Button 
-          onClick={createTestData} 
-          disabled={isCreating}
-          className="w-full"
-        >
-          {isCreating ? 'Criando...' : 'Criar Dados de Teste'}
-        </Button>
+    <div className="space-y-4">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Criar Dados de Teste</CardTitle>
+          <CardDescription>
+            Criar tosadores e veterinários de teste com disponibilidade
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button 
+            onClick={createTestData} 
+            disabled={isCreating}
+            className="w-full"
+          >
+            {isCreating ? 'Criando...' : 'Criar Dados de Teste'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Disponibilidade para Tosadores</CardTitle>
+          <CardDescription>
+            Criar disponibilidade para todos os tosadores registrados
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button 
+            onClick={createGroomerAvailability} 
+            disabled={isCreating}
+            className="w-full"
+            variant="outline"
+          >
+            {isCreating ? 'Criando...' : 'Criar Disponibilidade'}
+          </Button>
+        </CardContent>
       </CardContent>
-    </Card>
+    </div>
   );
 };
 

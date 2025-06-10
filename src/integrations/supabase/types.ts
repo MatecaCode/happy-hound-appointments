@@ -571,6 +571,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      backfill_user_profiles: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       create_availability_slots: {
         Args: {
           p_resource_type: string
