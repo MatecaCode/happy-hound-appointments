@@ -598,6 +598,15 @@ export type Database = {
         Args: { code_value: string }
         Returns: undefined
       }
+      reduce_availability_capacity: {
+        Args: {
+          p_resource_type: string
+          p_provider_id: string
+          p_date: string
+          p_time_slot: string
+        }
+        Returns: undefined
+      }
       validate_registration_code: {
         Args: { code_value: string; role_value: string }
         Returns: boolean

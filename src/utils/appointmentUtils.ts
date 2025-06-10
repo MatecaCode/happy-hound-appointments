@@ -108,16 +108,18 @@ export const createAppointment = async (
 
     if (appointmentError) throw appointmentError;
 
-    // Update availability by reducing capacity
+    // Update availability by reducing capacity using direct SQL
     const dateStr = date.toISOString().split('T')[0];
     
     // Reduce provider availability
-    const { error: providerError } = await supabase.rpc('reduce_availability_capacity', {
-      p_resource_type: resourceType,
-      p_provider_id: selectedGroomerId,
-      p_date: dateStr,
-      p_time_slot: selectedTimeSlotId
-    });
+    const { error: providerError } = await supabase
+      .from('service_availability')
+      .update({ available_capacity: supabase.raw('available_capacity - 1') })
+      .eq('resource_type', resourceType)
+      .eq('provider_id', selectedGroomerId)
+      .eq('date', dateStr)
+      .eq('time_slot', selectedTimeSlotId)
+      .gt('available_capacity', 0);
 
     if (providerError) {
       console.error('Error reducing provider availability:', providerError);
@@ -125,12 +127,13 @@ export const createAppointment = async (
 
     // If it's a grooming service that requires a bath, also reduce shower capacity
     if (service?.service_type === 'grooming' && service?.name?.toLowerCase().includes('banho')) {
-      const { error: showerError } = await supabase.rpc('reduce_availability_capacity', {
-        p_resource_type: 'shower',
-        p_provider_id: null,
-        p_date: dateStr,
-        p_time_slot: selectedTimeSlotId
-      });
+      const { error: showerError } = await supabase
+        .from('service_availability')
+        .update({ available_capacity: supabase.raw('available_capacity - 1') })
+        .eq('resource_type', 'shower')
+        .eq('date', dateStr)
+        .eq('time_slot', selectedTimeSlotId)
+        .gt('available_capacity', 0);
 
       if (showerError) {
         console.error('Error reducing shower availability:', showerError);
@@ -144,4 +147,21 @@ export const createAppointment = async (
     toast.error('Erro ao criar agendamento');
     return false;
   }
+};
+
+// Helper function to determine required resources for a service
+export const getRequiredResources = (serviceType: string, serviceName: string): string[] => {
+  const resources: string[] = [];
+  
+  if (serviceType === 'grooming') {
+    resources.push('groomer');
+    // If service includes bath, also need shower
+    if (serviceName.toLowerCase().includes('banho')) {
+      resources.push('shower');
+    }
+  } else if (serviceType === 'veterinary') {
+    resources.push('veterinary');
+  }
+  
+  return resources;
 };

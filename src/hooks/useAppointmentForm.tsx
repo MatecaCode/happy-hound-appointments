@@ -61,6 +61,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     fetchTimeSlots,
   } = useAppointmentData();
 
+  // Get the currently selected service object
+  const selectedServiceObj = services.find(s => s.id === formState.selectedService);
+
   // Handle next available appointment selection
   const handleNextAvailableSelect = () => {
     if (nextAvailable) {
@@ -113,16 +116,17 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   useEffect(() => {
     if (formState.formStep === 3 && formState.date) {
       console.log('🔍 DEBUG: useEffect triggered for step 3, date:', formState.date);
-      fetchAvailableProviders(serviceType, formState.date);
+      console.log('🔍 DEBUG: Selected service:', selectedServiceObj);
+      fetchAvailableProviders(serviceType, formState.date, selectedServiceObj);
     }
-  }, [formState.formStep, formState.date, serviceType, fetchAvailableProviders]);
+  }, [formState.formStep, formState.date, serviceType, selectedServiceObj, fetchAvailableProviders]);
 
   // Fetch time slots when date or groomer changes
   useEffect(() => {
     if (formState.formStep === 4) {
-      fetchTimeSlots(formState.date, formState.selectedGroomerId, formState.setIsLoading);
+      fetchTimeSlots(formState.date, formState.selectedGroomerId, formState.setIsLoading, selectedServiceObj);
     }
-  }, [formState.formStep, formState.date, formState.selectedGroomerId, fetchTimeSlots]);
+  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots]);
 
   return {
     // Spread all form state
