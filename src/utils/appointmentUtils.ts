@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -12,6 +11,17 @@ export const createAppointment = async (
   notes: string
 ) => {
   try {
+    console.log('🔧 Creating appointment...');
+    console.log('📋 Parameters:', {
+      userId,
+      selectedPet,
+      selectedService,
+      selectedGroomerId,
+      date: date.toISOString().split('T')[0],
+      selectedTimeSlotId,
+      notes
+    });
+
     // Get pet and service details
     const { data: pet } = await supabase
       .from('pets')
@@ -108,53 +118,24 @@ export const createAppointment = async (
 
     if (appointmentError) throw appointmentError;
 
-    // Update availability by reducing capacity using the database function
-    const dateStr = date.toISOString().split('T')[0];
-    
-    // Reduce provider availability
-    const { error: providerError } = await supabase
-      .rpc('reduce_availability_capacity', {
-        p_resource_type: resourceType,
-        p_provider_id: selectedGroomerId,
-        p_date: dateStr,
-        p_time_slot: selectedTimeSlotId
-      });
-
-    if (providerError) {
-      console.error('Error reducing provider availability:', providerError);
-    }
-
-    // If it's a grooming service that requires a bath, also reduce shower capacity
-    if (service?.service_type === 'grooming' && service?.name?.toLowerCase().includes('banho')) {
-      const { error: showerError } = await supabase
-        .rpc('reduce_availability_capacity', {
-          p_resource_type: 'shower',
-          p_provider_id: null,
-          p_date: dateStr,
-          p_time_slot: selectedTimeSlotId
-        });
-
-      if (showerError) {
-        console.error('Error reducing shower availability:', showerError);
-      }
-    }
-
+    console.log('✅ Appointment created successfully:', appointment);
     toast.success('Agendamento realizado com sucesso!');
     return true;
+    
   } catch (error: any) {
-    console.error('Error creating appointment:', error);
-    toast.error('Erro ao criar agendamento');
+    console.error('💥 Error creating appointment:', error);
+    toast.error('Erro ao criar agendamento: ' + error.message);
     return false;
   }
 };
 
-// Helper function to determine required resources for a service
+// Helper function to determine required resources for a service (keeping for compatibility)
 export const getRequiredResources = (serviceType: string, serviceName: string): string[] => {
   const resources: string[] = [];
   
   if (serviceType === 'grooming') {
     resources.push('groomer');
-    // If service includes bath, also need shower
+    // If service includes bath, also need shower capacity (future enhancement)
     if (serviceName.toLowerCase().includes('banho')) {
       resources.push('shower');
     }
