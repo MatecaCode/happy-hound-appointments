@@ -42,12 +42,11 @@ const CreateAvailabilitySlots = () => {
       for (const groomer of groomers || []) {
         for (const timeSlot of timeSlots) {
           availabilitySlots.push({
-            resource_type: 'groomer',
             provider_id: groomer.id,
             date: date,
             time_slot: timeSlot,
-            available_capacity: 1,
-            max_capacity: 1
+            available: true,
+            provider_type: 'groomer'
           });
         }
       }
@@ -56,34 +55,21 @@ const CreateAvailabilitySlots = () => {
       for (const vet of vets || []) {
         for (const timeSlot of timeSlots) {
           availabilitySlots.push({
-            resource_type: 'veterinary',
             provider_id: vet.id,
             date: date,
             time_slot: timeSlot,
-            available_capacity: 1,
-            max_capacity: 1
+            available: true,
+            provider_type: 'veterinary'
           });
         }
       }
 
-      // Create shower availability (shared resource, no specific provider)
-      for (const timeSlot of timeSlots) {
-        availabilitySlots.push({
-          resource_type: 'shower',
-          provider_id: null,
-          date: date,
-          time_slot: timeSlot,
-          available_capacity: 5,
-          max_capacity: 5
-        });
-      }
+      console.log('📅 Inserting availability slots to provider_availability:', availabilitySlots.length);
 
-      console.log('📅 Inserting availability slots:', availabilitySlots.length);
-
-      // Insert all availability slots
+      // Insert all availability slots to the correct table
       const { error: insertError } = await supabase
-        .from('service_availability')
-        .upsert(availabilitySlots, { onConflict: 'resource_type,provider_id,date,time_slot' });
+        .from('provider_availability')
+        .upsert(availabilitySlots, { onConflict: 'provider_id,date,time_slot' });
 
       if (insertError) throw insertError;
 
@@ -170,7 +156,6 @@ const CreateAvailabilitySlots = () => {
         
         <div className="text-xs text-muted-foreground">
           <p>• Tosadores: 1 agendamento por slot de 30min</p>
-          <p>• Banhos: 5 animais por slot de 30min</p>
           <p>• Veterinários: 1 consulta por slot de 30min</p>
         </div>
       </CardContent>

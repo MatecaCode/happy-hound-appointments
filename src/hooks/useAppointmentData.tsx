@@ -48,6 +48,96 @@ export const useAppointmentData = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
 
+  // Helper function to check if a provider has any available slots on a date
+  const checkProviderHasAvailableSlots = useCallback(async (
+    providerId: string,
+    dateStr: string,
+    serviceDurationMinutes: number = 30
+  ) => {
+    try {
+      // Get all provider availability slots for this date
+      const { data: availabilitySlots, error: availError } = await supabase
+        .from('provider_availability')
+        .select('time_slot')
+        .eq('provider_id', providerId)
+        .eq('date', dateStr)
+        .eq('available', true)
+        .order('time_slot');
+
+      if (availError || !availabilitySlots || availabilitySlots.length === 0) {
+        console.log(`No base availability found for ${providerId} on ${dateStr}`);
+        return false;
+      }
+
+      // Convert time_slot strings to a comparable format (e.g., minutes from midnight)
+      const availableSlotTimesInMinutes = availabilitySlots.map(slot => {
+        const [hour, minute] = slot.time_slot.split(':').map(Number);
+        return hour * 60 + minute;
+      }).sort((a, b) => a - b); // Ensure sorted
+
+      // Get all existing appointments for this provider on this date
+      const { data: appointments, error: appointmentsError } = await supabase
+        .from('appointments')
+        .select('time, service_id')
+        .eq('provider_id', providerId)
+        .eq('date', dateStr);
+
+      if (appointmentsError) {
+        console.error('Error checking appointments:', appointmentsError);
+        return false;
+      }
+
+      // Fetch services to get their durations
+      const { data: allServices, error: servicesError } = await supabase
+        .from('services')
+        .select('id, duration');
+      if (servicesError) {
+        console.error('Error fetching all services for duration check:', servicesError);
+        return false;
+      }
+      const serviceDurationsMap = new Map(allServices?.map(s => [s.id, s.duration]));
+
+      // Mark booked time blocks. A booked slot takes up its duration.
+      const occupiedTimeBlocks = new Set<number>(); // Stores minutes from midnight for occupied blocks
+      appointments?.forEach(apt => {
+        const [aptHour, aptMinute] = apt.time.split(':').map(Number);
+        const aptStartTimeInMinutes = aptHour * 60 + aptMinute;
+        const aptDuration = serviceDurationsMap.get(apt.service_id) || 30; // Default to 30 if not found
+
+        for (let i = 0; i < aptDuration; i += 30) { // Mark every 30-min block that the appointment covers
+          occupiedTimeBlocks.add(aptStartTimeInMinutes + i);
+        }
+      });
+
+      const requiredSlots = Math.ceil(serviceDurationMinutes / 30);
+
+      for (let i = 0; i <= availableSlotTimesInMinutes.length - requiredSlots; i++) {
+        const currentStartTime = availableSlotTimesInMinutes[i];
+        let isBlockAvailable = true;
+
+        for (let j = 0; j < requiredSlots; j++) {
+          const checkTime = currentStartTime + (j * 30);
+
+          // Ensure this checkTime is actually one of the available slots for the provider
+          // AND not booked, AND sequential.
+          if (!availableSlotTimesInMinutes.includes(checkTime) || occupiedTimeBlocks.has(checkTime)) {
+            isBlockAvailable = false;
+            break;
+          }
+        }
+
+        if (isBlockAvailable) {
+          return true; // Found a contiguous block of available time
+        }
+      }
+
+      return false; // No available contiguous block found
+    } catch (error) {
+      console.error('Error checking provider slots:', error);
+      return false;
+    }
+  }, []);
+
   // Fetch providers available on a specific date using provider_availability table
   const fetchAvailableProviders = useCallback(async (
     type: 'grooming' | 'veterinary', 
@@ -135,55 +225,7 @@ export const useAppointmentData = () => {
       toast.error('Erro ao carregar profissionais');
       setGroomers([]);
     }
-  }, []);
-
-  // Helper function to check if a provider has any available slots on a date
-  const checkProviderHasAvailableSlots = useCallback(async (
-    providerId: string,
-    dateStr: string,
-    serviceDuration: number = 30
-  ) => {
-    try {
-      // Get all provider availability slots for this date
-      const { data: availabilitySlots, error: availError } = await supabase
-        .from('provider_availability')
-        .select('time_slot')
-        .eq('provider_id', providerId)
-        .eq('date', dateStr)
-        .eq('available', true)
-        .order('time_slot');
-
-      if (availError || !availabilitySlots || availabilitySlots.length === 0) {
-        return false;
-      }
-
-      // Get all existing appointments for this provider on this date
-      const { data: appointments, error: appointmentsError } = await supabase
-        .from('appointments')
-        .select('time')
-        .eq('provider_id', providerId)
-        .eq('date', dateStr);
-
-      if (appointmentsError) {
-        console.error('Error checking appointments:', appointmentsError);
-        return false;
-      }
-
-      const bookedTimes = new Set(appointments?.map(apt => apt.time) || []);
-      
-      // Check if any available slots are not booked
-      for (const slot of availabilitySlots) {
-        if (!bookedTimes.has(slot.time_slot)) {
-          return true; // Found at least one available slot
-        }
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Error checking provider slots:', error);
-      return false;
-    }
-  }, []);
+  }, [checkProviderHasAvailableSlots]);
 
   // Fetch services based on service type
   const fetchServices = useCallback(async (type: 'grooming' | 'veterinary') => {
@@ -259,7 +301,7 @@ export const useAppointmentData = () => {
       // Get existing appointments for this provider on this date
       const { data: appointments, error: appointmentsError } = await supabase
         .from('appointments')
-        .select('time')
+        .select('time, service_id')
         .eq('provider_id', selectedGroomerId)
         .eq('date', dateStr);
 
@@ -267,17 +309,66 @@ export const useAppointmentData = () => {
 
       console.log('🔍 DEBUG: Existing appointments:', appointments);
 
-      const bookedTimes = new Set(appointments?.map(apt => apt.time) || []);
-      
-      // Transform to TimeSlot format, marking slots as unavailable if already booked
-      const slots: TimeSlot[] = availabilitySlots.map(slot => ({
-        id: slot.time_slot,
-        time: slot.time_slot,
-        available: !bookedTimes.has(slot.time_slot)
+      // Get all services to map service_id to duration
+      const { data: allServices, error: servicesError } = await supabase
+        .from('services')
+        .select('id, duration');
+      if (servicesError) throw servicesError;
+      const serviceDurationsMap = new Map(allServices?.map(s => [s.id, s.duration]));
+
+      // Mark booked time blocks
+      const bookedTimeBlocks = new Set<number>(); // Stores minutes from midnight for occupied blocks
+      appointments?.forEach(apt => {
+        const [aptHour, aptMinute] = apt.time.split(':').map(Number);
+        const aptStartTimeInMinutes = aptHour * 60 + aptMinute;
+        const aptDuration = serviceDurationsMap.get(apt.service_id) || 30;
+
+        for (let i = 0; i < aptDuration; i += 30) { // Mark every 30-min block that the appointment covers
+          bookedTimeBlocks.add(aptStartTimeInMinutes + i);
+        }
+      });
+
+      const requiredSlots = Math.ceil((selectedService?.duration || 30) / 30);
+
+      // Convert available time slots to minutes from midnight for easier calculation
+      const availableTimesInMinutes = new Set(availabilitySlots.map(slot => {
+        const [hour, minute] = slot.time_slot.split(':').map(Number);
+        return hour * 60 + minute;
       }));
 
-      console.log('✅ Final time slots:', slots);
-      setTimeSlots(slots);
+      const finalAvailableSlots: TimeSlot[] = [];
+
+      for (const slot of availabilitySlots) {
+        const [hour, minute] = slot.time_slot.split(':').map(Number);
+        const currentSlotTimeInMinutes = hour * 60 + minute;
+        let isSlotBlockAvailable = true;
+
+        for (let i = 0; i < requiredSlots; i++) {
+          const checkTime = currentSlotTimeInMinutes + (i * 30);
+          // Check if this time slot is within the provider's general availability
+          // AND not already booked by another appointment
+          if (!availableTimesInMinutes.has(checkTime) || bookedTimeBlocks.has(checkTime)) {
+            isSlotBlockAvailable = false;
+            break;
+          }
+        }
+
+        finalAvailableSlots.push({
+          id: slot.time_slot,
+          time: slot.time_slot,
+          available: isSlotBlockAvailable
+        });
+      }
+
+      // Sort the slots by time before setting state
+      finalAvailableSlots.sort((a, b) => {
+        const [aHour, aMinute] = a.time.split(':').map(Number);
+        const [bHour, bMinute] = b.time.split(':').map(Number);
+        return (aHour * 60 + aMinute) - (bHour * 60 + bMinute);
+      });
+
+      console.log('✅ Final time slots:', finalAvailableSlots);
+      setTimeSlots(finalAvailableSlots);
       
     } catch (error: any) {
       console.error('💥 Error fetching time slots:', error);
