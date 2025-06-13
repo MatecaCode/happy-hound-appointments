@@ -1,147 +1,73 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export const createAppointment = async (
   userId: string,
-  selectedPet: string,
-  selectedService: string,
-  selectedGroomerId: string,
+  petId: string,
+  serviceId: string,
+  providerId: string,
   date: Date,
-  selectedTimeSlotId: string,
-  notes: string
+  timeSlot: string,
+  notes?: string
 ) => {
   try {
-    console.log('🔧 Creating appointment...');
-    console.log('📋 Parameters:', {
-      userId,
-      selectedPet,
-      selectedService,
-      selectedGroomerId,
-      date: date.toISOString().split('T')[0],
-      selectedTimeSlotId,
-      notes
+    // Get pet and service details for the appointment
+    const [petResult, serviceResult] = await Promise.all([
+      supabase.from('pets').select('name').eq('id', petId).single(),
+      supabase.from('services').select('name').eq('id', serviceId).single()
+    ]);
+
+    if (petResult.error) {
+      console.error('Error fetching pet:', petResult.error);
+      toast.error('Erro ao buscar informações do pet');
+      return false;
+    }
+
+    if (serviceResult.error) {
+      console.error('Error fetching service:', serviceResult.error);
+      toast.error('Erro ao buscar informações do serviço');
+      return false;
+    }
+
+    // Get user name from auth metadata or user_roles join
+    const { data: { user } } = await supabase.auth.getUser();
+    const ownerName = user?.user_metadata?.name || user?.email || 'Cliente';
+
+    const dateStr = date.toISOString().split('T')[0];
+
+    // Use the atomic reservation function to prevent double booking
+    const { data: appointmentId, error } = await supabase.rpc('reserve_appointment_slot', {
+      p_user_id: userId,
+      p_pet_id: petId,
+      p_service_id: serviceId,
+      p_provider_id: providerId,
+      p_date: dateStr,
+      p_time: timeSlot,
+      p_pet_name: petResult.data.name,
+      p_owner_name: ownerName,
+      p_service_name: serviceResult.data.name,
+      p_notes: notes || null
     });
 
-    // Get pet and service details
-    const { data: pet } = await supabase
-      .from('pets')
-      .select('name')
-      .eq('id', selectedPet)
-      .single();
-
-    const { data: service } = await supabase
-      .from('services')
-      .select('name, service_type')
-      .eq('id', selectedService)
-      .single();
-
-    // Try to get provider name from groomers table first, then veterinarians
-    let providerName = 'Profissional';
-    let resourceType = 'groomer'; // default
-    
-    const { data: groomer } = await supabase
-      .from('groomers')
-      .select('name')
-      .eq('id', selectedGroomerId)
-      .single();
-
-    if (groomer) {
-      providerName = groomer.name;
-      resourceType = 'groomer';
-    } else {
-      const { data: vet } = await supabase
-        .from('veterinarians')
-        .select('name')
-        .eq('id', selectedGroomerId)
-        .single();
-      
-      if (vet) {
-        providerName = vet.name;
-        resourceType = 'veterinary';
-      }
-    }
-
-    // Get user profile for owner name from the appropriate table
-    let ownerName = 'Usuário';
-    
-    // Check clients table first
-    const { data: clientProfile } = await supabase
-      .from('clients')
-      .select('name')
-      .eq('user_id', userId)
-      .single();
-      
-    if (clientProfile) {
-      ownerName = clientProfile.name;
-    } else {
-      // Check groomers table
-      const { data: groomerProfile } = await supabase
-        .from('groomers')
-        .select('name')
-        .eq('user_id', userId)
-        .single();
-        
-      if (groomerProfile) {
-        ownerName = groomerProfile.name;
+    if (error) {
+      console.error('Error creating appointment:', error);
+      if (error.message.includes('Slot no longer available')) {
+        toast.error('Este horário não está mais disponível. Por favor, escolha outro horário.');
+      } else if (error.message.includes('Provider not available')) {
+        toast.error('O profissional não está disponível neste horário.');
       } else {
-        // Check veterinarians table
-        const { data: vetProfile } = await supabase
-          .from('veterinarians')
-          .select('name')
-          .eq('user_id', userId)
-          .single();
-          
-        if (vetProfile) {
-          ownerName = vetProfile.name;
-        }
+        toast.error('Erro ao criar agendamento: ' + error.message);
       }
+      return false;
     }
 
-    // Create appointment
-    const { data: appointment, error: appointmentError } = await supabase
-      .from('appointments')
-      .insert({
-        user_id: userId,
-        pet_id: selectedPet,
-        service_id: selectedService,
-        provider_id: selectedGroomerId,
-        date: date.toISOString().split('T')[0],
-        time: selectedTimeSlotId,
-        service: service?.name || '',
-        pet_name: pet?.name || '',
-        owner_name: ownerName,
-        notes: notes || null,
-        resource_type: resourceType
-      })
-      .select()
-      .single();
-
-    if (appointmentError) throw appointmentError;
-
-    console.log('✅ Appointment created successfully:', appointment);
-    toast.success('Agendamento realizado com sucesso!');
+    console.log('Appointment created successfully:', appointmentId);
+    toast.success('Agendamento criado com sucesso!');
     return true;
-    
   } catch (error: any) {
-    console.error('💥 Error creating appointment:', error);
-    toast.error('Erro ao criar agendamento: ' + error.message);
+    console.error('Error creating appointment:', error);
+    toast.error('Erro inesperado ao criar agendamento');
     return false;
   }
-};
-
-// Helper function to determine required resources for a service (keeping for compatibility)
-export const getRequiredResources = (serviceType: string, serviceName: string): string[] => {
-  const resources: string[] = [];
-  
-  if (serviceType === 'grooming') {
-    resources.push('groomer');
-    // If service includes bath, also need shower capacity (future enhancement)
-    if (serviceName.toLowerCase().includes('banho')) {
-      resources.push('shower');
-    }
-  } else if (serviceType === 'veterinary') {
-    resources.push('veterinary');
-  }
-  
-  return resources;
 };

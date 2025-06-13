@@ -138,7 +138,7 @@ export const useAppointmentData = () => {
     }
   }, []);
 
-  // Fetch providers available on a specific date using provider_availability table
+  // Fetch providers available on a specific date using the new providers view
   const fetchAvailableProviders = useCallback(async (
     type: 'grooming' | 'veterinary', 
     selectedDate: Date,
@@ -147,26 +147,26 @@ export const useAppointmentData = () => {
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
       
-      console.log('🔍 DEBUG: Starting fetchAvailableProviders');
+      console.log('🔍 DEBUG: Starting fetchAvailableProviders using providers view');
       console.log('🔍 DEBUG: Service type:', type);
       console.log('🔍 DEBUG: Date string:', dateStr);
       console.log('🔍 DEBUG: Selected service:', selectedService);
       
-      // Determine provider type
-      const providerType = type === 'grooming' ? 'groomer' : 'veterinary';
+      // Determine provider type for the unified view
+      const providerType = type === 'grooming' ? 'groomer' : 'vet';
       
-      // Step 1: Get all providers of the correct type
-      const tableName = type === 'grooming' ? 'groomers' : 'veterinarians';
+      // Step 1: Get all providers of the correct type using the new providers view
       let { data: providers, error: providersError } = await supabase
-        .from(tableName)
-        .select('*');
+        .from('providers')
+        .select('*')
+        .eq('provider_type', providerType);
 
-      console.log('🔍 DEBUG: All providers found:', providers);
+      console.log('🔍 DEBUG: Providers from unified view:', providers);
 
       if (providersError) throw providersError;
 
       if (!providers || providers.length === 0) {
-        console.log('❌ No providers found in', tableName);
+        console.log('❌ No providers found for type:', providerType);
         setGroomers([]);
         return;
       }
@@ -181,7 +181,7 @@ export const useAppointmentData = () => {
         const { data: availability, error: availError } = await supabase
           .from('provider_availability')
           .select('*')
-          .eq('provider_id', provider.id)
+          .eq('provider_id', provider.provider_id)
           .eq('date', dateStr)
           .eq('available', true);
           
@@ -190,7 +190,7 @@ export const useAppointmentData = () => {
         if (availability && availability.length > 0) {
           // Check if any of these slots are still free (not booked in appointments)
           const hasAvailableSlots = await checkProviderHasAvailableSlots(
-            provider.id, 
+            provider.provider_id, 
             dateStr, 
             selectedService?.duration || 30
           );
@@ -208,9 +208,9 @@ export const useAppointmentData = () => {
 
       // Transform for UI
       const transformedProviders: Provider[] = availableProviders.map(provider => ({
-        id: provider.id,
+        id: provider.provider_id,
         name: provider.name,
-        role: type === 'grooming' ? 'groomer' : 'vet',
+        role: provider.provider_type,
         profile_image: provider.profile_image,
         rating: provider.rating || 4.5,
         specialty: provider.specialty,
@@ -277,9 +277,9 @@ export const useAppointmentData = () => {
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
       
-      console.log('🔍 DEBUG: Fetching time slots for groomer:', selectedGroomerId, 'on date:', dateStr);
+      console.log('🔍 DEBUG: Fetching time slots for provider:', selectedGroomerId, 'on date:', dateStr);
       
-      // Get available slots from provider_availability for this groomer and date
+      // Get available slots from provider_availability for this provider and date
       const { data: availabilitySlots, error: availError } = await supabase
         .from('provider_availability')
         .select('*')

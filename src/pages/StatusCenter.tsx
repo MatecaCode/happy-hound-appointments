@@ -32,7 +32,7 @@ interface AppointmentStatus {
 }
 
 const StatusCenter = () => {
-  const { user, userRole, loading: authLoading } = useAuth();
+  const { user, userRole, loading: authLoading, hasRole } = useAuth();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<AppointmentStatus[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,22 +46,20 @@ const StatusCenter = () => {
       return;
     }
 
-    // Only allow admin, groomer, and vet roles
-    if (!['admin', 'groomer', 'vet'].includes(userRole || '')) {
+    // Only allow admin, groomer, and vet roles using hasRole from useAuth
+    if (!hasRole('admin') && !hasRole('groomer') && !hasRole('vet')) {
       toast.error('Acesso negado. Esta página é restrita a profissionais.');
       navigate('/');
       return;
     }
 
     loadAppointments();
-  }, [user, userRole, authLoading, navigate]);
+  }, [user, userRole, authLoading, navigate, hasRole]);
 
   const loadAppointments = async () => {
     try {
       setLoading(true);
       
-      // For now, we'll load from appointments table
-      // In the future, we might want a separate appointment_status table
       let query = supabase
         .from('appointments')
         .select(`
@@ -78,26 +76,16 @@ const StatusCenter = () => {
         .order('date', { ascending: true })
         .order('time', { ascending: true });
 
-      // If user is groomer or vet, only show their appointments
-      if (userRole === 'groomer') {
-        const { data: groomerData } = await supabase
-          .from('groomers')
-          .select('id')
+      // If user is groomer or vet, only show their appointments using the providers view
+      if (hasRole('groomer') || hasRole('vet')) {
+        const { data: providerData } = await supabase
+          .from('providers')
+          .select('provider_id')
           .eq('user_id', user?.id)
           .single();
         
-        if (groomerData) {
-          query = query.eq('provider_id', groomerData.id);
-        }
-      } else if (userRole === 'vet') {
-        const { data: vetData } = await supabase
-          .from('veterinarians')
-          .select('id')
-          .eq('user_id', user?.id)
-          .single();
-        
-        if (vetData) {
-          query = query.eq('provider_id', vetData.id);
+        if (providerData) {
+          query = query.eq('provider_id', providerData.provider_id);
         }
       }
 
@@ -109,36 +97,18 @@ const StatusCenter = () => {
         return;
       }
 
-      // Get provider names
+      // Get provider names using the providers view
       const appointmentsWithProviders = await Promise.all(
         (data || []).map(async (appointment) => {
-          let providerName = 'N/A';
-          
-          // Try to get groomer name first
-          const { data: groomerData } = await supabase
-            .from('groomers')
+          const { data: providerData } = await supabase
+            .from('providers')
             .select('name')
-            .eq('id', appointment.provider_id)
+            .eq('provider_id', appointment.provider_id)
             .single();
-          
-          if (groomerData) {
-            providerName = groomerData.name;
-          } else {
-            // Try veterinarian
-            const { data: vetData } = await supabase
-              .from('veterinarians')
-              .select('name')
-              .eq('id', appointment.provider_id)
-              .single();
-            
-            if (vetData) {
-              providerName = vetData.name;
-            }
-          }
 
           return {
             ...appointment,
-            provider_name: providerName
+            provider_name: providerData?.name || 'N/A'
           };
         })
       );
@@ -181,7 +151,7 @@ const StatusCenter = () => {
     switch (status) {
       case 'pending':
         return <Clock className="h-4 w-4" />;
-      case 'in-progress':
+      case 'in_progress':
         return <PlayCircle className="h-4 w-4" />;
       case 'completed':
         return <CheckCircle className="h-4 w-4" />;
@@ -196,7 +166,7 @@ const StatusCenter = () => {
     switch (status) {
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
-      case 'in-progress':
+      case 'in_progress':
         return 'bg-blue-100 text-blue-800';
       case 'completed':
         return 'bg-green-100 text-green-800';
@@ -211,7 +181,7 @@ const StatusCenter = () => {
     switch (status) {
       case 'pending':
         return 'Pendente';
-      case 'in-progress':
+      case 'in_progress':
         return 'Em Andamento';
       case 'completed':
         return 'Concluído';
@@ -256,7 +226,7 @@ const StatusCenter = () => {
             <CardHeader>
               <CardTitle>Agendamentos em Andamento</CardTitle>
               <CardDescription>
-                {userRole === 'admin' 
+                {hasRole('admin') 
                   ? 'Todos os agendamentos do sistema'
                   : 'Seus agendamentos atribuídos'
                 }
@@ -314,7 +284,7 @@ const StatusCenter = () => {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="pending">Pendente</SelectItem>
-                              <SelectItem value="in-progress">Em Andamento</SelectItem>
+                              <SelectItem value="in_progress">Em Andamento</SelectItem>
                               <SelectItem value="completed">Concluído</SelectItem>
                               <SelectItem value="cancelled">Cancelado</SelectItem>
                             </SelectContent>

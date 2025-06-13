@@ -1,248 +1,297 @@
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Menu } from 'lucide-react';
 
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { User, ChevronDown, Settings, Shield } from 'lucide-react';
+} from "@/components/ui/dropdown-menu"
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 const Navigation = () => {
-  const location = useLocation();
-  const { user, signOut, isAdmin, isClient, isGroomer, isVet, userRole } = useAuth();
+  const { user, signOut, userRole, hasRole } = useAuth();
+  const navigate = useNavigate();
+  const [isOpen, setIsOpen] = useState(false);
 
-  const isActive = (path: string) => location.pathname === path;
-
-  const renderNavLinks = () => {
-    // Show admin-specific navigation
-    if (isAdmin) {
-      return (
-        <>
-          <Link 
-            to="/admin" 
-            className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive('/admin') ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            Painel Admin
-          </Link>
-          <Link 
-            to="/status-center" 
-            className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive('/status-center') ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            Centro de Status
-          </Link>
-        </>
-      );
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error during logout:', error);
     }
-
-    // Show groomer-specific navigation
-    if (isGroomer) {
-      return (
-        <>
-          <Link 
-            to="/groomer-dashboard" 
-            className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive('/groomer-dashboard') || isActive('/groomer-calendar') || isActive('/groomer-schedule') ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            Meu Painel
-          </Link>
-          <Link 
-            to="/status-center" 
-            className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive('/status-center') ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            Status dos Serviços
-          </Link>
-        </>
-      );
-    }
-
-    // Show vet-specific navigation
-    if (isVet) {
-      return (
-        <>
-          <Link 
-            to="/vet-calendar" 
-            className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive('/vet-calendar') ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            Consultas
-          </Link>
-          <Link 
-            to="/status-center" 
-            className={`text-sm font-medium transition-colors hover:text-primary ${
-              isActive('/status-center') ? 'text-primary' : 'text-muted-foreground'
-            }`}
-          >
-            Status dos Serviços
-          </Link>
-        </>
-      );
-    }
-
-    // Default client navigation
-    return (
-      <>
-        <Link 
-          to="/" 
-          className={`text-sm font-medium transition-colors hover:text-primary ${
-            isActive('/') ? 'text-primary' : 'text-muted-foreground'
-          }`}
-        >
-          Início
-        </Link>
-        <Link 
-          to="/services" 
-          className={`text-sm font-medium transition-colors hover:text-primary ${
-            isActive('/services') ? 'text-primary' : 'text-muted-foreground'
-          }`}
-        >
-          Serviços
-        </Link>
-        <Link 
-          to="/about" 
-          className={`text-sm font-medium transition-colors hover:text-primary ${
-            isActive('/about') ? 'text-primary' : 'text-muted-foreground'
-          }`}
-        >
-          Sobre
-        </Link>
-        <Link 
-          to="/book" 
-          className={`text-sm font-medium transition-colors hover:text-primary ${
-            isActive('/book') ? 'text-primary' : 'text-muted-foreground'
-          }`}
-        >
-          Agendar
-        </Link>
-        <Link 
-          to="/shop" 
-          className={`text-sm font-medium transition-colors hover:text-primary ${
-            isActive('/shop') ? 'text-primary' : 'text-muted-foreground'
-          }`}
-        >
-          Loja
-        </Link>
-      </>
-    );
   };
 
-  const renderDropdownItems = () => {
-    // Admin dropdown options
-    if (isAdmin) {
-      return (
-        <>
-          <DropdownMenuItem asChild>
-            <Link to="/profile" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Perfil
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/admin" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Painel Admin
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/status-center" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Centro de Status
-            </Link>
-          </DropdownMenuItem>
-        </>
-      );
-    }
-
-    // Provider (groomer/vet) dropdown options
-    if (isGroomer || isVet) {
-      return (
-        <>
-          <DropdownMenuItem asChild>
-            <Link to="/profile">Perfil</Link>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <Link to="/status-center">Status dos Serviços</Link>
-          </DropdownMenuItem>
-        </>
-      );
-    }
-
-    // Default client dropdown
-    return (
-      <>
-        <DropdownMenuItem asChild>
-          <Link to="/profile">Perfil</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/pets">Meus Pets</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/appointments">Agendamentos</Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link to="/cart">Carrinho</Link>
-        </DropdownMenuItem>
-      </>
-    );
-  };
+  const navItems = [
+    { name: 'Início', href: '/' },
+    { name: 'Serviços', href: '/services' },
+    { name: 'Sobre', href: '/about' },
+  ];
 
   return (
-    <nav className="bg-white shadow-sm sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-6">
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          <Link to="/" className="flex items-center space-x-2">
-            <img src="/logo-vettale.png" alt="Vettale" className="h-8 w-8" />
-            <span className="text-xl font-bold text-primary">Vettale</span>
-          </Link>
-          
-          <div className="hidden md:flex items-center space-x-8">
-            {renderNavLinks()}
+          <div className="flex items-center">
+            <Link to="/" className="flex items-center space-x-2">
+              <img src="/logo-vettale.png" alt="VetTale" className="h-8 w-8" />
+              <span className="text-xl font-bold text-primary">VetTale</span>
+            </Link>
           </div>
-          
-          <div className="flex items-center space-x-4">
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-8">
+            {navItems.map((item) => (
+              <Link
+                key={item.name}
+                to={item.href}
+                className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
+              >
+                {item.name}
+              </Link>
+            ))}
+            
             {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-2">
-                    <User className="h-4 w-4" />
-                    <span className="hidden md:inline">
-                      {isAdmin ? 'Admin' : 'Minha Conta'}
-                    </span>
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {renderDropdownItems()}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={signOut}>
-                    Sair
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <div className="flex items-center space-x-4">
+                <Link
+                  to="/book"
+                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Agendar
+                </Link>
+                
+                {/* Role-based navigation using hasRole */}
+                {hasRole('admin') && (
+                  <Link
+                    to="/admin"
+                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
+                  >
+                    Admin
+                  </Link>
+                )}
+                
+                {hasRole('groomer') && (
+                  <Link
+                    to="/groomer-dashboard"
+                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
+                  >
+                    Dashboard
+                  </Link>
+                )}
+                
+                {hasRole('vet') && (
+                  <Link
+                    to="/vet-calendar"
+                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
+                  >
+                    Calendário
+                  </Link>
+                )}
+                
+                {(hasRole('admin') || hasRole('groomer') || hasRole('vet')) && (
+                  <Link
+                    to="/status-center"
+                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
+                  >
+                    Status
+                  </Link>
+                )}
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-8 w-8 rounded-full">
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback>
+                          {user.email?.charAt(0).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-56" align="end" forceMount>
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium leading-none">
+                          {user.user_metadata?.name || 'Usuário'}
+                        </p>
+                        <p className="text-xs leading-none text-muted-foreground">
+                          {user.email}
+                        </p>
+                        {userRole && (
+                          <p className="text-xs leading-none text-muted-foreground capitalize">
+                            {userRole === 'admin' ? 'Administrador' : 
+                             userRole === 'groomer' ? 'Tosador' :
+                             userRole === 'vet' ? 'Veterinário' : 'Cliente'}
+                          </p>
+                        )}
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/profile">Perfil</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/pets">Meus Pets</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/appointments">Agendamentos</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout}>
+                      Sair
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             ) : (
-              <div className="flex items-center space-x-2">
-                <Button variant="ghost" asChild>
-                  <Link to="/login">Entrar</Link>
-                </Button>
-                <Button asChild>
-                  <Link to="/register">Cadastrar</Link>
-                </Button>
+              <div className="flex items-center space-x-4">
+                <Link
+                  to="/login"
+                  className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  Entrar
+                </Link>
+                <Link
+                  to="/register"
+                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                >
+                  Cadastrar
+                </Link>
               </div>
             )}
           </div>
+
+          {/* Mobile menu button */}
+          <div className="md:hidden">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsOpen(!isOpen)}
+            >
+              <Menu className="h-6 w-6" />
+            </Button>
+          </div>
         </div>
+
+        {/* Mobile Navigation */}
+        {isOpen && (
+          <div className="md:hidden">
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t border-gray-200">
+              {navItems.map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                  onClick={() => setIsOpen(false)}
+                >
+                  {item.name}
+                </Link>
+              ))}
+              
+              {user ? (
+                <>
+                  <Link
+                    to="/book"
+                    className="block w-full text-left bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Agendar
+                  </Link>
+                  
+                  {/* Role-based mobile navigation */}
+                  {hasRole('admin') && (
+                    <Link
+                      to="/admin"
+                      className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Admin
+                    </Link>
+                  )}
+                  
+                  {hasRole('groomer') && (
+                    <Link
+                      to="/groomer-dashboard"
+                      className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Dashboard
+                    </Link>
+                  )}
+                  
+                  {hasRole('vet') && (
+                    <Link
+                      to="/vet-calendar"
+                      className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Calendário
+                    </Link>
+                  )}
+                  
+                  {(hasRole('admin') || hasRole('groomer') || hasRole('vet')) && (
+                    <Link
+                      to="/status-center"
+                      className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                      onClick={() => setIsOpen(false)}
+                    >
+                      Status
+                    </Link>
+                  )}
+                  
+                  <Link
+                    to="/profile"
+                    className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Perfil
+                  </Link>
+                  <Link
+                    to="/pets"
+                    className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Meus Pets
+                  </Link>
+                  <Link
+                    to="/appointments"
+                    className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Agendamentos
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="text-gray-700 hover:text-primary block w-full text-left px-3 py-2 text-base font-medium transition-colors"
+                  >
+                    Sair
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Entrar
+                  </Link>
+                  <Link
+                    to="/register"
+                    className="block w-full text-left bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    Cadastrar
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );
