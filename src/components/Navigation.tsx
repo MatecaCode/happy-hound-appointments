@@ -13,78 +13,7 @@ import { User, ChevronDown } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
-  const { user, signOut } = useAuth();
-  const [userRole, setUserRole] = React.useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = React.useState(false);
-
-  // Fetch user role from the appropriate table
-  React.useEffect(() => {
-    const fetchUserRole = async () => {
-      if (!user) return;
-      
-      try {
-        const { supabase } = await import('@/integrations/supabase/client');
-        
-        // Check for admin role first using type assertion
-        const { data: adminData } = await (supabase as any)
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'admin')
-          .single();
-          
-        if (adminData) {
-          setUserRole('admin');
-          setIsAdmin(true);
-          return;
-        }
-        
-        // Check clients table
-        const { data: clientData } = await supabase
-          .from('clients')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-          
-        if (clientData) {
-          setUserRole('client');
-          return;
-        }
-        
-        // Check groomers table
-        const { data: groomerData } = await supabase
-          .from('groomers')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-          
-        if (groomerData) {
-          setUserRole('groomer');
-          return;
-        }
-        
-        // Check veterinarians table
-        const { data: vetData } = await supabase
-          .from('veterinarians')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-          
-        if (vetData) {
-          setUserRole('vet');
-          return;
-        }
-        
-        // Default to client if no role found
-        setUserRole('client');
-      } catch (error) {
-        console.error('Error fetching user role:', error);
-        setUserRole('client');
-      }
-    };
-    
-    fetchUserRole();
-  }, [user]);
+  const { user, signOut, isAdmin, userRole } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 

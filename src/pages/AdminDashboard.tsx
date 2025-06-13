@@ -10,51 +10,28 @@ import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
 
 const AdminDashboard = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const checkAdminRole = async () => {
-      if (!user) {
-        navigate('/login');
-        return;
-      }
+    // Wait for auth to finish loading
+    if (authLoading) return;
 
-      try {
-        // Use type assertion to work around missing types
-        const { data, error } = await (supabase as any)
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'admin')
-          .single();
+    if (!user) {
+      navigate('/login');
+      return;
+    }
 
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error checking admin role:', error);
-          toast.error('Erro ao verificar permissões');
-          navigate('/');
-          return;
-        }
+    if (!isAdmin) {
+      toast.error('Acesso negado. Apenas administradores podem acessar esta página.');
+      navigate('/');
+      return;
+    }
 
-        if (data) {
-          setIsAdmin(true);
-        } else {
-          toast.error('Acesso negado. Apenas administradores podem acessar esta página.');
-          navigate('/');
-        }
-      } catch (error) {
-        console.error('Error checking admin role:', error);
-        navigate('/');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAdminRole();
-  }, [user, navigate]);
+    setLoading(false);
+  }, [user, isAdmin, authLoading, navigate]);
 
   const handleRefreshAvailability = async () => {
     setRefreshing(true);
@@ -90,7 +67,7 @@ const AdminDashboard = () => {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">

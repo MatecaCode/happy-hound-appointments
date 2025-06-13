@@ -10,67 +10,30 @@ interface LayoutProps {
 }
 
 const Layout = ({ children }: LayoutProps) => {
-  const { user } = useAuth();
+  const { user, userRole } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Re-enable role-based redirects using the new table structure
+  // Role-based redirects using the centralized userRole
   useEffect(() => {
-    const fetchUserRole = async () => {
-      if (!user) return;
-      
-      try {
-        const { supabase } = await import('@/integrations/supabase/client');
-        
-        // Check clients table first
-        const { data: clientData } = await supabase
-          .from('clients')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-          
-        if (clientData) {
-          console.log('🔍 Layout Debug - User role: client, Current path:', location.pathname);
-          return; // Client stays on current page
-        }
-        
-        // Check groomers table
-        const { data: groomerData } = await supabase
-          .from('groomers')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-          
-        if (groomerData) {
-          console.log('🔍 Layout Debug - User role: groomer, Current path:', location.pathname);
-          if (location.pathname === '/') {
-            navigate('/groomer-dashboard');
-          }
-          return;
-        }
-        
-        // Check veterinarians table
-        const { data: vetData } = await supabase
-          .from('veterinarians')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-          
-        if (vetData) {
-          console.log('🔍 Layout Debug - User role: vet, Current path:', location.pathname);
-          if (location.pathname === '/') {
-            navigate('/vet-calendar');
-          }
-          return;
-        }
-        
-      } catch (error) {
-        console.error('Error fetching user role:', error);
-      }
-    };
+    if (!user || !userRole) return;
     
-    fetchUserRole();
-  }, [user, location.pathname, navigate]);
+    console.log('🔍 Layout Debug - User role:', userRole, 'Current path:', location.pathname);
+    
+    // Redirect groomers to their dashboard if they're on the home page
+    if (userRole === 'groomer' && location.pathname === '/') {
+      navigate('/groomer-dashboard');
+      return;
+    }
+    
+    // Redirect vets to their calendar if they're on the home page
+    if (userRole === 'vet' && location.pathname === '/') {
+      navigate('/vet-calendar');
+      return;
+    }
+    
+    // Clients and admins stay on whatever page they're on
+  }, [user, userRole, location.pathname, navigate]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">

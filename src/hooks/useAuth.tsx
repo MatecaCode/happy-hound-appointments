@@ -1,3 +1,4 @@
+
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
@@ -13,6 +14,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   loading: boolean;
   isAdmin: boolean;
+  userRole: string | null;
+  hasRole: (role: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -22,20 +25,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const navigate = useNavigate();
 
-  const checkAdminRole = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
+  const fetchUserRoles = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
 
-    if (error) {
-      console.error('Failed to check user roles:', error);
-      return false;
+      if (error) {
+        console.error('Failed to fetch user roles:', error);
+        return [];
+      }
+
+      return data?.map(r => r.role) || [];
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
+      return [];
     }
+  };
 
-    return data?.some((r) => r.role === 'admin') ?? false;
+  const hasRole = (role: string) => {
+    return userRoles.includes(role);
   };
 
   useEffect(() => {
@@ -44,13 +58,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       async (event, session) => {
         console.log('🔐 Auth state changed:', event, session?.user?.email);
         setSession(session);
+        
         if (session?.user) {
           setUser(session.user);
-          const admin = await checkAdminRole(session.user.id);
-          setIsAdmin(admin);
+          
+          // Fetch roles from user_roles table
+          const roles = await fetchUserRoles(session.user.id);
+          setUserRoles(roles);
+          setIsAdmin(roles.includes('admin'));
+          
+          // Set primary role (first role found, or 'client' as default)
+          if (roles.includes('admin')) {
+            setUserRole('admin');
+          } else if (roles.includes('groomer')) {
+            setUserRole('groomer');
+          } else if (roles.includes('vet')) {
+            setUserRole('vet');
+          } else if (roles.includes('client')) {
+            setUserRole('client');
+          } else {
+            setUserRole('client'); // default fallback
+          }
         } else {
           setUser(null);
           setIsAdmin(false);
+          setUserRole(null);
+          setUserRoles([]);
         }
         setLoading(false);
       }
@@ -60,13 +93,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       console.log('🔐 Initial session:', session?.user?.email);
       setSession(session);
+      
       if (session?.user) {
         setUser(session.user);
-        const admin = await checkAdminRole(session.user.id);
-        setIsAdmin(admin);
+        
+        // Fetch roles from user_roles table
+        const roles = await fetchUserRoles(session.user.id);
+        setUserRoles(roles);
+        setIsAdmin(roles.includes('admin'));
+        
+        // Set primary role
+        if (roles.includes('admin')) {
+          setUserRole('admin');
+        } else if (roles.includes('groomer')) {
+          setUserRole('groomer');
+        } else if (roles.includes('vet')) {
+          setUserRole('vet');
+        } else if (roles.includes('client')) {
+          setUserRole('client');
+        } else {
+          setUserRole('client'); // default fallback
+        }
       } else {
         setUser(null);
         setIsAdmin(false);
+        setUserRole(null);
+        setUserRoles([]);
       }
       setLoading(false);
     });
@@ -160,6 +212,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signOut,
         loading,
         isAdmin,
+        userRole,
+        hasRole,
       }}
     >
       {children}
