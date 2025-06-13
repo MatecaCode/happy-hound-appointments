@@ -7,9 +7,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { User, ChevronDown } from 'lucide-react';
+import { User, ChevronDown, Settings, Shield } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
@@ -27,7 +28,15 @@ const Navigation = () => {
               isActive('/admin') ? 'text-primary' : 'text-muted-foreground'
             }`}
           >
-            Admin
+            Painel Admin
+          </Link>
+          <Link 
+            to="/status-center" 
+            className={`text-sm font-medium transition-colors hover:text-primary ${
+              isActive('/status-center') ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            Centro de Status
           </Link>
         </>
       );
@@ -44,6 +53,14 @@ const Navigation = () => {
           >
             Meu Painel
           </Link>
+          <Link 
+            to="/status-center" 
+            className={`text-sm font-medium transition-colors hover:text-primary ${
+              isActive('/status-center') ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            Status dos Serviços
+          </Link>
         </>
       );
     }
@@ -58,6 +75,14 @@ const Navigation = () => {
             }`}
           >
             Consultas
+          </Link>
+          <Link 
+            to="/status-center" 
+            className={`text-sm font-medium transition-colors hover:text-primary ${
+              isActive('/status-center') ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            Status dos Serviços
           </Link>
         </>
       );
@@ -110,6 +135,64 @@ const Navigation = () => {
     );
   };
 
+  const renderDropdownItems = () => {
+    if (userRole === 'admin') {
+      return (
+        <>
+          <DropdownMenuItem asChild>
+            <Link to="/profile" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Perfil
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/admin" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Painel Admin
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/status-center" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Centro de Status
+            </Link>
+          </DropdownMenuItem>
+        </>
+      );
+    }
+
+    if (userRole === 'groomer' || userRole === 'vet') {
+      return (
+        <>
+          <DropdownMenuItem asChild>
+            <Link to="/profile">Perfil</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link to="/status-center">Status dos Serviços</Link>
+          </DropdownMenuItem>
+        </>
+      );
+    }
+
+    // Default client dropdown
+    return (
+      <>
+        <DropdownMenuItem asChild>
+          <Link to="/profile">Perfil</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/pets">Meus Pets</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/appointments">Agendamentos</Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link to="/cart">Carrinho</Link>
+        </DropdownMenuItem>
+      </>
+    );
+  };
+
   return (
     <nav className="bg-white shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-6">
@@ -129,32 +212,15 @@ const Navigation = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-2">
                     <User className="h-4 w-4" />
-                    <span className="hidden md:inline">Minha Conta</span>
+                    <span className="hidden md:inline">
+                      {userRole === 'admin' ? 'Admin' : 'Minha Conta'}
+                    </span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link to="/profile">Perfil</Link>
-                  </DropdownMenuItem>
-                  {isAdmin && (
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin">Painel Admin</Link>
-                    </DropdownMenuItem>
-                  )}
-                  {userRole === 'client' && (
-                    <>
-                      <DropdownMenuItem asChild>
-                        <Link to="/pets">Meus Pets</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/appointments">Agendamentos</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/cart">Carrinho</Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
+                  {renderDropdownItems()}
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={signOut}>
                     Sair
                   </DropdownMenuItem>

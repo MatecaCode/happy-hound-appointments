@@ -22,6 +22,7 @@ import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AdminDashboard from "./pages/AdminDashboard";
+import StatusCenter from "./pages/StatusCenter";
 import { AuthProvider } from "./hooks/useAuth";
 import TestDataPage from "./pages/TestDataPage";
 
@@ -56,6 +57,7 @@ const App = () => {
               <Route path="/shop" element={<Shop />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/status-center" element={<StatusCenter />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/test-data" element={<TestDataPage />} />
               <Route path="*" element={<NotFound />} />
