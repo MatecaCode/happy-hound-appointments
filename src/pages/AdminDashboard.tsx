@@ -24,7 +24,8 @@ const AdminDashboard = () => {
       }
 
       try {
-        const { data, error } = await supabase
+        // Use type assertion to work around missing types
+        const { data, error } = await (supabase as any)
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)

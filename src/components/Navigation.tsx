@@ -25,8 +25,8 @@ const Navigation = () => {
       try {
         const { supabase } = await import('@/integrations/supabase/client');
         
-        // Check for admin role first
-        const { data: adminData } = await supabase
+        // Check for admin role first using type assertion
+        const { data: adminData } = await (supabase as any)
           .from('user_roles')
           .select('role')
           .eq('user_id', user.id)
