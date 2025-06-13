@@ -76,16 +76,29 @@ const StatusCenter = () => {
         .order('date', { ascending: true })
         .order('time', { ascending: true });
 
-      // If user is groomer or vet, only show their appointments using the providers view
+      // If user is groomer or vet, only show their appointments
       if (hasRole('groomer') || hasRole('vet')) {
-        const { data: providerData } = await supabase
-          .from('providers')
-          .select('provider_id')
-          .eq('user_id', user?.id)
-          .single();
+        // Get the provider ID based on user role
+        let providerData = null;
+        
+        if (hasRole('groomer')) {
+          const { data: groomerData } = await supabase
+            .from('groomers')
+            .select('id')
+            .eq('user_id', user?.id)
+            .single();
+          providerData = groomerData;
+        } else if (hasRole('vet')) {
+          const { data: vetData } = await supabase
+            .from('veterinarians')
+            .select('id')
+            .eq('user_id', user?.id)
+            .single();
+          providerData = vetData;
+        }
         
         if (providerData) {
-          query = query.eq('provider_id', providerData.provider_id);
+          query = query.eq('provider_id', providerData.id);
         }
       }
 
@@ -97,18 +110,33 @@ const StatusCenter = () => {
         return;
       }
 
-      // Get provider names using the providers view
+      // Get provider names by checking both groomers and veterinarians tables
       const appointmentsWithProviders = await Promise.all(
         (data || []).map(async (appointment) => {
-          const { data: providerData } = await supabase
-            .from('providers')
+          // Try groomers first
+          let { data: groomerData } = await supabase
+            .from('groomers')
             .select('name')
-            .eq('provider_id', appointment.provider_id)
+            .eq('id', appointment.provider_id)
+            .single();
+
+          if (groomerData) {
+            return {
+              ...appointment,
+              provider_name: groomerData.name
+            };
+          }
+
+          // Try veterinarians if not found in groomers
+          let { data: vetData } = await supabase
+            .from('veterinarians')
+            .select('name')
+            .eq('id', appointment.provider_id)
             .single();
 
           return {
             ...appointment,
-            provider_name: providerData?.name || 'N/A'
+            provider_name: vetData?.name || 'N/A'
           };
         })
       );

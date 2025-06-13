@@ -138,7 +138,7 @@ export const useAppointmentData = () => {
     }
   }, []);
 
-  // Fetch providers available on a specific date using the new providers view
+  // Fetch providers available on a specific date using role-based filtering
   const fetchAvailableProviders = useCallback(async (
     type: 'grooming' | 'veterinary', 
     selectedDate: Date,
@@ -147,31 +147,57 @@ export const useAppointmentData = () => {
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
       
-      console.log('🔍 DEBUG: Starting fetchAvailableProviders using providers view');
+      console.log('🔍 DEBUG: Starting fetchAvailableProviders with role-based filtering');
       console.log('🔍 DEBUG: Service type:', type);
       console.log('🔍 DEBUG: Date string:', dateStr);
       console.log('🔍 DEBUG: Selected service:', selectedService);
       
-      // Determine provider type for the unified view
-      const providerType = type === 'grooming' ? 'groomer' : 'vet';
+      // Determine the role we're looking for
+      const targetRole = type === 'grooming' ? 'groomer' : 'vet';
       
-      // Step 1: Get all providers of the correct type using the new providers view
-      let { data: providers, error: providersError } = await supabase
-        .from('providers')
-        .select('*')
-        .eq('provider_type', providerType);
+      // Get users with the target role
+      const { data: userRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', targetRole);
 
-      console.log('🔍 DEBUG: Providers from unified view:', providers);
+      if (rolesError) throw rolesError;
 
-      if (providersError) throw providersError;
-
-      if (!providers || providers.length === 0) {
-        console.log('❌ No providers found for type:', providerType);
+      if (!userRoles || userRoles.length === 0) {
+        console.log('❌ No users found with role:', targetRole);
         setGroomers([]);
         return;
       }
 
-      // Step 2: Check which providers are available on the selected date
+      const userIds = userRoles.map(ur => ur.user_id);
+      
+      // Get provider profiles based on role
+      let providersQuery;
+      if (type === 'grooming') {
+        providersQuery = supabase
+          .from('groomers')
+          .select('*')
+          .in('user_id', userIds);
+      } else {
+        providersQuery = supabase
+          .from('veterinarians')
+          .select('*')
+          .in('user_id', userIds);
+      }
+
+      const { data: providers, error: providersError } = await providersQuery;
+
+      console.log('🔍 DEBUG: Providers from tables:', providers);
+
+      if (providersError) throw providersError;
+
+      if (!providers || providers.length === 0) {
+        console.log('❌ No providers found for role:', targetRole);
+        setGroomers([]);
+        return;
+      }
+
+      // Check which providers are available on the selected date
       const availableProviders = [];
       
       for (const provider of providers) {
@@ -181,7 +207,7 @@ export const useAppointmentData = () => {
         const { data: availability, error: availError } = await supabase
           .from('provider_availability')
           .select('*')
-          .eq('provider_id', provider.provider_id)
+          .eq('provider_id', provider.id)
           .eq('date', dateStr)
           .eq('available', true);
           
@@ -190,7 +216,7 @@ export const useAppointmentData = () => {
         if (availability && availability.length > 0) {
           // Check if any of these slots are still free (not booked in appointments)
           const hasAvailableSlots = await checkProviderHasAvailableSlots(
-            provider.provider_id, 
+            provider.id, 
             dateStr, 
             selectedService?.duration || 30
           );
@@ -208,9 +234,9 @@ export const useAppointmentData = () => {
 
       // Transform for UI
       const transformedProviders: Provider[] = availableProviders.map(provider => ({
-        id: provider.provider_id,
+        id: provider.id,
         name: provider.name,
-        role: provider.provider_type,
+        role: targetRole,
         profile_image: provider.profile_image,
         rating: provider.rating || 4.5,
         specialty: provider.specialty,
