@@ -15,6 +15,7 @@ const Navigation = () => {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const [userRole, setUserRole] = React.useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = React.useState(false);
 
   // Fetch user role from the appropriate table
   React.useEffect(() => {
@@ -24,7 +25,21 @@ const Navigation = () => {
       try {
         const { supabase } = await import('@/integrations/supabase/client');
         
-        // Check clients table first
+        // Check for admin role first
+        const { data: adminData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('role', 'admin')
+          .single();
+          
+        if (adminData) {
+          setUserRole('admin');
+          setIsAdmin(true);
+          return;
+        }
+        
+        // Check clients table
         const { data: clientData } = await supabase
           .from('clients')
           .select('id')
@@ -74,6 +89,21 @@ const Navigation = () => {
   const isActive = (path: string) => location.pathname === path;
 
   const renderNavLinks = () => {
+    if (userRole === 'admin') {
+      return (
+        <>
+          <Link 
+            to="/admin" 
+            className={`text-sm font-medium transition-colors hover:text-primary ${
+              isActive('/admin') ? 'text-primary' : 'text-muted-foreground'
+            }`}
+          >
+            Admin
+          </Link>
+        </>
+      );
+    }
+
     if (userRole === 'groomer') {
       return (
         <>
@@ -178,6 +208,11 @@ const Navigation = () => {
                   <DropdownMenuItem asChild>
                     <Link to="/profile">Perfil</Link>
                   </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin">Painel Admin</Link>
+                    </DropdownMenuItem>
+                  )}
                   {userRole === 'client' && (
                     <>
                       <DropdownMenuItem asChild>
