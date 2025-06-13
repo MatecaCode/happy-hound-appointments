@@ -19,7 +19,8 @@ const Navigation = () => {
   const isActive = (path: string) => location.pathname === path;
 
   const renderNavLinks = () => {
-    if (userRole === 'admin') {
+    // Show admin-specific navigation
+    if (isAdmin || userRole === 'admin') {
       return (
         <>
           <Link 
@@ -42,6 +43,7 @@ const Navigation = () => {
       );
     }
 
+    // Show groomer-specific navigation
     if (userRole === 'groomer') {
       return (
         <>
@@ -65,6 +67,7 @@ const Navigation = () => {
       );
     }
 
+    // Show vet-specific navigation
     if (userRole === 'vet') {
       return (
         <>
@@ -88,7 +91,7 @@ const Navigation = () => {
       );
     }
 
-    // Default client navigation
+    // Default client navigation (only show for clients or when no specific role)
     return (
       <>
         <Link 
@@ -136,7 +139,8 @@ const Navigation = () => {
   };
 
   const renderDropdownItems = () => {
-    if (userRole === 'admin') {
+    // Admin dropdown options
+    if (isAdmin || userRole === 'admin') {
       return (
         <>
           <DropdownMenuItem asChild>
@@ -161,6 +165,7 @@ const Navigation = () => {
       );
     }
 
+    // Provider (groomer/vet) dropdown options
     if (userRole === 'groomer' || userRole === 'vet') {
       return (
         <>
@@ -213,7 +218,7 @@ const Navigation = () => {
                   <Button variant="ghost" className="flex items-center space-x-2">
                     <User className="h-4 w-4" />
                     <span className="hidden md:inline">
-                      {userRole === 'admin' ? 'Admin' : 'Minha Conta'}
+                      {isAdmin || userRole === 'admin' ? 'Admin' : 'Minha Conta'}
                     </span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>

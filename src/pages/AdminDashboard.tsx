@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -10,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
 
 const AdminDashboard = () => {
-  const { user, signOut, isAdmin, loading: authLoading } = useAuth();
+  const { user, signOut, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -23,22 +22,24 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     // Wait for auth to finish loading
-    if (authLoading) return;
+    if (loading) return;
 
+    // If not logged in, redirect to login
     if (!user) {
       navigate('/login');
       return;
     }
 
+    // If user is loaded but not an admin, show access denied and redirect
     if (!isAdmin) {
       toast.error('Acesso negado. Apenas administradores podem acessar esta página.');
       navigate('/');
       return;
     }
 
-    // Load dashboard statistics
+    // If we get here, user is admin - load dashboard statistics
     loadStats();
-  }, [user, isAdmin, authLoading, navigate]);
+  }, [user, isAdmin, loading, navigate]);
 
   const loadStats = async () => {
     try {
@@ -96,7 +97,8 @@ const AdminDashboard = () => {
     }
   };
 
-  if (authLoading) {
+  // Show loading state while auth is loading
+  if (loading) {
     return (
       <Layout>
         <div className="min-h-screen flex items-center justify-center">
@@ -109,8 +111,21 @@ const AdminDashboard = () => {
     );
   }
 
+  // Show access denied if not admin (after loading is complete)
   if (!user || !isAdmin) {
-    return null;
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-red-600 mb-4">Acesso Negado</h1>
+            <p className="text-gray-600 mb-4">Você não tem permissão para acessar esta página.</p>
+            <Button onClick={() => navigate('/')}>
+              Voltar ao Início
+            </Button>
+          </div>
+        </div>
+      </Layout>
+    );
   }
 
   return (
