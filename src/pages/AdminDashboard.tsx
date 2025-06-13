@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -30,7 +31,7 @@ const AdminDashboard = () => {
       return;
     }
 
-    // If user is loaded but not an admin, show access denied and redirect
+    // If user is loaded but not an admin (based on user_roles table), show access denied and redirect
     if (!isAdmin) {
       toast.error('Acesso negado. Apenas administradores podem acessar esta página.');
       navigate('/');
@@ -111,7 +112,7 @@ const AdminDashboard = () => {
     );
   }
 
-  // Show access denied if not admin (after loading is complete)
+  // Show access denied if not admin (after loading is complete, based on user_roles)
   if (!user || !isAdmin) {
     return (
       <Layout>

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -47,38 +48,44 @@ const Register = () => {
     setCodeRequired(role === 'groomer' || role === 'vet');
   }, [role]);
   
-  const validateRegistrationCode = async () => {
+  const validateAndUseRegistrationCode = async () => {
     if (!codeRequired) return true;
     
     try {
-      // Use raw SQL query with Supabase's rpc function to validate the code
-      const { data, error } = await supabase.rpc('validate_registration_code', {
+      // Validate the registration code
+      const { data: isValid, error: validateError } = await supabase.rpc('validate_registration_code', {
         code_value: registrationCode,
         role_value: role
       });
       
-      if (error) {
-        console.error('Error validating code:', error);
+      if (validateError) {
+        console.error('Error validating code:', validateError);
         setError('Erro ao validar código de registro.');
         return false;
       }
       
-      // If data is not truthy, the code is invalid
-      if (!data) {
+      if (!isValid) {
         setError(`Código de registro inválido para ${role === 'groomer' ? 'tosador' : 'veterinário'}.`);
         return false;
       }
-      
-      // Mark code as used via rpc function
-      await supabase.rpc('mark_code_as_used', {
-        code_value: registrationCode
-      });
       
       return true;
     } catch (error) {
       console.error('Exception during code validation:', error);
       setError('Erro ao validar código de registro.');
       return false;
+    }
+  };
+
+  const markCodeAsUsed = async () => {
+    if (!codeRequired) return;
+    
+    try {
+      await supabase.rpc('mark_code_as_used', {
+        code_value: registrationCode
+      });
+    } catch (error) {
+      console.error('Error marking code as used:', error);
     }
   };
   
@@ -106,15 +113,20 @@ const Register = () => {
     try {
       // Validate registration code if required
       if (codeRequired) {
-        const isValid = await validateRegistrationCode();
+        const isValid = await validateAndUseRegistrationCode();
         if (!isValid) {
           setIsLoading(false);
           return;
         }
       }
       
-      // Create the user account
+      // Create the user account (the handle_new_user trigger will add them to user_roles)
       await signUp(email, password, name, role);
+      
+      // Mark the code as used after successful signup
+      if (codeRequired) {
+        await markCodeAsUsed();
+      }
       
       // If this is a groomer registration, set up initial availability
       if (role === 'groomer') {

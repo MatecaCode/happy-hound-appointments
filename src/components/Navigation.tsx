@@ -14,13 +14,13 @@ import { User, ChevronDown, Settings, Shield } from 'lucide-react';
 
 const Navigation = () => {
   const location = useLocation();
-  const { user, signOut, isAdmin, userRole } = useAuth();
+  const { user, signOut, isAdmin, isClient, isGroomer, isVet, userRole } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
   const renderNavLinks = () => {
     // Show admin-specific navigation
-    if (isAdmin || userRole === 'admin') {
+    if (isAdmin) {
       return (
         <>
           <Link 
@@ -44,7 +44,7 @@ const Navigation = () => {
     }
 
     // Show groomer-specific navigation
-    if (userRole === 'groomer') {
+    if (isGroomer) {
       return (
         <>
           <Link 
@@ -68,7 +68,7 @@ const Navigation = () => {
     }
 
     // Show vet-specific navigation
-    if (userRole === 'vet') {
+    if (isVet) {
       return (
         <>
           <Link 
@@ -91,7 +91,7 @@ const Navigation = () => {
       );
     }
 
-    // Default client navigation (only show for clients or when no specific role)
+    // Default client navigation
     return (
       <>
         <Link 
@@ -140,7 +140,7 @@ const Navigation = () => {
 
   const renderDropdownItems = () => {
     // Admin dropdown options
-    if (isAdmin || userRole === 'admin') {
+    if (isAdmin) {
       return (
         <>
           <DropdownMenuItem asChild>
@@ -166,7 +166,7 @@ const Navigation = () => {
     }
 
     // Provider (groomer/vet) dropdown options
-    if (userRole === 'groomer' || userRole === 'vet') {
+    if (isGroomer || isVet) {
       return (
         <>
           <DropdownMenuItem asChild>
@@ -218,7 +218,7 @@ const Navigation = () => {
                   <Button variant="ghost" className="flex items-center space-x-2">
                     <User className="h-4 w-4" />
                     <span className="hidden md:inline">
-                      {isAdmin || userRole === 'admin' ? 'Admin' : 'Minha Conta'}
+                      {isAdmin ? 'Admin' : 'Minha Conta'}
                     </span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>

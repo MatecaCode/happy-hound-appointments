@@ -615,12 +615,20 @@ export type Database = {
         }
         Returns: number
       }
+      get_user_roles: {
+        Args: { _user_id: string }
+        Returns: string[]
+      }
       has_role: {
         Args: { _user_id: string; _role: string }
         Returns: boolean
       }
       mark_code_as_used: {
         Args: { code_value: string }
+        Returns: undefined
+      }
+      migrate_existing_users_to_roles: {
+        Args: Record<PropertyKey, never>
         Returns: undefined
       }
       reduce_availability_capacity: {
@@ -631,6 +639,10 @@ export type Database = {
           p_time_slot: string
         }
         Returns: undefined
+      }
+      user_has_role: {
+        Args: { _user_id: string; _role: string }
+        Returns: boolean
       }
       validate_registration_code: {
         Args: { code_value: string; role_value: string }

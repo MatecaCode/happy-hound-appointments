@@ -10,13 +10,14 @@ interface LayoutProps {
 }
 
 const Layout = ({ children }: LayoutProps) => {
-  const { user, userRole } = useAuth();
+  const { user, userRole, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Role-based redirects using the centralized userRole
+  // Role-based redirects using the centralized userRole from user_roles table
   useEffect(() => {
-    if (!user || !userRole) return;
+    // Don't redirect while auth is loading
+    if (loading || !user || !userRole) return;
     
     console.log('🔍 Layout Debug - User role:', userRole, 'Current path:', location.pathname);
     
@@ -33,7 +34,7 @@ const Layout = ({ children }: LayoutProps) => {
     }
     
     // Clients and admins stay on whatever page they're on
-  }, [user, userRole, location.pathname, navigate]);
+  }, [user, userRole, location.pathname, navigate, loading]);
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
