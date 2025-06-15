@@ -1,8 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
-
 import { supabase } from '@/integrations/supabase/client';
 
 interface Appointment {
@@ -21,50 +20,50 @@ const StatusCenter: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-useEffect(() => {
-  const fetchData = async () => {
-    setIsLoading(true);
-    try {
-      // Join appointments ←→ pets, services, clients for display names
-      const { data, error } = await supabase
-        .from('appointments')
-        .select(`
-          id,
-          date,
-          time,
-          status,
-          notes,
-          pet:pet_id (
-            name
-          ),
-          service:service_id (
-            name
-          ),
-          client:user_id (
-            name
-          )
-        `)
-        .order('date', { ascending: false });
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      try {
+        // Join appointments ←→ pets, services, clients for display names
+        const { data, error } = await supabase
+          .from('appointments')
+          .select(`
+            id,
+            date,
+            time,
+            status,
+            notes,
+            pet:pets (
+              name
+            ),
+            service:services (
+              name
+            ),
+            client:clients (
+              name
+            )
+          `)
+          .order('date', { ascending: false });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      // Map: flatten structure for easier display
-      const enhanced = (data || []).map((row: any) => ({
-        ...row,
-        pet_name: row.pet?.name || '-',
-        service: row.service?.name || '-',
-        owner_name: row.client?.name || '-',
-      }));
+        // Map: flatten structure for easier display
+        const enhanced = (data || []).map((row: any) => ({
+          ...row,
+          pet_name: row.pet?.name || '-',
+          service: row.service?.name || '-',
+          owner_name: row.client?.name || '-',
+        }));
 
-      setAppointments(enhanced);
-    } catch (err: any) {
-      setError('Erro ao carregar dados dos agendamentos');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  fetchData();
-}, []);
+        setAppointments(enhanced);
+      } catch (err: any) {
+        setError('Erro ao carregar dados dos agendamentos');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
 
   return (
     <Layout>

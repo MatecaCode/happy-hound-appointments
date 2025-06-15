@@ -27,9 +27,13 @@ export async function createAppointment(
     // Convert date/time
     const isoDate = date.toISOString().split('T')[0];
 
-    // Helper: get provider profile id for groomer/vet, if needed
+    // Helper: get provider_profile id for groomer/vet if needed 
     let providerProfileId = providerId;
-    if ((serviceType === 'grooming' || serviceType === 'veterinary') && providerId) {
+    if (
+      (serviceType === 'grooming' || serviceType === 'veterinary') &&
+      providerId
+    ) {
+      // Must get the provider_profiles.id (profile PK, not user_id)
       const { data: prof, error: profError } = await supabase
         .from('provider_profiles')
         .select('id')
@@ -40,9 +44,9 @@ export async function createAppointment(
       else throw new Error('Profissional não encontrado');
     }
 
-    // --- Main service logic ---
+    // --- Main booking logic ---
     if (serviceType === 'shower_only') {
-      // 1. check spot
+      // 1. check spot in shower_availability only
       const { data: spots, error: spotErr } = await supabase
         .from('shower_availability')
         .select('id, available_spots')
@@ -54,7 +58,7 @@ export async function createAppointment(
         throw new Error('Nenhuma vaga de banho disponível para este horário');
       }
 
-      // Insert: provider_id will be null
+      // Insert with provider_id null
       const { error } = await supabase.from('appointments').insert([{
         user_id: userId,
         pet_id: petId,
@@ -67,14 +71,14 @@ export async function createAppointment(
       }]);
       if (error) throw error;
 
-      // Decrement spot (optimistic, server syncs on db)
+      // Decrement spot (optimistically)
       await supabase
         .from('shower_availability')
         .update({ available_spots: (spots.available_spots || 1) - 1 })
         .eq('id', spots.id);
-
     } else if (serviceType === 'grooming') {
-      // 1. check provider_availability
+      // Grooming: check provider_availability and shower_availability
+      // 1. provider_availability (groomer)
       const { data: avail, error: availErr } = await supabase
         .from('provider_availability')
         .select('available')
@@ -87,7 +91,7 @@ export async function createAppointment(
         throw new Error('Tosador não disponível nesse horário');
       }
 
-      // 2. check shower spot too!
+      // 2. shower slots
       const { data: spots, error: spotErr } = await supabase
         .from('shower_availability')
         .select('id, available_spots')
@@ -99,7 +103,7 @@ export async function createAppointment(
         throw new Error('Nenhuma vaga de banho disponível para este horário');
       }
 
-      // Insert with provider_id filled
+      // Insert, with correct provider_id (provider_profiles.id)
       const { error } = await supabase.from('appointments').insert([{
         user_id: userId,
         pet_id: petId,
@@ -112,13 +116,14 @@ export async function createAppointment(
       }]);
       if (error) throw error;
 
+      // Decrement shower spot
       await supabase
         .from('shower_availability')
         .update({ available_spots: (spots.available_spots || 1) - 1 })
         .eq('id', spots.id);
 
     } else if (serviceType === 'veterinary') {
-      // 1. check provider_availability only
+      // Vet: only check provider_availability
       const { data: avail, error: availErr } = await supabase
         .from('provider_availability')
         .select('available')
@@ -146,9 +151,7 @@ export async function createAppointment(
     } else {
       throw new Error('Tipo de serviço não suportado');
     }
-
     return true;
-
   } catch (err) {
     console.error('Erro ao criar agendamento:', err);
     throw err;
