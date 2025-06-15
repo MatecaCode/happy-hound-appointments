@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 
 interface PetFormProps {
   userId: string;
@@ -17,6 +18,8 @@ interface PetFormProps {
   onSuccess?: () => void;
   editing?: boolean;
 }
+
+type PetInsert = Database['public']['Tables']['pets']['Insert'];
 
 export default function PetForm({ userId, initialPet = {}, onSuccess, editing = false }: PetFormProps) {
   const [name, setName] = useState(initialPet.name || '');
@@ -67,15 +70,15 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           onSuccess?.();
         }
       } else {
-        // Create new pet - let the database trigger handle user_id assignment
-        // We explicitly omit user_id as the trigger will set it
+        // Create new pet - the database trigger will handle user_id assignment
+        // We use type assertion to tell TypeScript this is valid
         const insertPayload = {
           name: name.trim(),
           breed: breed.trim() || null,
           age: age.trim() || null
-        };
+        } as PetInsert;
         
-        console.log('🆕 Creating pet with payload (without user_id):', insertPayload);
+        console.log('🆕 Creating pet with payload (trigger will set user_id):', insertPayload);
         console.log('🔍 Current auth state check...');
         
         // Check current session for debugging
