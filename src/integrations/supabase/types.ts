@@ -102,6 +102,36 @@ export type Database = {
           },
         ]
       }
+      clients: {
+        Row: {
+          name: string | null
+          user_id: string
+        }
+        Insert: {
+          name?: string | null
+          user_id: string
+        }
+        Update: {
+          name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      groomers: {
+        Row: {
+          name: string | null
+          user_id: string
+        }
+        Insert: {
+          name?: string | null
+          user_id: string
+        }
+        Update: {
+          name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string | null
@@ -403,6 +433,21 @@ export type Database = {
           created_at?: string | null
           id?: string
           role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      veterinarians: {
+        Row: {
+          name: string | null
+          user_id: string
+        }
+        Insert: {
+          name?: string | null
+          user_id: string
+        }
+        Update: {
+          name?: string | null
           user_id?: string
         }
         Relationships: []
