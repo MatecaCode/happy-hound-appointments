@@ -67,15 +67,14 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           onSuccess?.();
         }
       } else {
-        // Create new pet
+        // Create new pet - let the database trigger handle user_id assignment
         const insertPayload = {
-          user_id: userId,
           name: name.trim(),
           breed: breed.trim() || null,
           age: age.trim() || null
         };
         
-        console.log('🆕 Creating pet with payload:', insertPayload);
+        console.log('🆕 Creating pet with payload (without user_id):', insertPayload);
         console.log('🔍 Current auth state check...');
         
         // Check current session for debugging
