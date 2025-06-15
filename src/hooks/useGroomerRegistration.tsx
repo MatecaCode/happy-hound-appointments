@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -6,12 +5,10 @@ import { toast } from 'sonner';
 export const useGroomerRegistration = () => {
   const [isCreatingAvailability, setIsCreatingAvailability] = useState(false);
 
-  const createInitialAvailability = async (groomerId: string, groomerName: string) => {
+  // Create initial availability for a connected provider_profile
+  const createInitialAvailability = async (providerId: string, providerName: string) => {
     setIsCreatingAvailability(true);
     try {
-      console.log(`🔧 Creating initial availability for groomer: ${groomerName} (${groomerId})`);
-
-      // Create availability for the next 30 days
       const today = new Date();
       const dates = [];
       for (let i = 0; i < 30; i++) {
@@ -20,42 +17,27 @@ export const useGroomerRegistration = () => {
         dates.push(date.toISOString().split('T')[0]);
       }
 
-      // Create availability for this groomer
       for (const dateStr of dates) {
-        const { error: groomerAvailError } = await supabase.rpc('create_availability_slots', {
-          p_resource_type: 'groomer',
-          p_date: dateStr,
-          p_provider_id: groomerId,
-          p_start_time: '09:00',
-          p_end_time: '17:00'
-        });
-
-        if (groomerAvailError) {
-          console.error(`❌ Error creating availability for ${groomerName} on ${dateStr}:`, groomerAvailError);
-          // Don't throw error, just log it - we don't want to block registration
+        // Insert 30-min slots from 09:00 to 17:00 for each date
+        const timeSlots = [];
+        for (let hour = 9; hour < 17; hour++) {
+          timeSlots.push(`${hour.toString().padStart(2, '0')}:00`);
+          timeSlots.push(`${hour.toString().padStart(2, '0')}:30`);
         }
+        const availSlots = timeSlots.map(slot => ({
+          provider_id: providerId,
+          date: dateStr,
+          time_slot: slot,
+          available: true
+        }));
+        await supabase
+          .from('provider_availability')
+          .upsert(availSlots, { onConflict: 'provider_id,date,time_slot' });
       }
-
-      // Also ensure shower availability exists for grooming services
-      for (const dateStr of dates) {
-        const { error: showerAvailError } = await supabase.rpc('create_availability_slots', {
-          p_resource_type: 'shower',
-          p_date: dateStr,
-          p_provider_id: null,
-          p_start_time: '09:00',
-          p_end_time: '17:00'
-        });
-
-        if (showerAvailError) {
-          console.error(`❌ Error creating shower availability for ${dateStr}:`, showerAvailError);
-          // Don't throw error, just log it
-        }
-      }
-
-      console.log(`✅ Initial availability created for groomer: ${groomerName}`);
+      toast.success(`Disponibilidade inicial criada para ${providerName}!`);
       return true;
     } catch (error: any) {
-      console.error('💥 Error creating initial availability:', error);
+      toast.warning('Conta criada, mas pode ser necessário configurar disponibilidade manualmente.');
       return false;
     } finally {
       setIsCreatingAvailability(false);
@@ -64,30 +46,23 @@ export const useGroomerRegistration = () => {
 
   const setupNewGroomer = async (userId: string) => {
     try {
-      // Get the groomer record that was just created
-      const { data: groomer, error: groomerError } = await supabase
-        .from('groomers')
+      // Find the provider_profile entry for this user and role
+      const { data: providerProfile, error: groomerError } = await supabase
+        .from('provider_profiles')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .eq('type', 'groomer')
+        .maybeSingle();
 
-      if (groomerError || !groomer) {
-        console.error('❌ Could not find groomer record:', groomerError);
+      if (groomerError || !providerProfile) {
+        console.error('❌ Could not find groomer profile:', groomerError);
         return false;
       }
-
-      // Create initial availability for the new groomer
-      const success = await createInitialAvailability(groomer.id, groomer.name);
-      
-      if (success) {
-        toast.success(`Disponibilidade inicial criada para ${groomer.name}!`);
-      } else {
-        toast.warning('Conta criada, mas pode ser necessário configurar disponibilidade manualmente.');
-      }
-
+      // providerName may be unavailable, fallback to 'Tosador(a)'
+      const providerName = providerProfile.name ?? 'Tosador(a)';
+      const success = await createInitialAvailability(providerProfile.id, providerName);
       return success;
     } catch (error: any) {
-      console.error('💥 Error setting up new groomer:', error);
       return false;
     }
   };

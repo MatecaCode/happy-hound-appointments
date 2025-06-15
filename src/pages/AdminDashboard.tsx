@@ -44,13 +44,14 @@ const AdminDashboard = () => {
 
   const loadStats = async () => {
     try {
+      // Approximate "clients" as count of user_roles where role = 'client'
+      // Approximate "service_availability" as provider_availability
       const [usersRes, petsRes, appointmentsRes, slotsRes] = await Promise.all([
-        supabase.from('clients').select('id', { count: 'exact' }),
+        supabase.from('user_roles').select('id', { count: 'exact' }).eq('role', 'client'),
         supabase.from('pets').select('id', { count: 'exact' }),
         supabase.from('appointments').select('id', { count: 'exact' }),
-        supabase.from('service_availability').select('id', { count: 'exact' })
+        supabase.from('provider_availability').select('id', { count: 'exact' })
       ]);
-
       setStats({
         totalUsers: usersRes.count || 0,
         totalPets: petsRes.count || 0,

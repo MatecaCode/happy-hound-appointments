@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -146,53 +145,17 @@ export const useAppointmentData = () => {
   ) => {
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
-      
-      console.log('🔍 DEBUG: Starting fetchAvailableProviders with role-based filtering');
-      console.log('🔍 DEBUG: Service type:', type);
-      console.log('🔍 DEBUG: Date string:', dateStr);
-      console.log('🔍 DEBUG: Selected service:', selectedService);
-      
-      // Determine the role we're looking for
       const targetRole = type === 'grooming' ? 'groomer' : 'vet';
-      
-      // Get users with the target role
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('user_id')
-        .eq('role', targetRole);
 
-      if (rolesError) throw rolesError;
-
-      if (!userRoles || userRoles.length === 0) {
-        console.log('❌ No users found with role:', targetRole);
-        setGroomers([]);
-        return;
-      }
-
-      const userIds = userRoles.map(ur => ur.user_id);
-      
       // Get provider profiles based on role
-      let providersQuery;
-      if (type === 'grooming') {
-        providersQuery = supabase
-          .from('groomers')
-          .select('*')
-          .in('user_id', userIds);
-      } else {
-        providersQuery = supabase
-          .from('veterinarians')
-          .select('*')
-          .in('user_id', userIds);
-      }
-
-      const { data: providers, error: providersError } = await providersQuery;
-
-      console.log('🔍 DEBUG: Providers from tables:', providers);
+      const { data: providers, error: providersError } = await supabase
+        .from('provider_profiles')
+        .select('*')
+        .eq('type', targetRole);
 
       if (providersError) throw providersError;
 
       if (!providers || providers.length === 0) {
-        console.log('❌ No providers found for role:', targetRole);
         setGroomers([]);
         return;
       }
@@ -201,49 +164,35 @@ export const useAppointmentData = () => {
       const availableProviders = [];
       
       for (const provider of providers) {
-        console.log(`🔍 DEBUG: Checking availability for ${provider.name} on ${dateStr}`);
-        
-        // Check provider_availability table for this provider on this date
         const { data: availability, error: availError } = await supabase
           .from('provider_availability')
           .select('*')
           .eq('provider_id', provider.id)
           .eq('date', dateStr)
           .eq('available', true);
-          
-        console.log(`🔍 DEBUG: Availability for ${provider.name}:`, availability);
-        
         if (availability && availability.length > 0) {
-          // Check if any of these slots are still free (not booked in appointments)
           const hasAvailableSlots = await checkProviderHasAvailableSlots(
             provider.id, 
             dateStr, 
             selectedService?.duration || 30
           );
-          
           if (hasAvailableSlots) {
-            console.log(`✅ Provider ${provider.name} has available slots`);
             availableProviders.push(provider);
-          } else {
-            console.log(`❌ Provider ${provider.name} has no available slots (all booked)`);
           }
-        } else {
-          console.log(`❌ Provider ${provider.name} has no availability on ${dateStr}`);
         }
       }
 
       // Transform for UI
       const transformedProviders: Provider[] = availableProviders.map(provider => ({
         id: provider.id,
-        name: provider.name,
+        name: provider.name ?? '',
         role: targetRole,
-        profile_image: provider.profile_image,
+        profile_image: provider.photo_url,
         rating: provider.rating || 4.5,
-        specialty: provider.specialty,
-        about: provider.about
+        specialty: provider.specialty ?? '',
+        about: provider.bio ?? ''
       }));
 
-      console.log('✅ Final transformed providers:', transformedProviders);
       setGroomers(transformedProviders);
       
     } catch (error: any) {
