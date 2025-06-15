@@ -24,7 +24,7 @@ const Pets = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPet, setEditingPet] = useState<Pet | null>(null);
-  
+
   // Form states
   const [name, setName] = useState('');
   const [breed, setBreed] = useState('');
@@ -37,16 +37,23 @@ const Pets = () => {
   }, [user]);
 
   const fetchPets = async () => {
-    if (!user) return;
-    
+    if (!user) {
+      setPets([]);
+      return;
+    }
     try {
+      console.log('🔍 Fetching pets for user:', user.id);
       const { data, error } = await supabase
         .from('pets')
         .select('*')
         .eq('user_id', user.id);
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        toast.info('Nenhum pet encontrado para sua conta.');
+      }
       setPets(data || []);
+      console.log('🐶 Pets fetched:', data);
     } catch (error: any) {
       console.error('Error fetching pets:', error);
       toast.error('Erro ao carregar pets');
@@ -79,34 +86,42 @@ const Pets = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !name.trim()) return;
+    if (!user || !user.id || !name.trim()) {
+      toast.error("Você precisa estar logado para salvar um pet.");
+      return;
+    }
 
     setIsLoading(true);
     try {
       if (editingPet) {
         // Update existing pet
+        const updatePayload = {
+          name: name.trim(),
+          breed: breed.trim() || null,
+          age: age.trim() || null,
+          updated_at: new Date().toISOString()
+        };
+        console.log('📝 Updating pet:', editingPet.id, updatePayload);
         const { error } = await supabase
           .from('pets')
-          .update({
-            name: name.trim(),
-            breed: breed.trim() || null,
-            age: age.trim() || null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', editingPet.id);
+          .update(updatePayload)
+          .eq('id', editingPet.id)
+          .eq('user_id', user.id);
 
         if (error) throw error;
         toast.success('Pet atualizado com sucesso!');
       } else {
-        // Create new pet
+        // Create new pet with user_id set
+        const insertPayload = {
+          user_id: user.id,
+          name: name.trim(),
+          breed: breed.trim() || null,
+          age: age.trim() || null
+        };
+        console.log('➕ Inserting pet:', insertPayload);
         const { error } = await supabase
           .from('pets')
-          .insert({
-            user_id: user.id,
-            name: name.trim(),
-            breed: breed.trim() || null,
-            age: age.trim() || null
-          });
+          .insert(insertPayload);
 
         if (error) throw error;
         toast.success('Pet adicionado com sucesso!');
@@ -126,10 +141,12 @@ const Pets = () => {
     if (!confirm('Tem certeza que deseja remover este pet?')) return;
 
     try {
+      console.log('❌ Deleting pet:', petId, 'for user:', user?.id);
       const { error } = await supabase
         .from('pets')
         .delete()
-        .eq('id', petId);
+        .eq('id', petId)
+        .eq('user_id', user?.id);
 
       if (error) throw error;
       toast.success('Pet removido com sucesso!');
@@ -182,7 +199,7 @@ const Pets = () => {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="breed">Raça</Label>
                   <Input
@@ -193,7 +210,7 @@ const Pets = () => {
                     placeholder="Ex: Golden Retriever"
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="age">Idade</Label>
                   <Input
@@ -204,7 +221,7 @@ const Pets = () => {
                     placeholder="Ex: 3 anos"
                   />
                 </div>
-                
+
                 <div className="flex gap-2 pt-4">
                   <Button type="button" variant="outline" onClick={closeDialog}>
                     Cancelar
@@ -217,7 +234,7 @@ const Pets = () => {
             </DialogContent>
           </Dialog>
         </div>
-        
+
         {pets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {pets.map((pet) => (
@@ -280,3 +297,4 @@ const Pets = () => {
 };
 
 export default Pets;
+
