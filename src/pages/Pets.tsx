@@ -18,13 +18,24 @@ interface Pet {
 }
 
 const Pets = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [pets, setPets] = useState<Pet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dialogPet, setDialogPet] = useState<Pet | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const fetchPets = async () => {
+    console.log('🔍 fetchPets called:', { 
+      user: user?.id, 
+      authLoading,
+      isLoading 
+    });
+
+    if (authLoading) {
+      console.log('⏳ Auth still loading, waiting...');
+      return;
+    }
+
     if (!user) {
       console.log('👤 No user found, clearing pets');
       setPets([]);
@@ -38,7 +49,11 @@ const Pets = () => {
     try {
       // Check current auth state first
       const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-      console.log('🔐 Auth check:', { currentUser: currentUser?.id, error: authError });
+      console.log('🔐 Auth check:', { 
+        currentUser: currentUser?.id, 
+        error: authError,
+        providedUser: user.id
+      });
       
       if (authError || !currentUser) {
         console.error('❌ Auth error during fetch:', authError);
@@ -47,6 +62,7 @@ const Pets = () => {
         return;
       }
 
+      console.log('📡 Making database query...');
       const { data, error } = await supabase
         .from('pets')
         .select('*')
@@ -58,7 +74,8 @@ const Pets = () => {
         error, 
         userCount: data?.length || 0,
         userId: user.id,
-        authUserId: currentUser.id
+        authUserId: currentUser.id,
+        query: `SELECT * FROM pets WHERE user_id = '${user.id}'`
       });
 
       if (error) {
@@ -110,8 +127,9 @@ const Pets = () => {
   };
 
   useEffect(() => {
+    console.log('🔄 useEffect triggered:', { user: user?.id, authLoading });
     fetchPets();
-  }, [user]);
+  }, [user, authLoading]);
 
   const openDialog = (pet?: Pet) => {
     console.log('🔓 Opening dialog for pet:', pet?.name || 'new pet');
@@ -126,9 +144,28 @@ const Pets = () => {
   };
 
   const handlePetFormSuccess = () => {
+    console.log('✅ Pet form success callback');
     fetchPets();
     closeDialog();
   };
+
+  console.log('🎨 Pets page render:', { 
+    user: user?.id, 
+    authLoading, 
+    isLoading, 
+    petsCount: pets.length,
+    isDialogOpen 
+  });
+
+  if (authLoading) {
+    return (
+      <Layout>
+        <div className="max-w-md mx-auto py-16 text-center">
+          <p>Verificando autenticação...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!user) {
     return (
@@ -188,6 +225,9 @@ const Pets = () => {
         {isLoading ? (
           <div className="text-center py-8">
             <p>Carregando pets...</p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Usuário: {user.id}
+            </p>
           </div>
         ) : pets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

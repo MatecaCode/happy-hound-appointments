@@ -27,7 +27,10 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🚀 Form submitted - handleSubmit called!');
+    
     if (!userId || !name.trim()) {
+      console.error('❌ Validation failed:', { userId: !!userId, name: name.trim() });
       toast.error("Você precisa estar logado e o nome do pet não pode estar vazio.");
       return;
     }
@@ -38,8 +41,7 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
       breed, 
       age, 
       editing, 
-      petId: initialPet.id,
-      authUser: (await supabase.auth.getUser()).data.user?.id
+      petId: initialPet.id
     });
     
     setIsSubmitting(true);
@@ -47,7 +49,12 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
     try {
       // Check current auth state
       const { data: { user }, error: authError } = await supabase.auth.getUser();
-      console.log('🔐 Current auth user:', user?.id, 'Provided userId:', userId);
+      console.log('🔐 Auth check result:', { 
+        user: user?.id, 
+        userId, 
+        authError,
+        match: user?.id === userId 
+      });
       
       if (authError || !user) {
         console.error('❌ Auth error:', authError);
@@ -136,6 +143,8 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
     }
   };
 
+  console.log('🎨 PetForm render:', { userId, editing, isSubmitting, name });
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
@@ -144,7 +153,10 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           id="name"
           type="text"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            console.log('📝 Name changed:', e.target.value);
+            setName(e.target.value);
+          }}
           required
           placeholder="Nome do seu pet"
         />
@@ -173,6 +185,7 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
         <Button
           type="submit"
           disabled={isSubmitting || !name.trim()}
+          onClick={() => console.log('🔘 Submit button clicked!')}
         >
           {isSubmitting ? 'Salvando...' : editing ? 'Atualizar' : 'Adicionar'}
         </Button>
