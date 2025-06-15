@@ -36,11 +36,25 @@ const GroomerCalendar = () => {
     
     setIsLoading(true);
     try {
+      // First get the provider profile for this user
+      const { data: providerProfile, error: profileError } = await supabase
+        .from('provider_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('type', 'groomer')
+        .single();
+
+      if (profileError || !providerProfile) {
+        console.error('Provider profile not found:', profileError);
+        setAppointments([]);
+        return;
+      }
+
       const dateStr = selectedDate.toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('appointments')
         .select('*')
-        .eq('provider_id', user.id)
+        .eq('provider_id', providerProfile.id)
         .eq('date', dateStr)
         .order('time');
 

@@ -15,17 +15,19 @@ const CreateAvailabilitySlots = () => {
     try {
       console.log('🔧 Creating availability slots for date:', date);
 
-      // Get all groomers
+      // Get all groomers from provider_profiles
       const { data: groomers, error: groomersError } = await supabase
-        .from('groomers')
-        .select('id, name');
+        .from('provider_profiles')
+        .select('id, user_id')
+        .eq('type', 'groomer');
 
       if (groomersError) throw groomersError;
 
-      // Get all veterinarians
+      // Get all veterinarians from provider_profiles
       const { data: vets, error: vetsError } = await supabase
-        .from('veterinarians')
-        .select('id, name');
+        .from('provider_profiles')
+        .select('id, user_id')
+        .eq('type', 'vet');
 
       if (vetsError) throw vetsError;
 
@@ -45,8 +47,7 @@ const CreateAvailabilitySlots = () => {
             provider_id: groomer.id,
             date: date,
             time_slot: timeSlot,
-            available: true,
-            provider_type: 'groomer'
+            available: true
           });
         }
       }
@@ -58,15 +59,14 @@ const CreateAvailabilitySlots = () => {
             provider_id: vet.id,
             date: date,
             time_slot: timeSlot,
-            available: true,
-            provider_type: 'veterinary'
+            available: true
           });
         }
       }
 
       console.log('📅 Inserting availability slots to provider_availability:', availabilitySlots.length);
 
-      // Insert all availability slots to the correct table
+      // Insert all availability slots
       const { error: insertError } = await supabase
         .from('provider_availability')
         .upsert(availabilitySlots, { onConflict: 'provider_id,date,time_slot' });

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -78,24 +77,14 @@ const StatusCenter = () => {
 
       // If user is groomer or vet, only show their appointments
       if (hasRole('groomer') || hasRole('vet')) {
-        // Get the provider ID based on user role
-        let providerData = null;
-        
-        if (hasRole('groomer')) {
-          const { data: groomerData } = await supabase
-            .from('groomers')
-            .select('id')
-            .eq('user_id', user?.id)
-            .single();
-          providerData = groomerData;
-        } else if (hasRole('vet')) {
-          const { data: vetData } = await supabase
-            .from('veterinarians')
-            .select('id')
-            .eq('user_id', user?.id)
-            .single();
-          providerData = vetData;
-        }
+        // Get the provider profile for this user
+        const providerType = hasRole('groomer') ? 'groomer' : 'vet';
+        const { data: providerData } = await supabase
+          .from('provider_profiles')
+          .select('id')
+          .eq('user_id', user?.id)
+          .eq('type', providerType)
+          .single();
         
         if (providerData) {
           query = query.eq('provider_id', providerData.id);
@@ -110,33 +99,18 @@ const StatusCenter = () => {
         return;
       }
 
-      // Get provider names by checking both groomers and veterinarians tables
+      // Get provider names from provider_profiles table
       const appointmentsWithProviders = await Promise.all(
         (data || []).map(async (appointment) => {
-          // Try groomers first
-          let { data: groomerData } = await supabase
-            .from('groomers')
-            .select('name')
-            .eq('id', appointment.provider_id)
-            .single();
-
-          if (groomerData) {
-            return {
-              ...appointment,
-              provider_name: groomerData.name
-            };
-          }
-
-          // Try veterinarians if not found in groomers
-          let { data: vetData } = await supabase
-            .from('veterinarians')
-            .select('name')
+          const { data: providerData } = await supabase
+            .from('provider_profiles')
+            .select('user_id, type')
             .eq('id', appointment.provider_id)
             .single();
 
           return {
             ...appointment,
-            provider_name: vetData?.name || 'N/A'
+            provider_name: providerData ? `${providerData.type} (${providerData.user_id})` : 'N/A'
           };
         })
       );
