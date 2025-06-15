@@ -26,11 +26,16 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
     if (!userId || !name.trim()) {
       toast.error("Você precisa estar logado e o nome do pet não pode estar vazio.");
       return;
     }
+
+    console.log('🐕 Starting pet submission:', { userId, name, breed, age, editing, petId: initialPet.id });
+    
     setIsSubmitting(true);
+    
     try {
       if (editing && initialPet.id) {
         // Editing existing pet
@@ -40,47 +45,68 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           age: age.trim() || null,
           updated_at: new Date().toISOString()
         };
+        
+        console.log('📝 Updating pet with payload:', updatePayload);
+        
         const { error, data } = await supabase
           .from('pets')
           .update(updatePayload)
           .eq('id', initialPet.id)
           .eq('user_id', userId)
           .select();
+
+        console.log('📝 Update result:', { error, data });
+
         if (error) {
+          console.error('❌ Update error:', error);
           toast.error('Erro ao atualizar pet: ' + error.message);
         } else if (!data || data.length === 0) {
-          toast.error('Pet não foi atualizado. Você tem permissão? (RLS)');
+          console.error('❌ No data returned from update - possible RLS issue');
+          toast.error('Pet não foi atualizado. Verifique suas permissões.');
         } else {
+          console.log('✅ Pet updated successfully:', data[0]);
           toast.success('Pet atualizado com sucesso!');
           onSuccess?.();
         }
       } else {
-        // Creating new
+        // Creating new pet
         const insertPayload = {
           user_id: userId,
           name: name.trim(),
           breed: breed.trim() || null,
           age: age.trim() || null
         };
+        
+        console.log('🆕 Creating pet with payload:', insertPayload);
+        
         const { error, data } = await supabase
           .from('pets')
           .insert(insertPayload)
           .select();
 
+        console.log('🆕 Insert result:', { error, data });
+
         if (error) {
-          console.error('Erro inserindo pet:', error, insertPayload);
+          console.error('❌ Insert error:', error);
           toast.error('Erro ao adicionar pet: ' + error.message);
         } else if (!data || data.length === 0) {
-          toast.error('O pet não foi salvo. Sua sessão está logada? (RLS impediu inserir)');
-          console.error('Insert result empty:', {insertPayload, error, data, userId});
+          console.error('❌ No data returned from insert - possible RLS issue');
+          toast.error('Pet não foi salvo. Verifique suas permissões.');
         } else {
+          console.log('✅ Pet created successfully:', data[0]);
           toast.success('Pet adicionado com sucesso!');
+          // Clear form for new entries
+          if (!editing) {
+            setName('');
+            setBreed('');
+            setAge('');
+          }
           onSuccess?.();
         }
       }
     } catch (err: any) {
-      console.error('Erro geral no submit:', err);
-      toast.error('Erro desconhecido ao salvar.');
+      console.error('💥 Unexpected error in pet submission:', err);
+      toast.error('Erro inesperado: ' + (err.message || 'Erro desconhecido'));
     } finally {
       setIsSubmitting(false);
     }
@@ -96,6 +122,7 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
+          placeholder="Nome do seu pet"
         />
       </div>
       <div>
@@ -121,7 +148,7 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
       <div className="flex gap-2 pt-4">
         <Button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || !name.trim()}
         >
           {isSubmitting ? 'Salvando...' : editing ? 'Atualizar' : 'Adicionar'}
         </Button>
