@@ -412,6 +412,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      atomic_create_appointment: {
+        Args: {
+          _user_id: string
+          _pet_id: string
+          _service_id: string
+          _provider_id: string
+          _date: string
+          _time: string
+          _notes?: string
+        }
+        Returns: string
+      }
       get_user_roles: {
         Args: { _user_id: string }
         Returns: string[]

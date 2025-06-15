@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -17,6 +18,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+
+// Helper to fetch name/email from auth users metadata
+async function getOwnerName(userId: string): Promise<string> {
+  try {
+    // This is a workaround because we can't join on auth.users from public schema, so we fetch via Supabase SDK
+    const { data: { user } } = await supabase.auth.admin.getUserById(userId);
+    return user?.user_metadata?.name || user?.email || 'Cliente';
+  } catch {
+    return 'Cliente';
+  }
+}
 
 interface AppointmentStatus {
   id: string;
@@ -53,24 +65,36 @@ const StatusCenter = () => {
     }
 
     loadAppointments();
+    // eslint-disable-next-line
   }, [user, userRole, authLoading, navigate, hasRole]);
 
   const loadAppointments = async () => {
     try {
       setLoading(true);
-      
+
+      // Fetch appointment + pet + service in one query 
       let query = supabase
         .from('appointments')
         .select(`
           id,
-          pet_name,
-          owner_name,
-          service,
+          pet_id,
+          user_id,
+          service_id,
+          provider_id,
           date,
           time,
           status,
           notes,
-          provider_id
+          pets (
+            name
+          ),
+          services (
+            name
+          ),
+          provider_profiles (
+            type,
+            user_id
+          )
         `)
         .order('date', { ascending: true })
         .order('time', { ascending: true });
@@ -85,7 +109,7 @@ const StatusCenter = () => {
           .eq('user_id', user?.id)
           .eq('type', providerType)
           .single();
-        
+
         if (providerData) {
           query = query.eq('provider_id', providerData.id);
         }
@@ -93,29 +117,44 @@ const StatusCenter = () => {
 
       const { data, error } = await query;
 
-      if (error) {
+      if (error || !data) {
         console.error('Error loading appointments:', error);
         toast.error('Erro ao carregar agendamentos');
         return;
       }
 
-      // Get provider names from provider_profiles table
-      const appointmentsWithProviders = await Promise.all(
-        (data || []).map(async (appointment) => {
-          const { data: providerData } = await supabase
-            .from('provider_profiles')
-            .select('user_id, type')
-            .eq('id', appointment.provider_id)
-            .single();
+      // As we cannot join directly to auth.users, fetch all unique user_ids
+      const userIdSet = new Set<string>();
+      data.forEach((apt: any) => {
+        if (apt.user_id) userIdSet.add(apt.user_id);
+      });
+      const userIdArr = Array.from(userIdSet);
 
-          return {
-            ...appointment,
-            provider_name: providerData ? `${providerData.type} (${providerData.user_id})` : 'N/A'
-          };
+      // Map user_id to name/email in parallel (limiting requests for perf)
+      const ownerNamesMap: Record<string, string> = {};
+      await Promise.all(
+        userIdArr.map(async (uid) => {
+          ownerNamesMap[uid] = await getOwnerName(uid);
         })
       );
 
-      setAppointments(appointmentsWithProviders);
+      // Map to AppointmentStatus with "pets", "services", "provider_profiles" relations
+      const appointmentsWithFields: AppointmentStatus[] = (data as any[]).map((apt: any) => ({
+        id: apt.id,
+        pet_name: apt.pets?.name ?? 'Pet',
+        owner_name: ownerNamesMap[apt.user_id] ?? 'Cliente',
+        service: apt.services?.name ?? 'Serviço',
+        provider_name:
+          (apt.provider_profiles
+            ? `${apt.provider_profiles.type} (${apt.provider_profiles.user_id?.slice(0, 8)})`
+            : 'N/A'),
+        date: apt.date,
+        time: apt.time,
+        status: apt.status,
+        notes: apt.notes ?? undefined,
+      }));
+
+      setAppointments(appointmentsWithFields);
     } catch (error) {
       console.error('Error loading appointments:', error);
       toast.error('Erro ao carregar agendamentos');
@@ -228,7 +267,7 @@ const StatusCenter = () => {
             <CardHeader>
               <CardTitle>Agendamentos em Andamento</CardTitle>
               <CardDescription>
-                {hasRole('admin') 
+                {hasRole('admin')
                   ? 'Todos os agendamentos do sistema'
                   : 'Seus agendamentos atribuídos'
                 }
