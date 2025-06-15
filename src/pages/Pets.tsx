@@ -1,15 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { PlusCircle, Trash2, Edit } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { PlusCircle, Trash2, Edit } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import PetForm from '@/components/PetForm';
 
 interface Pet {
   id: string;
@@ -22,20 +20,11 @@ const Pets = () => {
   const { user } = useAuth();
   const [pets, setPets] = useState<Pet[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingPet, setEditingPet] = useState<Pet | null>(null);
 
-  // Form states
-  const [name, setName] = useState('');
-  const [breed, setBreed] = useState('');
-  const [age, setAge] = useState('');
+  // Refactored openDialog/closeDialog to use minimal state
+  const [dialogPet, setDialogPet] = useState<Pet | null>(null);
 
-  useEffect(() => {
-    if (user) {
-      fetchPets();
-    }
-  }, [user]);
-
+  // Fetch logic remains the same
   const fetchPets = async () => {
     if (!user) {
       setPets([]);
@@ -60,83 +49,6 @@ const Pets = () => {
     }
   };
 
-  const resetForm = () => {
-    setName('');
-    setBreed('');
-    setAge('');
-    setEditingPet(null);
-  };
-
-  const openDialog = (pet?: Pet) => {
-    if (pet) {
-      setEditingPet(pet);
-      setName(pet.name);
-      setBreed(pet.breed || '');
-      setAge(pet.age || '');
-    } else {
-      resetForm();
-    }
-    setIsDialogOpen(true);
-  };
-
-  const closeDialog = () => {
-    setIsDialogOpen(false);
-    resetForm();
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!user || !user.id || !name.trim()) {
-      toast.error("Você precisa estar logado para salvar um pet.");
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      if (editingPet) {
-        // Update existing pet
-        const updatePayload = {
-          name: name.trim(),
-          breed: breed.trim() || null,
-          age: age.trim() || null,
-          updated_at: new Date().toISOString()
-        };
-        console.log('📝 Updating pet:', editingPet.id, updatePayload);
-        const { error } = await supabase
-          .from('pets')
-          .update(updatePayload)
-          .eq('id', editingPet.id)
-          .eq('user_id', user.id);
-
-        if (error) throw error;
-        toast.success('Pet atualizado com sucesso!');
-      } else {
-        // Create new pet with user_id set
-        const insertPayload = {
-          user_id: user.id,
-          name: name.trim(),
-          breed: breed.trim() || null,
-          age: age.trim() || null
-        };
-        console.log('➕ Inserting pet:', insertPayload);
-        const { error } = await supabase
-          .from('pets')
-          .insert(insertPayload);
-
-        if (error) throw error;
-        toast.success('Pet adicionado com sucesso!');
-      }
-
-      await fetchPets();
-      closeDialog();
-    } catch (error: any) {
-      console.error('Error saving pet:', error);
-      toast.error('Erro ao salvar pet');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const deletePet = async (petId: string) => {
     if (!confirm('Tem certeza que deseja remover este pet?')) return;
 
@@ -155,6 +67,24 @@ const Pets = () => {
       console.error('Error deleting pet:', error);
       toast.error('Erro ao remover pet');
     }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchPets();
+    }
+  }, [user]);
+
+  // For dialog open state:
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  const openDialog = (pet?: Pet) => {
+    setDialogPet(pet ?? null);
+    setIsDialogOpen(true);
+  };
+  const closeDialog = () => {
+    setDialogPet(null);
+    setIsDialogOpen(false);
   };
 
   if (!user) {
@@ -182,55 +112,30 @@ const Pets = () => {
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>
-                  {editingPet ? 'Editar Pet' : 'Adicionar Novo Pet'}
+                  {dialogPet ? 'Editar Pet' : 'Adicionar Novo Pet'}
                 </DialogTitle>
                 <DialogDescription>
                   Preencha as informações do seu pet
                 </DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Nome *</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="breed">Raça</Label>
-                  <Input
-                    id="breed"
-                    type="text"
-                    value={breed}
-                    onChange={(e) => setBreed(e.target.value)}
-                    placeholder="Ex: Golden Retriever"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="age">Idade</Label>
-                  <Input
-                    id="age"
-                    type="text"
-                    value={age}
-                    onChange={(e) => setAge(e.target.value)}
-                    placeholder="Ex: 3 anos"
-                  />
-                </div>
-
-                <div className="flex gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={closeDialog}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={isLoading}>
-                    {isLoading ? 'Salvando...' : editingPet ? 'Atualizar' : 'Adicionar'}
-                  </Button>
-                </div>
-              </form>
+              <PetForm
+                userId={user.id}
+                initialPet={dialogPet ?? undefined}
+                editing={!!dialogPet}
+                onSuccess={() => {
+                  fetchPets();
+                  closeDialog();
+                }}
+              />
+              <div className="flex justify-end pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={closeDialog}
+                >
+                  Cancelar
+                </Button>
+              </div>
             </DialogContent>
           </Dialog>
         </div>
@@ -297,4 +202,3 @@ const Pets = () => {
 };
 
 export default Pets;
-
