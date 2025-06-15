@@ -20,7 +20,7 @@ interface Pet {
 const Pets = () => {
   const { user } = useAuth();
   const [pets, setPets] = useState<Pet[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [dialogPet, setDialogPet] = useState<Pet | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -28,6 +28,7 @@ const Pets = () => {
     if (!user) {
       console.log('👤 No user found, clearing pets');
       setPets([]);
+      setIsLoading(false);
       return;
     }
 
@@ -35,13 +36,30 @@ const Pets = () => {
     setIsLoading(true);
     
     try {
+      // Check current auth state first
+      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
+      console.log('🔐 Auth check:', { currentUser: currentUser?.id, error: authError });
+      
+      if (authError || !currentUser) {
+        console.error('❌ Auth error during fetch:', authError);
+        toast.error('Erro de autenticação. Faça login novamente.');
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('pets')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      console.log('🐶 Fetch pets result:', { data, error, userCount: data?.length || 0 });
+      console.log('🐶 Fetch pets result:', { 
+        data, 
+        error, 
+        userCount: data?.length || 0,
+        userId: user.id,
+        authUserId: currentUser.id
+      });
 
       if (error) {
         console.error('❌ Error fetching pets:', error);
@@ -51,7 +69,6 @@ const Pets = () => {
 
       if (!data || data.length === 0) {
         console.log('📭 No pets found for user');
-        toast.info('Nenhum pet encontrado para sua conta.');
         setPets([]);
       } else {
         console.log('✅ Pets loaded successfully:', data.map(p => ({ id: p.id, name: p.name })));
@@ -93,9 +110,7 @@ const Pets = () => {
   };
 
   useEffect(() => {
-    if (user) {
-      fetchPets();
-    }
+    fetchPets();
   }, [user]);
 
   const openDialog = (pet?: Pet) => {
@@ -108,6 +123,11 @@ const Pets = () => {
     console.log('🔒 Closing dialog');
     setDialogPet(null);
     setIsDialogOpen(false);
+  };
+
+  const handlePetFormSuccess = () => {
+    fetchPets();
+    closeDialog();
   };
 
   if (!user) {
@@ -150,10 +170,7 @@ const Pets = () => {
                 userId={user.id}
                 initialPet={dialogPet ?? undefined}
                 editing={!!dialogPet}
-                onSuccess={() => {
-                  fetchPets();
-                  closeDialog();
-                }}
+                onSuccess={handlePetFormSuccess}
               />
               <div className="flex justify-end pt-2">
                 <Button

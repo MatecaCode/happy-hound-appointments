@@ -32,11 +32,35 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
       return;
     }
 
-    console.log('🐕 Starting pet submission:', { userId, name, breed, age, editing, petId: initialPet.id });
+    console.log('🐕 Starting pet submission:', { 
+      userId, 
+      name, 
+      breed, 
+      age, 
+      editing, 
+      petId: initialPet.id,
+      authUser: (await supabase.auth.getUser()).data.user?.id
+    });
     
     setIsSubmitting(true);
     
     try {
+      // Check current auth state
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      console.log('🔐 Current auth user:', user?.id, 'Provided userId:', userId);
+      
+      if (authError || !user) {
+        console.error('❌ Auth error:', authError);
+        toast.error('Erro de autenticação. Faça login novamente.');
+        return;
+      }
+
+      if (user.id !== userId) {
+        console.error('❌ User ID mismatch:', { authUserId: user.id, providedUserId: userId });
+        toast.error('Erro de autenticação. Recarregue a página.');
+        return;
+      }
+
       if (editing && initialPet.id) {
         // Editing existing pet
         const updatePayload = {
