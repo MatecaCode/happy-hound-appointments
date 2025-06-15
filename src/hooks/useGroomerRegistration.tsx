@@ -1,7 +1,52 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+const START_HOUR = 9;
+const END_HOUR = 17;
+const SLOT_INTERVALS = [":00", ":30"];
+const PROVIDER_DAYS = 30;
+const SHOWER_DAYS = 90; // 3 months approx
+const SHOWER_SPOTS = 5;
+
+function generateTimeSlots() {
+  const slots: string[] = [];
+  for(let hour = START_HOUR; hour < END_HOUR; hour++) {
+    for (const mins of SLOT_INTERVALS) {
+      slots.push(`${hour.toString().padStart(2,"0")}${mins}`);
+    }
+  }
+  return slots;
+}
+
+async function ensureShowerAvailability() {
+  const today = new Date();
+  const slots = generateTimeSlots();
+  for (let i = 0; i < SHOWER_DAYS; i++) {
+    const dateObj = new Date(today);
+    dateObj.setDate(today.getDate() + i);
+    const dateStr = dateObj.toISOString().split('T')[0];
+    for(const slot of slots) {
+      // Check if it already exists to avoid dup key error
+      const { data, error } = await supabase
+        .from('shower_availability')
+        .select('id')
+        .eq('date', dateStr)
+        .eq('time_slot', slot)
+        .single();
+      if (!data) {
+        await supabase
+          .from('shower_availability')
+          .insert({
+            date: dateStr,
+            time_slot: slot,
+            available_spots: SHOWER_SPOTS
+          });
+      }
+      // else: already exists, do nothing
+    }
+  }
+}
 
 export const useGroomerRegistration = () => {
   const [isCreatingAvailability, setIsCreatingAvailability] = useState(false);
@@ -10,32 +55,32 @@ export const useGroomerRegistration = () => {
   const createInitialAvailability = async (providerId: string) => {
     setIsCreatingAvailability(true);
     try {
+      // Generate provider_availability (next 30 days)
       const today = new Date();
-      const dates = [];
-      for (let i = 0; i < 30; i++) {
-        const date = new Date(today);
-        date.setDate(today.getDate() + i);
-        dates.push(date.toISOString().split('T')[0]);
-      }
-
-      for (const dateStr of dates) {
-        // Insert 30-min slots from 09:00 to 17:00 for each date
-        const timeSlots = [];
-        for (let hour = 9; hour < 17; hour++) {
-          timeSlots.push(`${hour.toString().padStart(2, '0')}:00`);
-          timeSlots.push(`${hour.toString().padStart(2, '0')}:30`);
+      const slots = generateTimeSlots();
+      let batchAll: any[] = [];
+      for (let i = 0; i < PROVIDER_DAYS; i++) {
+        const dateObj = new Date(today);
+        dateObj.setDate(today.getDate() + i);
+        const dateStr = dateObj.toISOString().split('T')[0];
+        for(const slot of slots) {
+          batchAll.push({
+            provider_id: providerId,
+            date: dateStr,
+            time_slot: slot,
+            available: true
+          });
         }
-        const availSlots = timeSlots.map(slot => ({
-          provider_id: providerId,
-          date: dateStr,
-          time_slot: slot,
-          available: true
-        }));
+      }
+      // Upsert in batches to avoid hitting rate limits
+      const batchSize = 100;
+      for(let j = 0; j < batchAll.length; j += batchSize) {
+        const batch = batchAll.slice(j, j + batchSize);
         await supabase
           .from('provider_availability')
-          .upsert(availSlots, { onConflict: 'provider_id,date,time_slot' });
+          .upsert(batch, { onConflict: 'provider_id,date,time_slot' });
       }
-      toast.success(`Disponibilidade inicial criada!`);
+      toast.success('Disponibilidade inicial criada!');
       return true;
     } catch (error: any) {
       toast.warning('Conta criada, mas pode ser necessário configurar disponibilidade manualmente.');
@@ -45,9 +90,10 @@ export const useGroomerRegistration = () => {
     }
   };
 
+  // FULL setup on new groomer registration: provider + shower
   const setupNewGroomer = async (userId: string) => {
     try {
-      // Find the provider_profile entry for this user and role
+      // Find their provider_profile id (as 'groomer')
       const { data: providerProfile, error: groomerError } = await supabase
         .from('provider_profiles')
         .select('*')
@@ -60,7 +106,9 @@ export const useGroomerRegistration = () => {
         return false;
       }
 
-      // No name field: fallback to generic
+      // Ensure shower_availability (anyone can trigger it, but only admins can update)
+      await ensureShowerAvailability();
+      // provider's own individual availabilities
       const success = await createInitialAvailability(providerProfile.id);
       return success;
     } catch (error: any) {
