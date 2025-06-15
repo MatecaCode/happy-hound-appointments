@@ -76,6 +76,14 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
         };
         
         console.log('🆕 Creating pet with payload:', insertPayload);
+        console.log('🔍 Current auth state check...');
+        
+        // Check current session for debugging
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        console.log('🔐 Current session:', { 
+          user: sessionData.session?.user?.id, 
+          error: sessionError 
+        });
         
         const { error, data } = await supabase
           .from('pets')

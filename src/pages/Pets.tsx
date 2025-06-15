@@ -62,6 +62,14 @@ const Pets = () => {
     
     try {
       console.log('📡 Making database query...');
+      
+      // First, let's check our auth state
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      console.log('🔐 Auth session check:', { 
+        user: sessionData.session?.user?.id, 
+        error: sessionError 
+      });
+      
       const { data, error } = await supabase
         .from('pets')
         .select('*')
@@ -72,7 +80,8 @@ const Pets = () => {
         data, 
         error, 
         userCount: data?.length || 0,
-        userId: user.id
+        userId: user.id,
+        query: `SELECT * FROM pets WHERE user_id = '${user.id}'`
       });
 
       if (error) {
@@ -83,6 +92,10 @@ const Pets = () => {
 
       setPets(data || []);
       console.log('✅ Pets loaded successfully:', data?.length || 0, 'pets');
+      
+      // Let's also check if there are any pets in the database for this user
+      console.log('🔍 Raw pets data for debugging:', JSON.stringify(data, null, 2));
+      
     } catch (error: any) {
       console.error('💥 Unexpected error fetching pets:', error);
       toast.error('Erro inesperado ao carregar pets');
@@ -182,6 +195,9 @@ const Pets = () => {
             <h1 className="text-3xl font-bold">Meus Pets</h1>
             <p className="text-muted-foreground">
               {isLoading ? 'Carregando...' : `${pets.length} pet(s) encontrado(s)`}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Usuário: {user?.id || 'Não identificado'}
             </p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
