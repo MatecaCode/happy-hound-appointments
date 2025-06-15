@@ -23,15 +23,29 @@ const Pets = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [dialogPet, setDialogPet] = useState<Pet | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [authTimeout, setAuthTimeout] = useState(false);
+
+  // Add timeout for auth loading
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (authLoading) {
+        console.log('⏰ Auth loading timeout - proceeding anyway');
+        setAuthTimeout(true);
+      }
+    }, 5000); // 5 second timeout
+
+    return () => clearTimeout(timer);
+  }, [authLoading]);
 
   const fetchPets = async () => {
     console.log('🔍 fetchPets called:', { 
       user: user?.id, 
       authLoading,
+      authTimeout,
       isLoading 
     });
 
-    if (authLoading) {
+    if (authLoading && !authTimeout) {
       console.log('⏳ Auth still loading, waiting...');
       return;
     }
@@ -47,21 +61,6 @@ const Pets = () => {
     setIsLoading(true);
     
     try {
-      // Check current auth state first
-      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
-      console.log('🔐 Auth check:', { 
-        currentUser: currentUser?.id, 
-        error: authError,
-        providedUser: user.id
-      });
-      
-      if (authError || !currentUser) {
-        console.error('❌ Auth error during fetch:', authError);
-        toast.error('Erro de autenticação. Faça login novamente.');
-        setIsLoading(false);
-        return;
-      }
-
       console.log('📡 Making database query...');
       const { data, error } = await supabase
         .from('pets')
@@ -73,9 +72,7 @@ const Pets = () => {
         data, 
         error, 
         userCount: data?.length || 0,
-        userId: user.id,
-        authUserId: currentUser.id,
-        query: `SELECT * FROM pets WHERE user_id = '${user.id}'`
+        userId: user.id
       });
 
       if (error) {
@@ -84,13 +81,8 @@ const Pets = () => {
         return;
       }
 
-      if (!data || data.length === 0) {
-        console.log('📭 No pets found for user');
-        setPets([]);
-      } else {
-        console.log('✅ Pets loaded successfully:', data.map(p => ({ id: p.id, name: p.name })));
-        setPets(data);
-      }
+      setPets(data || []);
+      console.log('✅ Pets loaded successfully:', data?.length || 0, 'pets');
     } catch (error: any) {
       console.error('💥 Unexpected error fetching pets:', error);
       toast.error('Erro inesperado ao carregar pets');
@@ -127,9 +119,9 @@ const Pets = () => {
   };
 
   useEffect(() => {
-    console.log('🔄 useEffect triggered:', { user: user?.id, authLoading });
+    console.log('🔄 useEffect triggered:', { user: user?.id, authLoading, authTimeout });
     fetchPets();
-  }, [user, authLoading]);
+  }, [user, authLoading, authTimeout]);
 
   const openDialog = (pet?: Pet) => {
     console.log('🔓 Opening dialog for pet:', pet?.name || 'new pet');
@@ -152,22 +144,27 @@ const Pets = () => {
   console.log('🎨 Pets page render:', { 
     user: user?.id, 
     authLoading, 
+    authTimeout,
     isLoading, 
     petsCount: pets.length,
     isDialogOpen 
   });
 
-  if (authLoading) {
+  // Show loading only for a short time, then proceed
+  if (authLoading && !authTimeout) {
     return (
       <Layout>
         <div className="max-w-md mx-auto py-16 text-center">
           <p>Verificando autenticação...</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            Se demorar muito, recarregue a página
+          </p>
         </div>
       </Layout>
     );
   }
 
-  if (!user) {
+  if (!user && !authLoading) {
     return (
       <Layout>
         <div className="max-w-md mx-auto py-16 text-center">
@@ -204,7 +201,7 @@ const Pets = () => {
                 </DialogDescription>
               </DialogHeader>
               <PetForm
-                userId={user.id}
+                userId={user?.id || ''}
                 initialPet={dialogPet ?? undefined}
                 editing={!!dialogPet}
                 onSuccess={handlePetFormSuccess}
@@ -226,7 +223,7 @@ const Pets = () => {
           <div className="text-center py-8">
             <p>Carregando pets...</p>
             <p className="text-sm text-muted-foreground mt-2">
-              Usuário: {user.id}
+              Usuário: {user?.id || 'Não identificado'}
             </p>
           </div>
         ) : pets.length > 0 ? (

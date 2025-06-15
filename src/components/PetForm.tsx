@@ -28,53 +28,23 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
     e.preventDefault();
     
     console.log('🚀 Form submitted - handleSubmit called!');
+    console.log('📋 Form data:', { userId, name, breed, age, editing, petId: initialPet.id });
     
     if (!userId || !name.trim()) {
       console.error('❌ Validation failed:', { userId: !!userId, name: name.trim() });
-      toast.error("Você precisa estar logado e o nome do pet não pode estar vazio.");
+      toast.error("Nome do pet é obrigatório.");
       return;
     }
 
-    console.log('🐕 Starting pet submission:', { 
-      userId, 
-      name, 
-      breed, 
-      age, 
-      editing, 
-      petId: initialPet.id
-    });
-    
     setIsSubmitting(true);
     
     try {
-      // Check current auth state
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      console.log('🔐 Auth check result:', { 
-        user: user?.id, 
-        userId, 
-        authError,
-        match: user?.id === userId 
-      });
-      
-      if (authError || !user) {
-        console.error('❌ Auth error:', authError);
-        toast.error('Erro de autenticação. Faça login novamente.');
-        return;
-      }
-
-      if (user.id !== userId) {
-        console.error('❌ User ID mismatch:', { authUserId: user.id, providedUserId: userId });
-        toast.error('Erro de autenticação. Recarregue a página.');
-        return;
-      }
-
       if (editing && initialPet.id) {
-        // Editing existing pet
+        // Update existing pet
         const updatePayload = {
           name: name.trim(),
           breed: breed.trim() || null,
           age: age.trim() || null,
-          updated_at: new Date().toISOString()
         };
         
         console.log('📝 Updating pet with payload:', updatePayload);
@@ -91,16 +61,13 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
         if (error) {
           console.error('❌ Update error:', error);
           toast.error('Erro ao atualizar pet: ' + error.message);
-        } else if (!data || data.length === 0) {
-          console.error('❌ No data returned from update - possible RLS issue');
-          toast.error('Pet não foi atualizado. Verifique suas permissões.');
         } else {
-          console.log('✅ Pet updated successfully:', data[0]);
+          console.log('✅ Pet updated successfully');
           toast.success('Pet atualizado com sucesso!');
           onSuccess?.();
         }
       } else {
-        // Creating new pet
+        // Create new pet
         const insertPayload = {
           user_id: userId,
           name: name.trim(),
@@ -120,18 +87,13 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
         if (error) {
           console.error('❌ Insert error:', error);
           toast.error('Erro ao adicionar pet: ' + error.message);
-        } else if (!data || data.length === 0) {
-          console.error('❌ No data returned from insert - possible RLS issue');
-          toast.error('Pet não foi salvo. Verifique suas permissões.');
         } else {
-          console.log('✅ Pet created successfully:', data[0]);
+          console.log('✅ Pet created successfully:', data);
           toast.success('Pet adicionado com sucesso!');
           // Clear form for new entries
-          if (!editing) {
-            setName('');
-            setBreed('');
-            setAge('');
-          }
+          setName('');
+          setBreed('');
+          setAge('');
           onSuccess?.();
         }
       }
@@ -153,10 +115,7 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           id="name"
           type="text"
           value={name}
-          onChange={(e) => {
-            console.log('📝 Name changed:', e.target.value);
-            setName(e.target.value);
-          }}
+          onChange={(e) => setName(e.target.value)}
           required
           placeholder="Nome do seu pet"
         />
@@ -185,7 +144,6 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
         <Button
           type="submit"
           disabled={isSubmitting || !name.trim()}
-          onClick={() => console.log('🔘 Submit button clicked!')}
         >
           {isSubmitting ? 'Salvando...' : editing ? 'Atualizar' : 'Adicionar'}
         </Button>
