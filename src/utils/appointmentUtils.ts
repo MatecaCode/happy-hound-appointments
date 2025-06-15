@@ -1,8 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
-export const createAppointment = async (
+// Main appointment creation function
+export async function createAppointment(
   userId: string,
   petId: string,
   serviceId: string,
@@ -10,54 +9,148 @@ export const createAppointment = async (
   date: Date,
   timeSlot: string,
   notes?: string
-) => {
+): Promise<boolean> {
   try {
-    // Get pet and service details
-    const [petResult, serviceResult] = await Promise.all([
-      supabase.from('pets').select('name').eq('id', petId).single(),
-      supabase.from('services').select('service_type').eq('id', serviceId).single()
-    ]);
+    // Fetch service type first!
+    const { data: service, error: serviceError } = await supabase
+      .from('services')
+      .select('service_type')
+      .eq('id', serviceId)
+      .single();
 
-    if (petResult.error) {
-      toast.error('Erro ao buscar informações do pet');
-      return false;
+    if (serviceError || !service) {
+      throw new Error('Serviço não encontrado');
     }
 
-    if (serviceResult.error) {
-      toast.error('Erro ao buscar informações do serviço');
-      return false;
+    const serviceType = service.service_type as 'shower_only' | 'grooming' | 'veterinary';
+
+    // Convert date/time
+    const isoDate = date.toISOString().split('T')[0];
+
+    // Helper: get provider profile id for groomer/vet, if needed
+    let providerProfileId = providerId;
+    if ((serviceType === 'grooming' || serviceType === 'veterinary') && providerId) {
+      const { data: prof, error: profError } = await supabase
+        .from('provider_profiles')
+        .select('id')
+        .eq('user_id', providerId)
+        .eq('type', serviceType === 'grooming' ? 'groomer' : 'vet')
+        .single();
+      if (prof && prof.id) providerProfileId = prof.id;
+      else throw new Error('Profissional não encontrado');
     }
 
-    // Get current user name if needed (not used here but left for future enhancements)
-    // const { data: { user } } = await supabase.auth.getUser();
-    // const ownerName = user?.user_metadata?.name || user?.email || 'Cliente';
+    // --- Main service logic ---
+    if (serviceType === 'shower_only') {
+      // 1. check spot
+      const { data: spots, error: spotErr } = await supabase
+        .from('shower_availability')
+        .select('id, available_spots')
+        .eq('date', isoDate)
+        .eq('time_slot', timeSlot)
+        .single();
 
-    const dateStr = date.toISOString().split('T')[0];
+      if (spotErr || !spots || spots.available_spots <= 0) {
+        throw new Error('Nenhuma vaga de banho disponível para este horário');
+      }
 
-    // Call atomic_create_appointment which does all required logic
-    const { data: appointmentId, error } = await supabase.rpc('atomic_create_appointment', {
-      _user_id: userId,
-      _pet_id: petId,
-      _service_id: serviceId,
-      _provider_id: providerId, // nullable for shower-only
-      _date: dateStr,
-      _time: timeSlot,
-      _notes: notes || null
-    });
+      // Insert: provider_id will be null
+      const { error } = await supabase.from('appointments').insert([{
+        user_id: userId,
+        pet_id: petId,
+        service_id: serviceId,
+        provider_id: null,
+        date: isoDate,
+        time: timeSlot,
+        notes,
+        status: 'upcoming'
+      }]);
+      if (error) throw error;
 
-    if (error) {
-      // Show a nice toast depending on error message if available
-      let errorMsg = 'Erro ao criar agendamento';
-      if (error.details) errorMsg += `: ${error.details}`;
-      else if (error.message) errorMsg += `: ${error.message}`;
-      toast.error(errorMsg);
-      return false;
+      // Decrement spot (optimistic, server syncs on db)
+      await supabase
+        .from('shower_availability')
+        .update({ available_spots: (spots.available_spots || 1) - 1 })
+        .eq('id', spots.id);
+
+    } else if (serviceType === 'grooming') {
+      // 1. check provider_availability
+      const { data: avail, error: availErr } = await supabase
+        .from('provider_availability')
+        .select('available')
+        .eq('provider_id', providerProfileId)
+        .eq('date', isoDate)
+        .eq('time_slot', timeSlot)
+        .single();
+
+      if (availErr || !avail || avail.available === false) {
+        throw new Error('Tosador não disponível nesse horário');
+      }
+
+      // 2. check shower spot too!
+      const { data: spots, error: spotErr } = await supabase
+        .from('shower_availability')
+        .select('id, available_spots')
+        .eq('date', isoDate)
+        .eq('time_slot', timeSlot)
+        .single();
+
+      if (spotErr || !spots || spots.available_spots <= 0) {
+        throw new Error('Nenhuma vaga de banho disponível para este horário');
+      }
+
+      // Insert with provider_id filled
+      const { error } = await supabase.from('appointments').insert([{
+        user_id: userId,
+        pet_id: petId,
+        service_id: serviceId,
+        provider_id: providerProfileId,
+        date: isoDate,
+        time: timeSlot,
+        notes,
+        status: 'upcoming'
+      }]);
+      if (error) throw error;
+
+      await supabase
+        .from('shower_availability')
+        .update({ available_spots: (spots.available_spots || 1) - 1 })
+        .eq('id', spots.id);
+
+    } else if (serviceType === 'veterinary') {
+      // 1. check provider_availability only
+      const { data: avail, error: availErr } = await supabase
+        .from('provider_availability')
+        .select('available')
+        .eq('provider_id', providerProfileId)
+        .eq('date', isoDate)
+        .eq('time_slot', timeSlot)
+        .single();
+
+      if (availErr || !avail || avail.available === false) {
+        throw new Error('Veterinário não disponível nesse horário');
+      }
+
+      // Insert
+      const { error } = await supabase.from('appointments').insert([{
+        user_id: userId,
+        pet_id: petId,
+        service_id: serviceId,
+        provider_id: providerProfileId,
+        date: isoDate,
+        time: timeSlot,
+        notes,
+        status: 'upcoming'
+      }]);
+      if (error) throw error;
+    } else {
+      throw new Error('Tipo de serviço não suportado');
     }
 
-    toast.success('Agendamento criado com sucesso!');
     return true;
-  } catch (error: any) {
-    toast.error('Erro inesperado ao criar agendamento');
-    return false;
+
+  } catch (err) {
+    console.error('Erro ao criar agendamento:', err);
+    throw err;
   }
-};
+}
