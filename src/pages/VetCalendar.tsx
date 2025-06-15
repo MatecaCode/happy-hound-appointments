@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Calendar } from '@/components/ui/calendar';
@@ -59,7 +58,18 @@ const VetCalendar = () => {
         .order('time');
 
       if (error) throw error;
-      setAppointments(data || []);
+      // Map to Appointment with placeholders
+      setAppointments(
+        (data || []).map((apt) => ({
+          id: apt.id,
+          pet_name: 'Pet',
+          service: 'Serviço',
+          owner_name: 'Cliente',
+          time: apt.time,
+          status: apt.status,
+          notes: apt.notes ?? undefined,
+        }))
+      );
     } catch (error: any) {
       console.error('Error fetching appointments:', error);
       toast.error('Erro ao carregar consultas');

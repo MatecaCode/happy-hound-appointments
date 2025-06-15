@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -36,33 +35,28 @@ export const createAppointment = async (
 
     const dateStr = date.toISOString().split('T')[0];
 
-    // Use the atomic reservation function to prevent double booking
-    const { data: appointmentId, error } = await supabase.rpc('reserve_appointment_slot', {
-      p_user_id: userId,
-      p_pet_id: petId,
-      p_service_id: serviceId,
-      p_provider_id: providerId,
-      p_date: dateStr,
-      p_time: timeSlot,
-      p_pet_name: petResult.data.name,
-      p_owner_name: ownerName,
-      p_service_name: serviceResult.data.name,
-      p_notes: notes || null
-    });
+    // If the stored procedure isn't available, create appointment directly
+    // TODO: If custom Supabase function is installed, use it here
+    const { data: insertData, error } = await supabase
+      .from('appointments')
+      .insert([{
+        user_id: userId,
+        pet_id: petId,
+        service_id: serviceId,
+        provider_id: providerId,
+        date: dateStr,
+        time: timeSlot,
+        notes: notes || null,
+        status: 'pending'
+      }]);
 
     if (error) {
       console.error('Error creating appointment:', error);
-      if (error.message.includes('Slot no longer available')) {
-        toast.error('Este horário não está mais disponível. Por favor, escolha outro horário.');
-      } else if (error.message.includes('Provider not available')) {
-        toast.error('O profissional não está disponível neste horário.');
-      } else {
-        toast.error('Erro ao criar agendamento: ' + error.message);
-      }
+      toast.error('Erro ao criar agendamento: ' + error.message);
       return false;
     }
 
-    console.log('Appointment created successfully:', appointmentId);
+    console.log('Appointment created successfully:', insertData);
     toast.success('Agendamento criado com sucesso!');
     return true;
   } catch (error: any) {

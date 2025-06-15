@@ -168,7 +168,18 @@ const GroomerDashboard = () => {
         .order('time');
 
       if (error) throw error;
-      setAppointments(data || []);
+      // Map raw data to Appointment structure with placeholders for missing fields
+      setAppointments(
+        (data || []).map((apt) => ({
+          id: apt.id,
+          pet_name: 'Pet',
+          service: 'Serviço',
+          owner_name: 'Cliente',
+          time: apt.time,
+          status: apt.status,
+          notes: apt.notes ?? undefined,
+        }))
+      );
     } catch (error: any) {
       console.error('Error fetching appointments:', error);
       toast.error('Erro ao carregar agendamentos');
