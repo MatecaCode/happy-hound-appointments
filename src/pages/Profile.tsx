@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,52 +24,25 @@ const Profile = () => {
 
   const fetchProfile = async () => {
     if (!user) return;
-    
     try {
-      // Check clients table first
-      const { data: clientData } = await supabase
-        .from('clients')
+      // Only look in provider_profiles for providers, or fallback for clients
+      const { data: providerProfile } = await supabase
+        .from('provider_profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single();
-        
-      if (clientData) {
-        setProfile(clientData);
-        setUserRole('client');
-        setName(clientData.name || '');
-        setPhone(clientData.phone || '');
+        .maybeSingle();
+      if (providerProfile) {
+        setProfile(providerProfile);
+        setUserRole(providerProfile.type);
+        setName('');  // No name in schema
+        setPhone(''); // No phone in schema
         return;
       }
-      
-      // Check groomers table
-      const { data: groomerData } = await supabase
-        .from('groomers')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-        
-      if (groomerData) {
-        setProfile(groomerData);
-        setUserRole('groomer');
-        setName(groomerData.name || '');
-        setPhone(groomerData.phone || '');
-        return;
-      }
-      
-      // Check veterinarians table
-      const { data: vetData } = await supabase
-        .from('veterinarians')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-        
-      if (vetData) {
-        setProfile(vetData);
-        setUserRole('vet');
-        setName(vetData.name || '');
-        setPhone(vetData.phone || '');
-        return;
-      }
+      // No profile, must be client
+      setProfile(null);
+      setUserRole('client');
+      setName('');
+      setPhone('');
     } catch (error: any) {
       console.error('Error fetching profile:', error);
       toast.error('Erro ao carregar perfil');
@@ -79,47 +51,8 @@ const Profile = () => {
 
   const updateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
-
-    setIsLoading(true);
-    try {
-      const updateData = {
-        name,
-        phone,
-        updated_at: new Date().toISOString()
-      };
-
-      let error;
-      if (userRole === 'client') {
-        const result = await supabase
-          .from('clients')
-          .update(updateData)
-          .eq('user_id', user.id);
-        error = result.error;
-      } else if (userRole === 'groomer') {
-        const result = await supabase
-          .from('groomers')
-          .update(updateData)
-          .eq('user_id', user.id);
-        error = result.error;
-      } else if (userRole === 'vet') {
-        const result = await supabase
-          .from('veterinarians')
-          .update(updateData)
-          .eq('user_id', user.id);
-        error = result.error;
-      }
-
-      if (error) throw error;
-      
-      toast.success('Perfil atualizado com sucesso!');
-      fetchProfile();
-    } catch (error: any) {
-      console.error('Error updating profile:', error);
-      toast.error('Erro ao atualizar perfil');
-    } finally {
-      setIsLoading(false);
-    }
+    // Just no-op; can't update provider_profiles anyway for name/phone
+    toast.info('Atualização de perfil indisponível nesta versão.');
   };
 
   if (!user) {
@@ -141,7 +74,7 @@ const Profile = () => {
           <CardHeader>
             <CardTitle>Informações Pessoais</CardTitle>
             <CardDescription>
-              Atualize suas informações pessoais aqui
+              Informações pessoais não disponíveis para edição nesta versão.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -166,8 +99,7 @@ const Profile = () => {
                   id="name"
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
+                  disabled
                 />
               </div>
               
@@ -177,7 +109,7 @@ const Profile = () => {
                   id="phone"
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  disabled
                   placeholder="(11) 99999-9999"
                 />
               </div>
@@ -195,8 +127,8 @@ const Profile = () => {
                 />
               </div>
               
-              <Button type="submit" disabled={isLoading}>
-                {isLoading ? 'Salvando...' : 'Salvar Alterações'}
+              <Button type="submit" disabled>
+                Salvando...
               </Button>
             </form>
           </CardContent>

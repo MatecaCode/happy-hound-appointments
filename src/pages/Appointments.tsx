@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import AppointmentCard, { Appointment } from '@/components/AppointmentCard';
@@ -31,10 +30,12 @@ const Appointments = () => {
         if (error) throw error;
         
         if (data) {
+          // Map to AppointmentCard's expected structure, but we have no pet name or service string directly
           const formattedData = data.map(apt => ({
             id: apt.id,
-            petName: apt.pet_name,
-            service: apt.service,
+            // No petName or service, just placeholders for now
+            petName: 'Pet',
+            service: 'Serviço',
             date: new Date(apt.date),
             time: apt.time,
             status: apt.status as 'upcoming' | 'completed' | 'cancelled',

@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -6,7 +7,7 @@ export const useGroomerRegistration = () => {
   const [isCreatingAvailability, setIsCreatingAvailability] = useState(false);
 
   // Create initial availability for a connected provider_profile
-  const createInitialAvailability = async (providerId: string, providerName: string) => {
+  const createInitialAvailability = async (providerId: string) => {
     setIsCreatingAvailability(true);
     try {
       const today = new Date();
@@ -34,7 +35,7 @@ export const useGroomerRegistration = () => {
           .from('provider_availability')
           .upsert(availSlots, { onConflict: 'provider_id,date,time_slot' });
       }
-      toast.success(`Disponibilidade inicial criada para ${providerName}!`);
+      toast.success(`Disponibilidade inicial criada!`);
       return true;
     } catch (error: any) {
       toast.warning('Conta criada, mas pode ser necessário configurar disponibilidade manualmente.');
@@ -58,9 +59,9 @@ export const useGroomerRegistration = () => {
         console.error('❌ Could not find groomer profile:', groomerError);
         return false;
       }
-      // providerName may be unavailable, fallback to 'Tosador(a)'
-      const providerName = providerProfile.name ?? 'Tosador(a)';
-      const success = await createInitialAvailability(providerProfile.id, providerName);
+
+      // No name field: fallback to generic
+      const success = await createInitialAvailability(providerProfile.id);
       return success;
     } catch (error: any) {
       return false;

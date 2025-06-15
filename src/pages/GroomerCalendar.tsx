@@ -59,7 +59,19 @@ const GroomerCalendar = () => {
         .order('time');
 
       if (error) throw error;
-      setAppointments(data || []);
+
+      // Map for AppointmentCard
+      const displayData: Appointment[] = (data ?? []).map((apt) => ({
+        id: apt.id,
+        pet_name: 'Pet',
+        service: 'Serviço',
+        time: apt.time,
+        owner_name: 'Cliente',
+        status: apt.status,
+        notes: apt.notes,
+      }));
+
+      setAppointments(displayData);
     } catch (error: any) {
       console.error('Error fetching appointments:', error);
       toast.error('Erro ao carregar agendamentos');
@@ -184,5 +196,4 @@ const GroomerCalendar = () => {
     </Layout>
   );
 };
-
 export default GroomerCalendar;
