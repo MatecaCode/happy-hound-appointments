@@ -68,7 +68,8 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
         }
       } else {
         // Create new pet - let the database trigger handle user_id assignment
-        const insertPayload = {
+        // We explicitly omit user_id as the trigger will set it
+        const insertPayload: Omit<any, 'user_id' | 'id' | 'created_at' | 'updated_at'> = {
           name: name.trim(),
           breed: breed.trim() || null,
           age: age.trim() || null
