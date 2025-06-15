@@ -226,7 +226,7 @@ const Pets = () => {
                 </Button>
               </div>
             </CardContent>
-          </div>
+          </Card>
         )}
       </div>
     </Layout>
