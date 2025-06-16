@@ -49,11 +49,18 @@ const Pets = () => {
     try {
       console.log('📡 Making pets fetch query...');
       
-      const { data, error } = await supabase
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Fetch timeout')), 10000);
+      });
+
+      const fetchPromise = supabase
         .from('pets')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       console.log('🐶 Fetch pets result:', { 
         data, 
@@ -73,7 +80,11 @@ const Pets = () => {
       
     } catch (error: any) {
       console.error('💥 Unexpected error fetching pets:', error);
-      toast.error('Erro inesperado ao carregar pets');
+      if (error.message === 'Fetch timeout') {
+        toast.error('Timeout ao carregar pets. Tente novamente.');
+      } else {
+        toast.error('Erro inesperado ao carregar pets');
+      }
     } finally {
       console.log('🔄 Setting fetchPets isLoading to false');
       setIsLoading(false);
@@ -142,6 +153,7 @@ const Pets = () => {
     return (
       <Layout>
         <div className="max-w-md mx-auto py-16 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p>Verificando autenticação...</p>
         </div>
       </Layout>

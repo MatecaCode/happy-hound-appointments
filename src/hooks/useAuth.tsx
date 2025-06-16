@@ -45,20 +45,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserRoles = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      console.log('🎭 Fetching user roles for:', userId);
+      
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Role fetch timeout')), 10000);
+      });
+
+      const fetchPromise = supabase
         .from('user_roles')
         .select('role')
         .eq('user_id', userId);
 
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
       if (error) {
-        console.error('Failed to fetch user roles:', error);
-        return [];
+        console.error('❌ Failed to fetch user roles:', error);
+        return ['client']; // Default fallback role
       }
 
-      return data?.map(r => r.role) || [];
+      const roles = data?.map(r => r.role) || ['client'];
+      console.log('✅ User roles fetched:', roles);
+      return roles;
     } catch (error) {
-      console.error('Error fetching user roles:', error);
-      return [];
+      console.error('💥 Error fetching user roles:', error);
+      return ['client']; // Default fallback role
     }
   };
 
@@ -67,47 +78,122 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔐 Auth state changed:', event, session?.user?.email);
-        setSession(session);
+    let mounted = true;
+    let authTimeout: NodeJS.Timeout;
+
+    console.log('🔐 Setting up auth state listener...');
+
+    // Set timeout to prevent infinite loading 
+    authTimeout = setTimeout(() => {
+      if (mounted && loading) {
+        console.warn('⚠️ Auth timeout reached, setting loading to false');
+        setLoading(false);
+      }
+    }, 15000); // 15 second timeout
+
+    const initializeAuth = async () => {
+      try {
+        // Get initial session first
+        console.log('🔍 Getting initial session...');
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
         
-        if (session?.user) {
-          setUser(session.user);
+        if (sessionError) {
+          console.error('❌ Session error:', sessionError);
+          if (mounted) {
+            setSession(null);
+            setUser(null);
+            setUserRoles([]);
+            setLoading(false);
+          }
+          return;
+        }
+
+        console.log('🔐 Initial session:', initialSession?.user?.email || 'No session');
+
+        if (initialSession?.user && mounted) {
+          setSession(initialSession);
+          setUser(initialSession.user);
           
-          // Fetch roles from user_roles table
-          const roles = await fetchUserRoles(session.user.id);
-          console.log('🎭 User roles fetched:', roles);
-          setUserRoles(roles);
-        } else {
+          // Fetch roles with error handling
+          try {
+            const roles = await fetchUserRoles(initialSession.user.id);
+            if (mounted) {
+              setUserRoles(roles);
+            }
+          } catch (roleError) {
+            console.error('❌ Role fetch failed:', roleError);
+            if (mounted) {
+              setUserRoles(['client']); // Fallback
+            }
+          }
+        } else if (mounted) {
+          setSession(null);
           setUser(null);
           setUserRoles([]);
         }
+
+        if (mounted) {
+          setLoading(false);
+        }
+
+      } catch (error) {
+        console.error('💥 Auth initialization error:', error);
+        if (mounted) {
+          setSession(null);
+          setUser(null);
+          setUserRoles([]);
+          setLoading(false);
+        }
+      }
+    };
+
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('🔐 Auth state changed:', event, session?.user?.email || 'No session');
+        
+        if (!mounted) return;
+
+        clearTimeout(authTimeout);
+        
+        if (session?.user) {
+          setSession(session);
+          setUser(session.user);
+          
+          // Fetch roles in background with timeout
+          setTimeout(async () => {
+            if (mounted) {
+              try {
+                const roles = await fetchUserRoles(session.user.id);
+                if (mounted) {
+                  setUserRoles(roles);
+                }
+              } catch (error) {
+                console.error('❌ Background role fetch failed:', error);
+                if (mounted) {
+                  setUserRoles(['client']);
+                }
+              }
+            }
+          }, 0);
+        } else {
+          setSession(null);
+          setUser(null);
+          setUserRoles([]);
+        }
+        
         setLoading(false);
       }
     );
 
-    // Get initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      console.log('🔐 Initial session:', session?.user?.email);
-      setSession(session);
-      
-      if (session?.user) {
-        setUser(session.user);
-        
-        // Fetch roles from user_roles table
-        const roles = await fetchUserRoles(session.user.id);
-        console.log('🎭 Initial user roles:', roles);
-        setUserRoles(roles);
-      } else {
-        setUser(null);
-        setUserRoles([]);
-      }
-      setLoading(false);
-    });
+    // Initialize auth
+    initializeAuth();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      clearTimeout(authTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
