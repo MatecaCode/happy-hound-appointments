@@ -23,29 +23,15 @@ const Pets = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [dialogPet, setDialogPet] = useState<Pet | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [authTimeout, setAuthTimeout] = useState(false);
-
-  // Add timeout for auth loading
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (authLoading) {
-        console.log('⏰ Auth loading timeout - proceeding anyway');
-        setAuthTimeout(true);
-      }
-    }, 5000); // 5 second timeout
-
-    return () => clearTimeout(timer);
-  }, [authLoading]);
 
   const fetchPets = async () => {
     console.log('🔍 fetchPets called:', { 
       user: user?.id, 
       authLoading,
-      authTimeout,
       isLoading 
     });
 
-    if (authLoading && !authTimeout) {
+    if (authLoading) {
       console.log('⏳ Auth still loading, waiting...');
       return;
     }
@@ -63,18 +49,11 @@ const Pets = () => {
     try {
       console.log('📡 Making pets fetch query...');
       
-      // Add timeout to prevent infinite loading
-      const fetchPromise = supabase
+      const { data, error } = await supabase
         .from('pets')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Fetch pets timed out')), 8000)
-      );
-
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
       console.log('🐶 Fetch pets result:', { 
         data, 
@@ -94,11 +73,7 @@ const Pets = () => {
       
     } catch (error: any) {
       console.error('💥 Unexpected error fetching pets:', error);
-      if (error.message === 'Fetch pets timed out') {
-        toast.error('Carregamento dos pets demorou muito. Verifique sua conexão.');
-      } else {
-        toast.error('Erro inesperado ao carregar pets');
-      }
+      toast.error('Erro inesperado ao carregar pets');
     } finally {
       console.log('🔄 Setting fetchPets isLoading to false');
       setIsLoading(false);
@@ -133,9 +108,9 @@ const Pets = () => {
   };
 
   useEffect(() => {
-    console.log('🔄 useEffect triggered:', { user: user?.id, authLoading, authTimeout });
+    console.log('🔄 useEffect triggered:', { user: user?.id, authLoading });
     fetchPets();
-  }, [user, authLoading, authTimeout]);
+  }, [user, authLoading]);
 
   const openDialog = (pet?: Pet) => {
     console.log('🔓 Opening dialog for pet:', pet?.name || 'new pet');
@@ -158,21 +133,16 @@ const Pets = () => {
   console.log('🎨 Pets page render:', { 
     user: user?.id, 
     authLoading, 
-    authTimeout,
     isLoading, 
     petsCount: pets.length,
     isDialogOpen 
   });
 
-  // Show loading only for a short time, then proceed
-  if (authLoading && !authTimeout) {
+  if (authLoading) {
     return (
       <Layout>
         <div className="max-w-md mx-auto py-16 text-center">
           <p>Verificando autenticação...</p>
-          <p className="text-sm text-muted-foreground mt-2">
-            Se demorar muito, recarregue a página
-          </p>
         </div>
       </Layout>
     );
@@ -196,9 +166,6 @@ const Pets = () => {
             <h1 className="text-3xl font-bold">Meus Pets</h1>
             <p className="text-muted-foreground">
               {isLoading ? 'Carregando...' : `${pets.length} pet(s) encontrado(s)`}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Usuário: {user?.id || 'Não identificado'}
             </p>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -239,9 +206,6 @@ const Pets = () => {
         {isLoading ? (
           <div className="text-center py-8">
             <p>Carregando pets...</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Usuário: {user?.id || 'Não identificado'}
-            </p>
           </div>
         ) : pets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

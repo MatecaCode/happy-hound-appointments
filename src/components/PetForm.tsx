@@ -70,59 +70,28 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           onSuccess?.();
         }
       } else {
-        // Create new pet - enhanced debugging
-        console.log('🆕 Starting pet creation process...');
+        // Create new pet - SIMPLIFIED APPROACH
+        console.log('🆕 Creating new pet with direct user_id assignment...');
         
-        // Check auth session first
-        console.log('🔐 Checking auth session...');
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        console.log('🔐 Session check result:', { 
-          user: sessionData.session?.user?.id, 
-          userEmail: sessionData.session?.user?.email,
-          error: sessionError,
-          sessionExists: !!sessionData.session 
-        });
-
-        if (!sessionData.session) {
-          console.error('❌ No active session found');
-          toast.error('Sessão expirada. Faça login novamente.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        // Create insert payload
-        const insertPayload = {
+        // Create insert payload with user_id included
+        const insertPayload: PetInsert = {
           name: name.trim(),
           breed: breed.trim() || null,
-          age: age.trim() || null
-        } as PetInsert;
+          age: age.trim() || null,
+          user_id: userId  // Set user_id directly instead of relying on trigger
+        };
         
-        console.log('🆕 Creating pet with payload:', insertPayload);
-        console.log('🆕 Expected flow: RLS allows insert → Trigger sets user_id');
+        console.log('🆕 Insert payload with user_id:', insertPayload);
         
-        // Add timeout to prevent infinite hanging
-        const insertPromise = supabase
+        const { error, data } = await supabase
           .from('pets')
           .insert(insertPayload)
           .select();
 
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Insert operation timed out')), 10000)
-        );
-
-        console.log('📡 Making insert request with 10s timeout...');
-        const { error, data } = await Promise.race([insertPromise, timeoutPromise]) as any;
-
-        console.log('🆕 Insert operation completed!');
-        console.log('🆕 Insert result:', { error, data, dataLength: data?.length });
+        console.log('🆕 Insert result:', { error, data });
 
         if (error) {
-          console.error('❌ Insert error details:', {
-            message: error.message,
-            details: error.details,
-            hint: error.hint,
-            code: error.code
-          });
+          console.error('❌ Insert error:', error);
           toast.error('Erro ao adicionar pet: ' + error.message);
         } else if (!data || data.length === 0) {
           console.error('❌ Insert succeeded but returned no data');
@@ -139,17 +108,8 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
         }
       }
     } catch (err: any) {
-      console.error('💥 Unexpected error in pet submission:', {
-        message: err.message,
-        stack: err.stack,
-        name: err.name
-      });
-      
-      if (err.message === 'Insert operation timed out') {
-        toast.error('Operação demorou muito. Verifique sua conexão e tente novamente.');
-      } else {
-        toast.error('Erro inesperado: ' + (err.message || 'Erro desconhecido'));
-      }
+      console.error('💥 Unexpected error in pet submission:', err);
+      toast.error('Erro inesperado: ' + (err.message || 'Erro desconhecido'));
     } finally {
       console.log('🔄 Setting isSubmitting to false');
       setIsSubmitting(false);
