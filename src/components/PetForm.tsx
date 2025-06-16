@@ -70,37 +70,67 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           onSuccess?.();
         }
       } else {
-        // Create new pet - the database trigger will handle user_id assignment
-        // We use type assertion to tell TypeScript this is valid
+        // Create new pet - enhanced debugging
+        console.log('🆕 Starting pet creation process...');
+        
+        // Check auth session first
+        console.log('🔐 Checking auth session...');
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        console.log('🔐 Session check result:', { 
+          user: sessionData.session?.user?.id, 
+          userEmail: sessionData.session?.user?.email,
+          error: sessionError,
+          sessionExists: !!sessionData.session 
+        });
+
+        if (!sessionData.session) {
+          console.error('❌ No active session found');
+          toast.error('Sessão expirada. Faça login novamente.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Create insert payload
         const insertPayload = {
           name: name.trim(),
           breed: breed.trim() || null,
           age: age.trim() || null
         } as PetInsert;
         
-        console.log('🆕 Creating pet with payload (trigger will set user_id):', insertPayload);
-        console.log('🔍 Current auth state check...');
+        console.log('🆕 Creating pet with payload:', insertPayload);
+        console.log('🆕 Expected flow: RLS allows insert → Trigger sets user_id');
         
-        // Check current session for debugging
-        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-        console.log('🔐 Current session:', { 
-          user: sessionData.session?.user?.id, 
-          error: sessionError 
-        });
-        
-        const { error, data } = await supabase
+        // Add timeout to prevent infinite hanging
+        const insertPromise = supabase
           .from('pets')
           .insert(insertPayload)
           .select();
 
-        console.log('🆕 Insert result:', { error, data });
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Insert operation timed out')), 10000)
+        );
+
+        console.log('📡 Making insert request with 10s timeout...');
+        const { error, data } = await Promise.race([insertPromise, timeoutPromise]) as any;
+
+        console.log('🆕 Insert operation completed!');
+        console.log('🆕 Insert result:', { error, data, dataLength: data?.length });
 
         if (error) {
-          console.error('❌ Insert error:', error);
+          console.error('❌ Insert error details:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
           toast.error('Erro ao adicionar pet: ' + error.message);
+        } else if (!data || data.length === 0) {
+          console.error('❌ Insert succeeded but returned no data');
+          toast.error('Pet criado mas não foi possível confirmar. Recarregue a página.');
         } else {
-          console.log('✅ Pet created successfully:', data);
+          console.log('✅ Pet created successfully:', data[0]);
           toast.success('Pet adicionado com sucesso!');
+          
           // Clear form for new entries
           setName('');
           setBreed('');
@@ -109,9 +139,19 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
         }
       }
     } catch (err: any) {
-      console.error('💥 Unexpected error in pet submission:', err);
-      toast.error('Erro inesperado: ' + (err.message || 'Erro desconhecido'));
+      console.error('💥 Unexpected error in pet submission:', {
+        message: err.message,
+        stack: err.stack,
+        name: err.name
+      });
+      
+      if (err.message === 'Insert operation timed out') {
+        toast.error('Operação demorou muito. Verifique sua conexão e tente novamente.');
+      } else {
+        toast.error('Erro inesperado: ' + (err.message || 'Erro desconhecido'));
+      }
     } finally {
+      console.log('🔄 Setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };
@@ -129,6 +169,7 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           onChange={(e) => setName(e.target.value)}
           required
           placeholder="Nome do seu pet"
+          disabled={isSubmitting}
         />
       </div>
       <div>
@@ -139,6 +180,7 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           value={breed}
           onChange={(e) => setBreed(e.target.value)}
           placeholder="Ex: Golden Retriever"
+          disabled={isSubmitting}
         />
       </div>
       <div>
@@ -149,6 +191,7 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
           value={age}
           onChange={(e) => setAge(e.target.value)}
           placeholder="Ex: 3 anos"
+          disabled={isSubmitting}
         />
       </div>
       <div className="flex gap-2 pt-4">

@@ -61,27 +61,26 @@ const Pets = () => {
     setIsLoading(true);
     
     try {
-      console.log('📡 Making database query...');
+      console.log('📡 Making pets fetch query...');
       
-      // First, let's check our auth state
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      console.log('🔐 Auth session check:', { 
-        user: sessionData.session?.user?.id, 
-        error: sessionError 
-      });
-      
-      const { data, error } = await supabase
+      // Add timeout to prevent infinite loading
+      const fetchPromise = supabase
         .from('pets')
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+      
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Fetch pets timed out')), 8000)
+      );
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
       console.log('🐶 Fetch pets result:', { 
         data, 
         error, 
         userCount: data?.length || 0,
-        userId: user.id,
-        query: `SELECT * FROM pets WHERE user_id = '${user.id}'`
+        userId: user.id
       });
 
       if (error) {
@@ -93,13 +92,15 @@ const Pets = () => {
       setPets(data || []);
       console.log('✅ Pets loaded successfully:', data?.length || 0, 'pets');
       
-      // Let's also check if there are any pets in the database for this user
-      console.log('🔍 Raw pets data for debugging:', JSON.stringify(data, null, 2));
-      
     } catch (error: any) {
       console.error('💥 Unexpected error fetching pets:', error);
-      toast.error('Erro inesperado ao carregar pets');
+      if (error.message === 'Fetch pets timed out') {
+        toast.error('Carregamento dos pets demorou muito. Verifique sua conexão.');
+      } else {
+        toast.error('Erro inesperado ao carregar pets');
+      }
     } finally {
+      console.log('🔄 Setting fetchPets isLoading to false');
       setIsLoading(false);
     }
   };
