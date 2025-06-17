@@ -63,22 +63,26 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
 
         if (error) {
           console.error('❌ Update error:', error);
-          toast.error('Erro ao atualizar pet: ' + error.message);
+          // Handle unique constraint violation for updates
+          if (error.code === '23505' && error.message.includes('unique_pet_name_per_user')) {
+            toast.error('Você já tem um pet com este nome. Escolha um nome diferente.');
+          } else {
+            toast.error('Erro ao atualizar pet: ' + error.message);
+          }
         } else {
           console.log('✅ Pet updated successfully');
           toast.success('Pet atualizado com sucesso!');
           onSuccess?.();
         }
       } else {
-        // Create new pet - SIMPLIFIED APPROACH
+        // Create new pet
         console.log('🆕 Creating new pet with direct user_id assignment...');
         
-        // Create insert payload with user_id included
         const insertPayload: PetInsert = {
           name: name.trim(),
           breed: breed.trim() || null,
           age: age.trim() || null,
-          user_id: userId  // Set user_id directly instead of relying on trigger
+          user_id: userId
         };
         
         console.log('🆕 Insert payload with user_id:', insertPayload);
@@ -92,7 +96,12 @@ export default function PetForm({ userId, initialPet = {}, onSuccess, editing = 
 
         if (error) {
           console.error('❌ Insert error:', error);
-          toast.error('Erro ao adicionar pet: ' + error.message);
+          // Handle unique constraint violation for inserts
+          if (error.code === '23505' && error.message.includes('unique_pet_name_per_user')) {
+            toast.error('Você já tem um pet com este nome. Escolha um nome diferente.');
+          } else {
+            toast.error('Erro ao adicionar pet: ' + error.message);
+          }
         } else if (!data || data.length === 0) {
           console.error('❌ Insert succeeded but returned no data');
           toast.error('Pet criado mas não foi possível confirmar. Recarregue a página.');
