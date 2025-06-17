@@ -1,52 +1,8 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-const START_HOUR = 9;
-const END_HOUR = 17;
-const SLOT_INTERVALS = [":00", ":30"];
-const PROVIDER_DAYS = 30;
-const SHOWER_DAYS = 90; // 3 months approx
-const SHOWER_SPOTS = 5;
-
-function generateTimeSlots() {
-  const slots: string[] = [];
-  for(let hour = START_HOUR; hour < END_HOUR; hour++) {
-    for (const mins of SLOT_INTERVALS) {
-      slots.push(`${hour.toString().padStart(2,"0")}${mins}`);
-    }
-  }
-  return slots;
-}
-
-async function ensureShowerAvailability() {
-  const today = new Date();
-  const slots = generateTimeSlots();
-  for (let i = 0; i < SHOWER_DAYS; i++) {
-    const dateObj = new Date(today);
-    dateObj.setDate(today.getDate() + i);
-    const dateStr = dateObj.toISOString().split('T')[0];
-    for(const slot of slots) {
-      // Check if it already exists to avoid dup key error
-      const { data, error } = await supabase
-        .from('shower_availability')
-        .select('id')
-        .eq('date', dateStr)
-        .eq('time_slot', slot)
-        .single();
-      if (!data) {
-        await supabase
-          .from('shower_availability')
-          .insert({
-            date: dateStr,
-            time_slot: slot,
-            available_spots: SHOWER_SPOTS
-          });
-      }
-      // else: already exists, do nothing
-    }
-  }
-}
+import { TIME_SLOT_CONFIG } from '@/utils/timeSlotConfig';
 
 export const useGroomerRegistration = () => {
   const [isCreatingAvailability, setIsCreatingAvailability] = useState(false);
@@ -55,34 +11,23 @@ export const useGroomerRegistration = () => {
   const createInitialAvailability = async (providerId: string) => {
     setIsCreatingAvailability(true);
     try {
-      // Generate provider_availability (next 30 days)
-      const today = new Date();
-      const slots = generateTimeSlots();
-      let batchAll: any[] = [];
-      for (let i = 0; i < PROVIDER_DAYS; i++) {
-        const dateObj = new Date(today);
-        dateObj.setDate(today.getDate() + i);
-        const dateStr = dateObj.toISOString().split('T')[0];
-        for(const slot of slots) {
-          batchAll.push({
-            provider_id: providerId,
-            date: dateStr,
-            time_slot: slot,
-            available: true
-          });
-        }
+      // Call the database function to ensure provider availability
+      const { error } = await supabase.rpc('ensure_provider_availability', {
+        provider_profile_id: providerId,
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: new Date(Date.now() + TIME_SLOT_CONFIG.PROVIDER_DAYS * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      });
+
+      if (error) {
+        console.error('❌ Error creating provider availability:', error);
+        toast.error('Erro ao criar disponibilidade: ' + error.message);
+        return false;
       }
-      // Upsert in batches to avoid hitting rate limits
-      const batchSize = 100;
-      for(let j = 0; j < batchAll.length; j += batchSize) {
-        const batch = batchAll.slice(j, j + batchSize);
-        await supabase
-          .from('provider_availability')
-          .upsert(batch, { onConflict: 'provider_id,date,time_slot' });
-      }
+
       toast.success('Disponibilidade inicial criada!');
       return true;
     } catch (error: any) {
+      console.error('❌ Unexpected error in createInitialAvailability:', error);
       toast.warning('Conta criada, mas pode ser necessário configurar disponibilidade manualmente.');
       return false;
     } finally {
@@ -106,12 +51,12 @@ export const useGroomerRegistration = () => {
         return false;
       }
 
-      // Ensure shower_availability (anyone can trigger it, but only admins can update)
-      await ensureShowerAvailability();
-      // provider's own individual availabilities
+      // The database trigger should have already created the availability
+      // But we can call this as a fallback
       const success = await createInitialAvailability(providerProfile.id);
       return success;
     } catch (error: any) {
+      console.error('❌ Error in setupNewGroomer:', error);
       return false;
     }
   };

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { TIME_SLOT_CONFIG } from '@/utils/timeSlotConfig';
 
 export interface Provider {
   id: string;
@@ -51,7 +52,7 @@ export const useAppointmentData = () => {
   const checkProviderHasAvailableSlots = useCallback(async (
     providerId: string,
     dateStr: string,
-    serviceDurationMinutes: number = 30
+    serviceDurationMinutes: number = TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES
   ) => {
     try {
       // Get all provider availability slots for this date
@@ -101,24 +102,22 @@ export const useAppointmentData = () => {
       appointments?.forEach(apt => {
         const [aptHour, aptMinute] = apt.time.split(':').map(Number);
         const aptStartTimeInMinutes = aptHour * 60 + aptMinute;
-        const aptDuration = serviceDurationsMap.get(apt.service_id) || 30; // Default to 30 if not found
+        const aptDuration = serviceDurationsMap.get(apt.service_id) || TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES;
 
-        for (let i = 0; i < aptDuration; i += 30) { // Mark every 30-min block that the appointment covers
+        for (let i = 0; i < aptDuration; i += TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES) {
           occupiedTimeBlocks.add(aptStartTimeInMinutes + i);
         }
       });
 
-      const requiredSlots = Math.ceil(serviceDurationMinutes / 30);
+      const requiredSlots = Math.ceil(serviceDurationMinutes / TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES);
 
       for (let i = 0; i <= availableSlotTimesInMinutes.length - requiredSlots; i++) {
         const currentStartTime = availableSlotTimesInMinutes[i];
         let isBlockAvailable = true;
 
         for (let j = 0; j < requiredSlots; j++) {
-          const checkTime = currentStartTime + (j * 30);
+          const checkTime = currentStartTime + (j * TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES);
 
-          // Ensure this checkTime is actually one of the available slots for the provider
-          // AND not booked, AND sequential.
           if (!availableSlotTimesInMinutes.includes(checkTime) || occupiedTimeBlocks.has(checkTime)) {
             isBlockAvailable = false;
             break;
@@ -126,11 +125,11 @@ export const useAppointmentData = () => {
         }
 
         if (isBlockAvailable) {
-          return true; // Found a contiguous block of available time
+          return true;
         }
       }
 
-      return false; // No available contiguous block found
+      return false;
     } catch (error) {
       console.error('Error checking provider slots:', error);
       return false;
@@ -174,7 +173,7 @@ export const useAppointmentData = () => {
           const hasAvailableSlots = await checkProviderHasAvailableSlots(
             provider.id, 
             dateStr, 
-            selectedService?.duration || 30
+            selectedService?.duration || TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES
           );
           if (hasAvailableSlots) {
             availableProviders.push(provider);
@@ -292,18 +291,18 @@ export const useAppointmentData = () => {
       const serviceDurationsMap = new Map(allServices?.map(s => [s.id, s.duration]));
 
       // Mark booked time blocks
-      const bookedTimeBlocks = new Set<number>(); // Stores minutes from midnight for occupied blocks
+      const bookedTimeBlocks = new Set<number>();
       appointments?.forEach(apt => {
         const [aptHour, aptMinute] = apt.time.split(':').map(Number);
         const aptStartTimeInMinutes = aptHour * 60 + aptMinute;
-        const aptDuration = serviceDurationsMap.get(apt.service_id) || 30;
+        const aptDuration = serviceDurationsMap.get(apt.service_id) || TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES;
 
-        for (let i = 0; i < aptDuration; i += 30) { // Mark every 30-min block that the appointment covers
+        for (let i = 0; i < aptDuration; i += TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES) {
           bookedTimeBlocks.add(aptStartTimeInMinutes + i);
         }
       });
 
-      const requiredSlots = Math.ceil((selectedService?.duration || 30) / 30);
+      const requiredSlots = Math.ceil((selectedService?.duration || TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES) / TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES);
 
       // Convert available time slots to minutes from midnight for easier calculation
       const availableTimesInMinutes = new Set(availabilitySlots.map(slot => {
@@ -319,9 +318,7 @@ export const useAppointmentData = () => {
         let isSlotBlockAvailable = true;
 
         for (let i = 0; i < requiredSlots; i++) {
-          const checkTime = currentSlotTimeInMinutes + (i * 30);
-          // Check if this time slot is within the provider's general availability
-          // AND not already booked by another appointment
+          const checkTime = currentSlotTimeInMinutes + (i * TIME_SLOT_CONFIG.SLOT_INTERVAL_MINUTES);
           if (!availableTimesInMinutes.has(checkTime) || bookedTimeBlocks.has(checkTime)) {
             isSlotBlockAvailable = false;
             break;

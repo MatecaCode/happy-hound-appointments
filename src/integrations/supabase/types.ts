@@ -469,6 +469,24 @@ export type Database = {
         }
         Returns: string
       }
+      ensure_provider_availability: {
+        Args: {
+          provider_profile_id: string
+          start_date: string
+          end_date: string
+        }
+        Returns: undefined
+      }
+      ensure_shower_availability: {
+        Args: { start_date: string; end_date: string }
+        Returns: undefined
+      }
+      generate_time_slots: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          time_slot: string
+        }[]
+      }
       get_user_roles: {
         Args: { _user_id: string }
         Returns: string[]
@@ -482,6 +500,10 @@ export type Database = {
         Returns: undefined
       }
       migrate_existing_users_to_roles: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      roll_daily_availability: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
