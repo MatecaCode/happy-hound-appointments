@@ -1,4 +1,5 @@
 
+
 -- First, let's fix the availability generation to ensure 90 full days are created
 -- This replaces the previous functions with corrected logic
 
@@ -38,10 +39,11 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION public.ensure_shower_availability(start_date date, end_date date)
 RETURNS void AS $$
 DECLARE
-  current_date date;
+  loop_date date;
   slot_time time;
   total_days integer;
   days_processed integer := 0;
+  slots_created integer := 0;
 BEGIN
   -- Calculate total days to process
   total_days := (end_date - start_date) + 1;
@@ -49,19 +51,25 @@ BEGIN
   RAISE NOTICE 'Generating shower availability from % to % (% days)', 
     start_date, end_date, total_days;
   
-  FOR current_date IN SELECT generate_series(start_date, end_date, '1 day'::interval)::date LOOP
+  -- Loop through each date in the range
+  loop_date := start_date;
+  WHILE loop_date <= end_date LOOP
     -- Skip Sundays (dow = 0)
-    IF EXTRACT(dow FROM current_date) != 0 THEN
+    IF EXTRACT(dow FROM loop_date) != 0 THEN
+      -- Generate time slots for this date using the existing generate_time_slots function
       FOR slot_time IN SELECT time_slot FROM public.generate_time_slots() LOOP
         INSERT INTO public.shower_availability (date, time_slot, available_spots)
-        VALUES (current_date, slot_time, 5)
+        VALUES (loop_date, slot_time, 5)
         ON CONFLICT (date, time_slot) DO NOTHING;
+        slots_created := slots_created + 1;
       END LOOP;
       days_processed := days_processed + 1;
     END IF;
+    loop_date := loop_date + interval '1 day';
   END LOOP;
   
-  RAISE NOTICE 'Completed shower availability generation: % days processed', days_processed;
+  RAISE NOTICE 'Completed shower availability generation: % days processed, % slots created', 
+    days_processed, slots_created;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -164,3 +172,4 @@ BEGIN
   
   RAISE NOTICE 'Availability generation test completed successfully';
 END $$;
+
