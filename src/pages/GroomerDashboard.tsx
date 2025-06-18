@@ -35,13 +35,12 @@ const GroomerDashboard = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
   const [providerProfileId, setProviderProfileId] = useState<string | null>(null);
 
-  // Generate default time slots (8am to 5pm)
+  // Generate default time slots (9am to 5pm every 30 minutes)
   const generateDefaultSlots = (): AvailabilitySlot[] => {
     const slots: AvailabilitySlot[] = [];
-    for (let hour = 8; hour < 17; hour++) {
+    for (let hour = 9; hour < 17; hour++) {
       slots.push({
         id: `${hour}:00`,
         time: `${hour}:00`,
@@ -84,88 +83,7 @@ const GroomerDashboard = () => {
     }
   };
 
-  // Initialize provider availability for the next 3 months
-  const initializeProviderAvailability = async () => {
-    if (!user || !providerProfileId) return;
-    
-    console.log('🔧 Initializing provider availability for provider profile:', providerProfileId);
-    setIsInitializing(true);
-    
-    try {
-      // Check if provider already has availability data
-      const { data: existingAvailability, error: checkError } = await supabase
-        .from('provider_availability')
-        .select('date')
-        .eq('provider_id', providerProfileId)
-        .limit(1);
-
-      if (checkError) {
-        console.error('Error checking existing availability:', checkError);
-      }
-
-      // If provider already has some availability data, skip initialization
-      if (existingAvailability && existingAvailability.length > 0) {
-        console.log('✅ Provider already has availability data, skipping initialization');
-        setIsInitializing(false);
-        return;
-      }
-
-      console.log('📅 Creating availability for next 3 months...');
-      
-      // Generate availability for the next 3 months
-      const availabilityEntries = [];
-      const today = new Date();
-      const endDate = new Date();
-      endDate.setMonth(today.getMonth() + 3);
-
-      // Generate time slots
-      const timeSlots = generateDefaultSlots().map(slot => slot.time);
-
-      // Loop through each day for the next 3 months
-      for (let date = new Date(today); date <= endDate; date.setDate(date.getDate() + 1)) {
-        // Skip Sundays (day 0)
-        if (date.getDay() === 0) continue;
-
-        const dateStr = date.toISOString().split('T')[0];
-        
-        // Add all time slots for this date
-        for (const timeSlot of timeSlots) {
-          availabilityEntries.push({
-            provider_id: providerProfileId,
-            date: dateStr,
-            time_slot: timeSlot,
-            available: true
-          });
-        }
-      }
-
-      console.log(`📊 Creating ${availabilityEntries.length} availability entries...`);
-
-      // Insert all availability entries in batches
-      const batchSize = 100;
-      for (let i = 0; i < availabilityEntries.length; i += batchSize) {
-        const batch = availabilityEntries.slice(i, i + batchSize);
-        const { error: insertError } = await supabase
-          .from('provider_availability')
-          .insert(batch);
-
-        if (insertError) {
-          console.error('Error inserting availability batch:', insertError);
-          throw insertError;
-        }
-      }
-
-      console.log('✅ Provider availability initialized successfully');
-      toast.success('Disponibilidade inicializada para os próximos 3 meses');
-    } catch (error: any) {
-      console.error('❌ Error initializing provider availability:', error);
-      toast.error('Erro ao inicializar disponibilidade');
-    } finally {
-      setIsInitializing(false);
-    }
-  };
-
-  // Initialize on component mount
+  // Initialize provider profile
   useEffect(() => {
     const initialize = async () => {
       if (user) {
@@ -176,19 +94,12 @@ const GroomerDashboard = () => {
     initialize();
   }, [user]);
 
-  // Initialize availability when we have provider profile ID
   useEffect(() => {
-    if (providerProfileId) {
-      initializeProviderAvailability();
-    }
-  }, [providerProfileId]);
-
-  useEffect(() => {
-    if (selectedDate && providerProfileId && !isInitializing) {
+    if (selectedDate && providerProfileId) {
       fetchAppointments();
       fetchAvailability();
     }
-  }, [selectedDate, providerProfileId, isInitializing]);
+  }, [selectedDate, providerProfileId]);
 
   const fetchAppointments = async () => {
     if (!selectedDate || !providerProfileId) return;
@@ -346,22 +257,6 @@ const GroomerDashboard = () => {
   };
 
   const isWeekend = selectedDate?.getDay() === 0; // Sunday
-
-  if (isInitializing) {
-    return (
-      <Layout>
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-center min-h-[400px]">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-lg">Inicializando sua disponibilidade...</p>
-              <p className="text-sm text-muted-foreground">Configurando horários para os próximos 3 meses</p>
-            </div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
 
   if (!providerProfileId) {
     return (
