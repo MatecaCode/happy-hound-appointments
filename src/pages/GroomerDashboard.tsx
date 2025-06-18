@@ -36,6 +36,7 @@ const GroomerDashboard = () => {
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [providerProfileId, setProviderProfileId] = useState<string | null>(null);
 
   // Generate default time slots (8am to 5pm)
   const generateDefaultSlots = (): AvailabilitySlot[] => {
@@ -59,26 +60,50 @@ const GroomerDashboard = () => {
     return slots;
   };
 
+  // Get provider profile ID for the current user
+  const fetchProviderProfileId = async () => {
+    if (!user) return null;
+    
+    try {
+      const { data, error } = await supabase
+        .from('provider_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('type', 'groomer')
+        .single();
+
+      if (error) {
+        console.error('Error fetching provider profile:', error);
+        return null;
+      }
+
+      return data?.id || null;
+    } catch (error) {
+      console.error('Error fetching provider profile:', error);
+      return null;
+    }
+  };
+
   // Initialize provider availability for the next 3 months
   const initializeProviderAvailability = async () => {
-    if (!user) return;
+    if (!user || !providerProfileId) return;
     
-    console.log('🔧 Initializing provider availability for user:', user.id);
+    console.log('🔧 Initializing provider availability for provider profile:', providerProfileId);
     setIsInitializing(true);
     
     try {
-      // Check if user already has availability data
+      // Check if provider already has availability data
       const { data: existingAvailability, error: checkError } = await supabase
         .from('provider_availability')
         .select('date')
-        .eq('provider_id', user.id)
+        .eq('provider_id', providerProfileId)
         .limit(1);
 
       if (checkError) {
         console.error('Error checking existing availability:', checkError);
       }
 
-      // If user already has some availability data, skip initialization
+      // If provider already has some availability data, skip initialization
       if (existingAvailability && existingAvailability.length > 0) {
         console.log('✅ Provider already has availability data, skipping initialization');
         setIsInitializing(false);
@@ -106,7 +131,7 @@ const GroomerDashboard = () => {
         // Add all time slots for this date
         for (const timeSlot of timeSlots) {
           availabilityEntries.push({
-            provider_id: user.id,
+            provider_id: providerProfileId,
             date: dateStr,
             time_slot: timeSlot,
             available: true
@@ -140,22 +165,33 @@ const GroomerDashboard = () => {
     }
   };
 
-  // Initialize availability on component mount
+  // Initialize on component mount
   useEffect(() => {
-    if (user) {
-      initializeProviderAvailability();
-    }
+    const initialize = async () => {
+      if (user) {
+        const profileId = await fetchProviderProfileId();
+        setProviderProfileId(profileId);
+      }
+    };
+    initialize();
   }, [user]);
 
+  // Initialize availability when we have provider profile ID
   useEffect(() => {
-    if (selectedDate && user && !isInitializing) {
+    if (providerProfileId) {
+      initializeProviderAvailability();
+    }
+  }, [providerProfileId]);
+
+  useEffect(() => {
+    if (selectedDate && providerProfileId && !isInitializing) {
       fetchAppointments();
       fetchAvailability();
     }
-  }, [selectedDate, user, isInitializing]);
+  }, [selectedDate, providerProfileId, isInitializing]);
 
   const fetchAppointments = async () => {
-    if (!selectedDate || !user) return;
+    if (!selectedDate || !providerProfileId) return;
     
     setIsLoading(true);
     try {
@@ -163,7 +199,7 @@ const GroomerDashboard = () => {
       const { data, error } = await supabase
         .from('appointments')
         .select('*')
-        .eq('provider_id', user.id)
+        .eq('provider_id', providerProfileId)
         .eq('date', dateStr)
         .order('time');
 
@@ -189,7 +225,7 @@ const GroomerDashboard = () => {
   };
 
   const fetchAvailability = async () => {
-    if (!selectedDate || !user) return;
+    if (!selectedDate || !providerProfileId) return;
     
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
@@ -198,7 +234,7 @@ const GroomerDashboard = () => {
       const { data: availability, error: availError } = await supabase
         .from('provider_availability')
         .select('*')
-        .eq('provider_id', user.id)
+        .eq('provider_id', providerProfileId)
         .eq('date', dateStr);
 
       if (availError && availError.code !== 'PGRST116') {
@@ -209,7 +245,7 @@ const GroomerDashboard = () => {
       const { data: appointments, error: apptError } = await supabase
         .from('appointments')
         .select('time')
-        .eq('provider_id', user.id)
+        .eq('provider_id', providerProfileId)
         .eq('date', dateStr)
         .eq('status', 'upcoming');
 
@@ -238,7 +274,7 @@ const GroomerDashboard = () => {
   };
 
   const toggleAvailability = async (timeSlot: string) => {
-    if (!selectedDate || !user) return;
+    if (!selectedDate || !providerProfileId) return;
     
     const dateStr = selectedDate.toISOString().split('T')[0];
     const currentSlot = availabilitySlots.find(slot => slot.time === timeSlot);
@@ -256,7 +292,7 @@ const GroomerDashboard = () => {
       const { error } = await supabase
         .from('provider_availability')
         .upsert({
-          provider_id: user.id,
+          provider_id: providerProfileId,
           date: dateStr,
           time_slot: timeSlot,
           available: newAvailability
@@ -320,6 +356,21 @@ const GroomerDashboard = () => {
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
               <p className="text-lg">Inicializando sua disponibilidade...</p>
               <p className="text-sm text-muted-foreground">Configurando horários para os próximos 3 meses</p>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!providerProfileId) {
+    return (
+      <Layout>
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <p className="text-lg text-red-600">Erro: Perfil de tosador não encontrado</p>
+              <p className="text-sm text-muted-foreground">Entre em contato com o suporte</p>
             </div>
           </div>
         </div>
