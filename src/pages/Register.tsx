@@ -10,7 +10,6 @@ import Layout from '@/components/Layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
-import { useGroomerRegistration } from '@/hooks/useGroomerRegistration';
 import { toast } from 'sonner';
 
 const Register = () => {
@@ -25,7 +24,6 @@ const Register = () => {
   const [codeRequired, setCodeRequired] = useState(false);
   
   const { signUp, user } = useAuth();
-  const { setupNewGroomer } = useGroomerRegistration();
   const navigate = useNavigate();
   const location = useLocation();
   const suggestGroomerRole = location.state?.suggestGroomerRole;
@@ -120,7 +118,7 @@ const Register = () => {
         }
       }
       
-      // Create the user account (the handle_new_user trigger will add them to user_roles)
+      // Create the user account (the handle_new_user trigger will handle everything)
       await signUp(email, password, name, role);
       
       // Mark the code as used after successful signup
@@ -128,22 +126,15 @@ const Register = () => {
         await markCodeAsUsed();
       }
       
-      // If this is a groomer registration, set up initial availability
+      // Show success message based on role
       if (role === 'groomer') {
-        // Wait a bit for the trigger to create the groomer profile
-        setTimeout(async () => {
-          try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-              await setupNewGroomer(user.id);
-            }
-          } catch (error) {
-            console.error('Error setting up groomer:', error);
-          }
-        }, 2000);
+        toast.success('Registro realizado! Sua disponibilidade foi configurada automaticamente. Verifique seu email para confirmar a conta.');
+      } else if (role === 'vet') {
+        toast.success('Registro realizado! Sua agenda foi configurada automaticamente. Verifique seu email para confirmar a conta.');
+      } else {
+        toast.success('Registro realizado! Verifique seu email para confirmar a conta.');
       }
       
-      toast.success('Registro realizado! Verifique seu email para confirmar a conta.');
       // Signup function will navigate to login
     } catch (error: any) {
       setError(error.message || 'Erro ao criar conta.');
@@ -241,7 +232,8 @@ const Register = () => {
                         Ao se cadastrar como {role === 'groomer' ? 'tosador' : 'veterinário'}, 
                         você terá acesso ao calendário de agendamentos e será listado como 
                         profissional disponível para os clientes.
-                        {role === 'groomer' && ' Sua disponibilidade inicial será configurada automaticamente.'}
+                        {role === 'groomer' && ' Sua disponibilidade será configurada automaticamente para os próximos 90 dias.'}
+                        {role === 'vet' && ' Sua agenda será configurada automaticamente para os próximos 90 dias.'}
                       </AlertDescription>
                     </Alert>
                   )}
