@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -146,15 +147,47 @@ export const useAppointmentData = () => {
       const dateStr = selectedDate.toISOString().split('T')[0];
       const targetRole = type === 'grooming' ? 'groomer' : 'vet';
 
-      // Get provider profiles based on role
-      const { data: providers, error: providersError } = await supabase
-        .from('provider_profiles')
-        .select('*')
-        .eq('type', targetRole);
+      console.log('🔍 DEBUG: Fetching providers for type:', targetRole, 'on date:', dateStr);
 
-      if (providersError) throw providersError;
+      // Get provider profiles with names by joining with the legacy tables
+      let providersQuery;
+      if (targetRole === 'groomer') {
+        providersQuery = supabase
+          .from('provider_profiles')
+          .select(`
+            id,
+            type,
+            bio,
+            photo_url,
+            rating,
+            groomers!inner(name, user_id)
+          `)
+          .eq('type', 'groomer');
+      } else {
+        providersQuery = supabase
+          .from('provider_profiles')
+          .select(`
+            id,
+            type,
+            bio,
+            photo_url,
+            rating,
+            veterinarians!inner(name, user_id)
+          `)
+          .eq('type', 'vet');
+      }
+
+      const { data: providers, error: providersError } = await providersQuery;
+
+      if (providersError) {
+        console.error('Error fetching providers:', providersError);
+        throw providersError;
+      }
+
+      console.log('🔍 DEBUG: Raw providers data:', providers);
 
       if (!providers || providers.length === 0) {
+        console.log('❌ No providers found for type:', targetRole);
         setGroomers([]);
         return;
       }
@@ -169,6 +202,12 @@ export const useAppointmentData = () => {
           .eq('provider_id', provider.id)
           .eq('date', dateStr)
           .eq('available', true);
+        
+        if (availError) {
+          console.error('Error checking availability for provider:', provider.id, availError);
+          continue;
+        }
+        
         if (availability && availability.length > 0) {
           const hasAvailableSlots = await checkProviderHasAvailableSlots(
             provider.id, 
@@ -181,17 +220,32 @@ export const useAppointmentData = () => {
         }
       }
 
-      // Transform for UI
-      const transformedProviders: Provider[] = availableProviders.map(provider => ({
-        id: provider.id,
-        name: provider.name ?? '',
-        role: targetRole,
-        profile_image: provider.photo_url,
-        rating: provider.rating || 4.5,
-        specialty: provider.specialty ?? '',
-        about: provider.bio ?? ''
-      }));
+      console.log('🔍 DEBUG: Available providers after filtering:', availableProviders);
 
+      // Transform for UI - properly extract name from joined table
+      const transformedProviders: Provider[] = availableProviders.map(provider => {
+        let providerName = '';
+        
+        if (targetRole === 'groomer' && provider.groomers) {
+          providerName = Array.isArray(provider.groomers) ? provider.groomers[0]?.name || '' : provider.groomers.name || '';
+        } else if (targetRole === 'vet' && provider.veterinarians) {
+          providerName = Array.isArray(provider.veterinarians) ? provider.veterinarians[0]?.name || '' : provider.veterinarians.name || '';
+        }
+
+        console.log('🔍 DEBUG: Transforming provider:', provider.id, 'name:', providerName);
+
+        return {
+          id: provider.id,
+          name: providerName || 'Nome não disponível',
+          role: targetRole,
+          profile_image: provider.photo_url,
+          rating: provider.rating || 4.5,
+          specialty: '',
+          about: provider.bio || ''
+        };
+      });
+
+      console.log('🔍 DEBUG: Final transformed providers:', transformedProviders);
       setGroomers(transformedProviders);
       
     } catch (error: any) {
