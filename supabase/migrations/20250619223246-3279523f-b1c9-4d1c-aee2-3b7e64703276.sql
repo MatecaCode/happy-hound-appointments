@@ -1,4 +1,5 @@
 
+
 -- Update the handle_new_user function to create provider profiles and generate availability
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
@@ -47,12 +48,6 @@ BEGIN
                 CURRENT_DATE,
                 (CURRENT_DATE + interval '90 days')::date
             );
-            
-            -- Also ensure shower availability exists for groomers
-            PERFORM public.ensure_shower_availability(
-                CURRENT_DATE,
-                (CURRENT_DATE + interval '90 days')::date
-            );
         END IF;
         
     ELSIF user_role = 'vet' THEN
@@ -80,3 +75,4 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
