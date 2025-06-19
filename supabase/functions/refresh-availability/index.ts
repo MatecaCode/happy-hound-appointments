@@ -1,4 +1,5 @@
 
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 
 const corsHeaders = {
@@ -20,7 +21,35 @@ Deno.serve(async (req) => {
 
     console.log('🔧 Starting availability refresh...')
 
-    // Step 1: Fetch all active provider profiles
+    // Step 1: Clean up past availability records
+    const today = new Date().toISOString().split('T')[0]
+    console.log(`🧹 Cleaning up availability records before ${today}`)
+
+    // Delete past provider availability
+    const { data: deletedProviderSlots, error: deleteProviderError } = await supabase
+      .from('provider_availability')
+      .delete()
+      .lt('date', today)
+
+    if (deleteProviderError) {
+      console.error('Error deleting past provider availability:', deleteProviderError)
+      throw deleteProviderError
+    }
+
+    // Delete past shower availability  
+    const { data: deletedShowerSlots, error: deleteShowerError } = await supabase
+      .from('shower_availability')
+      .delete()
+      .lt('date', today)
+
+    if (deleteShowerError) {
+      console.error('Error deleting past shower availability:', deleteShowerError)
+      throw deleteShowerError
+    }
+
+    console.log(`✅ Cleaned up past availability records before ${today}`)
+
+    // Step 2: Fetch all active provider profiles
     const { data: providers, error: providersError } = await supabase
       .from('provider_profiles')
       .select('id, type')
@@ -32,7 +61,7 @@ Deno.serve(async (req) => {
 
     console.log(`📋 Found ${providers?.length || 0} active providers`)
 
-    // Step 2: Generate time slots from 09:00 to 16:30 (every 30 minutes)
+    // Step 3: Generate time slots from 09:00 to 16:30 (every 30 minutes)
     const timeSlots = []
     for (let hour = 9; hour < 17; hour++) {
       timeSlots.push(`${hour.toString().padStart(2, '0')}:00:00`)
@@ -50,7 +79,7 @@ Deno.serve(async (req) => {
 
     let totalSlots = 0
 
-    // Step 3: Generate provider availability for each provider
+    // Step 4: Generate provider availability for each provider
     for (const provider of providers || []) {
       const providerSlots = []
       
@@ -79,7 +108,7 @@ Deno.serve(async (req) => {
       console.log(`✅ Generated ${providerSlots.length} slots for provider ${provider.id} (${provider.type})`)
     }
 
-    // Step 4: Generate shower availability (shared resource, no specific provider)
+    // Step 5: Generate shower availability (shared resource, no specific provider)
     const showerSlots = []
     for (const timeSlot of timeSlots) {
       showerSlots.push({
@@ -104,7 +133,7 @@ Deno.serve(async (req) => {
     totalSlots += showerSlots.length
     console.log(`✅ Generated ${showerSlots.length} shower availability slots`)
 
-    const successMessage = `✅ Successfully refreshed availability for ${targetDateString}! Generated ${totalSlots} total slots.`
+    const successMessage = `✅ Successfully refreshed availability! Cleaned up past records and generated ${totalSlots} total slots for ${targetDateString}.`
     console.log(successMessage)
 
     return new Response(
@@ -113,6 +142,7 @@ Deno.serve(async (req) => {
         message: successMessage,
         totalSlots: totalSlots,
         targetDate: targetDateString,
+        cleanupDate: today,
         breakdown: {
           providers: providers?.length || 0,
           timeSlotsPerProvider: timeSlots.length,
@@ -140,3 +170,4 @@ Deno.serve(async (req) => {
     )
   }
 })
+
