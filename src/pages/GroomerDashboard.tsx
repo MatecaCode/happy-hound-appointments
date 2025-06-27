@@ -20,6 +20,7 @@ interface Appointment {
   owner_name: string;
   status: string;
   notes?: string;
+  service_duration?: number;
 }
 
 interface AvailabilitySlot {
@@ -107,26 +108,35 @@ const GroomerDashboard = () => {
     setIsLoading(true);
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
+      
+      // Updated query to use appointment_providers table
       const { data, error } = await supabase
         .from('appointments')
-        .select('*')
-        .eq('provider_id', providerProfileId)
+        .select(`
+          *,
+          services!inner(name, duration_minutes),
+          pets!inner(name),
+          clients!inner(name),
+          appointment_providers!inner(provider_id)
+        `)
+        .eq('appointment_providers.provider_id', providerProfileId)
         .eq('date', dateStr)
         .order('time');
 
       if (error) throw error;
-      // Map raw data to Appointment structure with placeholders for missing fields
-      setAppointments(
-        (data || []).map((apt) => ({
-          id: apt.id,
-          pet_name: 'Pet',
-          service: 'Serviço',
-          owner_name: 'Cliente',
-          time: apt.time,
-          status: apt.status,
-          notes: apt.notes ?? undefined,
-        }))
-      );
+      
+      const enhancedAppointments = (data || []).map((apt: any) => ({
+        id: apt.id,
+        pet_name: apt.pets?.name || 'Pet',
+        service: apt.services?.name || 'Service',
+        owner_name: apt.clients?.name || 'Client',
+        time: apt.time,
+        status: apt.status,
+        notes: apt.notes ?? undefined,
+        service_duration: apt.services?.duration_minutes || 30,
+      }));
+
+      setAppointments(enhancedAppointments);
     } catch (error: any) {
       console.error('Error fetching appointments:', error);
       toast.error('Erro ao carregar agendamentos');
@@ -152,13 +162,17 @@ const GroomerDashboard = () => {
         console.error('Error fetching availability:', availError);
       }
 
-      // Get existing appointments for this date
-      const { data: appointments, error: apptError } = await supabase
+      // Get existing appointments for this date through appointment_providers
+      const { data: appointmentData, error: apptError } = await supabase
         .from('appointments')
-        .select('time')
-        .eq('provider_id', providerProfileId)
+        .select(`
+          time,
+          services!inner(duration_minutes),
+          appointment_providers!inner(provider_id)
+        `)
+        .eq('appointment_providers.provider_id', providerProfileId)
         .eq('date', dateStr)
-        .eq('status', 'upcoming');
+        .in('status', ['pending', 'confirmed']);
 
       if (apptError) {
         console.error('Error fetching appointments:', apptError);
@@ -168,7 +182,19 @@ const GroomerDashboard = () => {
       const slots = generateDefaultSlots().map(slot => {
         const providerAvailability = availability?.find(a => a.time_slot === slot.time);
         const isProviderAvailable = providerAvailability ? providerAvailability.available : true;
-        const hasAppointment = appointments?.some(apt => apt.time === slot.time) || false;
+        
+        // Check if there's an appointment at this time slot
+        const hasAppointment = appointmentData?.some(apt => {
+          const appointmentTime = apt.time;
+          const duration = apt.services?.duration_minutes || 30;
+          const appointmentEndTime = new Date(`1970-01-01 ${appointmentTime}`);
+          appointmentEndTime.setMinutes(appointmentEndTime.getMinutes() + duration);
+          
+          const slotTime = new Date(`1970-01-01 ${slot.time}`);
+          
+          return slotTime >= new Date(`1970-01-01 ${appointmentTime}`) && 
+                 slotTime < appointmentEndTime;
+        }) || false;
 
         return {
           ...slot,
@@ -237,6 +263,14 @@ const GroomerDashboard = () => {
         .eq('id', appointmentId);
 
       if (error) throw error;
+      
+      // Log the status change
+      await supabase.from('appointment_events').insert({
+        appointment_id: appointmentId,
+        event_type: newStatus as any,
+        notes: `Status changed to ${newStatus} by provider`,
+        created_by: user?.id
+      });
       
       setAppointments(prev => 
         prev.map(apt => 
@@ -329,15 +363,21 @@ const GroomerDashboard = () => {
                               <p className="text-sm text-muted-foreground">
                                 {appointment.pet_name} - {appointment.owner_name}
                               </p>
+                              <p className="text-xs text-muted-foreground">
+                                Duração: {appointment.service_duration || 30} min
+                              </p>
                             </div>
                             <Badge variant={
                               appointment.status === 'completed' ? 'default' :
+                              appointment.status === 'confirmed' ? 'default' :
                               appointment.status === 'cancelled' ? 'destructive' :
                               'secondary'
                             }>
-                              {appointment.status === 'upcoming' ? 'Agendado' :
+                              {appointment.status === 'pending' ? 'Pendente' :
+                               appointment.status === 'confirmed' ? 'Confirmado' :
                                appointment.status === 'completed' ? 'Concluído' :
-                               'Cancelado'}
+                               appointment.status === 'cancelled' ? 'Cancelado' :
+                               appointment.status}
                             </Badge>
                           </div>
                           
@@ -346,14 +386,24 @@ const GroomerDashboard = () => {
                             <p className="text-sm mb-2"><strong>Observações:</strong> {appointment.notes}</p>
                           )}
                           
-                          {appointment.status === 'upcoming' && (
+                          {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
                             <div className="flex gap-2 mt-3">
-                              <Button
-                                size="sm"
-                                onClick={() => updateAppointmentStatus(appointment.id, 'completed')}
-                              >
-                                Marcar como Concluído
-                              </Button>
+                              {appointment.status === 'pending' && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => updateAppointmentStatus(appointment.id, 'confirmed')}
+                                >
+                                  Confirmar
+                                </Button>
+                              )}
+                              {appointment.status === 'confirmed' && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => updateAppointmentStatus(appointment.id, 'completed')}
+                                >
+                                  Marcar como Concluído
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
