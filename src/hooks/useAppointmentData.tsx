@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useServiceRequirements } from './useServiceRequirements';
@@ -11,8 +11,23 @@ export const useAppointmentData = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
 
+  // Add refs to track the last fetched parameters to prevent unnecessary re-fetches
+  const lastTimeSlotsParams = useRef<{
+    date?: string;
+    groomerId?: string | null;
+    serviceId?: string;
+  }>({});
+
   // Use centralized service requirements
   const { getServiceRequirements } = useServiceRequirements();
+
+  // Add a function to reset time slots cache
+  const resetTimeSlotsCache = useCallback(() => {
+    console.log('🔍 DEBUG: Resetting time slots cache');
+    lastTimeSlotsParams.current = {};
+    setTimeSlots([]);
+    setNextAvailable(null);
+  }, []);
 
   const fetchAvailableProviders = useCallback(async (
     serviceType: 'grooming' | 'veterinary',
@@ -207,11 +222,25 @@ export const useAppointmentData = () => {
       return;
     }
 
+    const dateStr = date.toISOString().split('T')[0];
+    
+    // Check if we're fetching the same parameters to prevent unnecessary re-fetches
+    const currentParams = {
+      date: dateStr,
+      groomerId,
+      serviceId: selectedService.id
+    };
+    
+    if (JSON.stringify(lastTimeSlotsParams.current) === JSON.stringify(currentParams)) {
+      console.log('🔍 DEBUG: Skipping time slots fetch - same parameters');
+      return;
+    }
+    
+    lastTimeSlotsParams.current = currentParams;
+
     setIsLoading(true);
     try {
-      console.log('🔍 DEBUG: Fetching time slots for:', { date, groomerId, service: selectedService });
-      
-      const dateStr = date.toISOString().split('T')[0];
+      console.log('🔍 DEBUG: Fetching time slots for:', { date: dateStr, groomerId, service: selectedService });
       
       // Get service requirements from centralized source
       const serviceRequirements = getServiceRequirements(selectedService.id);
@@ -317,6 +346,7 @@ export const useAppointmentData = () => {
 
     } catch (error) {
       console.error('Error fetching time slots:', error);
+      toast.error('Erro ao carregar horários disponíveis');
       setTimeSlots([]);
     } finally {
       setIsLoading(false);
@@ -333,5 +363,6 @@ export const useAppointmentData = () => {
     fetchServices,
     fetchUserPets,
     fetchTimeSlots,
+    resetTimeSlotsCache, // Export the reset function
   };
 };

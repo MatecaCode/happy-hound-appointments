@@ -1,5 +1,5 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 // Main appointment creation function using the new atomic booking system
 export async function createAppointment(
@@ -12,12 +12,23 @@ export async function createAppointment(
   notes?: string
 ): Promise<boolean> {
   try {
+    console.log('🔍 DEBUG: Starting appointment creation with params:', {
+      userId,
+      petId,
+      serviceId,
+      providerId,
+      date: date.toISOString(),
+      timeSlot,
+      notes
+    });
+
     const isoDate = date.toISOString().split('T')[0];
     
     // Convert provider user_id to provider_profile id if needed
     let providerIds: string[] = [];
     
     if (providerId) {
+      console.log('🔍 DEBUG: Converting provider user_id to provider_profile id...');
       const { data: providerProfile, error: profileError } = await supabase
         .from('provider_profiles')
         .select('id')
@@ -25,11 +36,24 @@ export async function createAppointment(
         .single();
 
       if (profileError || !providerProfile) {
+        console.error('🚨 ERROR: Provider profile not found:', profileError);
+        toast.error('Profissional não encontrado no sistema');
         throw new Error('Provider profile not found');
       }
       
+      console.log('🔍 DEBUG: Found provider profile:', providerProfile);
       providerIds = [providerProfile.id];
     }
+
+    console.log('🔍 DEBUG: Calling create_booking_atomic with:', {
+      _user_id: userId,
+      _pet_id: petId,
+      _service_id: serviceId,
+      _provider_ids: providerIds,
+      _booking_date: isoDate,
+      _time_slot: timeSlot,
+      _notes: notes || null
+    });
 
     // Use the new atomic booking function
     const { data: appointmentId, error } = await supabase.rpc('create_booking_atomic', {
@@ -42,19 +66,47 @@ export async function createAppointment(
       _notes: notes || null
     });
 
+    console.log('🔍 DEBUG: create_booking_atomic response:', { appointmentId, error });
+
     if (error) {
-      console.error('Booking error:', error);
+      console.error('🚨 ERROR: Booking error from RPC:', error);
+      
+      // Show user-friendly error messages
+      if (error.message.includes('not available')) {
+        toast.error('Horário não disponível. Por favor, selecione outro horário.');
+      } else if (error.message.includes('capacity exceeded')) {
+        toast.error('Capacidade de banho excedida para este horário.');
+      } else if (error.message.includes('conflicting appointment')) {
+        toast.error('Profissional já tem compromisso neste horário.');
+      } else {
+        toast.error(`Erro ao criar agendamento: ${error.message}`);
+      }
+      
       throw new Error(error.message || 'Failed to create booking');
     }
 
     if (!appointmentId) {
+      console.error('🚨 ERROR: No appointment ID returned from RPC');
+      toast.error('Erro interno: ID do agendamento não foi retornado');
       throw new Error('No appointment ID returned');
     }
 
+    console.log('✅ SUCCESS: Appointment created with ID:', appointmentId);
+    toast.success('Agendamento criado com sucesso!');
     return true;
+
   } catch (error: any) {
-    console.error('Error creating appointment:', error);
-    throw error;
+    console.error('🚨 ERROR: Error in createAppointment function:', error);
+    
+    // Only show toast if we haven't already shown one
+    if (!error.message?.includes('Provider profile not found') && 
+        !error.message?.includes('not available') &&
+        !error.message?.includes('capacity exceeded') &&
+        !error.message?.includes('conflicting appointment')) {
+      toast.error('Erro ao criar agendamento. Tente novamente.');
+    }
+    
+    return false;
   }
 }
 

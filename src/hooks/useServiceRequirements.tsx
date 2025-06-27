@@ -22,30 +22,9 @@ export const useServiceRequirements = () => {
   const fetchServiceRequirements = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Try to query the view directly first
-      const { data: viewData, error: viewError } = await supabase
-        .from('vw_service_requirements')
-        .select('*')
-        .order('service_name');
-
-      if (!viewError && viewData) {
-        // Map the view data to our interface
-        const mappedData: ServiceRequirements[] = viewData.map((item: any) => ({
-          service_id: item.service_id,
-          service_name: item.service_name,
-          service_type: item.service_type,
-          requires_shower: item.requires_shower,
-          requires_groomer: item.requires_groomer,
-          requires_vet: item.requires_vet,
-          combo: item.combo,
-          required_resource_count: item.required_resource_count,
-          required_resources: item.required_resources || []
-        }));
-        setServiceRequirements(mappedData);
-        return;
-      }
-
-      // Fallback to direct query with proper typing
+      console.log('🔍 DEBUG: Fetching service requirements...');
+      
+      // Query services with their resources directly
       const { data: fallbackData, error: fallbackError } = await supabase
         .from('services')
         .select(`
@@ -65,6 +44,8 @@ export const useServiceRequirements = () => {
         return;
       }
 
+      console.log('🔍 DEBUG: Raw service data:', fallbackData);
+
       // Transform the data to match our interface
       const transformedData: ServiceRequirements[] = (fallbackData || []).map(service => {
         const resources = service.service_resources || [];
@@ -83,7 +64,7 @@ export const useServiceRequirements = () => {
           .map(r => r.resource_type === 'provider' ? r.provider_type : r.resource_type)
           .filter(Boolean);
 
-        return {
+        const result = {
           service_id: service.id,
           service_name: service.name,
           service_type: service.service_type,
@@ -94,8 +75,12 @@ export const useServiceRequirements = () => {
           required_resource_count: requiredResources.length,
           required_resources: requiredResources
         };
+        
+        console.log(`🔍 DEBUG: Service ${service.name} requirements:`, result);
+        return result;
       });
 
+      console.log('🔍 DEBUG: Final transformed service requirements:', transformedData);
       setServiceRequirements(transformedData);
 
     } catch (error) {
@@ -107,7 +92,9 @@ export const useServiceRequirements = () => {
   }, []);
 
   const getServiceRequirements = useCallback((serviceId: string): ServiceRequirements | null => {
-    return serviceRequirements.find(req => req.service_id === serviceId) || null;
+    const result = serviceRequirements.find(req => req.service_id === serviceId) || null;
+    console.log(`🔍 DEBUG: Getting requirements for service ${serviceId}:`, result);
+    return result;
   }, [serviceRequirements]);
 
   const getRequirementsForServices = useCallback((serviceIds: string[]): ServiceRequirements[] => {
