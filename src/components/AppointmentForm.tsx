@@ -44,11 +44,37 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     fetchServices(serviceType);
   }, [serviceType, fetchServices]);
 
-  // Calculate the step number for the final confirmation based on whether groomer is required
-  const finalStepNumber = serviceRequiresGroomer ? 4 : 3;
+  // Dynamic step calculation based on service requirements
+  const getStepTitle = (step: number) => {
+    if (step === 1) return "1. Informações Básicas";
+    if (step === 2) return "2. Escolha da Data";
+    if (step === 3 && serviceRequiresGroomer) return "3. Seleção do Profissional";
+    if (step === 3 && !serviceRequiresGroomer) return "3. Confirme o Horário";
+    if (step === 4 && serviceRequiresGroomer) return "4. Confirme o Horário";
+    return "";
+  };
+
+  const getNextStep = (currentStep: number) => {
+    if (currentStep === 1) return 2;
+    if (currentStep === 2) return serviceRequiresGroomer ? 3 : 3; // Step 3 serves different purposes
+    if (currentStep === 3 && serviceRequiresGroomer) return 4;
+    return currentStep;
+  };
+
+  const getPreviousStep = (currentStep: number) => {
+    if (currentStep === 2) return 1;
+    if (currentStep === 3) return 2;
+    if (currentStep === 4) return 3;
+    return currentStep;
+  };
+
+  const isFinalStep = (step: number) => {
+    return (step === 3 && !serviceRequiresGroomer) || (step === 4 && serviceRequiresGroomer);
+  };
 
   console.log('🔍 DEBUG: AppointmentForm render - Service requires groomer:', serviceRequiresGroomer);
-  console.log('🔍 DEBUG: Current form step:', formStep, 'Final step:', finalStepNumber);
+  console.log('🔍 DEBUG: Current form step:', formStep);
+  console.log('🔍 DEBUG: Is final step:', isFinalStep(formStep));
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -60,7 +86,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setSelectedPet={setSelectedPet}
           selectedService={selectedService}
           setSelectedService={setSelectedService}
-          onNext={() => setFormStep(2)}
+          onNext={() => setFormStep(getNextStep(1))}
           serviceType={serviceType}
         />
       )}
@@ -79,28 +105,29 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setActiveTab={(tab: 'calendar' | 'next-available') => setActiveTab(tab)}
           notes={notes}
           setNotes={setNotes}
-          onBack={() => setFormStep(1)}
-          onNext={() => setFormStep(serviceRequiresGroomer ? 3 : 3)} // Go to step 3 for both cases, but step 3 will be different
+          onBack={() => setFormStep(getPreviousStep(2))}
+          onNext={() => setFormStep(getNextStep(2))}
           showTimeSlots={false}
           showSubmitButton={false}
+          stepTitle={getStepTitle(2)}
         />
       )}
       
-      {/* Only show groomer selection if service requires groomer */}
+      {/* Conditional groomer selection - only show if service requires groomer */}
       {formStep === 3 && serviceRequiresGroomer && (
         <GroomerSelectionForm
           groomers={groomers}
           selectedGroomerId={selectedGroomerId}
           setSelectedGroomerId={setSelectedGroomerId}
           date={date}
-          onNext={() => setFormStep(4)}
-          onBack={() => setFormStep(2)}
+          onNext={() => setFormStep(getNextStep(3))}
+          onBack={() => setFormStep(getPreviousStep(3))}
           serviceType={serviceType}
         />
       )}
       
       {/* Final step - time slot selection and confirmation */}
-      {((formStep === 3 && !serviceRequiresGroomer) || (formStep === 4 && serviceRequiresGroomer)) && (
+      {isFinalStep(formStep) && (
         <DateTimeForm
           date={date}
           setDate={setDate}
@@ -114,11 +141,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setActiveTab={(tab: 'calendar' | 'next-available') => setActiveTab(tab)}
           notes={notes}
           setNotes={setNotes}
-          onBack={() => setFormStep(serviceRequiresGroomer ? 3 : 2)}
+          onBack={() => setFormStep(getPreviousStep(formStep))}
           onSubmit={handleSubmit}
           showTimeSlots={true}
           showSubmitButton={true}
-          stepTitle={`${finalStepNumber}. Confirme o Horário`}
+          stepTitle={getStepTitle(formStep)}
         />
       )}
     </form>

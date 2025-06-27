@@ -113,6 +113,12 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         console.log('🔍 DEBUG: Service does not require groomer, clearing selected groomer');
         formState.setSelectedGroomerId('');
       }
+
+      // Reset form step when service requirements change to avoid inconsistent state
+      if (formState.formStep > 2) {
+        console.log('🔍 DEBUG: Service requirements changed, resetting to step 2');
+        formState.setFormStep(2);
+      }
     };
     
     if (formState.selectedService) {
@@ -183,7 +189,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [user, fetchUserPets]);
 
-  // Fetch available providers when date changes (for step 3) - only if groomer is required
+  // Fetch available providers when date changes and service requires groomer
   useEffect(() => {
     if (formState.formStep === 3 && formState.date && requiresGroomer) {
       console.log('🔍 DEBUG: useEffect triggered for step 3, date:', formState.date);
@@ -192,15 +198,16 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [formState.formStep, formState.date, serviceType, selectedServiceObj, fetchAvailableProviders, requiresGroomer]);
 
-  // Fetch time slots when date changes (for final step) or when groomer changes (if required)
+  // Fetch time slots for final step
   useEffect(() => {
-    const finalStep = requiresGroomer ? 4 : 3;
-    if (formState.formStep === finalStep) {
+    const isFinalStep = (formState.formStep === 3 && !requiresGroomer) || (formState.formStep === 4 && requiresGroomer);
+    
+    if (isFinalStep && formState.date) {
       // For shower-only services, pass null as groomer ID
       const groomerId = requiresGroomer ? formState.selectedGroomerId : null;
       console.log('🔍 DEBUG: Fetching time slots for final step:', {
         step: formState.formStep,
-        final_step: finalStep,
+        is_final_step: isFinalStep,
         requires_groomer: requiresGroomer,
         groomer_id: groomerId
       });
