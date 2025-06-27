@@ -50,13 +50,17 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     if (step === 2) return "2. Escolha da Data";
     if (step === 3 && serviceRequiresGroomer) return "3. Seleção do Profissional";
     if (step === 3 && !serviceRequiresGroomer) return "3. Confirme o Horário";
-    if (step === 4 && serviceRequiresGroomer) return "4. Confirme o Horário";
+    if (step === 4) return "4. Confirme o Horário";
     return "";
   };
 
+  // Fixed step progression logic
   const getNextStep = (currentStep: number) => {
     if (currentStep === 1) return 2;
-    if (currentStep === 2) return serviceRequiresGroomer ? 3 : 3; // Step 3 serves different purposes
+    if (currentStep === 2) {
+      // From step 2: go to step 3 if groomer required, otherwise skip to step 4 (final)
+      return serviceRequiresGroomer ? 3 : 4;
+    }
     if (currentStep === 3 && serviceRequiresGroomer) return 4;
     return currentStep;
   };
@@ -64,12 +68,16 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
   const getPreviousStep = (currentStep: number) => {
     if (currentStep === 2) return 1;
     if (currentStep === 3) return 2;
-    if (currentStep === 4) return 3;
+    if (currentStep === 4) {
+      // From step 4: go back to step 3 if groomer was required, otherwise step 2
+      return serviceRequiresGroomer ? 3 : 2;
+    }
     return currentStep;
   };
 
+  // A step is final if it's the time confirmation step
   const isFinalStep = (step: number) => {
-    return (step === 3 && !serviceRequiresGroomer) || (step === 4 && serviceRequiresGroomer);
+    return (step === 3 && !serviceRequiresGroomer) || (step === 4);
   };
 
   console.log('🔍 DEBUG: AppointmentForm render - Service requires groomer:', serviceRequiresGroomer);
@@ -113,7 +121,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
         />
       )}
       
-      {/* Conditional groomer selection - only show if service requires groomer */}
+      {/* Groomer selection - only show if service requires groomer AND we're on step 3 */}
       {formStep === 3 && serviceRequiresGroomer && (
         <GroomerSelectionForm
           groomers={groomers}
@@ -126,7 +134,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
         />
       )}
       
-      {/* Final step - time slot selection and confirmation */}
+      {/* Final step - time slot selection and confirmation (step 3 for no-groomer, step 4 for groomer) */}
       {isFinalStep(formStep) && (
         <DateTimeForm
           date={date}

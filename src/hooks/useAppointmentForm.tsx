@@ -114,9 +114,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         formState.setSelectedGroomerId('');
       }
 
-      // Reset form step when service requirements change to avoid inconsistent state
+      // Reset form step to 2 when service requirements change to avoid step confusion
+      // But only if we're past step 2 and the requirement has actually changed
       if (formState.formStep > 2) {
-        console.log('🔍 DEBUG: Service requirements changed, resetting to step 2');
+        console.log('🔍 DEBUG: Service requirements determined, resetting to step 2 for proper flow');
         formState.setFormStep(2);
       }
     };
@@ -200,7 +201,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
   // Fetch time slots for final step
   useEffect(() => {
-    const isFinalStep = (formState.formStep === 3 && !requiresGroomer) || (formState.formStep === 4 && requiresGroomer);
+    // Final step is step 3 (no groomer) or step 4 (with groomer)
+    const isFinalStep = (formState.formStep === 3 && !requiresGroomer) || (formState.formStep === 4);
     
     if (isFinalStep && formState.date) {
       // For shower-only services, pass null as groomer ID
