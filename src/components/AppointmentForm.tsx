@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAppointmentForm } from '@/hooks/useAppointmentForm';
 import BasicInfoForm from './appointment/BasicInfoForm';
@@ -36,12 +35,16 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     handleNextAvailableSelect,
     handleSubmit,
     fetchServices,
+    serviceRequiresGroomer,
   } = useAppointmentForm(serviceType);
 
   // Fetch appropriate services when service type changes
   React.useEffect(() => {
     fetchServices(serviceType);
   }, [serviceType, fetchServices]);
+
+  // Calculate the step number for the final confirmation
+  const finalStepNumber = serviceRequiresGroomer ? 4 : 3;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -73,13 +76,13 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           notes={notes}
           setNotes={setNotes}
           onBack={() => setFormStep(1)}
-          onNext={() => setFormStep(3)}
+          onNext={() => setFormStep(serviceRequiresGroomer ? 3 : 4)}
           showTimeSlots={false}
           showSubmitButton={false}
         />
       )}
       
-      {formStep === 3 && (
+      {formStep === 3 && serviceRequiresGroomer && (
         <GroomerSelectionForm
           groomers={groomers}
           selectedGroomerId={selectedGroomerId}
@@ -105,11 +108,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setActiveTab={(tab: 'calendar' | 'next-available') => setActiveTab(tab)}
           notes={notes}
           setNotes={setNotes}
-          onBack={() => setFormStep(3)}
+          onBack={() => setFormStep(serviceRequiresGroomer ? 3 : 2)}
           onSubmit={handleSubmit}
           showTimeSlots={true}
           showSubmitButton={true}
-          stepTitle="4. Confirme o Horário"
+          stepTitle={`${finalStepNumber}. Confirme o Horário`}
         />
       )}
     </form>

@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -225,11 +224,11 @@ export const useAppointmentData = () => {
 
   const fetchTimeSlots = useCallback(async (
     date: Date | undefined,
-    groomerId: string,
+    groomerId: string | null,
     setIsLoading: (loading: boolean) => void,
     selectedService?: Service
   ) => {
-    if (!date || !groomerId || !selectedService) {
+    if (!date || !selectedService) {
       setTimeSlots([]);
       return;
     }
@@ -240,20 +239,30 @@ export const useAppointmentData = () => {
       
       const dateStr = date.toISOString().split('T')[0];
       
-      // Get provider profile ID
-      const { data: providerProfile, error: profileError } = await supabase
-        .from('provider_profiles')
-        .select('id')
-        .eq('user_id', groomerId)
-        .single();
+      // Check if service requires groomer
+      const { data: serviceResources, error: resourceError } = await supabase
+        .from('service_resources')
+        .select('resource_type, provider_type')
+        .eq('service_id', selectedService.id);
 
-      if (profileError || !providerProfile) {
-        console.error('Provider profile not found:', profileError);
+      if (resourceError) {
+        console.error('Error fetching service resources:', resourceError);
         setTimeSlots([]);
         return;
       }
 
-      // Generate time slots and check availability using the new function
+      const requiresGroomer = serviceResources?.some(r => r.resource_type === 'provider' && r.provider_type === 'groomer');
+      const requiresShower = serviceResources?.some(r => r.resource_type === 'shower');
+
+      console.log('🔍 DEBUG: Service requirements:', { requiresGroomer, requiresShower });
+
+      // If service requires groomer but no groomer selected, return empty slots
+      if (requiresGroomer && !groomerId) {
+        setTimeSlots([]);
+        return;
+      }
+
+      // Generate time slots and check availability
       const slots: TimeSlot[] = [];
       const startHour = 9;
       const endHour = 17;
@@ -264,18 +273,46 @@ export const useAppointmentData = () => {
           if (hour === 16 && minutes === 30) break; // Don't go past 5 PM
           
           const timeSlot = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
-          
-          // Check if this provider is available using the new function
-          const { data: availableProviders, error } = await supabase.rpc('get_available_providers', {
-            _service_id: selectedService.id,
-            _date: dateStr,
-            _time_slot: timeSlot,
-            _duration: serviceDuration
-          });
+          let isAvailable = true;
 
-          const isAvailable = !error && 
-                             availableProviders && 
-                             availableProviders.some((p: any) => p.user_id === groomerId);
+          // Check groomer availability if required
+          if (requiresGroomer && groomerId) {
+            const { data: providerProfile, error: profileError } = await supabase
+              .from('provider_profiles')
+              .select('id')
+              .eq('user_id', groomerId)
+              .single();
+
+            if (profileError || !providerProfile) {
+              console.error('Provider profile not found:', profileError);
+              isAvailable = false;
+            } else {
+              const { data: availableProviders, error } = await supabase.rpc('get_available_providers', {
+                _service_id: selectedService.id,
+                _date: dateStr,
+                _time_slot: timeSlot,
+                _duration: serviceDuration
+              });
+
+              isAvailable = !error && 
+                           availableProviders && 
+                           availableProviders.some((p: any) => p.user_id === groomerId);
+            }
+          }
+
+          // Check shower availability if required
+          if (requiresShower && isAvailable) {
+            const { data: showerSlots, error: showerError } = await supabase
+              .from('shower_availability')
+              .select('available_spots')
+              .eq('date', dateStr)
+              .eq('time_slot', timeSlot)
+              .single();
+
+            if (showerError || !showerSlots || showerSlots.available_spots <= 0) {
+              isAvailable = false;
+            }
+          }
 
           slots.push({
             id: `${hour}:${minutes.toString().padStart(2, '0')}`,
@@ -291,11 +328,13 @@ export const useAppointmentData = () => {
       // Find next available slot
       const availableSlot = slots.find(slot => slot.available);
       if (availableSlot) {
-        const groomerName = groomers.find(g => g.id === groomerId)?.name || 'Profissional';
+        const providerName = requiresGroomer && groomerId 
+          ? groomers.find(g => g.id === groomerId)?.name || 'Profissional'
+          : 'Banho Disponível';
         setNextAvailable({
           date: dateStr,
           time: availableSlot.time,
-          provider_name: groomerName
+          provider_name: providerName
         });
       } else {
         setNextAvailable(null);
@@ -303,7 +342,6 @@ export const useAppointmentData = () => {
 
     } catch (error) {
       console.error('Error fetching time slots:', error);
-      toast.error('Erro ao carregar horários disponíveis');
       setTimeSlots([]);
     } finally {
       setIsLoading(false);
