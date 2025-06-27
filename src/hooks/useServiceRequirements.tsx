@@ -22,68 +22,82 @@ export const useServiceRequirements = () => {
   const fetchServiceRequirements = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Use rpc or direct query since the view might not be in TypeScript types yet
-      const { data, error } = await supabase
-        .rpc('get_service_requirements_view')
-        .returns<ServiceRequirements[]>();
+      // Try to query the view directly first
+      const { data: viewData, error: viewError } = await supabase
+        .from('vw_service_requirements')
+        .select('*')
+        .order('service_name');
 
-      if (error) {
-        console.error('Error fetching service requirements:', error);
-        // Fallback to direct query with proper typing
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('services')
-          .select(`
-            id,
-            name,
-            service_type,
-            service_resources (
-              resource_type,
-              provider_type,
-              required
-            )
-          `);
-
-        if (fallbackError) {
-          toast.error('Erro ao carregar requisitos dos serviços');
-          return;
-        }
-
-        // Transform the data to match our interface
-        const transformedData: ServiceRequirements[] = (fallbackData || []).map(service => {
-          const resources = service.service_resources || [];
-          const requiresShower = resources.some(r => r.resource_type === 'shower' && r.required);
-          const requiresGroomer = resources.some(r => r.resource_type === 'provider' && r.provider_type === 'groomer' && r.required);
-          const requiresVet = resources.some(r => r.resource_type === 'provider' && r.provider_type === 'vet' && r.required);
-          
-          let combo: ServiceRequirements['combo'] = 'none';
-          if (requiresGroomer && requiresShower) combo = 'groomer+shower';
-          else if (requiresVet) combo = 'vet';
-          else if (requiresGroomer) combo = 'groomer';
-          else if (requiresShower) combo = 'shower';
-
-          const requiredResources = resources
-            .filter(r => r.required)
-            .map(r => r.resource_type === 'provider' ? r.provider_type : r.resource_type)
-            .filter(Boolean);
-
-          return {
-            service_id: service.id,
-            service_name: service.name,
-            service_type: service.service_type,
-            requires_shower: requiresShower,
-            requires_groomer: requiresGroomer,
-            requires_vet: requiresVet,
-            combo,
-            required_resource_count: requiredResources.length,
-            required_resources: requiredResources
-          };
-        });
-
-        setServiceRequirements(transformedData);
+      if (!viewError && viewData) {
+        // Map the view data to our interface
+        const mappedData: ServiceRequirements[] = viewData.map((item: any) => ({
+          service_id: item.service_id,
+          service_name: item.service_name,
+          service_type: item.service_type,
+          requires_shower: item.requires_shower,
+          requires_groomer: item.requires_groomer,
+          requires_vet: item.requires_vet,
+          combo: item.combo,
+          required_resource_count: item.required_resource_count,
+          required_resources: item.required_resources || []
+        }));
+        setServiceRequirements(mappedData);
         return;
       }
 
-      setServiceRequirements(data || []);
+      // Fallback to direct query with proper typing
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('services')
+        .select(`
+          id,
+          name,
+          service_type,
+          service_resources (
+            resource_type,
+            provider_type,
+            required
+          )
+        `);
+
+      if (fallbackError) {
+        console.error('Error fetching service requirements:', fallbackError);
+        toast.error('Erro ao carregar requisitos dos serviços');
+        return;
+      }
+
+      // Transform the data to match our interface
+      const transformedData: ServiceRequirements[] = (fallbackData || []).map(service => {
+        const resources = service.service_resources || [];
+        const requiresShower = resources.some(r => r.resource_type === 'shower' && r.required);
+        const requiresGroomer = resources.some(r => r.resource_type === 'provider' && r.provider_type === 'groomer' && r.required);
+        const requiresVet = resources.some(r => r.resource_type === 'provider' && r.provider_type === 'vet' && r.required);
+        
+        let combo: ServiceRequirements['combo'] = 'none';
+        if (requiresGroomer && requiresShower) combo = 'groomer+shower';
+        else if (requiresVet) combo = 'vet';
+        else if (requiresGroomer) combo = 'groomer';
+        else if (requiresShower) combo = 'shower';
+
+        const requiredResources = resources
+          .filter(r => r.required)
+          .map(r => r.resource_type === 'provider' ? r.provider_type : r.resource_type)
+          .filter(Boolean);
+
+        return {
+          service_id: service.id,
+          service_name: service.name,
+          service_type: service.service_type,
+          requires_shower: requiresShower,
+          requires_groomer: requiresGroomer,
+          requires_vet: requiresVet,
+          combo,
+          required_resource_count: requiredResources.length,
+          required_resources: requiredResources
+        };
+      });
+
+      setServiceRequirements(transformedData);
+
     } catch (error) {
       console.error('Error in fetchServiceRequirements:', error);
       toast.error('Erro ao carregar requisitos dos serviços');
