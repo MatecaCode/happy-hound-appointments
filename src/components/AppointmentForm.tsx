@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useAppointmentForm } from '@/hooks/useAppointmentForm';
 import BasicInfoForm from './appointment/BasicInfoForm';
@@ -43,8 +44,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     fetchServices(serviceType);
   }, [serviceType, fetchServices]);
 
-  // Calculate the step number for the final confirmation
+  // Calculate the step number for the final confirmation based on whether groomer is required
   const finalStepNumber = serviceRequiresGroomer ? 4 : 3;
+
+  console.log('🔍 DEBUG: AppointmentForm render - Service requires groomer:', serviceRequiresGroomer);
+  console.log('🔍 DEBUG: Current form step:', formStep, 'Final step:', finalStepNumber);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -76,12 +80,13 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           notes={notes}
           setNotes={setNotes}
           onBack={() => setFormStep(1)}
-          onNext={() => setFormStep(serviceRequiresGroomer ? 3 : 4)}
+          onNext={() => setFormStep(serviceRequiresGroomer ? 3 : 3)} // Go to step 3 for both cases, but step 3 will be different
           showTimeSlots={false}
           showSubmitButton={false}
         />
       )}
       
+      {/* Only show groomer selection if service requires groomer */}
       {formStep === 3 && serviceRequiresGroomer && (
         <GroomerSelectionForm
           groomers={groomers}
@@ -94,7 +99,8 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
         />
       )}
       
-      {formStep === 4 && (
+      {/* Final step - time slot selection and confirmation */}
+      {((formStep === 3 && !serviceRequiresGroomer) || (formStep === 4 && serviceRequiresGroomer)) && (
         <DateTimeForm
           date={date}
           setDate={setDate}

@@ -65,14 +65,19 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   // Get the currently selected service object
   const selectedServiceObj = services.find(s => s.id === formState.selectedService);
 
-  // Check if the selected service requires a groomer
-  const serviceRequiresGroomer = useCallback(async () => {
+  // State to track if current service requires groomer
+  const [requiresGroomer, setRequiresGroomer] = React.useState(false);
+
+  // Check if the selected service requires a groomer by querying service_resources
+  const checkServiceRequiresGroomer = useCallback(async () => {
     if (!formState.selectedService) return false;
     
     try {
+      console.log('🔍 DEBUG: Checking if service requires groomer for service:', formState.selectedService);
+      
       const { data, error } = await supabase
         .from('service_resources')
-        .select('provider_type')
+        .select('provider_type, service_name')
         .eq('service_id', formState.selectedService)
         .eq('resource_type', 'provider')
         .eq('provider_type', 'groomer');
@@ -82,28 +87,40 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         return false;
       }
 
-      return data && data.length > 0;
+      const requiresGroomer = data && data.length > 0;
+      console.log('🔍 DEBUG: Service resource check result:', {
+        service_id: formState.selectedService,
+        service_resources: data,
+        requires_groomer: requiresGroomer
+      });
+
+      return requiresGroomer;
     } catch (error) {
       console.error('Error checking if service requires groomer:', error);
       return false;
     }
   }, [formState.selectedService]);
 
-  // State to track if current service requires groomer
-  const [requiresGroomer, setRequiresGroomer] = React.useState(false);
-
   // Check service requirements when service changes
   useEffect(() => {
     const checkRequirements = async () => {
-      const requires = await serviceRequiresGroomer();
+      const requires = await checkServiceRequiresGroomer();
       setRequiresGroomer(requires);
       console.log('🔍 DEBUG: Service requires groomer:', requires, 'for service:', formState.selectedService);
+      
+      // If service doesn't require groomer, clear any selected groomer
+      if (!requires && formState.selectedGroomerId) {
+        console.log('🔍 DEBUG: Service does not require groomer, clearing selected groomer');
+        formState.setSelectedGroomerId('');
+      }
     };
     
     if (formState.selectedService) {
       checkRequirements();
+    } else {
+      setRequiresGroomer(false);
     }
-  }, [formState.selectedService, serviceRequiresGroomer]);
+  }, [formState.selectedService, checkServiceRequiresGroomer, formState]);
 
   // Handle next available appointment selection
   const handleNextAvailableSelect = () => {
@@ -124,13 +141,21 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
     
     if (!formState.selectedPet || !formState.selectedService || !formState.date || !formState.selectedTimeSlotId) {
+      console.log('🔍 DEBUG: Missing required fields for submission');
       return;
     }
 
     // Only require groomer if service requires one
     if (requiresGroomer && !formState.selectedGroomerId) {
+      console.log('🔍 DEBUG: Service requires groomer but none selected');
       return;
     }
+
+    console.log('🔍 DEBUG: Submitting appointment:', {
+      service_requires_groomer: requiresGroomer,
+      selected_groomer: formState.selectedGroomerId,
+      service: formState.selectedService
+    });
 
     formState.setIsLoading(true);
     
@@ -167,11 +192,18 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [formState.formStep, formState.date, serviceType, selectedServiceObj, fetchAvailableProviders, requiresGroomer]);
 
-  // Fetch time slots when date changes (for step 4) or when groomer changes (if required)
+  // Fetch time slots when date changes (for final step) or when groomer changes (if required)
   useEffect(() => {
-    if (formState.formStep === 4) {
+    const finalStep = requiresGroomer ? 4 : 3;
+    if (formState.formStep === finalStep) {
       // For shower-only services, pass null as groomer ID
       const groomerId = requiresGroomer ? formState.selectedGroomerId : null;
+      console.log('🔍 DEBUG: Fetching time slots for final step:', {
+        step: formState.formStep,
+        final_step: finalStep,
+        requires_groomer: requiresGroomer,
+        groomer_id: groomerId
+      });
       fetchTimeSlots(formState.date, groomerId, formState.setIsLoading, selectedServiceObj);
     }
   }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresGroomer]);
