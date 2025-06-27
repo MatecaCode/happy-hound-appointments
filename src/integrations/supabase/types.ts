@@ -9,6 +9,80 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      appointment_events: {
+        Row: {
+          appointment_id: string | null
+          created_at: string | null
+          created_by: string | null
+          event_type: string
+          id: string
+          notes: string | null
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          event_type: string
+          id?: string
+          notes?: string | null
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          event_type?: string
+          id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_events_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      appointment_providers: {
+        Row: {
+          appointment_id: string | null
+          created_at: string | null
+          id: string
+          provider_id: string | null
+          role: string | null
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string | null
+          id?: string
+          provider_id?: string | null
+          role?: string | null
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string | null
+          id?: string
+          provider_id?: string | null
+          role?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appointment_providers_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appointment_providers_provider_id_fkey"
+            columns: ["provider_id"]
+            isOneToOne: false
+            referencedRelation: "provider_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appointments: {
         Row: {
           created_at: string
@@ -117,6 +191,36 @@ export type Database = {
         }
         Relationships: []
       }
+      clinics: {
+        Row: {
+          active: boolean | null
+          address: string | null
+          created_at: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          address?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          address?: string | null
+          created_at?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+        }
+        Relationships: []
+      }
       groomers: {
         Row: {
           name: string | null
@@ -131,6 +235,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      notification_queue: {
+        Row: {
+          appointment_id: string | null
+          created_at: string | null
+          id: string
+          message: string
+          message_type: string
+          recipient_id: string
+          recipient_type: string
+          sent: boolean | null
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string | null
+          id?: string
+          message: string
+          message_type: string
+          recipient_id: string
+          recipient_type: string
+          sent?: boolean | null
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string
+          message_type?: string
+          recipient_id?: string
+          recipient_type?: string
+          sent?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_appointment_id_fkey"
+            columns: ["appointment_id"]
+            isOneToOne: false
+            referencedRelation: "appointments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       order_items: {
         Row: {
@@ -365,11 +510,47 @@ export type Database = {
         }
         Relationships: []
       }
+      service_resources: {
+        Row: {
+          created_at: string | null
+          id: string
+          provider_type: string | null
+          required: boolean | null
+          resource_type: string
+          service_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          provider_type?: string | null
+          required?: boolean | null
+          resource_type: string
+          service_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          provider_type?: string | null
+          required?: boolean | null
+          resource_type?: string
+          service_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "service_resources_service_id_fkey"
+            columns: ["service_id"]
+            isOneToOne: false
+            referencedRelation: "services"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       services: {
         Row: {
           created_at: string | null
           description: string | null
           duration: number
+          duration_minutes: number | null
           id: string
           name: string
           price: number
@@ -379,6 +560,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           duration: number
+          duration_minutes?: number | null
           id?: string
           name: string
           price: number
@@ -388,6 +570,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           duration?: number
+          duration_minutes?: number | null
           id?: string
           name?: string
           price?: number
@@ -413,6 +596,27 @@ export type Database = {
           date?: string
           id?: string
           time_slot?: string
+        }
+        Relationships: []
+      }
+      shower_settings: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          max_spots: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          max_spots?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          max_spots?: number | null
         }
         Relationships: []
       }
@@ -469,6 +673,18 @@ export type Database = {
         }
         Returns: string
       }
+      create_booking_atomic: {
+        Args: {
+          _user_id: string
+          _pet_id: string
+          _service_id: string
+          _provider_ids: string[]
+          _booking_date: string
+          _time_slot: string
+          _notes?: string
+        }
+        Returns: string
+      }
       ensure_provider_availability: {
         Args: {
           provider_profile_id: string
@@ -486,6 +702,23 @@ export type Database = {
         Returns: {
           time_slot: string
         }[]
+      }
+      get_available_providers: {
+        Args: {
+          _service_id: string
+          _date: string
+          _time_slot: string
+          _duration?: number
+        }
+        Returns: {
+          provider_id: string
+          provider_type: string
+          user_id: string
+        }[]
+      }
+      get_shower_capacity: {
+        Args: { target_date: string }
+        Returns: number
       }
       get_user_roles: {
         Args: { _user_id: string }
