@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -71,13 +72,17 @@ export async function createAppointment(
     if (error) {
       console.error('🚨 ERROR: Booking error from RPC:', error);
       
-      // Show user-friendly error messages
+      // Show user-friendly error messages based on error content
       if (error.message.includes('not available')) {
         toast.error('Horário não disponível. Por favor, selecione outro horário.');
-      } else if (error.message.includes('capacity exceeded')) {
+      } else if (error.message.includes('capacity exceeded') || error.message.includes('Shower capacity exceeded')) {
         toast.error('Capacidade de banho excedida para este horário.');
       } else if (error.message.includes('conflicting appointment')) {
         toast.error('Profissional já tem compromisso neste horário.');
+      } else if (error.message.includes('Invalid service_id')) {
+        toast.error('Serviço inválido selecionado.');
+      } else if (error.message.includes('Provider') && error.message.includes('not available')) {
+        toast.error('Profissional não disponível neste horário.');
       } else {
         toast.error(`Erro ao criar agendamento: ${error.message}`);
       }
@@ -102,7 +107,8 @@ export async function createAppointment(
     if (!error.message?.includes('Provider profile not found') && 
         !error.message?.includes('not available') &&
         !error.message?.includes('capacity exceeded') &&
-        !error.message?.includes('conflicting appointment')) {
+        !error.message?.includes('conflicting appointment') &&
+        !error.message?.includes('Invalid service_id')) {
       toast.error('Erro ao criar agendamento. Tente novamente.');
     }
     

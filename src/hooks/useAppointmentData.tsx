@@ -18,6 +18,9 @@ export const useAppointmentData = () => {
     serviceId?: string;
   }>({});
 
+  // Track if we're currently fetching to prevent double requests
+  const isFetchingTimeSlots = useRef(false);
+
   // Use centralized service requirements
   const { getServiceRequirements } = useServiceRequirements();
 
@@ -235,8 +238,15 @@ export const useAppointmentData = () => {
       console.log('🔍 DEBUG: Skipping time slots fetch - same parameters');
       return;
     }
+
+    // Prevent double requests
+    if (isFetchingTimeSlots.current) {
+      console.log('🔍 DEBUG: Already fetching time slots, skipping...');
+      return;
+    }
     
     lastTimeSlotsParams.current = currentParams;
+    isFetchingTimeSlots.current = true;
 
     setIsLoading(true);
     try {
@@ -350,6 +360,7 @@ export const useAppointmentData = () => {
       setTimeSlots([]);
     } finally {
       setIsLoading(false);
+      isFetchingTimeSlots.current = false;
     }
   }, [groomers, getServiceRequirements]);
 
@@ -363,6 +374,6 @@ export const useAppointmentData = () => {
     fetchServices,
     fetchUserPets,
     fetchTimeSlots,
-    resetTimeSlotsCache, // Export the reset function
+    resetTimeSlotsCache,
   };
 };
