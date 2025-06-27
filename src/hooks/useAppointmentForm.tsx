@@ -67,10 +67,15 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
   // State to track if current service requires groomer
   const [requiresGroomer, setRequiresGroomer] = React.useState(false);
+  const [serviceRequirementsLoaded, setServiceRequirementsLoaded] = React.useState(false);
 
   // Check if the selected service requires a groomer by querying service_resources
   const checkServiceRequiresGroomer = useCallback(async () => {
-    if (!formState.selectedService) return false;
+    if (!formState.selectedService) {
+      setRequiresGroomer(false);
+      setServiceRequirementsLoaded(true);
+      return false;
+    }
     
     try {
       console.log('🔍 DEBUG: Checking if service requires groomer for service:', formState.selectedService);
@@ -84,6 +89,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
       if (error) {
         console.error('Error checking service requirements:', error);
+        setRequiresGroomer(false);
+        setServiceRequirementsLoaded(true);
         return false;
       }
 
@@ -94,40 +101,35 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         requires_groomer: requiresGroomer
       });
 
+      setRequiresGroomer(requiresGroomer);
+      setServiceRequirementsLoaded(true);
       return requiresGroomer;
     } catch (error) {
       console.error('Error checking if service requires groomer:', error);
+      setRequiresGroomer(false);
+      setServiceRequirementsLoaded(true);
       return false;
     }
   }, [formState.selectedService]);
 
   // Check service requirements when service changes
   useEffect(() => {
-    const checkRequirements = async () => {
-      const requires = await checkServiceRequiresGroomer();
-      setRequiresGroomer(requires);
-      console.log('🔍 DEBUG: Service requires groomer:', requires, 'for service:', formState.selectedService);
-      
-      // If service doesn't require groomer, clear any selected groomer
-      if (!requires && formState.selectedGroomerId) {
-        console.log('🔍 DEBUG: Service does not require groomer, clearing selected groomer');
-        formState.setSelectedGroomerId('');
-      }
-
-      // Reset form step to 2 when service requirements change to avoid step confusion
-      // But only if we're past step 2 and the requirement has actually changed
-      if (formState.formStep > 2) {
-        console.log('🔍 DEBUG: Service requirements determined, resetting to step 2 for proper flow');
-        formState.setFormStep(2);
-      }
-    };
-    
     if (formState.selectedService) {
-      checkRequirements();
+      setServiceRequirementsLoaded(false); // Reset loading state
+      checkServiceRequiresGroomer();
     } else {
       setRequiresGroomer(false);
+      setServiceRequirementsLoaded(true);
     }
-  }, [formState.selectedService, checkServiceRequiresGroomer, formState]);
+  }, [formState.selectedService, checkServiceRequiresGroomer]);
+
+  // Clear selected groomer if service doesn't require one
+  useEffect(() => {
+    if (serviceRequirementsLoaded && !requiresGroomer && formState.selectedGroomerId) {
+      console.log('🔍 DEBUG: Service does not require groomer, clearing selected groomer');
+      formState.setSelectedGroomerId('');
+    }
+  }, [requiresGroomer, serviceRequirementsLoaded, formState.selectedGroomerId, formState]);
 
   // Handle next available appointment selection
   const handleNextAvailableSelect = () => {
@@ -192,19 +194,19 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
   // Fetch available providers when date changes and service requires groomer
   useEffect(() => {
-    if (formState.formStep === 3 && formState.date && requiresGroomer) {
+    if (formState.formStep === 3 && formState.date && requiresGroomer && serviceRequirementsLoaded) {
       console.log('🔍 DEBUG: useEffect triggered for step 3, date:', formState.date);
       console.log('🔍 DEBUG: Selected service:', selectedServiceObj);
       fetchAvailableProviders(serviceType, formState.date, selectedServiceObj);
     }
-  }, [formState.formStep, formState.date, serviceType, selectedServiceObj, fetchAvailableProviders, requiresGroomer]);
+  }, [formState.formStep, formState.date, serviceType, selectedServiceObj, fetchAvailableProviders, requiresGroomer, serviceRequirementsLoaded]);
 
   // Fetch time slots for final step
   useEffect(() => {
     // Final step is step 3 (no groomer) or step 4 (with groomer)
     const isFinalStep = (formState.formStep === 3 && !requiresGroomer) || (formState.formStep === 4);
     
-    if (isFinalStep && formState.date) {
+    if (isFinalStep && formState.date && serviceRequirementsLoaded) {
       // For shower-only services, pass null as groomer ID
       const groomerId = requiresGroomer ? formState.selectedGroomerId : null;
       console.log('🔍 DEBUG: Fetching time slots for final step:', {
@@ -215,7 +217,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       });
       fetchTimeSlots(formState.date, groomerId, formState.setIsLoading, selectedServiceObj);
     }
-  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresGroomer]);
+  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresGroomer, serviceRequirementsLoaded]);
 
   return {
     // Spread all form state
@@ -230,6 +232,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     
     // Service requirements
     serviceRequiresGroomer: requiresGroomer,
+    serviceRequirementsLoaded,
     
     // Actions
     handleNextAvailableSelect,

@@ -37,6 +37,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     handleSubmit,
     fetchServices,
     serviceRequiresGroomer,
+    serviceRequirementsLoaded,
   } = useAppointmentForm(serviceType);
 
   // Fetch appropriate services when service type changes
@@ -54,10 +55,12 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     return "";
   };
 
-  // Fixed step progression logic
+  // Fixed step progression logic - only allow progression if service requirements are loaded
   const getNextStep = (currentStep: number) => {
     if (currentStep === 1) return 2;
     if (currentStep === 2) {
+      // Only allow progression if we know the service requirements
+      if (!serviceRequirementsLoaded) return 2;
       // From step 2: go to step 3 if groomer required, otherwise skip to step 4 (final)
       return serviceRequiresGroomer ? 3 : 4;
     }
@@ -80,7 +83,22 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     return (step === 3 && !serviceRequiresGroomer) || (step === 4);
   };
 
+  // Helper function to handle next button with proper validation
+  const handleNextStep = (currentStep: number) => {
+    const nextStep = getNextStep(currentStep);
+    
+    // Prevent progression from step 2 if service requirements aren't loaded yet
+    if (currentStep === 2 && !serviceRequirementsLoaded) {
+      console.log('🔍 DEBUG: Service requirements not loaded yet, waiting...');
+      return;
+    }
+    
+    console.log('🔍 DEBUG: Moving from step', currentStep, 'to step', nextStep);
+    setFormStep(nextStep);
+  };
+
   console.log('🔍 DEBUG: AppointmentForm render - Service requires groomer:', serviceRequiresGroomer);
+  console.log('🔍 DEBUG: Service requirements loaded:', serviceRequirementsLoaded);
   console.log('🔍 DEBUG: Current form step:', formStep);
   console.log('🔍 DEBUG: Is final step:', isFinalStep(formStep));
 
@@ -94,7 +112,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setSelectedPet={setSelectedPet}
           selectedService={selectedService}
           setSelectedService={setSelectedService}
-          onNext={() => setFormStep(getNextStep(1))}
+          onNext={() => handleNextStep(1)}
           serviceType={serviceType}
         />
       )}
@@ -108,13 +126,13 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setSelectedTimeSlotId={setSelectedTimeSlotId}
           nextAvailable={nextAvailable}
           handleNextAvailableSelect={handleNextAvailableSelect}
-          isLoading={isLoading}
+          isLoading={isLoading || !serviceRequirementsLoaded}
           activeTab={activeTab}
           setActiveTab={(tab: 'calendar' | 'next-available') => setActiveTab(tab)}
           notes={notes}
           setNotes={setNotes}
           onBack={() => setFormStep(getPreviousStep(2))}
-          onNext={() => setFormStep(getNextStep(2))}
+          onNext={() => handleNextStep(2)}
           showTimeSlots={false}
           showSubmitButton={false}
           stepTitle={getStepTitle(2)}
@@ -128,7 +146,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           selectedGroomerId={selectedGroomerId}
           setSelectedGroomerId={setSelectedGroomerId}
           date={date}
-          onNext={() => setFormStep(getNextStep(3))}
+          onNext={() => handleNextStep(3)}
           onBack={() => setFormStep(getPreviousStep(3))}
           serviceType={serviceType}
         />
