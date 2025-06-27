@@ -25,10 +25,46 @@ export const useAppointmentData = () => {
       console.log('🔍 DEBUG: Fetching providers for:', { serviceType, date, service: selectedService });
       
       const dateStr = date.toISOString().split('T')[0];
+      console.log('🔍 DEBUG: Date string:', dateStr);
+
+      // First, let's check if we have any service resources configured
+      const { data: serviceResources, error: resourceError } = await supabase
+        .from('service_resources')
+        .select('*')
+        .eq('service_id', selectedService.id);
+
+      console.log('🔍 DEBUG: Service resources:', serviceResources, 'Error:', resourceError);
+
+      // Check if we have any provider profiles
+      const { data: providerProfiles, error: profileError } = await supabase
+        .from('provider_profiles')
+        .select('*')
+        .eq('type', serviceType === 'grooming' ? 'groomer' : 'vet');
+
+      console.log('🔍 DEBUG: Provider profiles:', providerProfiles, 'Error:', profileError);
+
+      // Check provider availability for this date
+      const { data: providerAvailability, error: availError } = await supabase
+        .from('provider_availability')
+        .select('*')
+        .eq('date', dateStr)
+        .eq('available', true);
+
+      console.log('🔍 DEBUG: Provider availability:', providerAvailability, 'Error:', availError);
+
+      // Check shower availability for this date
+      const { data: showerAvailability, error: showerError } = await supabase
+        .from('shower_availability')
+        .select('*')
+        .eq('date', dateStr)
+        .gt('available_spots', 0);
+
+      console.log('🔍 DEBUG: Shower availability:', showerAvailability, 'Error:', showerError);
+
+      // Use the RPC function to get available providers
       const timeSlot = '09:00:00'; // Default time for checking availability
       const duration = selectedService.duration || 30;
 
-      // Use the new get_available_providers function
       const { data: availableProviders, error } = await supabase.rpc('get_available_providers', {
         _service_id: selectedService.id,
         _date: dateStr,
@@ -36,16 +72,30 @@ export const useAppointmentData = () => {
         _duration: duration
       });
 
+      console.log('🔍 DEBUG: RPC get_available_providers result:', availableProviders, 'Error:', error);
+
       if (error) {
         console.error('Error fetching available providers:', error);
         setGroomers([]);
         return;
       }
 
-      console.log('🔍 DEBUG: Available providers raw:', availableProviders);
-
       if (!availableProviders || availableProviders.length === 0) {
-        console.log('🔍 DEBUG: No available providers found');
+        console.log('🔍 DEBUG: No available providers found - checking if we have any providers at all');
+        
+        // Fallback: get all providers of the correct type if RPC fails
+        const { data: allProviders, error: allError } = await supabase
+          .from('provider_profiles')
+          .select('*')
+          .eq('type', serviceType === 'grooming' ? 'groomer' : 'vet');
+
+        console.log('🔍 DEBUG: All providers fallback:', allProviders, 'Error:', allError);
+
+        if (!allProviders || allProviders.length === 0) {
+          console.log('🔍 DEBUG: No providers found in the system at all!');
+          toast.error('Nenhum profissional cadastrado no sistema');
+        }
+
         setGroomers([]);
         return;
       }
@@ -88,6 +138,8 @@ export const useAppointmentData = () => {
         ...(groomerData || []),
         ...(vetData || [])
       ];
+
+      console.log('🔍 DEBUG: Combined user data:', allUserData);
 
       // Map to Provider format
       const formattedProviders: Provider[] = availableProviders.map((provider: any) => {

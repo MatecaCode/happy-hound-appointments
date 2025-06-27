@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import AppointmentForm from '@/components/AppointmentForm';
+import SetupBookingSystem from '@/components/SetupBookingSystem';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Book = () => {
@@ -39,8 +40,11 @@ const Book = () => {
               <AppointmentForm serviceType={appointmentType} />
             </div>
             
-            <div>
-              <div className="bg-secondary/50 p-6 rounded-lg space-y-6 sticky top-6">
+            <div className="space-y-6">
+              {/* Debug Setup Component - Remove this in production */}
+              <SetupBookingSystem />
+              
+              <div className="bg-secondary/50 p-6 rounded-lg space-y-6">
                 <h3 className="text-xl font-bold">Informações de Agendamento</h3>
                 
                 <div>
