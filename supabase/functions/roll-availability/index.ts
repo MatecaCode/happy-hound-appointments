@@ -21,15 +21,15 @@ serve(async (req) => {
 
     console.log('🔄 Starting daily availability roll...');
 
-    // Call the database function to roll availability
-    const { error } = await supabase.rpc('roll_daily_availability');
+    // Call the database function to roll provider availability
+    const { error: providerError } = await supabase.rpc('roll_daily_availability');
 
-    if (error) {
-      console.error('❌ Error rolling daily availability:', error);
+    if (providerError) {
+      console.error('❌ Error rolling provider availability:', providerError);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: error.message 
+          error: `Provider availability error: ${providerError.message}` 
         }),
         { 
           status: 500, 
@@ -38,12 +38,66 @@ serve(async (req) => {
       );
     }
 
-    console.log('✅ Daily availability rolled successfully');
+    console.log('✅ Provider availability rolled successfully');
+
+    // Generate shower availability for the target date (today + 90 days)
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + 90);
+    const dateString = targetDate.toISOString().split('T')[0];
+
+    console.log(`🚿 Adding shower availability for ${dateString}`);
+
+    // Generate time slots (09:00-16:30 every 30 minutes)
+    const timeSlots = [];
+    for (let hour = 9; hour < 17; hour++) {
+      timeSlots.push(`${hour.toString().padStart(2, '0')}:00:00`);
+      if (hour < 16) {
+        timeSlots.push(`${hour.toString().padStart(2, '0')}:30:00`);
+      }
+    }
+
+    // Create availability entries
+    const showerSlots = timeSlots.map((time) => ({
+      date: dateString,
+      time_slot: time,
+      available_spots: 5,
+    }));
+
+    console.log(`📋 Inserting ${showerSlots.length} shower slots for ${dateString}`);
+
+    // Insert shower availability slots
+    const { error: showerError } = await supabase
+      .from('shower_availability')
+      .upsert(showerSlots, {
+        onConflict: 'date,time_slot'
+      });
+
+    if (showerError) {
+      console.error('❌ Error inserting shower availability:', showerError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Shower availability error: ${showerError.message}` 
+        }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log('✅ Shower availability added successfully');
+    console.log('🎉 Daily availability roll completed successfully');
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: 'Daily availability rolled successfully',
+        details: {
+          providerAvailability: 'Updated via roll_daily_availability function',
+          showerAvailability: `Added ${showerSlots.length} slots for ${dateString}`,
+          targetDate: dateString
+        },
         timestamp: new Date().toISOString()
       }),
       { 
