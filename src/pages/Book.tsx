@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import AppointmentForm from '@/components/AppointmentForm';
 import SetupBookingSystem from '@/components/SetupBookingSystem';
+import BookingSystemDebugger from '@/components/BookingSystemDebugger';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Book = () => {
@@ -93,6 +94,12 @@ const Book = () => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* DEBUG SECTION - Remove this in production */}
+          <div className="mt-12 border-t pt-8">
+            <h2 className="text-2xl font-bold mb-4 text-red-600">🚨 DEBUG SECTION</h2>
+            <BookingSystemDebugger />
           </div>
         </div>
       </section>
