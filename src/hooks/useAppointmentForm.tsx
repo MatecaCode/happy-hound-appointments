@@ -4,8 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { useAppointmentFormState } from './useAppointmentFormState';
 import { useAppointmentData } from './useAppointmentData';
+import { useServiceRequirements } from './useServiceRequirements';
 import { createAppointment } from '@/utils/appointmentUtils';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface Provider {
   id: string;
@@ -62,66 +62,31 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     fetchTimeSlots,
   } = useAppointmentData();
 
+  // Use the new centralized service requirements hook
+  const { getServiceRequirements } = useServiceRequirements();
+
   // Get the currently selected service object
   const selectedServiceObj = services.find(s => s.id === formState.selectedService);
 
-  // State to track if current service requires groomer
-  const [requiresGroomer, setRequiresGroomer] = React.useState(false);
-  const [serviceRequirementsLoaded, setServiceRequirementsLoaded] = React.useState(false);
+  // Get service requirements from the centralized hook
+  const serviceRequirements = formState.selectedService 
+    ? getServiceRequirements(formState.selectedService)
+    : null;
 
-  // Check if the selected service requires a groomer by querying service_resources
-  const checkServiceRequiresGroomer = useCallback(async () => {
-    if (!formState.selectedService) {
-      setRequiresGroomer(false);
-      setServiceRequirementsLoaded(true);
-      return false;
-    }
-    
-    try {
-      console.log('🔍 DEBUG: Checking if service requires groomer for service:', formState.selectedService);
-      
-      const { data, error } = await supabase
-        .from('service_resources')
-        .select('provider_type, service_name')
-        .eq('service_id', formState.selectedService)
-        .eq('resource_type', 'provider')
-        .eq('provider_type', 'groomer');
+  // Extract requirements from the centralized data
+  const requiresGroomer = serviceRequirements?.requires_groomer || false;
+  const requiresShower = serviceRequirements?.requires_shower || false;
+  const requiresVet = serviceRequirements?.requires_vet || false;
+  const serviceRequirementsLoaded = Boolean(serviceRequirements);
 
-      if (error) {
-        console.error('Error checking service requirements:', error);
-        setRequiresGroomer(false);
-        setServiceRequirementsLoaded(true);
-        return false;
-      }
-
-      const requiresGroomer = data && data.length > 0;
-      console.log('🔍 DEBUG: Service resource check result:', {
-        service_id: formState.selectedService,
-        service_resources: data,
-        requires_groomer: requiresGroomer
-      });
-
-      setRequiresGroomer(requiresGroomer);
-      setServiceRequirementsLoaded(true);
-      return requiresGroomer;
-    } catch (error) {
-      console.error('Error checking if service requires groomer:', error);
-      setRequiresGroomer(false);
-      setServiceRequirementsLoaded(true);
-      return false;
-    }
-  }, [formState.selectedService]);
-
-  // Check service requirements when service changes
-  useEffect(() => {
-    if (formState.selectedService) {
-      setServiceRequirementsLoaded(false); // Reset loading state
-      checkServiceRequiresGroomer();
-    } else {
-      setRequiresGroomer(false);
-      setServiceRequirementsLoaded(true);
-    }
-  }, [formState.selectedService, checkServiceRequiresGroomer]);
+  console.log('🔍 DEBUG: Service requirements from view:', {
+    service_id: formState.selectedService,
+    requirements: serviceRequirements,
+    requires_groomer: requiresGroomer,
+    requires_shower: requiresShower,
+    requires_vet: requiresVet,
+    combo: serviceRequirements?.combo
+  });
 
   // Clear selected groomer if service doesn't require one
   useEffect(() => {
@@ -162,8 +127,11 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
     console.log('🔍 DEBUG: Submitting appointment:', {
       service_requires_groomer: requiresGroomer,
+      service_requires_shower: requiresShower,
+      service_requires_vet: requiresVet,
       selected_groomer: formState.selectedGroomerId,
-      service: formState.selectedService
+      service: formState.selectedService,
+      combo: serviceRequirements?.combo
     });
 
     formState.setIsLoading(true);
@@ -213,11 +181,12 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         step: formState.formStep,
         is_final_step: isFinalStep,
         requires_groomer: requiresGroomer,
+        requires_shower: requiresShower,
         groomer_id: groomerId
       });
       fetchTimeSlots(formState.date, groomerId, formState.setIsLoading, selectedServiceObj);
     }
-  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresGroomer, serviceRequirementsLoaded]);
+  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresGroomer, requiresShower, serviceRequirementsLoaded]);
 
   return {
     // Spread all form state
@@ -230,9 +199,12 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     services,
     groomers,
     
-    // Service requirements
+    // Service requirements from centralized hook
     serviceRequiresGroomer: requiresGroomer,
+    serviceRequiresShower: requiresShower,
+    serviceRequiresVet: requiresVet,
     serviceRequirementsLoaded,
+    serviceRequirements, // Full requirements object for advanced use
     
     // Actions
     handleNextAvailableSelect,

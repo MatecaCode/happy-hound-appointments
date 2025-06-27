@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useServiceRequirements } from './useServiceRequirements';
 import type { Provider, Pet, Service, TimeSlot, NextAvailable } from './useAppointmentForm';
 
 export const useAppointmentData = () => {
@@ -9,6 +10,9 @@ export const useAppointmentData = () => {
   const [userPets, setUserPets] = useState<Pet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
+
+  // Use centralized service requirements
+  const { getServiceRequirements } = useServiceRequirements();
 
   const fetchAvailableProviders = useCallback(async (
     serviceType: 'grooming' | 'veterinary',
@@ -26,39 +30,9 @@ export const useAppointmentData = () => {
       const dateStr = date.toISOString().split('T')[0];
       console.log('🔍 DEBUG: Date string:', dateStr);
 
-      // First, let's check if we have any service resources configured
-      const { data: serviceResources, error: resourceError } = await supabase
-        .from('service_resources')
-        .select('*')
-        .eq('service_id', selectedService.id);
-
-      console.log('🔍 DEBUG: Service resources:', serviceResources, 'Error:', resourceError);
-
-      // Check if we have any provider profiles
-      const { data: providerProfiles, error: profileError } = await supabase
-        .from('provider_profiles')
-        .select('*')
-        .eq('type', serviceType === 'grooming' ? 'groomer' : 'vet');
-
-      console.log('🔍 DEBUG: Provider profiles:', providerProfiles, 'Error:', profileError);
-
-      // Check provider availability for this date
-      const { data: providerAvailability, error: availError } = await supabase
-        .from('provider_availability')
-        .select('*')
-        .eq('date', dateStr)
-        .eq('available', true);
-
-      console.log('🔍 DEBUG: Provider availability:', providerAvailability, 'Error:', availError);
-
-      // Check shower availability for this date
-      const { data: showerAvailability, error: showerError } = await supabase
-        .from('shower_availability')
-        .select('*')
-        .eq('date', dateStr)
-        .gt('available_spots', 0);
-
-      console.log('🔍 DEBUG: Shower availability:', showerAvailability, 'Error:', showerError);
+      // Get service requirements from centralized source
+      const serviceRequirements = getServiceRequirements(selectedService.id);
+      console.log('🔍 DEBUG: Service requirements from centralized hook:', serviceRequirements);
 
       // Use the RPC function to get available providers
       const timeSlot = '09:00:00'; // Default time for checking availability
@@ -162,7 +136,7 @@ export const useAppointmentData = () => {
       setGroomers([]);
       toast.error('Erro ao buscar profissionais disponíveis');
     }
-  }, []);
+  }, [getServiceRequirements]);
 
   const fetchServices = useCallback(async (serviceType: 'grooming' | 'veterinary') => {
     try {
@@ -239,22 +213,23 @@ export const useAppointmentData = () => {
       
       const dateStr = date.toISOString().split('T')[0];
       
-      // Check if service requires groomer
-      const { data: serviceResources, error: resourceError } = await supabase
-        .from('service_resources')
-        .select('resource_type, provider_type')
-        .eq('service_id', selectedService.id);
-
-      if (resourceError) {
-        console.error('Error fetching service resources:', resourceError);
+      // Get service requirements from centralized source
+      const serviceRequirements = getServiceRequirements(selectedService.id);
+      
+      if (!serviceRequirements) {
+        console.log('🔍 DEBUG: No service requirements found');
         setTimeSlots([]);
         return;
       }
 
-      const requiresGroomer = serviceResources?.some(r => r.resource_type === 'provider' && r.provider_type === 'groomer');
-      const requiresShower = serviceResources?.some(r => r.resource_type === 'shower');
+      const requiresGroomer = serviceRequirements.requires_groomer;
+      const requiresShower = serviceRequirements.requires_shower;
 
-      console.log('🔍 DEBUG: Service requirements:', { requiresGroomer, requiresShower });
+      console.log('🔍 DEBUG: Service requirements from centralized hook:', { 
+        requiresGroomer, 
+        requiresShower,
+        combo: serviceRequirements.combo
+      });
 
       // If service requires groomer but no groomer selected, return empty slots
       if (requiresGroomer && !groomerId) {
@@ -346,7 +321,7 @@ export const useAppointmentData = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [groomers]);
+  }, [groomers, getServiceRequirements]);
 
   return {
     timeSlots,
