@@ -41,21 +41,35 @@ const ServiceStatusSection = () => {
           notes,
           service_status,
           user_id,
+          provider_id,
           pets:pet_id (name),
-          services:service_id (name),
-          provider_profiles:provider_id (
-            users:user_id (user_metadata)
-          )
+          services:service_id (name)
         `)
         .eq('status', 'confirmed')
         .order('date', { ascending: true });
 
       if (error) throw error;
 
-      // Get user details for each appointment
+      // Get user details and provider details for each appointment
       const appointmentsWithUserData = await Promise.all(
         (data || []).map(async (apt) => {
+          // Get user data
           const { data: userData } = await supabase.auth.admin.getUserById(apt.user_id);
+          
+          // Get provider data if provider_id exists
+          let providerName = null;
+          if (apt.provider_id) {
+            const { data: providerData } = await supabase
+              .from('provider_profiles')
+              .select('user_id')
+              .eq('id', apt.provider_id)
+              .single();
+            
+            if (providerData?.user_id) {
+              const { data: providerUserData } = await supabase.auth.admin.getUserById(providerData.user_id);
+              providerName = providerUserData.user?.user_metadata?.name || null;
+            }
+          }
           
           return {
             id: apt.id,
@@ -65,7 +79,7 @@ const ServiceStatusSection = () => {
             pet_name: apt.pets?.name || 'Pet',
             service_name: apt.services?.name || 'Serviço',
             user_name: userData.user?.user_metadata?.name || 'Cliente',
-            provider_name: apt.provider_profiles?.users?.user_metadata?.name || null,
+            provider_name: providerName,
             service_status: (apt.service_status || 'not_started') as 'not_started' | 'in_progress' | 'completed'
           };
         })

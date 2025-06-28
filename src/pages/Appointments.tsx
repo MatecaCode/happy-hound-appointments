@@ -47,11 +47,9 @@ const Appointments = () => {
             service_status,
             notes,
             user_id,
+            provider_id,
             pets:pet_id (name),
-            services:service_id (name),
-            provider_profiles:provider_id (
-              users:user_id (user_metadata)
-            )
+            services:service_id (name)
           `)
           .eq('user_id', user.id)
           .order('date', { ascending: true });
@@ -64,17 +62,36 @@ const Appointments = () => {
         console.log('Raw appointments data:', data);
         
         if (data) {
-          const formattedData = data.map(apt => ({
-            id: apt.id,
-            pet_name: apt.pets?.name || 'Pet',
-            service_name: apt.services?.name || 'Serviço',
-            date: new Date(apt.date),
-            time: apt.time,
-            status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
-            service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
-            notes: apt.notes || undefined,
-            provider_name: apt.provider_profiles?.users?.user_metadata?.name || null
-          }));
+          // Get provider details for each appointment that has a provider
+          const formattedData = await Promise.all(
+            data.map(async (apt) => {
+              let providerName = null;
+              if (apt.provider_id) {
+                const { data: providerData } = await supabase
+                  .from('provider_profiles')
+                  .select('user_id')
+                  .eq('id', apt.provider_id)
+                  .single();
+                
+                if (providerData?.user_id) {
+                  const { data: providerUserData } = await supabase.auth.admin.getUserById(providerData.user_id);
+                  providerName = providerUserData.user?.user_metadata?.name || null;
+                }
+              }
+
+              return {
+                id: apt.id,
+                pet_name: apt.pets?.name || 'Pet',
+                service_name: apt.services?.name || 'Serviço',
+                date: new Date(apt.date),
+                time: apt.time,
+                status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
+                service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
+                notes: apt.notes || undefined,
+                provider_name: providerName
+              };
+            })
+          );
           
           console.log('Formatted appointments:', formattedData);
           setAppointments(formattedData);
@@ -311,7 +328,7 @@ const Appointments = () => {
                 </div>
               ) : (
                 <div className="text-center py-20 bg-secondary/30 rounded-lg">
-                  <Dog className="w-12 w-12 mx-auto mb-4 text-primary opacity-70" />
+                  <Dog className="w-12 h-12 mx-auto mb-4 text-primary opacity-70" />
                   <h3 className="text-xl font-bold mb-2">Nenhum Agendamento Passado</h3>
                   <p className="text-muted-foreground mb-6">
                     Seu histórico de agendamentos aparecerá aqui depois que você tiver serviços conosco.
