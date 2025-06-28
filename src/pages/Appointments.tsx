@@ -1,7 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
-import AppointmentCard, { Appointment } from '@/components/AppointmentCard';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -13,9 +11,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface AppointmentWithDetails extends Appointment {
+interface AppointmentWithDetails {
+  id: string;
   pet_name: string;
   service_name: string;
+  date: Date;
+  time: string;
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  notes?: string;
   provider_name?: string;
 }
 
@@ -53,14 +56,12 @@ const Appointments = () => {
         if (data) {
           const formattedData = data.map(apt => ({
             id: apt.id,
-            petName: apt.pets?.name || 'Pet',
             pet_name: apt.pets?.name || 'Pet',
-            service: apt.services?.name || 'Serviço',
             service_name: apt.services?.name || 'Serviço',
             date: new Date(apt.date),
             time: apt.time,
             status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
-            notes: apt.notes,
+            notes: apt.notes || undefined,
             provider_name: apt.provider_profiles?.users?.user_metadata?.name
           }));
           
@@ -97,7 +98,7 @@ const Appointments = () => {
       
       const appointment = appointments.find(a => a.id === id);
       if (appointment) {
-        toast.success(`Agendamento para ${appointment.petName} foi cancelado.`);
+        toast.success(`Agendamento para ${appointment.pet_name} foi cancelado.`);
       }
     } catch (error: any) {
       console.error('Error cancelling appointment:', error.message);

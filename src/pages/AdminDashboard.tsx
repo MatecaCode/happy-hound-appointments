@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +7,8 @@ import { RefreshCw, LogOut, Users, Calendar, PawPrint, Clock } from 'lucide-reac
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
+import PendingApprovalsSection from '@/components/admin/PendingApprovalsSection';
+import ServiceStatusSection from '@/components/admin/ServiceStatusSection';
 
 const AdminDashboard = () => {
   const { user, signOut, isAdmin, loading } = useAuth();
@@ -22,30 +23,24 @@ const AdminDashboard = () => {
   const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
-    // Wait for auth to finish loading
     if (loading) return;
 
-    // If not logged in, redirect to login
     if (!user) {
       navigate('/login');
       return;
     }
 
-    // If user is loaded but not an admin (based on user_roles table), show access denied and redirect
     if (!isAdmin) {
       toast.error('Acesso negado. Apenas administradores podem acessar esta página.');
       navigate('/');
       return;
     }
 
-    // If we get here, user is admin - load dashboard statistics
     loadStats();
   }, [user, isAdmin, loading, navigate]);
 
   const loadStats = async () => {
     try {
-      // Approximate "clients" as count of user_roles where role = 'client'
-      // Approximate "service_availability" as provider_availability
       const [usersRes, petsRes, appointmentsRes, slotsRes] = await Promise.all([
         supabase.from('user_roles').select('id', { count: 'exact' }).eq('role', 'client'),
         supabase.from('pets').select('id', { count: 'exact' }),
@@ -99,7 +94,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Show loading state while auth is loading
   if (loading) {
     return (
       <Layout>
@@ -113,7 +107,6 @@ const AdminDashboard = () => {
     );
   }
 
-  // Show access denied if not admin (after loading is complete, based on user_roles)
   if (!user || !isAdmin) {
     return (
       <Layout>
@@ -134,7 +127,6 @@ const AdminDashboard = () => {
     <Layout>
       <div className="min-h-screen bg-gray-50 p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
           <div className="flex justify-between items-center mb-8">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Painel Administrativo</h1>
@@ -152,7 +144,6 @@ const AdminDashboard = () => {
             </Button>
           </div>
 
-          {/* Statistics Overview */}
           <div className="grid md:grid-cols-4 gap-6 mb-8">
             <Card>
               <CardHeader className="pb-2">
@@ -215,9 +206,12 @@ const AdminDashboard = () => {
             </Card>
           </div>
 
-          {/* Admin Actions */}
+          <div className="grid lg:grid-cols-2 gap-6 mb-8">
+            <PendingApprovalsSection />
+            <ServiceStatusSection />
+          </div>
+
           <div className="grid gap-6">
-            {/* Refresh Availability Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -243,7 +237,6 @@ const AdminDashboard = () => {
               </CardContent>
             </Card>
 
-            {/* Status Center */}
             <Card>
               <CardHeader>
                 <CardTitle>Centro de Status de Serviços</CardTitle>
