@@ -27,12 +27,11 @@ import AdminAvailabilityManager from "./pages/AdminAvailabilityManager";
 import AdminBookingPage from "./pages/AdminBookingPage";
 import { AuthProvider } from "./hooks/useAuth";
 import TestDataPage from "./pages/TestDataPage";
+import GroomerAvailability from './pages/GroomerAvailability';
 
 const queryClient = new QueryClient();
 
-const App = () => {
-  console.log('🚀 App component rendered');
-  
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -56,6 +55,7 @@ const App = () => {
               <Route path="/groomer-calendar" element={<GroomerDashboard />} />
               <Route path="/groomer-schedule" element={<GroomerDashboard />} />
               <Route path="/groomer-dashboard" element={<GroomerDashboard />} />
+              <Route path="/groomer-availability" element={<GroomerAvailability />} />
               <Route path="/vet-calendar" element={<VetCalendar />} />
               <Route path="/shop" element={<Shop />} />
               <Route path="/cart" element={<Cart />} />
@@ -72,6 +72,6 @@ const App = () => {
       </TooltipProvider>
     </QueryClientProvider>
   );
-};
+}
 
 export default App;

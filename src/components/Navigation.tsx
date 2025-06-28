@@ -35,12 +35,25 @@ const Navigation = () => {
     }
   };
 
-  const navItems = [
-    { name: 'Início', href: '/' },
-    { name: 'Serviços', href: '/services' },
-    { name: 'Banho & Tosa', href: '/', scrollTo: 'banho-e-tosa' },
-    { name: 'Sobre', href: '/about' },
-  ];
+  // Different navigation items for groomers vs regular users
+  const getNavItems = () => {
+    if (hasRole('groomer')) {
+      return [
+        { name: 'Dashboard', href: '/groomer-dashboard' },
+        { name: 'Banho & Tosa', href: '/', scrollTo: 'banho-e-tosa' },
+      ];
+    }
+    
+    // Default navigation for non-groomers
+    return [
+      { name: 'Início', href: '/' },
+      { name: 'Serviços', href: '/services' },
+      { name: 'Banho & Tosa', href: '/', scrollTo: 'banho-e-tosa' },
+      { name: 'Sobre', href: '/about' },
+    ];
+  };
+
+  const navItems = getNavItems();
 
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
@@ -102,15 +115,6 @@ const Navigation = () => {
                   </Link>
                 )}
                 
-                {hasRole('groomer') && (
-                  <Link
-                    to="/groomer-dashboard"
-                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
-                  >
-                    Dashboard
-                  </Link>
-                )}
-                
                 {hasRole('vet') && (
                   <Link
                     to="/vet-calendar"
@@ -161,12 +165,28 @@ const Navigation = () => {
                     <DropdownMenuItem asChild>
                       <Link to="/profile">Perfil</Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link to="/pets">Meus Pets</Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link to="/appointments">Agendamentos</Link>
-                    </DropdownMenuItem>
+                    {/* Only show pets and appointments for non-groomer users */}
+                    {!hasRole('groomer') && (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link to="/pets">Meus Pets</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/appointments">Agendamentos</Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    {/* Groomers can still register pets and book services */}
+                    {hasRole('groomer') && (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link to="/pets">Meus Pets</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/groomer-availability">Disponibilidade</Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={handleLogout}>
                       Sair
@@ -250,16 +270,6 @@ const Navigation = () => {
                     </Link>
                   )}
                   
-                  {hasRole('groomer') && (
-                    <Link
-                      to="/groomer-dashboard"
-                      className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
-                      onClick={() => setIsOpen(false)}
-                    >
-                      Dashboard
-                    </Link>
-                  )}
-                  
                   {hasRole('vet') && (
                     <Link
                       to="/vet-calendar"
@@ -287,20 +297,47 @@ const Navigation = () => {
                   >
                     Perfil
                   </Link>
-                  <Link
-                    to="/pets"
-                    className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Meus Pets
-                  </Link>
-                  <Link
-                    to="/appointments"
-                    className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Agendamentos
-                  </Link>
+                  
+                  {/* Only show pets and appointments for non-groomer users */}
+                  {!hasRole('groomer') && (
+                    <>
+                      <Link
+                        to="/pets"
+                        className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        Meus Pets
+                      </Link>
+                      <Link
+                        to="/appointments"
+                        className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        Agendamentos
+                      </Link>
+                    </>
+                  )}
+                  
+                  {/* Groomers can still register pets and manage availability */}
+                  {hasRole('groomer') && (
+                    <>
+                      <Link
+                        to="/pets"
+                        className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        Meus Pets
+                      </Link>
+                      <Link
+                        to="/groomer-availability"
+                        className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        Disponibilidade
+                      </Link>
+                    </>
+                  )}
+                  
                   <button
                     onClick={handleLogout}
                     className="text-gray-700 hover:text-primary block w-full text-left px-3 py-2 text-base font-medium transition-colors"
