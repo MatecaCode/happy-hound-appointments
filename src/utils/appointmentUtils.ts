@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -11,7 +10,7 @@ export async function createAppointment(
   date: Date,
   timeSlot: string,
   notes?: string
-): Promise<boolean> {
+): Promise<{ success: boolean; appointmentId?: string; bookingData?: any }> {
   try {
     console.log('🚀 BOOKING AUDIT: Starting appointment creation with params:', {
       userId,
@@ -26,130 +25,42 @@ export async function createAppointment(
 
     const isoDate = date.toISOString().split('T')[0];
     
-    // STEP 1: Service validation and resource requirements check
-    console.log('📋 STEP 1: Validating service and checking requirements...');
-    const { data: serviceData, error: serviceError } = await supabase
+    // STEP 1: Get user, pet, service, and provider data for notifications
+    const { data: userData } = await supabase.auth.getUser();
+    const { data: petData } = await supabase
+      .from('pets')
+      .select('name')
+      .eq('id', petId)
+      .single();
+    
+    const { data: serviceData } = await supabase
       .from('services')
-      .select('*')
+      .select('name')
       .eq('id', serviceId)
       .single();
 
-    if (serviceError || !serviceData) {
-      console.error('❌ SERVICE ERROR: Service not found:', serviceError);
-      toast.error('Serviço não encontrado');
-      return false;
-    }
-
-    console.log('✅ SERVICE FOUND:', serviceData);
-
-    // Check service resource requirements
-    const { data: serviceResources, error: resourceError } = await supabase
-      .from('service_resources')
-      .select('*')
-      .eq('service_id', serviceId);
-
-    if (resourceError) {
-      console.error('❌ RESOURCE ERROR: Failed to fetch service resources:', resourceError);
-    }
-
-    console.log('🔧 SERVICE RESOURCES:', serviceResources || []);
-    
-    const requiresShower = (serviceResources || []).some(r => r.resource_type === 'shower' && r.required);
-    const requiresProvider = (serviceResources || []).some(r => r.resource_type === 'provider' && r.required);
-    
-    console.log('📊 REQUIREMENTS ANALYSIS:', {
-      requiresShower,
-      requiresProvider,
-      hasProviderId: !!providerId
-    });
-
-    // STEP 2: Provider validation and conversion
-    let providerIds: string[] = [];
-    
-    if (providerId && requiresProvider) {
-      console.log('👤 STEP 2: Converting provider user_id to provider_profile id...');
-      const { data: providerProfile, error: profileError } = await supabase
+    let providerData = null;
+    if (providerId) {
+      const { data } = await supabase
         .from('provider_profiles')
-        .select('id, user_id, type')
+        .select(`
+          id,
+          user_id,
+          users:user_id (
+            email,
+            raw_user_meta_data
+          )
+        `)
         .eq('user_id', providerId)
         .single();
-
-      if (profileError || !providerProfile) {
-        console.error('❌ PROVIDER ERROR: Provider profile not found for user_id:', providerId, profileError);
-        toast.error('Profissional não encontrado no sistema');
-        return false;
-      }
-      
-      console.log('✅ PROVIDER PROFILE FOUND:', providerProfile);
-      providerIds = [providerProfile.id];
-    } else if (requiresProvider && !providerId) {
-      console.error('❌ VALIDATION ERROR: Service requires provider but none provided');
-      toast.error('Este serviço requer seleção de profissional');
-      return false;
+      providerData = data;
     }
 
-    // STEP 3: Pre-flight availability checks
-    console.log('🔍 STEP 3: Pre-flight availability checks...');
+    // STEP 2: Call the atomic booking RPC
+    console.log('🔄 STEP 2: Calling create_booking_atomic RPC...');
     
-    if (requiresShower) {
-      const { data: showerAvailability, error: showerError } = await supabase
-        .from('shower_availability')
-        .select('*')
-        .eq('date', isoDate)
-        .eq('time_slot', timeSlot)
-        .single();
-
-      console.log('🚿 SHOWER AVAILABILITY CHECK:', {
-        date: isoDate,
-        timeSlot,
-        availability: showerAvailability,
-        error: showerError
-      });
-
-      if (showerError || !showerAvailability || showerAvailability.available_spots <= 0) {
-        console.error('❌ SHOWER UNAVAILABLE:', { showerError, availability: showerAvailability });
-        toast.error('Horário de banho não disponível');
-        return false;
-      }
-    }
-
-    if (providerIds.length > 0) {
-      for (const providerProfileId of providerIds) {
-        const { data: providerAvail, error: providerError } = await supabase
-          .from('provider_availability')
-          .select('*')
-          .eq('provider_id', providerProfileId)
-          .eq('date', isoDate)
-          .eq('time_slot', timeSlot)
-          .single();
-
-        console.log('👨‍⚕️ PROVIDER AVAILABILITY CHECK:', {
-          providerProfileId,
-          date: isoDate,
-          timeSlot,
-          availability: providerAvail,
-          error: providerError
-        });
-
-        if (providerError || !providerAvail || !providerAvail.available) {
-          console.error('❌ PROVIDER UNAVAILABLE:', { providerError, availability: providerAvail });
-          toast.error('Profissional não disponível neste horário');
-          return false;
-        }
-      }
-    }
-
-    // STEP 4: Call the atomic booking RPC
-    console.log('🔄 STEP 4: Calling create_booking_atomic RPC with final params:', {
-      _user_id: userId,
-      _pet_id: petId,
-      _service_id: serviceId,
-      _provider_ids: providerIds,
-      _booking_date: isoDate,
-      _time_slot: timeSlot,
-      _notes: notes || null
-    });
-
+    const providerIds = providerId && providerData?.id ? [providerData.id] : [];
+    
     const { data: appointmentId, error } = await supabase.rpc('create_booking_atomic', {
       _user_id: userId,
       _pet_id: petId,
@@ -160,88 +71,97 @@ export async function createAppointment(
       _notes: notes || null
     });
 
-    console.log('📞 RPC RESPONSE:', { appointmentId, error });
-
     if (error) {
       console.error('❌ RPC ERROR: Booking failed:', error);
       
-      // Enhanced error message mapping
       if (error.message.includes('not available') || error.message.includes('Provider') && error.message.includes('not available')) {
         toast.error('Profissional não disponível para o horário selecionado.');
       } else if (error.message.includes('capacity exceeded') || error.message.includes('Shower capacity exceeded')) {
         toast.error('Capacidade de banho excedida para este horário.');
       } else if (error.message.includes('conflicting appointment')) {
         toast.error('Profissional já tem compromisso neste horário.');
-      } else if (error.message.includes('Invalid service_id')) {
-        toast.error('Serviço inválido selecionado.');
       } else if (error.message.includes('Vagas de banho esgotadas')) {
         toast.error('Vagas de banho esgotadas para este horário.');
-      } else if (error.message.includes('Nenhuma vaga de banho disponível')) {
-        toast.error('Nenhuma vaga de banho disponível neste horário.');
       } else {
-        console.error('❌ UNKNOWN ERROR TYPE:', error.message);
-        toast.error(`Erro específico: ${error.message}`);
+        toast.error(`Erro: ${error.message}`);
       }
       
-      return false;
+      return { success: false };
     }
 
     if (!appointmentId) {
       console.error('❌ NO APPOINTMENT ID: RPC succeeded but returned no ID');
       toast.error('Erro interno: ID do agendamento não foi retornado');
-      return false;
+      return { success: false };
     }
 
-    // STEP 5: Verify the booking was created
-    console.log('✅ STEP 5: Verifying booking creation...');
-    const { data: createdAppointment, error: verifyError } = await supabase
-      .from('appointments')
-      .select(`
-        *,
-        appointment_providers (
-          provider_id,
-          provider_profiles (
-            user_id,
-            type
-          )
-        )
-      `)
-      .eq('id', appointmentId)
-      .single();
-
-    if (verifyError || !createdAppointment) {
-      console.error('❌ VERIFICATION FAILED: Appointment not found after creation:', verifyError);
-      toast.error('Erro na verificação do agendamento criado');
-      return false;
-    }
-
-    console.log('🎉 BOOKING SUCCESS: Complete appointment record:', createdAppointment);
+    // STEP 3: Trigger email notifications
+    console.log('📧 STEP 3: Triggering email notifications...');
     
-    // STEP 6: Check related table updates
-    const { data: events } = await supabase
-      .from('appointment_events')
-      .select('*')
-      .eq('appointment_id', appointmentId);
+    const userEmail = userData?.user?.email;
+    const userName = userData?.user?.raw_user_meta_data?.name || 'Cliente';
+    const providerName = providerData?.users?.raw_user_meta_data?.name;
+    const providerEmail = providerData?.users?.email;
 
-    const { data: notifications } = await supabase
-      .from('notification_queue')
-      .select('*')
-      .eq('appointment_id', appointmentId);
+    // Prepare booking data for success page and emails
+    const bookingData = {
+      appointmentId,
+      petName: petData?.name || 'Pet',
+      serviceName: serviceData?.name || 'Serviço',
+      date: isoDate,
+      time: timeSlot,
+      providerName,
+      notes,
+      userName,
+      userEmail
+    };
 
-    console.log('📝 RELATED RECORDS CREATED:', {
-      events: events || [],
-      notifications: notifications || []
-    });
+    // Call email notification function
+    if (userEmail) {
+      try {
+        const response = await fetch('/functions/v1/send-booking-notifications', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+          },
+          body: JSON.stringify({
+            appointmentId,
+            userEmail,
+            userName,
+            petName: petData?.name || 'Pet',
+            serviceName: serviceData?.name || 'Serviço',
+            date: isoDate,
+            time: timeSlot,
+            providerName,
+            providerEmail,
+            notes
+          })
+        });
 
-    toast.success('Agendamento criado com sucesso!');
-    return true;
+        if (!response.ok) {
+          console.warn('⚠️ Email notifications failed, but booking was successful');
+        } else {
+          console.log('✅ Email notifications sent successfully');
+        }
+      } catch (emailError) {
+        console.warn('⚠️ Email error (booking still successful):', emailError);
+      }
+    }
+
+    console.log('🎉 BOOKING SUCCESS: Complete appointment record created');
+    toast.success('Agendamento enviado com sucesso!');
+    
+    return { 
+      success: true, 
+      appointmentId, 
+      bookingData 
+    };
 
   } catch (error: any) {
     console.error('💥 CRITICAL ERROR: Unexpected error in createAppointment:', error);
-    console.error('ERROR STACK:', error.stack);
-    
     toast.error('Erro crítico no sistema de agendamento');
-    return false;
+    return { success: false };
   }
 }
 

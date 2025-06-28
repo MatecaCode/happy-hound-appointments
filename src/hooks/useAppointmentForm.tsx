@@ -136,7 +136,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
     formState.setIsLoading(true);
     
-    const success = await createAppointment(
+    const result = await createAppointment(
       user.id,
       formState.selectedPet,
       formState.selectedService,
@@ -146,8 +146,11 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       formState.notes
     );
 
-    if (success) {
-      navigate('/confirmation');
+    if (result.success && result.bookingData) {
+      // Navigate to success page with booking data
+      navigate('/booking-success', { 
+        state: { bookingData: result.bookingData } 
+      });
     }
     
     formState.setIsLoading(false);

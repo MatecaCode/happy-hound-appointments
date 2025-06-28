@@ -8,6 +8,7 @@ import Services from "./pages/Services";
 import Book from "./pages/Book";
 import Appointments from "./pages/Appointments";
 import Confirmation from "./pages/Confirmation";
+import BookingSuccess from "./pages/BookingSuccess";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -44,6 +45,7 @@ const App = () => {
               <Route path="/book" element={<Book />} />
               <Route path="/appointments" element={<Appointments />} />
               <Route path="/confirmation" element={<Confirmation />} />
+              <Route path="/booking-success" element={<BookingSuccess />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />

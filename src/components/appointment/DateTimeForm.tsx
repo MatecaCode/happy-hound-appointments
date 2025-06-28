@@ -64,6 +64,21 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   
   const toDate = new Date();
   toDate.setMonth(today.getMonth() + 3);
+
+  // Handle time slot selection (just select, don't submit)
+  const handleTimeSlotClick = (timeSlotId: string) => {
+    console.log('🔍 DEBUG: Time slot clicked (selecting only):', timeSlotId);
+    setSelectedTimeSlotId(timeSlotId);
+  };
+
+  // Handle form submission (only when submit button is clicked)
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('🔍 DEBUG: Form submitted via submit button');
+    if (onSubmit) {
+      onSubmit(e);
+    }
+  };
   
   return (
     <>
@@ -142,8 +157,9 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                               variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
                               size="sm"
                               disabled={!slot.available}
-                              onClick={() => setSelectedTimeSlotId(slot.id)}
+                              onClick={() => handleTimeSlotClick(slot.id)}
                               className="justify-center"
+                              type="button"
                             >
                               {slot.time}
                               {!slot.available && (
@@ -195,13 +211,18 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
       
       <div className="flex justify-between">
         {!showTimeSlots && (
-          <Button onClick={onNext} disabled={!date}>
+          <Button onClick={onNext} disabled={!date} type="button">
             Continuar
           </Button>
         )}
         
         {showSubmitButton && onSubmit && (
-          <Button type="submit" disabled={isLoading || !selectedTimeSlotId} onClick={onSubmit}>
+          <Button 
+            type="button" 
+            disabled={isLoading || !selectedTimeSlotId} 
+            onClick={handleFormSubmit}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
             {isLoading ? 'Agendando...' : 'Concluir Agendamento'}
           </Button>
         )}
