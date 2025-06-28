@@ -6,40 +6,48 @@ interface TestimonialProps {
   name: string;
   text: string;
   dogName: string;
+  backgroundColor?: string;
 }
 
 const testimonials: TestimonialProps[] = [
   {
     name: "Mariana Silva",
     dogName: "Max",
-    text: "A Patinha Feliz transformou meu cachorrinho bagunceiro em um verdadeiro cavalheiro. Os tosadores são muito pacientes com meu cão ansioso!"
+    text: "A Vettale sempre acolhe o Max com muito carinho. A equipe é incrível — confiamos de olhos fechados!",
+    backgroundColor: "#F5EEE5"
   },
   {
     name: "Miguel Santos",
     dogName: "Bella",
-    text: "A equipe aqui é incrível! Minha Bella fica animada toda vez que chegamos ao salão. A qualidade do serviço é consistentemente excelente."
+    text: "A equipe da Vettale é sensacional! Minha Bella fica animada toda vez que chegamos. A qualidade do atendimento é sempre excepcional.",
+    backgroundColor: "#E9F3E1"
   },
   {
     name: "Júlia Oliveira",
     dogName: "Cooper",
-    text: "Cooper nunca esteve melhor! O processo de agendamento foi super simples, e eles realmente ouviram exatamente o que eu queria."
+    text: "Cooper nunca esteve melhor! O processo de agendamento da Vettale é super simples, e eles realmente entendem as necessidades de cada pet.",
+    backgroundColor: "#F5EEE5"
   },
 ];
 
 const Testimonials: React.FC = () => {
   return (
-    <section className="py-16 bg-secondary/50">
+    <section className="py-16" style={{ backgroundColor: '#FFFCF8' }}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-center mb-12">
           <h2 className="mb-4">O que Nossos <span className="text-primary">Clientes</span> Dizem</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Não acredite apenas em nossa palavra. Veja o que os donos de cães em nossa comunidade dizem sobre nossos serviços de tosa.
+            Não acredite apenas em nossa palavra. Veja o que os tutores em nossa comunidade dizem sobre o cuidado que oferecemos.
           </p>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {testimonials.map((testimonial, index) => (
-            <Card key={index} className="bg-background">
+            <Card 
+              key={index} 
+              className="border-0 shadow-sm hover:shadow-md transition-shadow duration-300"
+              style={{ backgroundColor: testimonial.backgroundColor }}
+            >
               <CardContent className="pt-6 pb-4">
                 <div className="space-y-4">
                   <div className="flex gap-1">
@@ -50,11 +58,11 @@ const Testimonials: React.FC = () => {
                     ))}
                   </div>
                   
-                  <p className="text-foreground font-medium">"{testimonial.text}"</p>
+                  <p className="text-foreground font-medium leading-relaxed">"{testimonial.text}"</p>
                   
                   <div>
-                    <p className="font-semibold">{testimonial.name}</p>
-                    <p className="text-sm text-muted-foreground">Dono(a) de {testimonial.dogName}</p>
+                    <p className="font-semibold text-foreground">{testimonial.name}</p>
+                    <p className="text-sm text-muted-foreground">Tutor(a) de {testimonial.dogName}</p>
                   </div>
                 </div>
               </CardContent>

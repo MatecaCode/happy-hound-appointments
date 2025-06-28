@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 
 const Hero = () => {
   return (
-    <section className="relative bg-gradient-to-br from-primary/5 to-secondary/10 py-20">
+    <section className="relative bg-gradient-to-br from-primary/5 to-secondary/10 py-20" style={{ backgroundColor: '#FFFCF8' }}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-8">
@@ -15,16 +15,15 @@ const Hero = () => {
                 Cuidado Completo para seu <span className="text-primary">Pet</span>
               </h1>
               <p className="text-xl text-muted-foreground">
-                Serviços veterinários e de estética com qualidade profissional. 
-                Agende online e garante o melhor cuidado para seu amigo de quatro patas.
+                Cuidamos com carinho da saúde, beleza e bem-estar do seu pet — em cada fase da vida.
               </p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button size="lg" asChild>
+              <Button size="lg" asChild className="bg-primary text-white hover:bg-primary/90">
                 <Link to="/book">Agendar Consulta</Link>
               </Button>
-              <Button size="lg" variant="outline" asChild>
+              <Button size="lg" variant="outline" asChild className="border-primary text-primary hover:bg-primary/5">
                 <Link to="/services">Nossos Serviços</Link>
               </Button>
             </div>
@@ -48,7 +47,7 @@ const Hero = () => {
           <div className="relative">
             <img 
               src="https://images.unsplash.com/photo-1582562124811-c09040d0a901?w=500&h=500&fit=crop&crop=faces" 
-              alt="Veterinário cuidando de um cachorro" 
+              alt="Veterinário cuidando carinhosamente de um pet em ambiente clínico acolhedor" 
               className="rounded-lg shadow-2xl w-full h-[500px] object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-lg"></div>
