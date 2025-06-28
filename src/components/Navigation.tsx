@@ -92,13 +92,6 @@ const Navigation = () => {
           <div className="hidden md:flex items-center space-x-4">
             {user ? (
               <>
-                <Link
-                  to="/book"
-                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-all duration-300 hover:shadow-md"
-                >
-                  Agendar Consulta
-                </Link>
-                
                 {/* Role-based navigation using hasRole */}
                 {hasRole('admin') && (
                   <Link
@@ -195,12 +188,6 @@ const Navigation = () => {
                 >
                   Cadastrar
                 </Link>
-                <Link
-                  to="/book"
-                  className="border border-primary text-primary px-4 py-2 rounded-lg hover:bg-primary/5 transition-all duration-300"
-                >
-                  Agendar Consulta
-                </Link>
               </div>
             )}
           </div>
@@ -252,14 +239,6 @@ const Navigation = () => {
               
               {user ? (
                 <>
-                  <Link
-                    to="/book"
-                    className="block w-full text-left bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 transition-colors"
-                    onClick={() => setIsOpen(false)}
-                  >
-                    Agendar Consulta
-                  </Link>
-                  
                   {/* Role-based mobile navigation */}
                   {hasRole('admin') && (
                     <Link

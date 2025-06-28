@@ -3,9 +3,10 @@ import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ServiceCardProps {
   title: string;
@@ -29,6 +30,19 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   className
 }) => {
   const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: Math.random() * 300 });
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleBookingClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      // Redirect to login if user is not logged in
+      navigate('/login');
+    } else {
+      // Navigate to booking page with service pre-selected
+      navigate('/book', { state: { service: title } });
+    }
+  };
 
   return (
     <Card 
@@ -68,11 +82,12 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
         <CardDescription className="min-h-[80px] text-muted-foreground leading-relaxed mb-4">
           {description}
         </CardDescription>
-        <Link to="/book" state={{ service: title }}>
-          <Button className="w-full bg-primary hover:bg-primary/90 text-white transition-all duration-300 hover:shadow-lg group-hover:scale-105">
-            Agendar Agora
-          </Button>
-        </Link>
+        <Button 
+          onClick={handleBookingClick}
+          className="w-full bg-primary hover:bg-primary/90 text-white transition-all duration-300 hover:shadow-lg group-hover:scale-105"
+        >
+          Agendar Agora
+        </Button>
       </CardContent>
     </Card>
   );
