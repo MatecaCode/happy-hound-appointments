@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Pet, Service, Provider, TimeSlot, NextAvailable } from './useAppointmentForm';
@@ -77,78 +78,51 @@ export const useAppointmentData = () => {
 
       const providerType = serviceType === 'grooming' ? 'groomer' : 'vet';
       
-      // Get ALL provider profiles of the correct type first
-      const { data: allProviderProfiles, error: profileError } = await supabase
-        .from('provider_profiles')
+      // Get provider profiles that have availability on the selected date
+      const { data: availableProviderData, error: availError } = await supabase
+        .from('provider_availability')
         .select(`
-          id,
-          user_id,
-          type,
-          bio,
-          rating
+          provider_id,
+          provider_profiles!inner(
+            id,
+            user_id,
+            type,
+            bio,
+            rating
+          )
         `)
-        .eq('type', providerType);
+        .eq('date', dateStr)
+        .eq('available', true)
+        .eq('provider_profiles.type', providerType);
 
-      if (profileError) {
-        console.error('❌ [FETCH_PROVIDERS] Error fetching provider profiles:', profileError);
-        throw profileError;
+      if (availError) {
+        console.error('❌ [FETCH_PROVIDERS] Error fetching available providers:', availError);
+        throw availError;
       }
 
-      console.log('📊 [FETCH_PROVIDERS] All provider profiles found:', {
-        count: allProviderProfiles?.length || 0,
-        profiles: allProviderProfiles?.map(p => ({ id: p.id, user_id: p.user_id, type: p.type }))
-      });
+      console.log('📊 [FETCH_PROVIDERS] Raw available provider data:', availableProviderData);
 
-      if (!allProviderProfiles || allProviderProfiles.length === 0) {
-        console.log('❌ [FETCH_PROVIDERS] No provider profiles found for type:', providerType);
+      if (!availableProviderData || availableProviderData.length === 0) {
+        console.log('❌ [FETCH_PROVIDERS] No available providers found');
         setGroomers([]);
         return;
       }
 
-      // Now check which of these providers have availability on the selected date
-      const providerIds = allProviderProfiles.map(p => p.id);
-      
-      console.log('🔍 [FETCH_PROVIDERS] Checking availability for provider IDs:', providerIds);
-      
-      const { data: availabilityData, error: availError } = await supabase
-        .from('provider_availability')
-        .select('provider_id, date, time_slot, available')
-        .eq('date', dateStr)
-        .in('provider_id', providerIds)
-        .eq('available', true);
+      // Get unique providers (since one provider can have multiple time slots)
+      const uniqueProviders = availableProviderData.reduce((acc: any[], curr) => {
+        if (!acc.find(p => p.provider_profiles.id === curr.provider_profiles.id)) {
+          acc.push(curr);
+        }
+        return acc;
+      }, []);
 
-      if (availError) {
-        console.error('❌ [FETCH_PROVIDERS] Error fetching availability:', availError);
-        throw availError;
-      }
-
-      console.log('📊 [FETCH_PROVIDERS] Availability data found:', {
-        total_slots: availabilityData?.length || 0,
-        availability_by_provider: availabilityData?.reduce((acc: any, curr) => {
-          acc[curr.provider_id] = (acc[curr.provider_id] || 0) + 1;
-          return acc;
-        }, {})
-      });
-
-      // Get unique provider IDs that have availability
-      const availableProviderIds = [...new Set(availabilityData?.map(a => a.provider_id) || [])];
-      
-      console.log('✅ [FETCH_PROVIDERS] Providers with availability:', availableProviderIds);
-
-      // Filter profiles to only those with availability
-      const availableProfiles = allProviderProfiles.filter(profile => 
-        availableProviderIds.includes(profile.id)
-      );
-
-      console.log('📊 [FETCH_PROVIDERS] Available profiles after filtering:', {
-        count: availableProfiles.length,
-        profiles: availableProfiles.map(p => ({ id: p.id, user_id: p.user_id }))
-      });
+      console.log('📊 [FETCH_PROVIDERS] Unique providers:', uniqueProviders);
 
       // Get names for these providers
       const availableProviders: Provider[] = [];
       
-      for (const profile of availableProfiles) {
+      for (const providerData of uniqueProviders) {
+        const profile = providerData.provider_profiles;
         let providerName = 'Provider';
         
         // Get name from appropriate table
@@ -248,6 +222,12 @@ export const useAppointmentData = () => {
       }
 
       // Use the new RPC to get available slots
+      console.log('🔍 [FETCH_TIME_SLOTS] Calling RPC with params:', {
+        _service_id: selectedService.id,
+        _date: dateStr,
+        _provider_id: providerProfileId
+      });
+
       const { data: availableSlots, error } = await supabase.rpc('get_available_slots_for_service', {
         _service_id: selectedService.id,
         _date: dateStr,

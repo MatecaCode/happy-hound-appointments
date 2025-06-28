@@ -64,6 +64,19 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 
   const canProceed = showTimeSlots ? selectedTimeSlotId : date;
 
+  // Debug logging for time slots 
+  React.useEffect(() => {
+    if (showTimeSlots) {
+      console.log('🔍 [DateTimeForm] Time slots data:', {
+        timeSlots,
+        timeSlots_count: timeSlots.length,
+        isLoading,
+        date: date?.toISOString(),
+        showTimeSlots
+      });
+    }
+  }, [timeSlots, isLoading, showTimeSlots, date]);
+
   return (
     <Card>
       <CardHeader>
@@ -78,59 +91,95 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'calendar' | 'next-available')}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="calendar">Escolher Data</TabsTrigger>
-            <TabsTrigger value="next-available">Próximo Disponível</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="calendar" className="space-y-4">
-            <div className="flex flex-col items-center space-y-4">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={handleDateSelect}
-                locale={ptBR}
-                disabled={(date) => date < new Date() || date.getDay() === 0}
-                className="rounded-md border"
-              />
-              
-              {date && (
-                <p className="text-sm text-muted-foreground">
-                  Data selecionada: {format(date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                </p>
-              )}
-            </div>
-
-            {showTimeSlots && date && (
-              <div className="mt-6">
-                {isLoading ? (
-                  <div className="text-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="mt-2 text-muted-foreground">
-                      {isShowerOnlyService ? 'Carregando horários de banho...' : 'Carregando horários...'}
-                    </p>
-                  </div>
-                ) : (
-                  <TimeSlotSelector
-                    date={date}
-                    timeSlots={timeSlots}
-                    selectedTimeSlotId={selectedTimeSlotId}
-                    onSelectTimeSlot={setSelectedTimeSlotId}
-                  />
+        {/* Show calendar and tabs only when NOT showing time slots (i.e., step 2) */}
+        {!showTimeSlots && (
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'calendar' | 'next-available')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="calendar">Escolher Data</TabsTrigger>
+              <TabsTrigger value="next-available">Próximo Disponível</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="calendar" className="space-y-4">
+              <div className="flex flex-col items-center space-y-4">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={handleDateSelect}
+                  locale={ptBR}
+                  disabled={(date) => date < new Date() || date.getDay() === 0}
+                  className="rounded-md border"
+                />
+                
+                {date && (
+                  <p className="text-sm text-muted-foreground">
+                    Data selecionada: {format(date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                  </p>
                 )}
               </div>
+            </TabsContent>
+            
+            <TabsContent value="next-available">
+              <NextAvailableAppointment
+                nextAvailable={nextAvailable}
+                onSelect={handleNextAvailableSelect}
+                loading={isLoading}
+              />
+            </TabsContent>
+          </Tabs>
+        )}
+
+        {/* Show time slots section for final step (step 4) */}
+        {showTimeSlots && (
+          <div className="space-y-4">
+            {/* Show selected date info */}
+            {date && (
+              <div className="text-center p-4 bg-secondary/20 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">Data selecionada:</p>
+                <p className="font-medium">
+                  {format(date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </p>
+              </div>
             )}
-          </TabsContent>
-          
-          <TabsContent value="next-available">
-            <NextAvailableAppointment
-              nextAvailable={nextAvailable}
-              onSelect={handleNextAvailableSelect}
-              loading={isLoading}
-            />
-          </TabsContent>
-        </Tabs>
+
+            {/* Time slots or loading */}
+            {isLoading ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="mt-2 text-muted-foreground">
+                  {isShowerOnlyService ? 'Carregando horários de banho...' : 'Carregando horários...'}
+                </p>
+              </div>
+            ) : timeSlots.length > 0 ? (
+              <TimeSlotSelector
+                date={date}
+                timeSlots={timeSlots}
+                selectedTimeSlotId={selectedTimeSlotId}
+                onSelectTimeSlot={setSelectedTimeSlotId}
+              />
+            ) : (
+              <div className="text-center py-8">
+                <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">
+                  Não há horários disponíveis para esta data
+                </p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  Tente selecionar uma data diferente ou use "Próximo Disponível"
+                </p>
+              </div>
+            )}
+
+            {/* Next available option when no slots */}
+            {!isLoading && timeSlots.length === 0 && nextAvailable && (
+              <div className="mt-4">
+                <NextAvailableAppointment
+                  nextAvailable={nextAvailable}
+                  onSelect={handleNextAvailableSelect}
+                  loading={false}
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="notes">Observações (opcional)</Label>
