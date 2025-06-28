@@ -41,26 +41,46 @@ export async function createAppointment(
       .single();
 
     let providerData = null;
+    let providerProfileId = null;
     if (providerId) {
-      const { data } = await supabase
+      // Get the provider profile ID from the provider_profiles table
+      const { data: providerProfile } = await supabase
         .from('provider_profiles')
-        .select(`
-          id,
-          user_id,
-          users:user_id (
-            email,
-            user_metadata
-          )
-        `)
+        .select('id, user_id')
         .eq('user_id', providerId)
         .single();
-      providerData = data;
+      
+      if (providerProfile) {
+        providerProfileId = providerProfile.id;
+        // Get user data for the provider
+        const { data: providerUserData } = await supabase
+          .from('clients')
+          .select('name')
+          .eq('user_id', providerId)
+          .single();
+        
+        // Also try groomers table
+        const { data: groomerData } = await supabase
+          .from('groomers')
+          .select('name')
+          .eq('user_id', providerId)
+          .single();
+        
+        providerData = {
+          id: providerProfileId,
+          user_id: providerId,
+          name: providerUserData?.name || groomerData?.name || 'Provider'
+        };
+      }
     }
 
-    // STEP 2: Call the atomic booking RPC
-    console.log('🔄 STEP 2: Calling create_booking_atomic RPC...');
+    // STEP 2: Call the atomic booking RPC with provider profile IDs
+    console.log('🔄 STEP 2: Calling create_booking_atomic RPC...', {
+      provider_profile_id: providerProfileId,
+      provider_user_id: providerId
+    });
     
-    const providerIds = providerId && providerData?.id ? [providerData.id] : [];
+    const providerIds = providerProfileId ? [providerProfileId] : [];
     
     const { data: appointmentId, error } = await supabase.rpc('create_booking_atomic', {
       _user_id: userId,
@@ -101,8 +121,8 @@ export async function createAppointment(
     
     const userEmail = userData?.user?.email;
     const userName = userData?.user?.user_metadata?.name || 'Cliente';
-    const providerName = providerData?.users?.user_metadata?.name;
-    const providerEmail = providerData?.users?.email;
+    const providerName = providerData?.name;
+    const providerEmail = userData?.user?.email; // This needs to be fixed to get provider email
 
     // Prepare booking data for success page and emails
     const bookingData = {

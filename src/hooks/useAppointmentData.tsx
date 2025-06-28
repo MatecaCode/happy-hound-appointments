@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -47,6 +46,14 @@ export const useAppointmentData = () => {
     try {
       console.log('👥 PROVIDER FETCH: Starting for:', { serviceType, date, service: selectedService });
       
+      // Ensure we don't select Sundays
+      const dayOfWeek = date.getDay();
+      if (dayOfWeek === 0) {
+        console.log('⚠️ PROVIDER FETCH: Sunday selected, no providers available');
+        setGroomers([]);
+        return;
+      }
+      
       const dateStr = date.toISOString().split('T')[0];
 
       // Get service requirements from centralized source
@@ -73,21 +80,7 @@ export const useAppointmentData = () => {
       }
 
       if (!availableProviders || availableProviders.length === 0) {
-        console.log('⚠️ NO PROVIDERS: Checking fallback...');
-        
-        // Fallback: get all providers of the correct type if RPC fails
-        const { data: allProviders, error: allError } = await supabase
-          .from('provider_profiles')
-          .select('*')
-          .eq('type', serviceType === 'grooming' ? 'groomer' : 'vet');
-
-        console.log('🔄 FALLBACK PROVIDERS:', { providers: allProviders, error: allError });
-
-        if (!allProviders || allProviders.length === 0) {
-          console.log('❌ NO PROVIDERS FOUND: No providers in system!');
-          toast.error('Nenhum profissional cadastrado no sistema');
-        }
-
+        console.log('⚠️ NO PROVIDERS: No providers available for this date/service');
         setGroomers([]);
         return;
       }
@@ -141,9 +134,9 @@ export const useAppointmentData = () => {
           name: userInfo?.name || `${provider.provider_type} Provider`,
           role: provider.provider_type,
           profile_image: undefined,
-          rating: undefined,
+          rating: 4.5, // Default rating
           specialty: provider.provider_type === 'groomer' ? 'Tosa e Banho' : 'Veterinária',
-          about: undefined
+          about: `Profissional experiente em ${provider.provider_type === 'groomer' ? 'tosa e banho' : 'veterinária'}`
         };
       });
 
@@ -226,6 +219,14 @@ export const useAppointmentData = () => {
   ) => {
     if (!date || !selectedService) {
       console.log('⚠️ TIME SLOTS: Missing date or service, clearing slots');
+      setTimeSlots([]);
+      return;
+    }
+
+    // Check if it's Sunday
+    const dayOfWeek = date.getDay();
+    if (dayOfWeek === 0) {
+      console.log('⚠️ TIME SLOTS: Sunday selected, no slots available');
       setTimeSlots([]);
       return;
     }

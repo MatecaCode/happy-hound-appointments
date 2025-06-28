@@ -102,7 +102,8 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                 className="mx-auto pointer-events-auto"
                 locale={ptBR}
                 disabled={(date) => {
-                  return date < today;
+                  const dayOfWeek = date.getDay();
+                  return date < today || dayOfWeek === 0; // Disable past dates and Sundays
                 }}
                 fromDate={today}
                 toDate={toDate}
@@ -110,89 +111,78 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             </CardContent>
           </Card>
         ) : (
-          // Full date/time selection for step 4
-          <Tabs defaultValue="calendar" value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="calendar">Calendário</TabsTrigger>
-              <TabsTrigger value="next">Próximo Disponível</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="calendar">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardContent className="p-4">
-                    <Calendar
-                      mode="single"
-                      selected={date}
-                      onSelect={(newDate) => newDate && setDate(newDate)}
-                      className="mx-auto pointer-events-auto"
-                      locale={ptBR}
-                      disabled={(date) => {
-                        return date < today;
-                      }}
-                      fromDate={today}
-                      toDate={toDate}
-                    />
-                  </CardContent>
-                </Card>
-                
-                <div>
-                  <Card>
-                    <CardContent className="p-4">
-                      <h3 className="font-semibold mb-4">
-                        Horários para {format(date, 'dd/MM/yyyy', { locale: ptBR })}
-                      </h3>
-                      
-                      {isLoading ? (
-                        <p className="text-center text-muted-foreground">Carregando horários...</p>
-                      ) : timeSlots.length === 0 ? (
-                        <p className="text-center text-muted-foreground">
-                          Selecione um profissional primeiro para ver os horários disponíveis
-                        </p>
-                      ) : (
-                        <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
-                          {timeSlots.map((slot) => (
-                            <Button
-                              key={slot.id}
-                              variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
-                              size="sm"
-                              disabled={!slot.available}
-                              onClick={() => handleTimeSlotClick(slot.id)}
-                              className="justify-center"
-                              type="button"
-                            >
-                              {slot.time}
-                              {!slot.available && (
-                                <Badge variant="secondary" className="ml-2 text-xs">
-                                  Ocupado
-                                </Badge>
-                              )}
-                            </Button>
-                          ))}
-                        </div>
-                      )}
-                      
-                      {timeSlots.filter(slot => slot.available).length === 0 && timeSlots.length > 0 && (
-                        <p className="text-center text-muted-foreground mt-4">
-                          Não há horários disponíveis para esta data. Tente outra data ou use "Próximo Disponível".
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
+          // Time-only selection for final step (no calendar needed)
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold">
+                    Horários para {format(date, 'dd/MM/yyyy', { locale: ptBR })}
+                  </h3>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveTab('next')}
+                  >
+                    Ver Próximo Disponível
+                  </Button>
                 </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="next">
-              <div className="py-6">
-                <NextAvailableAppointment
-                  nextAvailable={nextAvailable}
-                  onSelect={handleNextAvailableSelect}
-                  loading={isLoading}
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
+                
+                {isLoading ? (
+                  <p className="text-center text-muted-foreground">Carregando horários...</p>
+                ) : timeSlots.length === 0 ? (
+                  <p className="text-center text-muted-foreground">
+                    Nenhum horário disponível para esta data
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {timeSlots.map((slot) => (
+                      <Button
+                        key={slot.id}
+                        variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
+                        size="sm"
+                        disabled={!slot.available}
+                        onClick={() => handleTimeSlotClick(slot.id)}
+                        className="justify-center"
+                        type="button"
+                      >
+                        {slot.time}
+                        {!slot.available && (
+                          <Badge variant="secondary" className="ml-2 text-xs">
+                            Ocupado
+                          </Badge>
+                        )}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+                
+                {timeSlots.filter(slot => slot.available).length === 0 && timeSlots.length > 0 && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-center text-yellow-800 font-medium">
+                      Não há horários disponíveis para esta data
+                    </p>
+                    <p className="text-center text-yellow-700 text-sm mt-1">
+                      Tente selecionar outra data ou use "Próximo Disponível"
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Next Available Option */}
+            {activeTab === 'next' && (
+              <Card>
+                <CardContent className="p-4">
+                  <NextAvailableAppointment
+                    nextAvailable={nextAvailable}
+                    onSelect={handleNextAvailableSelect}
+                    loading={isLoading}
+                  />
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
         
         {showTimeSlots && (

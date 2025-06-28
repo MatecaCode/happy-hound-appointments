@@ -4,13 +4,15 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CalendarCheck, Clock, Dog, User, Mail, Phone, CheckCircle } from 'lucide-react';
+import { CalendarCheck, Clock, Dog, User, Mail, Phone, CheckCircle, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useAuth } from '@/hooks/useAuth';
 
 const BookingSuccess = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // Get booking data from navigation state
   const bookingData = location.state?.bookingData;
@@ -20,6 +22,9 @@ const BookingSuccess = () => {
     navigate('/book');
     return null;
   }
+
+  // Check if user is a groomer to show appropriate dashboard link
+  const isGroomer = user?.user_metadata?.role === 'groomer';
   
   return (
     <Layout>
@@ -113,12 +118,22 @@ const BookingSuccess = () => {
           </Card>
           
           <div className="flex flex-col sm:flex-row gap-4 mt-8">
-            <Button 
-              className="w-full sm:w-auto" 
-              onClick={() => navigate('/appointments')}
-            >
-              Ver Meus Agendamentos
-            </Button>
+            {isGroomer ? (
+              <Button 
+                className="w-full sm:w-auto flex items-center gap-2" 
+                onClick={() => navigate('/groomer-dashboard')}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Voltar ao Dashboard
+              </Button>
+            ) : (
+              <Button 
+                className="w-full sm:w-auto" 
+                onClick={() => navigate('/appointments')}
+              >
+                Ver Meus Agendamentos
+              </Button>
+            )}
             <Button 
               variant="outline" 
               className="w-full sm:w-auto"

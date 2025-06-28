@@ -50,13 +50,8 @@ const GroomerSelectionForm = ({
     console.log('🔍 Selected groomer ID:', selectedGroomerId);
   }, [groomers, selectedGroomerId, serviceType, date]);
   
-  // Auto-select first groomer if there's only one and none is selected
-  useEffect(() => {
-    if (groomers.length === 1 && !selectedGroomerId) {
-      console.log('🎯 Auto-selecting single groomer:', groomers[0]);
-      setSelectedGroomerId(groomers[0].id);
-    }
-  }, [groomers, selectedGroomerId, setSelectedGroomerId]);
+  // DO NOT auto-select - let user choose
+  // Removed the auto-select useEffect
 
   // Render stars for ratings
   const renderRating = (rating: number = 0) => {
@@ -92,8 +87,8 @@ const GroomerSelectionForm = ({
               }}
               className={`cursor-pointer transition-colors duration-200 ${
                 selectedGroomerId === groomer.id 
-                  ? 'border-primary ring-2 ring-primary/20' 
-                  : 'hover:border-gray-300'
+                  ? 'border-primary ring-2 ring-primary/20 bg-primary/5' 
+                  : 'hover:border-gray-300 hover:shadow-md'
               }`}
             >
               <CardContent className="p-4 space-y-4">
@@ -128,12 +123,12 @@ const GroomerSelectionForm = ({
                   </div>
                 )}
                 
-                <div className={`p-1 text-center rounded text-sm ${
+                <div className={`p-2 text-center rounded text-sm font-medium ${
                   selectedGroomerId === groomer.id 
                   ? 'bg-primary text-primary-foreground' 
-                  : 'bg-secondary'
+                  : 'bg-secondary text-secondary-foreground'
                 }`}>
-                  {selectedGroomerId === groomer.id ? 'Selecionado' : 'Selecionar'}
+                  {selectedGroomerId === groomer.id ? '✓ Selecionado' : 'Clique para Selecionar'}
                 </div>
               </CardContent>
             </Card>
