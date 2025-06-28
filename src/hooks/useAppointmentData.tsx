@@ -305,14 +305,14 @@ export const useAppointmentData = () => {
       const slots: TimeSlot[] = [];
       const startHour = 9;
       const endHour = 17;
-      const serviceDuration = selectedService.duration || 30;
 
       console.log('🕒 TIME SLOTS: Generating slots from', startHour, 'to', endHour);
 
-      // If groomer is selected, get their availability directly from provider_availability table
-      let groomerAvailableSlots: string[] = [];
+      // Get groomer's provider_profile_id if groomer is selected
+      let providerProfileId: string | null = null;
       if (requiresGroomer && groomerId) {
-        // Get provider profile ID first
+        console.log('🔍 FINDING PROVIDER PROFILE: For user_id:', groomerId);
+        
         const { data: providerProfile, error: profileError } = await supabase
           .from('provider_profiles')
           .select('id')
@@ -321,15 +321,24 @@ export const useAppointmentData = () => {
 
         if (profileError || !providerProfile) {
           console.error('❌ PROVIDER PROFILE ERROR:', profileError);
+          console.log('❌ NO PROVIDER PROFILE FOUND for user_id:', groomerId);
           setTimeSlots([]);
           return;
         }
 
-        // Get all available slots for this groomer on this date
+        providerProfileId = providerProfile.id;
+        console.log('✅ PROVIDER PROFILE FOUND:', { user_id: groomerId, provider_id: providerProfileId });
+      }
+
+      // Get groomer availability if required
+      let groomerAvailableSlots: string[] = [];
+      if (requiresGroomer && providerProfileId) {
+        console.log('🔍 CHECKING GROOMER AVAILABILITY:', { providerProfileId, date: dateStr });
+        
         const { data: availabilityData, error: availError } = await supabase
           .from('provider_availability')
-          .select('time_slot')
-          .eq('provider_id', providerProfile.id)
+          .select('time_slot, available')
+          .eq('provider_id', providerProfileId)
           .eq('date', dateStr)
           .eq('available', true);
 
@@ -346,6 +355,8 @@ export const useAppointmentData = () => {
       // Get shower availability for all time slots if required
       let showerAvailableSlots: string[] = [];
       if (requiresShower) {
+        console.log('🔍 CHECKING SHOWER AVAILABILITY for date:', dateStr);
+        
         const { data: showerData, error: showerError } = await supabase
           .from('shower_availability')
           .select('time_slot, available_spots')
@@ -368,7 +379,7 @@ export const useAppointmentData = () => {
           let isAvailable = true;
 
           // Check groomer availability if required
-          if (requiresGroomer && groomerId) {
+          if (requiresGroomer && providerProfileId) {
             if (!groomerAvailableSlots.includes(timeSlot)) {
               isAvailable = false;
               console.log(`⏰ SLOT ${timeSlot}: UNAVAILABLE (Groomer not available)`);
