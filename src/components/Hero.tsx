@@ -6,11 +6,11 @@ import { Link } from 'react-router-dom';
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
 
 const Hero = () => {
-  const titleAnimation = useScrollAnimation({ delay: 100 });
-  const subtitleAnimation = useScrollAnimation({ delay: 300 });
-  const buttonAnimation = useScrollAnimation({ delay: 500 });
-  const featuresAnimation = useScrollAnimation({ delay: 700 });
-  const imageAnimation = useScrollAnimation({ delay: 200 });
+  const titleAnimation = useScrollAnimation<HTMLHeadingElement>({ delay: 100 });
+  const subtitleAnimation = useScrollAnimation<HTMLParagraphElement>({ delay: 300 });
+  const buttonAnimation = useScrollAnimation<HTMLDivElement>({ delay: 500 });
+  const featuresAnimation = useScrollAnimation<HTMLDivElement>({ delay: 700 });
+  const imageAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
 
   return (
     <section className="relative bg-gradient-to-br from-primary/5 to-secondary/10 py-20" style={{ backgroundColor: '#FFFCF8' }}>

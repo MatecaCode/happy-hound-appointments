@@ -32,7 +32,7 @@ const testimonials: TestimonialProps[] = [
 ];
 
 const Testimonials: React.FC = () => {
-  const headerAnimation = useScrollAnimation({ delay: 100 });
+  const headerAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
 
   return (
     <section className="py-16" style={{ backgroundColor: '#FFFCF8' }}>
@@ -51,7 +51,7 @@ const Testimonials: React.FC = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {testimonials.map((testimonial, index) => {
-            const cardAnimation = useScrollAnimation({ delay: index * 200 + 200 });
+            const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: index * 200 + 200 });
             
             return (
               <Card 

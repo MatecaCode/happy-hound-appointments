@@ -1,4 +1,3 @@
-
 import React from 'react';
 import Layout from '@/components/Layout';
 import Hero from '@/components/Hero';
@@ -10,10 +9,10 @@ import { Link } from 'react-router-dom';
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
 
 const Index = () => {
-  const institutionalAnimation = useScrollAnimation({ delay: 200 });
-  const servicesHeaderAnimation = useScrollAnimation({ delay: 100 });
-  const banhoTosaHeaderAnimation = useScrollAnimation({ delay: 100 });
-  const ctaAnimation = useScrollAnimation({ delay: 200 });
+  const institutionalAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
+  const servicesHeaderAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
+  const banhoTosaHeaderAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
+  const ctaAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
 
   const services = [
     {

@@ -28,7 +28,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
   backgroundColor,
   className
 }) => {
-  const cardAnimation = useScrollAnimation({ delay: Math.random() * 300 });
+  const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: Math.random() * 300 });
 
   return (
     <Card 

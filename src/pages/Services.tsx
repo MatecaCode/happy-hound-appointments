@@ -8,10 +8,10 @@ import { Separator } from "@/components/ui/separator";
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
 
 const Services = () => {
-  const headerAnimation = useScrollAnimation({ delay: 100 });
-  const vetHeaderAnimation = useScrollAnimation({ delay: 100 });
-  const groomingHeaderAnimation = useScrollAnimation({ delay: 100 });
-  const ctaAnimation = useScrollAnimation({ delay: 200 });
+  const headerAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
+  const vetHeaderAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
+  const groomingHeaderAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
+  const ctaAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
 
   const groomingServices = [
     {
