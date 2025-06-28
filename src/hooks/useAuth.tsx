@@ -258,28 +258,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signOut = async () => {
     try {
-      // Clear local state first
+      console.log('🚪 Starting logout process...');
+      
+      // Clear local state immediately to prevent UI issues
       setUser(null);
       setSession(null);
       setUserRoles([]);
 
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      // Attempt to sign out from Supabase
+      // Use a more robust approach that doesn't depend on session state
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      
+      if (error) {
+        console.warn('⚠️ Logout error (continuing anyway):', error);
+        // Don't throw the error - we'll handle it gracefully
+      } else {
+        console.log('✅ Logout successful');
+      }
 
       toast.success('Logout realizado com sucesso!');
       
-      // Navigate after a short delay to ensure state is cleared
-      setTimeout(() => {
-        navigate('/', { replace: true });
-      }, 100);
-    } catch (error: any) {
-      console.error('Sign out error:', error);
-      toast.error(error.message || 'Erro ao fazer logout');
+      // Navigate immediately after clearing state
+      navigate('/', { replace: true });
       
-      // Even if there's an error, try to clear local state and redirect
+    } catch (error: any) {
+      console.error('💥 Sign out error:', error);
+      
+      // Even if there's an error, ensure we clear state and redirect
+      // This prevents users from being stuck in a broken auth state
       setUser(null);
       setSession(null);
       setUserRoles([]);
+      
+      // Show a gentle warning but still navigate
+      toast.success('Sessão encerrada');
       navigate('/', { replace: true });
     }
   };
