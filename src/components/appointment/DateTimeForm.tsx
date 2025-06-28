@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, Clock, Sparkles } from 'lucide-react';
+import { CalendarIcon, Clock, Sparkles, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import TimeSlotSelector from '@/components/TimeSlotSelector';
@@ -62,20 +61,33 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     }
   };
 
-  const canProceed = showTimeSlots ? selectedTimeSlotId : date;
+  // 🔒 CRITICAL: Validate selected slot is in available slots
+  const isSelectedSlotValid = React.useMemo(() => {
+    if (!selectedTimeSlotId) return false;
+    const validSlot = timeSlots.find(slot => 
+      slot.id === selectedTimeSlotId && slot.available
+    );
+    return Boolean(validSlot);
+  }, [selectedTimeSlotId, timeSlots]);
+
+  const canProceed = showTimeSlots ? isSelectedSlotValid : date; // Use slot validation instead of just ID
 
   // Debug logging for time slots 
   React.useEffect(() => {
     if (showTimeSlots) {
-      console.log('🔍 [DateTimeForm] Time slots data:', {
+      console.log('🔍 [DateTimeForm] Time slots data with validation:', {
         timeSlots,
         timeSlots_count: timeSlots.length,
+        available_count: timeSlots.filter(s => s.available).length,
         isLoading,
         date: date?.toISOString(),
-        showTimeSlots
+        showTimeSlots,
+        selected_slot: selectedTimeSlotId,
+        is_selected_valid: isSelectedSlotValid,
+        can_proceed: canProceed
       });
     }
-  }, [timeSlots, isLoading, showTimeSlots, date]);
+  }, [timeSlots, isLoading, showTimeSlots, date, selectedTimeSlotId, isSelectedSlotValid, canProceed]);
 
   return (
     <Card>
@@ -137,6 +149,18 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                 <p className="text-sm text-muted-foreground mb-1">Data selecionada:</p>
                 <p className="font-medium">
                   {format(date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                </p>
+              </div>
+            )}
+
+            {/* 🔒 CRITICAL: Show slot validation warning */}
+            {selectedTimeSlotId && !isSelectedSlotValid && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800 text-sm font-medium">
+                  ⚠️ Horário selecionado não está mais disponível
+                </p>
+                <p className="text-red-600 text-sm">
+                  Por favor, selecione outro horário da lista atualizada.
                 </p>
               </div>
             )}
@@ -208,6 +232,11 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Processando...
+                </>
+              ) : !isSelectedSlotValid && selectedTimeSlotId ? (
+                <>
+                  <AlertTriangle className="h-4 w-4 mr-2" />
+                  Horário Indisponível
                 </>
               ) : (
                 <>
