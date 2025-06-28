@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Calendar as CalendarIcon, Clock, Users, Shower, AlertTriangle } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, Users, Droplets, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -133,15 +133,15 @@ const AdminAvailabilityManager = () => {
 
       if (availError) throw availError;
 
-      // Get appointments for this provider and date
+      // Get appointments for this provider and date - fix the query structure
       const { data: appointments, error: apptError } = await supabase
         .from('appointments')
         .select(`
           id,
           time,
-          pets:pet_id (name),
-          services:service_id (name),
-          clients:user_id (name),
+          user_id,
+          pet_id,
+          service_id,
           appointment_providers!inner(provider_id)
         `)
         .eq('appointment_providers.provider_id', selectedProvider)
@@ -149,6 +149,39 @@ const AdminAvailabilityManager = () => {
         .in('status', ['pending', 'confirmed']);
 
       if (apptError) throw apptError;
+
+      // Get additional data for appointments
+      const appointmentsWithDetails = await Promise.all(
+        (appointments || []).map(async (apt) => {
+          // Get pet name
+          const { data: petData } = await supabase
+            .from('pets')
+            .select('name')
+            .eq('id', apt.pet_id)
+            .single();
+
+          // Get service name
+          const { data: serviceData } = await supabase
+            .from('services')
+            .select('name')
+            .eq('id', apt.service_id)
+            .single();
+
+          // Get client name
+          const { data: clientData } = await supabase
+            .from('clients')
+            .select('name')
+            .eq('user_id', apt.user_id)
+            .single();
+
+          return {
+            ...apt,
+            pet_name: petData?.name || 'Pet',
+            service_name: serviceData?.name || 'Serviço',
+            user_name: clientData?.name || 'Cliente'
+          };
+        })
+      );
 
       // Generate time slots
       const slots: TimeSlot[] = [];
@@ -158,7 +191,7 @@ const AdminAvailabilityManager = () => {
           
           const timeStr = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
           const availabilityRecord = availability?.find(a => a.time_slot === timeStr + ':00');
-          const appointment = appointments?.find(a => a.time === timeStr + ':00');
+          const appointment = appointmentsWithDetails?.find(a => a.time === timeStr + ':00');
           
           slots.push({
             time: timeStr,
@@ -166,9 +199,9 @@ const AdminAvailabilityManager = () => {
             hasAppointment: !!appointment,
             appointmentDetails: appointment ? {
               id: appointment.id,
-              pet_name: appointment.pets?.name || 'Pet',
-              user_name: appointment.clients?.name || 'Cliente',
-              service_name: appointment.services?.name || 'Serviço'
+              pet_name: appointment.pet_name,
+              user_name: appointment.user_name,
+              service_name: appointment.service_name
             } : undefined
           });
         }
@@ -365,7 +398,7 @@ const AdminAvailabilityManager = () => {
                       </SelectItem>
                       <SelectItem value="shower">
                         <div className="flex items-center gap-2">
-                          <Shower className="h-4 w-4" />
+                          <Droplets className="h-4 w-4" />
                           Banho e Tosa
                         </div>
                       </SelectItem>
