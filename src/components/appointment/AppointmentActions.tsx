@@ -49,7 +49,7 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
     }
   };
 
-  // Only show cancel button for pending appointments
+  // Only show cancel button for pending appointments - confirmed appointments cannot be cancelled
   if (status !== 'pending') {
     return null;
   }

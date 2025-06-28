@@ -241,7 +241,8 @@ const Appointments = () => {
         </div>
       )}
 
-      {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
+      {/* Only show cancel button for pending appointments */}
+      {appointment.status === 'pending' && (
         <Button 
           variant="outline" 
           size="sm" 
