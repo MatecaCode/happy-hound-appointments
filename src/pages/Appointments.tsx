@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import AppointmentCard, { Appointment } from '@/components/AppointmentCard';
@@ -5,16 +6,25 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dog } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Dog, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+interface AppointmentWithDetails extends Appointment {
+  pet_name: string;
+  service_name: string;
+  provider_name?: string;
+}
 
 const Appointments = () => {
   const { user } = useAuth();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Load user's appointments from the database
+  // Load user's appointments from the database with detailed information
   useEffect(() => {
     const fetchAppointments = async () => {
       if (!user) return;
@@ -23,22 +33,35 @@ const Appointments = () => {
       try {
         const { data, error } = await supabase
           .from('appointments')
-          .select('*')
+          .select(`
+            id,
+            date,
+            time,
+            status,
+            notes,
+            pets:pet_id (name),
+            services:service_id (name),
+            provider_profiles:provider_id (
+              users:user_id (user_metadata)
+            )
+          `)
           .eq('user_id', user.id)
           .order('date', { ascending: true });
         
         if (error) throw error;
         
         if (data) {
-          // Map to AppointmentCard's expected structure, but we have no pet name or service string directly
           const formattedData = data.map(apt => ({
             id: apt.id,
-            // No petName or service, just placeholders for now
-            petName: 'Pet',
-            service: 'Serviço',
+            petName: apt.pets?.name || 'Pet',
+            pet_name: apt.pets?.name || 'Pet',
+            service: apt.services?.name || 'Serviço',
+            service_name: apt.services?.name || 'Serviço',
             date: new Date(apt.date),
             time: apt.time,
-            status: apt.status as 'upcoming' | 'completed' | 'cancelled',
+            status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
+            notes: apt.notes,
+            provider_name: apt.provider_profiles?.users?.user_metadata?.name
           }));
           
           setAppointments(formattedData);
@@ -81,9 +104,106 @@ const Appointments = () => {
       toast.error('Erro ao cancelar agendamento');
     }
   };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return (
+          <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
+            <Clock className="w-3 h-3 mr-1" />
+            Aguardando Aprovação
+          </Badge>
+        );
+      case 'confirmed':
+        return (
+          <Badge variant="default" className="bg-blue-100 text-blue-800 border-blue-200">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Confirmado
+          </Badge>
+        );
+      case 'completed':
+        return (
+          <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
+            <CheckCircle className="w-3 h-3 mr-1" />
+            Concluído
+          </Badge>
+        );
+      case 'cancelled':
+        return (
+          <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
+            <XCircle className="w-3 h-3 mr-1" />
+            Cancelado
+          </Badge>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const AppointmentDetailCard = ({ appointment }: { appointment: AppointmentWithDetails }) => (
+    <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
+      <div className="flex justify-between items-start mb-4">
+        <div className="flex items-center gap-3">
+          <Dog className="h-8 w-8 text-primary" />
+          <div>
+            <h3 className="font-semibold text-lg">{appointment.pet_name}</h3>
+            <p className="text-sm text-muted-foreground">{appointment.service_name}</p>
+          </div>
+        </div>
+        {getStatusBadge(appointment.status)}
+      </div>
+      
+      <div className="space-y-2 mb-4">
+        <div className="flex items-center text-sm">
+          <span className="font-medium w-20">Data:</span>
+          <span>{format(appointment.date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+        </div>
+        <div className="flex items-center text-sm">
+          <span className="font-medium w-20">Horário:</span>
+          <span>{appointment.time}</span>
+        </div>
+        {appointment.provider_name && (
+          <div className="flex items-center text-sm">
+            <span className="font-medium w-20">Profissional:</span>
+            <span>{appointment.provider_name}</span>
+          </div>
+        )}
+        {appointment.notes && (
+          <div className="flex items-start text-sm">
+            <span className="font-medium w-20">Notas:</span>
+            <span className="flex-1">{appointment.notes}</span>
+          </div>
+        )}
+      </div>
+
+      {appointment.status === 'pending' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+          <p className="text-sm text-amber-800">
+            <Clock className="w-4 h-4 inline mr-1" />
+            Aguardando aprovação da nossa equipe. Você receberá uma confirmação em breve.
+          </p>
+        </div>
+      )}
+
+      {(appointment.status === 'pending' || appointment.status === 'confirmed') && (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => cancelAppointment(appointment.id)}
+          className="w-full sm:w-auto"
+        >
+          Cancelar Agendamento
+        </Button>
+      )}
+    </div>
+  );
   
-  const upcomingAppointments = appointments.filter(apt => apt.status === 'upcoming');
-  const pastAppointments = appointments.filter(apt => apt.status === 'completed' || apt.status === 'cancelled');
+  const upcomingAppointments = appointments.filter(apt => 
+    apt.status === 'pending' || apt.status === 'confirmed'
+  );
+  const pastAppointments = appointments.filter(apt => 
+    apt.status === 'completed' || apt.status === 'cancelled'
+  );
 
   return (
     <Layout>
@@ -100,8 +220,12 @@ const Appointments = () => {
         <div className="max-w-7xl mx-auto px-6">
           <Tabs defaultValue="upcoming" className="w-full">
             <TabsList className="grid w-full grid-cols-2 mb-8">
-              <TabsTrigger value="upcoming">Próximos</TabsTrigger>
-              <TabsTrigger value="past">Passados</TabsTrigger>
+              <TabsTrigger value="upcoming">
+                Próximos {upcomingAppointments.length > 0 && `(${upcomingAppointments.length})`}
+              </TabsTrigger>
+              <TabsTrigger value="past">
+                Passados {pastAppointments.length > 0 && `(${pastAppointments.length})`}
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="upcoming">
@@ -112,10 +236,9 @@ const Appointments = () => {
               ) : upcomingAppointments.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {upcomingAppointments.map(appointment => (
-                    <AppointmentCard 
+                    <AppointmentDetailCard 
                       key={appointment.id}
                       appointment={appointment}
-                      onCancel={cancelAppointment}
                     />
                   ))}
                 </div>
@@ -141,7 +264,7 @@ const Appointments = () => {
               ) : pastAppointments.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {pastAppointments.map(appointment => (
-                    <AppointmentCard 
+                    <AppointmentDetailCard 
                       key={appointment.id}
                       appointment={appointment}
                     />

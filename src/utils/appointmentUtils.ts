@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -48,7 +49,7 @@ export async function createAppointment(
           user_id,
           users:user_id (
             email,
-            raw_user_meta_data
+            user_metadata
           )
         `)
         .eq('user_id', providerId)
@@ -99,8 +100,8 @@ export async function createAppointment(
     console.log('📧 STEP 3: Triggering email notifications...');
     
     const userEmail = userData?.user?.email;
-    const userName = userData?.user?.raw_user_meta_data?.name || 'Cliente';
-    const providerName = providerData?.users?.raw_user_meta_data?.name;
+    const userName = userData?.user?.user_metadata?.name || 'Cliente';
+    const providerName = providerData?.users?.user_metadata?.name;
     const providerEmail = providerData?.users?.email;
 
     // Prepare booking data for success page and emails
