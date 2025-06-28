@@ -127,17 +127,19 @@ export const useAppointmentData = () => {
 
       console.log('📊 COMBINED USER DATA:', allUserData);
 
-      // Map to Provider format
+      // CRITICAL FIX: Map to Provider format with user_id for UI compatibility
       const formattedProviders: Provider[] = availableProviders.map((provider: any) => {
         const userInfo = allUserData.find(u => u.user_id === provider.user_id);
         return {
-          id: provider.user_id, // Use user_id for compatibility
+          id: provider.user_id, // Keep using user_id for UI compatibility
           name: userInfo?.name || `${provider.provider_type} Provider`,
           role: provider.provider_type,
           profile_image: undefined,
           rating: 4.5, // Default rating
           specialty: provider.provider_type === 'groomer' ? 'Tosa e Banho' : 'Veterinária',
-          about: `Profissional experiente em ${provider.provider_type === 'groomer' ? 'tosa e banho' : 'veterinária'}`
+          about: `Profissional experiente em ${provider.provider_type === 'groomer' ? 'tosa e banho' : 'veterinária'}`,
+          // CRITICAL: Store the provider_profile_id for later use
+          provider_profile_id: provider.provider_id
         };
       });
 
@@ -308,26 +310,34 @@ export const useAppointmentData = () => {
 
       console.log('🕒 TIME SLOTS: Generating slots from', startHour, 'to', endHour);
 
-      // Get groomer's provider_profile_id if groomer is selected
+      // CRITICAL FIX: Get groomer's provider_profile_id if groomer is selected
       let providerProfileId: string | null = null;
       if (requiresGroomer && groomerId) {
-        console.log('🔍 FINDING PROVIDER PROFILE: For user_id:', groomerId);
+        console.log('🔍 FINDING PROVIDER PROFILE ID: For user_id:', groomerId);
         
-        const { data: providerProfile, error: profileError } = await supabase
-          .from('provider_profiles')
-          .select('id')
-          .eq('user_id', groomerId)
-          .single();
+        // First, try to find the provider_profile_id from our groomers state
+        const selectedGroomer = groomers.find(g => g.id === groomerId);
+        if (selectedGroomer && (selectedGroomer as any).provider_profile_id) {
+          providerProfileId = (selectedGroomer as any).provider_profile_id;
+          console.log('✅ PROVIDER PROFILE ID FROM CACHE:', { user_id: groomerId, provider_profile_id: providerProfileId });
+        } else {
+          // Fallback: Query the database directly
+          const { data: providerProfile, error: profileError } = await supabase
+            .from('provider_profiles')
+            .select('id')
+            .eq('user_id', groomerId)
+            .single();
 
-        if (profileError || !providerProfile) {
-          console.error('❌ PROVIDER PROFILE ERROR:', profileError);
-          console.log('❌ NO PROVIDER PROFILE FOUND for user_id:', groomerId);
-          setTimeSlots([]);
-          return;
+          if (profileError || !providerProfile) {
+            console.error('❌ PROVIDER PROFILE ERROR:', profileError);
+            console.log('❌ NO PROVIDER PROFILE FOUND for user_id:', groomerId);
+            setTimeSlots([]);
+            return;
+          }
+
+          providerProfileId = providerProfile.id;
+          console.log('✅ PROVIDER PROFILE FOUND via DB:', { user_id: groomerId, provider_id: providerProfileId });
         }
-
-        providerProfileId = providerProfile.id;
-        console.log('✅ PROVIDER PROFILE FOUND:', { user_id: groomerId, provider_id: providerProfileId });
       }
 
       // Get groomer availability if required
@@ -441,6 +451,67 @@ export const useAppointmentData = () => {
       console.log('🏁 TIME SLOTS FETCH: Complete');
     }
   }, [groomers, getServiceRequirements]);
+
+  const fetchServices = useCallback(async (serviceType: 'grooming' | 'veterinary') => {
+    try {
+      console.log('📋 SERVICE FETCH: Starting for type:', serviceType);
+      
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('service_type', serviceType);
+
+      if (error) {
+        console.error('❌ SERVICE FETCH ERROR:', error);
+        toast.error('Erro ao carregar serviços');
+        return;
+      }
+
+      const formattedServices: Service[] = (data || []).map(service => ({
+        id: service.id,
+        name: service.name,
+        price: Number(service.price),
+        duration: service.duration_minutes || service.duration || 30,
+        service_type: service.service_type
+      }));
+
+      console.log('✅ SERVICES LOADED:', formattedServices);
+      setServices(formattedServices);
+    } catch (error) {
+      console.error('💥 SERVICE FETCH CRITICAL ERROR:', error);
+      toast.error('Erro ao carregar serviços');
+    }
+  }, []);
+
+  const fetchUserPets = useCallback(async (userId: string) => {
+    try {
+      console.log('🐕 PET FETCH: Starting for user:', userId);
+      
+      const { data, error } = await supabase
+        .from('pets')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (error) {
+        console.error('❌ PET FETCH ERROR:', error);
+        toast.error('Erro ao carregar pets');
+        return;
+      }
+
+      const formattedPets: Pet[] = (data || []).map(pet => ({
+        id: pet.id,
+        name: pet.name,
+        breed: pet.breed,
+        age: pet.age
+      }));
+
+      console.log('✅ PETS LOADED:', formattedPets);
+      setUserPets(formattedPets);
+    } catch (error) {
+      console.error('💥 PET FETCH CRITICAL ERROR:', error);
+      toast.error('Erro ao carregar pets');
+    }
+  }, []);
 
   return {
     timeSlots,

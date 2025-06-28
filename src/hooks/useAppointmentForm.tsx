@@ -15,6 +15,7 @@ export interface Provider {
   rating?: number;
   specialty?: string;
   about?: string;
+  provider_profile_id?: string; // Add this to track the actual provider profile ID
 }
 
 export interface Pet {
@@ -134,13 +135,15 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       combo: serviceRequirements?.combo
     });
 
+    // CRITICAL FIX: Pass the correct user_id to createAppointment
+    // The createAppointment function will handle the user_id -> provider_profile_id conversion
     formState.setIsLoading(true);
     
     const result = await createAppointment(
       user.id,
       formState.selectedPet,
       formState.selectedService,
-      requiresGroomer ? formState.selectedGroomerId : null,
+      requiresGroomer ? formState.selectedGroomerId : null, // This is user_id
       formState.date,
       formState.selectedTimeSlotId,
       formState.notes
