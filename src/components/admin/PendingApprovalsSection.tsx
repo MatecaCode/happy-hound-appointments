@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,9 +38,9 @@ const PendingApprovalsSection = () => {
           date,
           time,
           notes,
+          user_id,
           pets:pet_id (name),
           services:service_id (name),
-          user_id,
           provider_profiles:provider_id (
             users:user_id (user_metadata)
           )

@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Dog, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Dog, Clock, CheckCircle, XCircle, Play } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -18,6 +18,7 @@ interface AppointmentWithDetails {
   date: Date;
   time: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  service_status?: 'not_started' | 'in_progress' | 'completed';
   notes?: string;
   provider_name?: string;
 }
@@ -41,7 +42,9 @@ const Appointments = () => {
             date,
             time,
             status,
+            service_status,
             notes,
+            user_id,
             pets:pet_id (name),
             services:service_id (name),
             provider_profiles:provider_id (
@@ -61,6 +64,7 @@ const Appointments = () => {
             date: new Date(apt.date),
             time: apt.time,
             status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
+            service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
             notes: apt.notes || undefined,
             provider_name: apt.provider_profiles?.users?.user_metadata?.name
           }));
@@ -106,7 +110,7 @@ const Appointments = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, serviceStatus?: string) => {
     switch (status) {
       case 'pending':
         return (
@@ -116,6 +120,32 @@ const Appointments = () => {
           </Badge>
         );
       case 'confirmed':
+        // Show service status for confirmed appointments
+        if (serviceStatus) {
+          switch (serviceStatus) {
+            case 'not_started':
+              return (
+                <Badge variant="default" className="bg-blue-100 text-blue-800 border-blue-200">
+                  <Clock className="w-3 h-3 mr-1" />
+                  Confirmado - Não Iniciado
+                </Badge>
+              );
+            case 'in_progress':
+              return (
+                <Badge variant="default" className="bg-blue-100 text-blue-800 border-blue-200">
+                  <Play className="w-3 h-3 mr-1" />
+                  Em Andamento
+                </Badge>
+              );
+            case 'completed':
+              return (
+                <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
+                  <CheckCircle className="w-3 h-3 mr-1" />
+                  Serviço Concluído
+                </Badge>
+              );
+          }
+        }
         return (
           <Badge variant="default" className="bg-blue-100 text-blue-800 border-blue-200">
             <CheckCircle className="w-3 h-3 mr-1" />
@@ -151,7 +181,7 @@ const Appointments = () => {
             <p className="text-sm text-muted-foreground">{appointment.service_name}</p>
           </div>
         </div>
-        {getStatusBadge(appointment.status)}
+        {getStatusBadge(appointment.status, appointment.service_status)}
       </div>
       
       <div className="space-y-2 mb-4">

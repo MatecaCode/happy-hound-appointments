@@ -92,6 +92,7 @@ export type Database = {
           pet_id: string
           provider_id: string | null
           service_id: string
+          service_status: string
           status: string
           time: string
           user_id: string
@@ -104,6 +105,7 @@ export type Database = {
           pet_id: string
           provider_id?: string | null
           service_id: string
+          service_status?: string
           status?: string
           time: string
           user_id: string
@@ -116,6 +118,7 @@ export type Database = {
           pet_id?: string
           provider_id?: string | null
           service_id?: string
+          service_status?: string
           status?: string
           time?: string
           user_id?: string
