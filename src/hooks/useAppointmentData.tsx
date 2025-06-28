@@ -221,8 +221,8 @@ export const useAppointmentData = () => {
         });
       }
 
-      // Use the new RPC to get available slots
-      console.log('🔍 [FETCH_TIME_SLOTS] Calling RPC with params:', {
+      // 🔥 FIXED: Use correct RPC parameter names with underscores
+      console.log('🔍 [FETCH_TIME_SLOTS] Calling RPC with CORRECTED params:', {
         _service_id: selectedService.id,
         _date: dateStr,
         _provider_id: providerProfileId
@@ -280,6 +280,7 @@ export const useAppointmentData = () => {
         
         const dateStr = checkDate.toISOString().split('T')[0];
         
+        // 🔥 FIXED: Use correct RPC parameter names
         const { data: availableSlots } = await supabase.rpc('get_available_slots_for_service', {
           _service_id: serviceId,
           _date: dateStr,

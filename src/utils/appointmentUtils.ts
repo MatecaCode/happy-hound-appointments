@@ -94,7 +94,7 @@ export async function createAppointment(
     if (providerProfileId) {
       console.log('🔍 [CREATE_APPOINTMENT] PRE-VALIDATION: Checking provider availability before RPC call');
 
-      // Use the new RPC to validate availability
+      // 🔥 FIXED: Use correct RPC parameter names
       const { data: availableSlots } = await supabase.rpc('get_available_slots_for_service', {
         _service_id: serviceId,
         _date: isoDate,
