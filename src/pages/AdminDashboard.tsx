@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -18,7 +17,7 @@ const AdminDashboard = () => {
     totalUsers: 0,
     totalPets: 0,
     totalAppointments: 0,
-    serviceSlots: 0
+    todayBookedServices: 0
   });
   const [loadingStats, setLoadingStats] = useState(true);
 
@@ -51,10 +50,10 @@ const AdminDashboard = () => {
         console.error('Error fetching users count:', usersError);
       }
 
-      // Get total pets
+      // Get total pets - fix the query
       const { count: petsCount, error: petsError } = await supabase
         .from('pets')
-        .select('*', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true });
 
       if (petsError) {
         console.error('Error fetching pets count:', petsError);
@@ -69,21 +68,23 @@ const AdminDashboard = () => {
         console.error('Error fetching appointments count:', appointmentsError);
       }
 
-      // Get total availability slots
-      const { count: slotsCount, error: slotsError } = await supabase
-        .from('provider_availability')
+      // Get today's booked services
+      const today = new Date().toISOString().split('T')[0];
+      const { count: todayServicesCount, error: todayServicesError } = await supabase
+        .from('appointments')
         .select('*', { count: 'exact', head: true })
-        .eq('available', true);
+        .eq('date', today)
+        .in('status', ['pending', 'confirmed']);
 
-      if (slotsError) {
-        console.error('Error fetching slots count:', slotsError);
+      if (todayServicesError) {
+        console.error('Error fetching today services count:', todayServicesError);
       }
 
       setStats({
         totalUsers: usersCount || 0,
         totalPets: petsCount || 0,
         totalAppointments: appointmentsCount || 0,
-        serviceSlots: slotsCount || 0
+        todayBookedServices: todayServicesCount || 0
       });
     } catch (error) {
       console.error('Error loading stats:', error);
@@ -200,14 +201,14 @@ const AdminDashboard = () => {
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Clock className="h-5 w-5" />
-                  Horários
+                  Serviços Hoje
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-orange-600">
-                  {loadingStats ? '...' : stats.serviceSlots}
+                  {loadingStats ? '...' : stats.todayBookedServices}
                 </p>
-                <p className="text-sm text-gray-500">Disponíveis</p>
+                <p className="text-sm text-gray-500">Agendados</p>
               </CardContent>
             </Card>
           </div>
