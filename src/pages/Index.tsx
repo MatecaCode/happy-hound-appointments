@@ -56,8 +56,8 @@ const Index = () => {
               </div>
               <div>
                 <img 
-                  src="https://images.unsplash.com/photo-1721322800607-8c38375eef04?w=400&h=320&fit=crop&crop=center" 
-                  alt="Clínica Vettale - ambiente acolhedor com veterinário cuidando de um pet" 
+                  src="/lovable-uploads/46b4db57-9aff-472d-a42a-f68fef707648.png" 
+                  alt="Clínica Vettale - fachada moderna da clínica veterinária" 
                   className="rounded-lg shadow-lg h-80 w-full object-cover"
                 />
               </div>
@@ -103,7 +103,7 @@ const Index = () => {
         {/* CTA Section */}
         <section className="py-20 bg-primary text-primary-foreground">
           <div className="max-w-7xl mx-auto px-6 text-center">
-            <div className="inline-flex items-center justify-center" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }} className="rounded-full p-2 mb-8">
+            <div className="inline-flex items-center justify-center rounded-full p-2 mb-8" style={{ backgroundColor: 'rgba(255, 255, 255, 0.1)' }}>
               <Dog className="h-5 w-5" />
             </div>
             

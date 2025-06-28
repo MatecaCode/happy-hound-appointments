@@ -23,9 +23,6 @@ const Hero = () => {
               <Button size="lg" asChild className="bg-primary text-white hover:bg-primary/90">
                 <Link to="/book">Agendar Consulta</Link>
               </Button>
-              <Button size="lg" variant="outline" asChild className="border-primary text-primary hover:bg-primary/5">
-                <Link to="/services">Nossos Serviços</Link>
-              </Button>
             </div>
             
             <div className="flex items-center gap-8 pt-8">
@@ -46,8 +43,8 @@ const Hero = () => {
           
           <div className="relative">
             <img 
-              src="https://images.unsplash.com/photo-1582562124811-c09040d0a901?w=500&h=500&fit=crop&crop=faces" 
-              alt="Veterinário cuidando carinhosamente de um pet em ambiente clínico acolhedor" 
+              src="/lovable-uploads/58d1d3ba-3aac-4831-819e-db278e404d9d.png" 
+              alt="Cachorro corgi feliz com patinhas levantadas em ambiente acolhedor" 
               className="rounded-lg shadow-2xl w-full h-[500px] object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-lg"></div>
