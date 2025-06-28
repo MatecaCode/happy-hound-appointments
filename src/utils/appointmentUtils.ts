@@ -1,7 +1,8 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// SIMPLIFIED: Accept provider_profile_id directly instead of converting user_id
+// ENHANCED LOGGING: Accept provider_profile_id directly with comprehensive tracking
 export async function createAppointment(
   userId: string,
   petId: string,
@@ -12,7 +13,7 @@ export async function createAppointment(
   notes?: string
 ): Promise<{ success: boolean; appointmentId?: string; bookingData?: any }> {
   try {
-    console.log('🚀 SIMPLIFIED BOOKING: Starting appointment creation with params:', {
+    console.log('🚀 [CREATE_APPOINTMENT] Starting appointment creation with enhanced logging:', {
       userId,
       petId,
       serviceId,
@@ -39,16 +40,26 @@ export async function createAppointment(
       .eq('id', serviceId)
       .single();
 
+    console.log('📊 [CREATE_APPOINTMENT] Basic data retrieved:', {
+      user: userData?.user?.user_metadata?.name,
+      pet: petData?.name,
+      service: serviceData?.name
+    });
+
     let providerData = null;
     
     // Get provider data if provider is selected
     if (providerProfileId) {
+      console.log('👥 [CREATE_APPOINTMENT] Fetching provider data for:', providerProfileId);
+
       const { data: providerProfile } = await supabase
         .from('provider_profiles')
         .select('user_id, type')
         .eq('id', providerProfileId)
         .single();
       
+      console.log('📊 [CREATE_APPOINTMENT] Provider profile data:', providerProfile);
+
       if (providerProfile) {
         // Get user name for the provider
         const { data: providerUserData } = await supabase
@@ -74,11 +85,54 @@ export async function createAppointment(
           user_id: providerProfile.user_id,
           name: providerUserData?.name || groomerData?.name || vetData?.name || 'Provider'
         };
+
+        console.log('✅ [CREATE_APPOINTMENT] Provider data assembled:', providerData);
+      }
+    }
+
+    // CRITICAL: Validate the provider_profile_id exists in provider_availability before booking
+    if (providerProfileId) {
+      console.log('🔍 [CREATE_APPOINTMENT] PRE-VALIDATION: Checking provider availability before RPC call:', {
+        provider_profile_id: providerProfileId,
+        date: isoDate,
+        time_slot: timeSlot
+      });
+
+      const { data: preValidation, error: preValidationError } = await supabase
+        .from('provider_availability')
+        .select('available')
+        .eq('provider_id', providerProfileId)
+        .eq('date', isoDate)
+        .eq('time_slot', timeSlot)
+        .single();
+
+      console.log('📊 [CREATE_APPOINTMENT] PRE-VALIDATION result:', {
+        data: preValidation,
+        error: preValidationError,
+        available: preValidation?.available
+      });
+
+      if (preValidationError || !preValidation?.available) {
+        console.error('❌ [CREATE_APPOINTMENT] PRE-VALIDATION FAILED:', {
+          error: preValidationError,
+          available: preValidation?.available,
+          message: 'Provider not available in provider_availability table'
+        });
+        toast.error('Profissional não disponível para o horário selecionado (pré-validação).');
+        return { success: false };
       }
     }
 
     // Call the atomic booking RPC with correct provider_profile_id
-    console.log('🔄 CALLING RPC: create_booking_atomic with provider_profile_id:', providerProfileId);
+    console.log('🔄 [CREATE_APPOINTMENT] CALLING RPC: create_booking_atomic with parameters:', {
+      _user_id: userId,
+      _pet_id: petId,
+      _service_id: serviceId,
+      _provider_ids: providerProfileId ? [providerProfileId] : [],
+      _booking_date: isoDate,
+      _time_slot: timeSlot,
+      _notes: notes || null
+    });
     
     const providerIds = providerProfileId ? [providerProfileId] : [];
     
@@ -92,8 +146,20 @@ export async function createAppointment(
       _notes: notes || null
     });
 
+    console.log('📞 [CREATE_APPOINTMENT] RPC create_booking_atomic result:', {
+      appointmentId,
+      error,
+      success: !error && !!appointmentId
+    });
+
     if (error) {
-      console.error('❌ RPC ERROR: Booking failed:', error);
+      console.error('❌ [CREATE_APPOINTMENT] RPC ERROR: Booking failed:', {
+        error_message: error.message,
+        error_details: error.details,
+        error_hint: error.hint,
+        error_code: error.code,
+        full_error: error
+      });
       
       if (error.message.includes('not available') || error.message.includes('Provider') && error.message.includes('not available')) {
         toast.error('Profissional não disponível para o horário selecionado.');
@@ -111,7 +177,7 @@ export async function createAppointment(
     }
 
     if (!appointmentId) {
-      console.error('❌ NO APPOINTMENT ID: RPC succeeded but returned no ID');
+      console.error('❌ [CREATE_APPOINTMENT] NO APPOINTMENT ID: RPC succeeded but returned no ID');
       toast.error('Erro interno: ID do agendamento não foi retornado');
       return { success: false };
     }
@@ -129,7 +195,10 @@ export async function createAppointment(
       userEmail: userData?.user?.email
     };
 
-    console.log('🎉 BOOKING SUCCESS: Complete appointment record created');
+    console.log('🎉 [CREATE_APPOINTMENT] BOOKING SUCCESS: Complete appointment record created:', {
+      appointmentId,
+      bookingData
+    });
     toast.success('Agendamento enviado com sucesso!');
     
     return { 
@@ -139,7 +208,11 @@ export async function createAppointment(
     };
 
   } catch (error: any) {
-    console.error('💥 CRITICAL ERROR: Unexpected error in createAppointment:', error);
+    console.error('💥 [CREATE_APPOINTMENT] CRITICAL ERROR: Unexpected error in createAppointment:', {
+      error_message: error?.message,
+      error_stack: error?.stack,
+      full_error: error
+    });
     toast.error('Erro crítico no sistema de agendamento');
     return { success: false };
   }

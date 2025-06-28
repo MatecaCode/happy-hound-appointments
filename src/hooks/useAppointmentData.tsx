@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -45,7 +44,13 @@ export const useAppointmentData = () => {
     }
 
     try {
-      console.log('👥 PROVIDER FETCH: Starting for:', { serviceType, date, service: selectedService });
+      console.log('🔍 [FETCH_PROVIDERS] Starting provider fetch:', {
+        serviceType,
+        date: date.toISOString(),
+        service: selectedService,
+        service_id: selectedService.id,
+        timestamp: new Date().toISOString()
+      });
       
       // Ensure we don't select Sundays
       const dayOfWeek = date.getDay();
@@ -59,11 +64,18 @@ export const useAppointmentData = () => {
 
       // Get service requirements from centralized source
       const serviceRequirements = getServiceRequirements(selectedService.id);
-      console.log('📋 SERVICE REQUIREMENTS:', serviceRequirements);
+      console.log('📋 [FETCH_PROVIDERS] Service requirements:', serviceRequirements);
 
       // Use the RPC function to get available providers
       const timeSlot = '09:00:00'; // Default time for checking availability
       const duration = selectedService.duration || 30;
+
+      console.log('📞 [FETCH_PROVIDERS] Calling get_available_providers RPC with:', {
+        _service_id: selectedService.id,
+        _date: dateStr,
+        _time_slot: timeSlot,
+        _duration: duration
+      });
 
       const { data: availableProviders, error } = await supabase.rpc('get_available_providers', {
         _service_id: selectedService.id,
@@ -72,16 +84,20 @@ export const useAppointmentData = () => {
         _duration: duration
       });
 
-      console.log('📞 RPC get_available_providers result:', { availableProviders, error });
+      console.log('📞 [FETCH_PROVIDERS] RPC get_available_providers result:', { 
+        availableProviders, 
+        error,
+        provider_count: availableProviders?.length || 0
+      });
 
       if (error) {
-        console.error('❌ PROVIDER FETCH ERROR:', error);
+        console.error('❌ [FETCH_PROVIDERS] RPC ERROR:', error);
         setGroomers([]);
         return;
       }
 
       if (!availableProviders || availableProviders.length === 0) {
-        console.log('⚠️ NO PROVIDERS: No providers available for this date/service');
+        console.log('⚠️ [FETCH_PROVIDERS] No providers available for this date/service');
         setGroomers([]);
         return;
       }
@@ -89,13 +105,15 @@ export const useAppointmentData = () => {
       // Get user details for the providers
       const providerUserIds = availableProviders.map((p: any) => p.user_id);
       
+      console.log('👥 [FETCH_PROVIDERS] Provider user IDs from RPC:', providerUserIds);
+
       const { data: userData, error: userError } = await supabase
         .from('clients')
         .select('user_id, name')
         .in('user_id', providerUserIds);
 
       if (userError) {
-        console.error('❌ USER DATA ERROR:', userError);
+        console.error('❌ [FETCH_PROVIDERS] USER DATA ERROR:', userError);
       }
 
       // Also try groomers table for names
@@ -105,7 +123,7 @@ export const useAppointmentData = () => {
         .in('user_id', providerUserIds);
 
       if (groomerError) {
-        console.error('❌ GROOMER DATA ERROR:', groomerError);
+        console.error('❌ [FETCH_PROVIDERS] GROOMER DATA ERROR:', groomerError);
       }
 
       // Also try veterinarians table for names
@@ -115,7 +133,7 @@ export const useAppointmentData = () => {
         .in('user_id', providerUserIds);
 
       if (vetError) {
-        console.error('❌ VET DATA ERROR:', vetError);
+        console.error('❌ [FETCH_PROVIDERS] VET DATA ERROR:', vetError);
       }
 
       // Combine all name sources
@@ -125,12 +143,12 @@ export const useAppointmentData = () => {
         ...(vetData || [])
       ];
 
-      console.log('📊 COMBINED USER DATA:', allUserData);
+      console.log('📊 [FETCH_PROVIDERS] Combined user data:', allUserData);
 
-      // SIMPLIFIED: Map to Provider format - store BOTH user_id and provider_profile_id
+      // CRITICAL: Map to Provider format - store BOTH user_id and provider_profile_id
       const formattedProviders: Provider[] = availableProviders.map((provider: any) => {
         const userInfo = allUserData.find(u => u.user_id === provider.user_id);
-        return {
+        const mappedProvider = {
           id: provider.user_id, // Keep user_id for UI compatibility
           name: userInfo?.name || `${provider.provider_type} Provider`,
           role: provider.provider_type,
@@ -140,13 +158,22 @@ export const useAppointmentData = () => {
           about: `Profissional experiente em ${provider.provider_type === 'groomer' ? 'tosa e banho' : 'veterinária'}`,
           provider_profile_id: provider.provider_id // Store the actual provider_profile_id
         };
+        
+        console.log('🎯 [FETCH_PROVIDERS] Mapped provider:', {
+          original: provider,
+          mapped: mappedProvider,
+          user_id: provider.user_id,
+          provider_profile_id: provider.provider_id
+        });
+        
+        return mappedProvider;
       });
 
-      console.log('✅ FORMATTED PROVIDERS:', formattedProviders);
+      console.log('✅ [FETCH_PROVIDERS] Final formatted providers:', formattedProviders);
       setGroomers(formattedProviders);
 
     } catch (error) {
-      console.error('💥 PROVIDER FETCH CRITICAL ERROR:', error);
+      console.error('💥 [FETCH_PROVIDERS] CRITICAL ERROR:', error);
       setGroomers([]);
       toast.error('Erro ao buscar profissionais disponíveis');
     }
@@ -213,7 +240,7 @@ export const useAppointmentData = () => {
     }
   }, []);
 
-  // SIMPLIFIED TIME SLOT LOGIC: If groomer was selected, they're already validated as available
+  // ENHANCED TIME SLOT LOGIC with detailed logging
   const fetchTimeSlots = useCallback(async (
     date: Date | undefined,
     groomerId: string | null,
@@ -221,7 +248,7 @@ export const useAppointmentData = () => {
     selectedService?: Service
   ) => {
     if (!date || !selectedService) {
-      console.log('⚠️ TIME SLOTS: Missing date or service, clearing slots');
+      console.log('⚠️ [FETCH_TIMESLOTS] Missing date or service, clearing slots');
       setTimeSlots([]);
       return;
     }
@@ -229,7 +256,7 @@ export const useAppointmentData = () => {
     // Check if it's Sunday
     const dayOfWeek = date.getDay();
     if (dayOfWeek === 0) {
-      console.log('⚠️ TIME SLOTS: Sunday selected, no slots available');
+      console.log('⚠️ [FETCH_TIMESLOTS] Sunday selected, no slots available');
       setTimeSlots([]);
       return;
     }
@@ -239,20 +266,20 @@ export const useAppointmentData = () => {
     // Get service requirements
     const serviceRequirements = getServiceRequirements(selectedService.id);
     if (!serviceRequirements) {
-      console.log('❌ TIME SLOTS: No service requirements found');
+      console.log('❌ [FETCH_TIMESLOTS] No service requirements found');
       setTimeSlots([]);
       return;
     }
 
     const requiresGroomer = serviceRequirements.requires_groomer;
     
-    // SIMPLIFIED LOGIC: If groomer is required and selected, just get their availability
-    // If groomer is not required, get shower availability only
-    
-    console.log('⏰ SIMPLIFIED TIME SLOTS: Generating based on requirements:', {
-      requiresGroomer,
-      groomerId,
-      date: dateStr
+    console.log('🔍 [FETCH_TIMESLOTS] Starting time slot fetch:', {
+      date: dateStr,
+      groomer_user_id: groomerId,
+      service_id: selectedService.id,
+      requires_groomer: requiresGroomer,
+      service_requirements: serviceRequirements,
+      timestamp: new Date().toISOString()
     });
 
     setIsLoading(true);
@@ -269,10 +296,19 @@ export const useAppointmentData = () => {
         const selectedGroomer = groomers.find(g => g.id === groomerId);
         providerProfileId = (selectedGroomer as any)?.provider_profile_id || null;
         
-        console.log('🔍 PROVIDER PROFILE ID:', { 
-          user_id: groomerId, 
-          provider_profile_id: providerProfileId 
+        console.log('🎯 [FETCH_TIMESLOTS] Provider profile ID mapping:', { 
+          groomer_user_id: groomerId, 
+          provider_profile_id: providerProfileId,
+          selected_groomer: selectedGroomer,
+          all_groomers: groomers.map(g => ({ id: g.id, provider_profile_id: (g as any).provider_profile_id }))
         });
+
+        if (!providerProfileId) {
+          console.error('❌ [FETCH_TIMESLOTS] No provider_profile_id found for groomer:', groomerId);
+          setTimeSlots([]);
+          setIsLoading(false);
+          return;
+        }
       }
 
       // Generate time slots and check availability
@@ -283,9 +319,17 @@ export const useAppointmentData = () => {
           const timeSlot = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
           let isAvailable = true;
 
+          console.log(`🕐 [FETCH_TIMESLOTS] Checking slot ${timeSlot}:`);
+
           // Check provider availability if required
           if (requiresGroomer && providerProfileId) {
-            const { data: providerAvail } = await supabase
+            console.log(`🔍 [FETCH_TIMESLOTS] Checking provider availability for slot ${timeSlot}:`, {
+              provider_profile_id: providerProfileId,
+              date: dateStr,
+              time_slot: timeSlot
+            });
+
+            const { data: providerAvail, error: providerError } = await supabase
               .from('provider_availability')
               .select('available')
               .eq('provider_id', providerProfileId)
@@ -293,21 +337,37 @@ export const useAppointmentData = () => {
               .eq('time_slot', timeSlot)
               .single();
             
-            if (!providerAvail?.available) {
+            console.log(`📊 [FETCH_TIMESLOTS] Provider availability result for ${timeSlot}:`, {
+              data: providerAvail,
+              error: providerError,
+              available: providerAvail?.available
+            });
+
+            if (providerError || !providerAvail?.available) {
+              console.log(`❌ [FETCH_TIMESLOTS] Provider not available for ${timeSlot}:`, providerError);
               isAvailable = false;
             }
           }
 
           // Check shower availability if required
           if (serviceRequirements.requires_shower && isAvailable) {
-            const { data: showerAvail } = await supabase
+            console.log(`🚿 [FETCH_TIMESLOTS] Checking shower availability for slot ${timeSlot}:`);
+
+            const { data: showerAvail, error: showerError } = await supabase
               .from('shower_availability')
               .select('available_spots')
               .eq('date', dateStr)
               .eq('time_slot', timeSlot)
               .single();
             
-            if (!showerAvail || showerAvail.available_spots <= 0) {
+            console.log(`📊 [FETCH_TIMESLOTS] Shower availability result for ${timeSlot}:`, {
+              data: showerAvail,
+              error: showerError,
+              available_spots: showerAvail?.available_spots
+            });
+
+            if (showerError || !showerAvail || showerAvail.available_spots <= 0) {
+              console.log(`❌ [FETCH_TIMESLOTS] Shower not available for ${timeSlot}:`, showerError);
               isAvailable = false;
             }
           }
@@ -317,12 +377,16 @@ export const useAppointmentData = () => {
             time: `${hour}:${minutes.toString().padStart(2, '0')}`,
             available: isAvailable
           });
+
+          console.log(`✅ [FETCH_TIMESLOTS] Slot ${timeSlot} final status:`, { available: isAvailable });
         }
       }
 
-      console.log('✅ TIME SLOTS GENERATED:', {
+      console.log('✅ [FETCH_TIMESLOTS] Time slots generation complete:', {
         total: slots.length,
-        available: slots.filter(s => s.available).length
+        available: slots.filter(s => s.available).length,
+        unavailable: slots.filter(s => !s.available).length,
+        slots_summary: slots.map(s => ({ time: s.time, available: s.available }))
       });
       
       setTimeSlots(slots);
@@ -338,12 +402,14 @@ export const useAppointmentData = () => {
           time: availableSlot.time,
           provider_name: providerName
         });
+        console.log('🎯 [FETCH_TIMESLOTS] Next available set:', { date: dateStr, time: availableSlot.time, provider_name: providerName });
       } else {
         setNextAvailable(null);
+        console.log('⚠️ [FETCH_TIMESLOTS] No available slots found');
       }
 
     } catch (error) {
-      console.error('💥 TIME SLOTS ERROR:', error);
+      console.error('💥 [FETCH_TIMESLOTS] CRITICAL ERROR:', error);
       setTimeSlots([]);
     } finally {
       setIsLoading(false);
