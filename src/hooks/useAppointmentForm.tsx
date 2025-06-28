@@ -1,4 +1,3 @@
-
 import React, { useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -6,6 +5,7 @@ import { useAppointmentFormState } from './useAppointmentFormState';
 import { useAppointmentData } from './useAppointmentData';
 import { useServiceRequirements } from './useServiceRequirements';
 import { createAppointment } from '@/utils/appointmentUtils';
+import { toast } from 'sonner';
 
 export interface Provider {
   id: string;
@@ -171,14 +171,26 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
     formState.setIsLoading(true);
     
-    console.log('📤 [APPOINTMENT_FORM] SUBMIT: Calling createAppointment with final parameters:', {
+    // 🔥 CRITICAL DEBUG: Final payload logging
+    const finalPayload = {
       user_id: user.id,
       pet_id: formState.selectedPet,
       service_id: formState.selectedService,
-      provider_profile_id: providerProfileId, // Pass provider_profile_id directly
+      provider_profile_id: providerProfileId,
       date: formState.date,
       time_slot: formState.selectedTimeSlotId,
       notes: formState.notes
+    };
+    
+    console.log('📤 [APPOINTMENT_FORM] 🔥 FINAL PAYLOAD TO createAppointment:', finalPayload);
+    console.log('📤 [APPOINTMENT_FORM] 🔥 EXACT VALUES BEING SENT TO RPC:', {
+      _user_id: user.id,
+      _pet_id: formState.selectedPet,
+      _service_id: formState.selectedService,
+      _provider_ids: providerProfileId ? [providerProfileId] : [],
+      _booking_date: formState.date.toISOString().split('T')[0],
+      _time_slot: formState.selectedTimeSlotId + ':00',
+      _notes: formState.notes
     });
 
     // Pass the provider_profile_id directly (not user_id)
