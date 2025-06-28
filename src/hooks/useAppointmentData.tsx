@@ -127,19 +127,18 @@ export const useAppointmentData = () => {
 
       console.log('📊 COMBINED USER DATA:', allUserData);
 
-      // CRITICAL FIX: Map to Provider format with user_id for UI compatibility
+      // SIMPLIFIED: Map to Provider format - store BOTH user_id and provider_profile_id
       const formattedProviders: Provider[] = availableProviders.map((provider: any) => {
         const userInfo = allUserData.find(u => u.user_id === provider.user_id);
         return {
-          id: provider.user_id, // Keep using user_id for UI compatibility
+          id: provider.user_id, // Keep user_id for UI compatibility
           name: userInfo?.name || `${provider.provider_type} Provider`,
           role: provider.provider_type,
           profile_image: undefined,
-          rating: 4.5, // Default rating
+          rating: 4.5,
           specialty: provider.provider_type === 'groomer' ? 'Tosa e Banho' : 'Veterinária',
           about: `Profissional experiente em ${provider.provider_type === 'groomer' ? 'tosa e banho' : 'veterinária'}`,
-          // CRITICAL: Store the provider_profile_id for later use
-          provider_profile_id: provider.provider_id
+          provider_profile_id: provider.provider_id // Store the actual provider_profile_id
         };
       });
 
@@ -214,6 +213,7 @@ export const useAppointmentData = () => {
     }
   }, []);
 
+  // SIMPLIFIED TIME SLOT LOGIC: If groomer was selected, they're already validated as available
   const fetchTimeSlots = useCallback(async (
     date: Date | undefined,
     groomerId: string | null,
@@ -236,171 +236,79 @@ export const useAppointmentData = () => {
 
     const dateStr = date.toISOString().split('T')[0];
     
-    // Create unique fetch ID to prevent race conditions
-    const fetchId = `${dateStr}-${groomerId}-${selectedService.id}-${Date.now()}`;
-    
-    // Enhanced parameter tracking to prevent unnecessary re-fetches
-    const currentParams = {
-      date: dateStr,
-      groomerId,
-      serviceId: selectedService.id,
-      fetchId
-    };
-    
-    // Only compare the functional parameters, not the fetchId
-    const functionalParams = { date: dateStr, groomerId, serviceId: selectedService.id };
-    const lastFunctionalParams = { 
-      date: lastTimeSlotsParams.current.date, 
-      groomerId: lastTimeSlotsParams.current.groomerId, 
-      serviceId: lastTimeSlotsParams.current.serviceId 
-    };
-    
-    if (JSON.stringify(lastFunctionalParams) === JSON.stringify(functionalParams)) {
-      console.log('⏭️ TIME SLOTS: Skipping fetch - same functional parameters');
+    // Get service requirements
+    const serviceRequirements = getServiceRequirements(selectedService.id);
+    if (!serviceRequirements) {
+      console.log('❌ TIME SLOTS: No service requirements found');
+      setTimeSlots([]);
       return;
     }
 
-    // Prevent double requests
-    if (isFetchingTimeSlots.current) {
-      console.log('⏸️ TIME SLOTS: Already fetching, skipping...');
-      return;
-    }
+    const requiresGroomer = serviceRequirements.requires_groomer;
     
-    lastTimeSlotsParams.current = currentParams;
-    isFetchingTimeSlots.current = true;
+    // SIMPLIFIED LOGIC: If groomer is required and selected, just get their availability
+    // If groomer is not required, get shower availability only
+    
+    console.log('⏰ SIMPLIFIED TIME SLOTS: Generating based on requirements:', {
+      requiresGroomer,
+      groomerId,
+      date: dateStr
+    });
 
     setIsLoading(true);
+    
     try {
-      console.log('⏰ TIME SLOTS FETCH: Starting with params:', {
-        date: dateStr,
-        groomerId,
-        service: selectedService,
-        fetchId
-      });
-      
-      // Get service requirements from centralized source
-      const serviceRequirements = getServiceRequirements(selectedService.id);
-      
-      if (!serviceRequirements) {
-        console.log('❌ TIME SLOTS: No service requirements found');
-        setTimeSlots([]);
-        return;
-      }
-
-      const requiresGroomer = serviceRequirements.requires_groomer;
-      const requiresShower = serviceRequirements.requires_shower;
-
-      console.log('📋 TIME SLOTS REQUIREMENTS:', { 
-        requiresGroomer, 
-        requiresShower,
-        combo: serviceRequirements.combo
-      });
-
-      // If service requires groomer but no groomer selected, return empty slots
-      if (requiresGroomer && !groomerId) {
-        console.log('⚠️ TIME SLOTS: Service requires groomer but none selected');
-        setTimeSlots([]);
-        return;
-      }
-
-      // Generate time slots and check availability
       const slots: TimeSlot[] = [];
       const startHour = 9;
       const endHour = 17;
 
-      console.log('🕒 TIME SLOTS: Generating slots from', startHour, 'to', endHour);
-
-      // CRITICAL FIX: Get groomer's provider_profile_id if groomer is selected
       let providerProfileId: string | null = null;
+      
+      // If groomer is required, get their provider_profile_id
       if (requiresGroomer && groomerId) {
-        console.log('🔍 FINDING PROVIDER PROFILE ID: For user_id:', groomerId);
-        
-        // First, try to find the provider_profile_id from our groomers state
         const selectedGroomer = groomers.find(g => g.id === groomerId);
-        if (selectedGroomer && (selectedGroomer as any).provider_profile_id) {
-          providerProfileId = (selectedGroomer as any).provider_profile_id;
-          console.log('✅ PROVIDER PROFILE ID FROM CACHE:', { user_id: groomerId, provider_profile_id: providerProfileId });
-        } else {
-          // Fallback: Query the database directly
-          const { data: providerProfile, error: profileError } = await supabase
-            .from('provider_profiles')
-            .select('id')
-            .eq('user_id', groomerId)
-            .single();
-
-          if (profileError || !providerProfile) {
-            console.error('❌ PROVIDER PROFILE ERROR:', profileError);
-            console.log('❌ NO PROVIDER PROFILE FOUND for user_id:', groomerId);
-            setTimeSlots([]);
-            return;
-          }
-
-          providerProfileId = providerProfile.id;
-          console.log('✅ PROVIDER PROFILE FOUND via DB:', { user_id: groomerId, provider_id: providerProfileId });
-        }
-      }
-
-      // Get groomer availability if required
-      let groomerAvailableSlots: string[] = [];
-      if (requiresGroomer && providerProfileId) {
-        console.log('🔍 CHECKING GROOMER AVAILABILITY:', { providerProfileId, date: dateStr });
+        providerProfileId = (selectedGroomer as any)?.provider_profile_id || null;
         
-        const { data: availabilityData, error: availError } = await supabase
-          .from('provider_availability')
-          .select('time_slot, available')
-          .eq('provider_id', providerProfileId)
-          .eq('date', dateStr)
-          .eq('available', true);
-
-        if (availError) {
-          console.error('❌ GROOMER AVAILABILITY ERROR:', availError);
-          setTimeSlots([]);
-          return;
-        }
-
-        groomerAvailableSlots = (availabilityData || []).map(slot => slot.time_slot);
-        console.log('👨‍🦲 GROOMER AVAILABLE SLOTS:', groomerAvailableSlots);
+        console.log('🔍 PROVIDER PROFILE ID:', { 
+          user_id: groomerId, 
+          provider_profile_id: providerProfileId 
+        });
       }
 
-      // Get shower availability for all time slots if required
-      let showerAvailableSlots: string[] = [];
-      if (requiresShower) {
-        console.log('🔍 CHECKING SHOWER AVAILABILITY for date:', dateStr);
-        
-        const { data: showerData, error: showerError } = await supabase
-          .from('shower_availability')
-          .select('time_slot, available_spots')
-          .eq('date', dateStr)
-          .gt('available_spots', 0);
-
-        if (showerError) {
-          console.error('❌ SHOWER AVAILABILITY ERROR:', showerError);
-        } else {
-          showerAvailableSlots = (showerData || []).map(slot => slot.time_slot);
-          console.log('🚿 SHOWER AVAILABLE SLOTS:', showerAvailableSlots);
-        }
-      }
-
+      // Generate time slots and check availability
       for (let hour = startHour; hour < endHour; hour++) {
         for (const minutes of [0, 30]) {
-          if (hour === 16 && minutes === 30) break; // Don't go past 5 PM
+          if (hour === 16 && minutes === 30) break;
           
           const timeSlot = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
           let isAvailable = true;
 
-          // Check groomer availability if required
+          // Check provider availability if required
           if (requiresGroomer && providerProfileId) {
-            if (!groomerAvailableSlots.includes(timeSlot)) {
+            const { data: providerAvail } = await supabase
+              .from('provider_availability')
+              .select('available')
+              .eq('provider_id', providerProfileId)
+              .eq('date', dateStr)
+              .eq('time_slot', timeSlot)
+              .single();
+            
+            if (!providerAvail?.available) {
               isAvailable = false;
-              console.log(`⏰ SLOT ${timeSlot}: UNAVAILABLE (Groomer not available)`);
             }
           }
 
           // Check shower availability if required
-          if (requiresShower && isAvailable) {
-            if (!showerAvailableSlots.includes(timeSlot)) {
+          if (serviceRequirements.requires_shower && isAvailable) {
+            const { data: showerAvail } = await supabase
+              .from('shower_availability')
+              .select('available_spots')
+              .eq('date', dateStr)
+              .eq('time_slot', timeSlot)
+              .single();
+            
+            if (!showerAvail || showerAvail.available_spots <= 0) {
               isAvailable = false;
-              console.log(`⏰ SLOT ${timeSlot}: UNAVAILABLE (Shower not available)`);
             }
           }
 
@@ -409,22 +317,17 @@ export const useAppointmentData = () => {
             time: `${hour}:${minutes.toString().padStart(2, '0')}`,
             available: isAvailable
           });
-
-          if (isAvailable) {
-            console.log(`⏰ SLOT ${timeSlot}: AVAILABLE`);
-          }
         }
       }
 
       console.log('✅ TIME SLOTS GENERATED:', {
         total: slots.length,
-        available: slots.filter(s => s.available).length,
-        unavailable: slots.filter(s => !s.available).length
+        available: slots.filter(s => s.available).length
       });
       
       setTimeSlots(slots);
 
-      // Find next available slot
+      // Set next available
       const availableSlot = slots.find(slot => slot.available);
       if (availableSlot) {
         const providerName = requiresGroomer && groomerId 
@@ -435,83 +338,17 @@ export const useAppointmentData = () => {
           time: availableSlot.time,
           provider_name: providerName
         });
-        console.log('✅ NEXT AVAILABLE SET:', { date: dateStr, time: availableSlot.time, provider: providerName });
       } else {
         setNextAvailable(null);
-        console.log('❌ NO AVAILABLE SLOTS FOUND');
       }
 
     } catch (error) {
-      console.error('💥 TIME SLOTS CRITICAL ERROR:', error);
-      toast.error('Erro ao carregar horários disponíveis');
+      console.error('💥 TIME SLOTS ERROR:', error);
       setTimeSlots([]);
     } finally {
       setIsLoading(false);
-      isFetchingTimeSlots.current = false;
-      console.log('🏁 TIME SLOTS FETCH: Complete');
     }
   }, [groomers, getServiceRequirements]);
-
-  const fetchServices = useCallback(async (serviceType: 'grooming' | 'veterinary') => {
-    try {
-      console.log('📋 SERVICE FETCH: Starting for type:', serviceType);
-      
-      const { data, error } = await supabase
-        .from('services')
-        .select('*')
-        .eq('service_type', serviceType);
-
-      if (error) {
-        console.error('❌ SERVICE FETCH ERROR:', error);
-        toast.error('Erro ao carregar serviços');
-        return;
-      }
-
-      const formattedServices: Service[] = (data || []).map(service => ({
-        id: service.id,
-        name: service.name,
-        price: Number(service.price),
-        duration: service.duration_minutes || service.duration || 30,
-        service_type: service.service_type
-      }));
-
-      console.log('✅ SERVICES LOADED:', formattedServices);
-      setServices(formattedServices);
-    } catch (error) {
-      console.error('💥 SERVICE FETCH CRITICAL ERROR:', error);
-      toast.error('Erro ao carregar serviços');
-    }
-  }, []);
-
-  const fetchUserPets = useCallback(async (userId: string) => {
-    try {
-      console.log('🐕 PET FETCH: Starting for user:', userId);
-      
-      const { data, error } = await supabase
-        .from('pets')
-        .select('*')
-        .eq('user_id', userId);
-
-      if (error) {
-        console.error('❌ PET FETCH ERROR:', error);
-        toast.error('Erro ao carregar pets');
-        return;
-      }
-
-      const formattedPets: Pet[] = (data || []).map(pet => ({
-        id: pet.id,
-        name: pet.name,
-        breed: pet.breed,
-        age: pet.age
-      }));
-
-      console.log('✅ PETS LOADED:', formattedPets);
-      setUserPets(formattedPets);
-    } catch (error) {
-      console.error('💥 PET FETCH CRITICAL ERROR:', error);
-      toast.error('Erro ao carregar pets');
-    }
-  }, []);
 
   return {
     timeSlots,

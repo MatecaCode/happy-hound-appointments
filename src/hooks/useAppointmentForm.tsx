@@ -15,7 +15,7 @@ export interface Provider {
   rating?: number;
   specialty?: string;
   about?: string;
-  provider_profile_id?: string; // Add this to track the actual provider profile ID
+  provider_profile_id?: string; // Store the actual provider profile ID
 }
 
 export interface Pet {
@@ -106,7 +106,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   };
 
-  // Submit appointment
+  // SIMPLIFIED SUBMIT: Use provider_profile_id directly
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -126,31 +126,33 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       return;
     }
 
-    console.log('🔍 DEBUG: Submitting appointment:', {
-      service_requires_groomer: requiresGroomer,
-      service_requires_shower: requiresShower,
-      service_requires_vet: requiresVet,
-      selected_groomer: formState.selectedGroomerId,
-      service: formState.selectedService,
-      combo: serviceRequirements?.combo
-    });
+    // CRITICAL: Get the provider_profile_id from the selected groomer
+    let providerProfileId: string | null = null;
+    if (requiresGroomer && formState.selectedGroomerId) {
+      const selectedGroomer = groomers.find(g => g.id === formState.selectedGroomerId);
+      providerProfileId = (selectedGroomer as any)?.provider_profile_id || null;
+      
+      console.log('🎯 SUBMIT: Using provider_profile_id directly:', {
+        user_id: formState.selectedGroomerId,
+        provider_profile_id: providerProfileId,
+        groomer_data: selectedGroomer
+      });
+    }
 
-    // CRITICAL FIX: Pass the correct user_id to createAppointment
-    // The createAppointment function will handle the user_id -> provider_profile_id conversion
     formState.setIsLoading(true);
     
+    // Pass the provider_profile_id directly (not user_id)
     const result = await createAppointment(
       user.id,
       formState.selectedPet,
       formState.selectedService,
-      requiresGroomer ? formState.selectedGroomerId : null, // This is user_id
+      providerProfileId, // Pass provider_profile_id directly
       formState.date,
       formState.selectedTimeSlotId,
       formState.notes
     );
 
     if (result.success && result.bookingData) {
-      // Navigate to success page with booking data
       navigate('/booking-success', { 
         state: { bookingData: result.bookingData } 
       });
@@ -181,18 +183,17 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     const isFinalStep = (formState.formStep === 3 && !requiresGroomer) || (formState.formStep === 4);
     
     if (isFinalStep && formState.date && serviceRequirementsLoaded) {
-      // For shower-only services, pass null as groomer ID
-      const groomerId = requiresGroomer ? formState.selectedGroomerId : null;
       console.log('🔍 DEBUG: Fetching time slots for final step:', {
         step: formState.formStep,
         is_final_step: isFinalStep,
         requires_groomer: requiresGroomer,
-        requires_shower: requiresShower,
-        groomer_id: groomerId
+        groomer_id: formState.selectedGroomerId
       });
-      fetchTimeSlots(formState.date, groomerId, formState.setIsLoading, selectedServiceObj);
+      
+      // Pass user_id to fetchTimeSlots - it will handle the conversion internally
+      fetchTimeSlots(formState.date, formState.selectedGroomerId, formState.setIsLoading, selectedServiceObj);
     }
-  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresGroomer, requiresShower, serviceRequirementsLoaded]);
+  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresGroomer, serviceRequirementsLoaded]);
 
   return {
     // Spread all form state
@@ -210,7 +211,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     serviceRequiresShower: requiresShower,
     serviceRequiresVet: requiresVet,
     serviceRequirementsLoaded,
-    serviceRequirements, // Full requirements object for advanced use
+    serviceRequirements,
     
     // Actions
     handleNextAvailableSelect,

@@ -1,23 +1,22 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// Main appointment creation function using the new atomic booking system
+// SIMPLIFIED: Accept provider_profile_id directly instead of converting user_id
 export async function createAppointment(
   userId: string,
   petId: string,
   serviceId: string,
-  providerId: string | null, // This is user_id from groomer selection
+  providerProfileId: string | null, // This is now provider_profile_id directly
   date: Date,
   timeSlot: string,
   notes?: string
 ): Promise<{ success: boolean; appointmentId?: string; bookingData?: any }> {
   try {
-    console.log('🚀 BOOKING AUDIT: Starting appointment creation with params:', {
+    console.log('🚀 SIMPLIFIED BOOKING: Starting appointment creation with params:', {
       userId,
       petId,
       serviceId,
-      providerId, // This is user_id
+      providerProfileId, // This is provider_profile_id
       date: date.toISOString(),
       timeSlot,
       notes,
@@ -26,7 +25,7 @@ export async function createAppointment(
 
     const isoDate = date.toISOString().split('T')[0];
     
-    // STEP 1: Get user, pet, service, and provider data for notifications
+    // Get user, pet, service data for notifications
     const { data: userData } = await supabase.auth.getUser();
     const { data: petData } = await supabase
       .from('pets')
@@ -41,154 +40,53 @@ export async function createAppointment(
       .single();
 
     let providerData = null;
-    let providerProfileId = null;
     
-    // CRITICAL FIX: Convert user_id to provider_profile_id if provider is selected
-    if (providerId) {
-      console.log('🔍 CONVERTING USER_ID TO PROVIDER_PROFILE_ID:', providerId);
+    // Get provider data if provider is selected
+    if (providerProfileId) {
+      const { data: providerProfile } = await supabase
+        .from('provider_profiles')
+        .select('user_id, type')
+        .eq('id', providerProfileId)
+        .single();
       
-      try {
-        // Get the provider profile ID from the provider_profiles table using user_id
-        const { data: providerProfile, error: profileError } = await supabase
-          .from('provider_profiles')
-          .select('id, user_id, type')
-          .eq('user_id', providerId) // providerId is actually user_id from groomer selection
+      if (providerProfile) {
+        // Get user name for the provider
+        const { data: providerUserData } = await supabase
+          .from('clients')
+          .select('name')
+          .eq('user_id', providerProfile.user_id)
           .single();
         
-        if (profileError) {
-          console.error('❌ PROVIDER PROFILE QUERY ERROR:', profileError);
-          
-          // FALLBACK: Try to create missing provider profile if user is a groomer/vet
-          console.log('🔄 ATTEMPTING TO CREATE MISSING PROVIDER PROFILE...');
-          
-          // Check if user has groomer or vet role
-          const { data: userRoles } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', providerId);
-          
-          const roles = userRoles?.map(r => r.role) || [];
-          console.log('👤 USER ROLES:', roles);
-          
-          if (roles.includes('groomer')) {
-            // Create missing groomer provider profile
-            const { data: newProfile, error: createError } = await supabase
-              .from('provider_profiles')
-              .insert({ user_id: providerId, type: 'groomer' })
-              .select('id, user_id, type')
-              .single();
-            
-            if (createError) {
-              console.error('❌ FAILED TO CREATE GROOMER PROFILE:', createError);
-              toast.error('Erro: Não foi possível criar perfil do profissional');
-              return { success: false };
-            }
-            
-            providerProfileId = newProfile.id;
-            console.log('✅ CREATED MISSING GROOMER PROFILE:', { user_id: providerId, provider_id: providerProfileId });
-            
-            // Generate availability for new profile
-            try {
-              await supabase.rpc('ensure_provider_availability', {
-                provider_profile_id: providerProfileId,
-                start_date: isoDate,
-                end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-              });
-              console.log('✅ GENERATED AVAILABILITY FOR NEW PROFILE');
-            } catch (availError) {
-              console.warn('⚠️ FAILED TO GENERATE AVAILABILITY:', availError);
-            }
-            
-          } else if (roles.includes('vet')) {
-            // Create missing vet provider profile
-            const { data: newProfile, error: createError } = await supabase
-              .from('provider_profiles')
-              .insert({ user_id: providerId, type: 'vet' })
-              .select('id, user_id, type')
-              .single();
-            
-            if (createError) {
-              console.error('❌ FAILED TO CREATE VET PROFILE:', createError);
-              toast.error('Erro: Não foi possível criar perfil do profissional');
-              return { success: false };
-            }
-            
-            providerProfileId = newProfile.id;
-            console.log('✅ CREATED MISSING VET PROFILE:', { user_id: providerId, provider_id: providerProfileId });
-            
-          } else {
-            console.error('❌ USER IS NOT A PROVIDER:', { user_id: providerId, roles });
-            toast.error('Erro: Usuário não é um profissional autorizado');
-            return { success: false };
-          }
-        } else if (!providerProfile) {
-          console.error('❌ NO PROVIDER PROFILE FOUND for user_id:', providerId);
-          toast.error('Erro: Perfil do profissional não encontrado');
-          return { success: false };
-        } else {
-          providerProfileId = providerProfile.id;
-          console.log('✅ PROVIDER CONVERSION SUCCESS:', { 
-            user_id: providerId, 
-            provider_profile_id: providerProfileId,
-            provider_type: providerProfile.type
-          });
-        }
+        const { data: groomerData } = await supabase
+          .from('groomers')
+          .select('name')
+          .eq('user_id', providerProfile.user_id)
+          .single();
         
-      } catch (conversionError) {
-        console.error('💥 PROVIDER CONVERSION CRITICAL ERROR:', conversionError);
-        toast.error('Erro crítico na conversão do profissional');
-        return { success: false };
+        const { data: vetData } = await supabase
+          .from('veterinarians')
+          .select('name')
+          .eq('user_id', providerProfile.user_id)
+          .single();
+        
+        providerData = {
+          id: providerProfileId,
+          user_id: providerProfile.user_id,
+          name: providerUserData?.name || groomerData?.name || vetData?.name || 'Provider'
+        };
       }
-      
-      // Get user data for the provider
-      const { data: providerUserData } = await supabase
-        .from('clients')
-        .select('name')
-        .eq('user_id', providerId)
-        .single();
-      
-      // Also try groomers table
-      const { data: groomerData } = await supabase
-        .from('groomers')
-        .select('name')
-        .eq('user_id', providerId)
-        .single();
-      
-      // Also try veterinarians table
-      const { data: vetData } = await supabase
-        .from('veterinarians')
-        .select('name')
-        .eq('user_id', providerId)
-        .single();
-      
-      providerData = {
-        id: providerProfileId,
-        user_id: providerId,
-        name: providerUserData?.name || groomerData?.name || vetData?.name || 'Provider'
-      };
     }
 
-    // STEP 2: Call the atomic booking RPC with correct provider profile IDs
-    console.log('🔄 STEP 2: Calling create_booking_atomic RPC with provider_profile_id:', providerProfileId);
+    // Call the atomic booking RPC with correct provider_profile_id
+    console.log('🔄 CALLING RPC: create_booking_atomic with provider_profile_id:', providerProfileId);
     
     const providerIds = providerProfileId ? [providerProfileId] : [];
-    
-    // CRITICAL: Validate provider_profile_id before calling RPC
-    if (providerId && !providerProfileId) {
-      console.error('💥 CRITICAL ERROR: Provider selected but no provider_profile_id found', {
-        providerId,
-        providerProfileId,
-        step: 'pre_rpc_validation'
-      });
-      toast.error('Erro crítico: ID do profissional inválido');
-      return { success: false };
-    }
     
     const { data: appointmentId, error } = await supabase.rpc('create_booking_atomic', {
       _user_id: userId,
       _pet_id: petId,
       _service_id: serviceId,
-      _provider_ids: providerIds, // Now using correct provider_profile_id
+      _provider_ids: providerIds, // Using provider_profile_id directly
       _booking_date: isoDate,
       _time_slot: timeSlot,
       _notes: notes || null
@@ -196,21 +94,6 @@ export async function createAppointment(
 
     if (error) {
       console.error('❌ RPC ERROR: Booking failed:', error);
-      
-      // Enhanced error logging for debugging
-      console.error('💥 RPC FAILURE DETAILS:', {
-        error_message: error.message,
-        error_code: error.code,
-        user_id: userId,
-        pet_id: petId,
-        service_id: serviceId,
-        provider_ids: providerIds,
-        provider_profile_id: providerProfileId,
-        original_provider_id: providerId,
-        booking_date: isoDate,
-        time_slot: timeSlot,
-        timestamp: new Date().toISOString()
-      });
       
       if (error.message.includes('not available') || error.message.includes('Provider') && error.message.includes('not available')) {
         toast.error('Profissional não disponível para o horário selecionado.');
@@ -229,68 +112,22 @@ export async function createAppointment(
 
     if (!appointmentId) {
       console.error('❌ NO APPOINTMENT ID: RPC succeeded but returned no ID');
-      console.error('💥 MISSING APPOINTMENT ID DETAILS:', {
-        rpc_response: appointmentId,
-        expected: 'uuid',
-        user_id: userId,
-        provider_ids: providerIds,
-        timestamp: new Date().toISOString()
-      });
       toast.error('Erro interno: ID do agendamento não foi retornado');
       return { success: false };
     }
 
-    // STEP 3: Trigger email notifications
-    console.log('📧 STEP 3: Triggering email notifications...');
-    
-    const userEmail = userData?.user?.email;
-    const userName = userData?.user?.user_metadata?.name || 'Cliente';
-    const providerName = providerData?.name;
-
-    // Prepare booking data for success page and emails
+    // Prepare booking data for success page
     const bookingData = {
       appointmentId,
       petName: petData?.name || 'Pet',
       serviceName: serviceData?.name || 'Serviço',
       date: isoDate,
       time: timeSlot,
-      providerName,
+      providerName: providerData?.name,
       notes,
-      userName,
-      userEmail
+      userName: userData?.user?.user_metadata?.name || 'Cliente',
+      userEmail: userData?.user?.email
     };
-
-    // Call email notification function
-    if (userEmail) {
-      try {
-        const response = await fetch('/functions/v1/send-booking-notifications', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
-          },
-          body: JSON.stringify({
-            appointmentId,
-            userEmail,
-            userName,
-            petName: petData?.name || 'Pet',
-            serviceName: serviceData?.name || 'Serviço',
-            date: isoDate,
-            time: timeSlot,
-            providerName,
-            notes
-          })
-        });
-
-        if (!response.ok) {
-          console.warn('⚠️ Email notifications failed, but booking was successful');
-        } else {
-          console.log('✅ Email notifications sent successfully');
-        }
-      } catch (emailError) {
-        console.warn('⚠️ Email error (booking still successful):', emailError);
-      }
-    }
 
     console.log('🎉 BOOKING SUCCESS: Complete appointment record created');
     toast.success('Agendamento enviado com sucesso!');
@@ -303,17 +140,6 @@ export async function createAppointment(
 
   } catch (error: any) {
     console.error('💥 CRITICAL ERROR: Unexpected error in createAppointment:', error);
-    console.error('💥 CRITICAL ERROR DETAILS:', {
-      error_message: error.message,
-      error_stack: error.stack,
-      user_id: userId,
-      pet_id: petId,
-      service_id: serviceId,
-      provider_id: providerId,
-      date: date.toISOString(),
-      time_slot: timeSlot,
-      timestamp: new Date().toISOString()
-    });
     toast.error('Erro crítico no sistema de agendamento');
     return { success: false };
   }
