@@ -65,8 +65,8 @@ const ServiceStatusSection = () => {
             pet_name: apt.pets?.name || 'Pet',
             service_name: apt.services?.name || 'Serviço',
             user_name: userData.user?.user_metadata?.name || 'Cliente',
-            provider_name: apt.provider_profiles?.users?.user_metadata?.name,
-            service_status: apt.service_status || 'not_started'
+            provider_name: apt.provider_profiles?.users?.user_metadata?.name || null,
+            service_status: (apt.service_status || 'not_started') as 'not_started' | 'in_progress' | 'completed'
           };
         })
       );
@@ -95,7 +95,7 @@ const ServiceStatusSection = () => {
       setConfirmedAppointments(prev => 
         prev.map(apt => 
           apt.id === appointmentId 
-            ? { ...apt, service_status: newStatus as any }
+            ? { ...apt, service_status: newStatus as 'not_started' | 'in_progress' | 'completed' }
             : apt
         )
       );

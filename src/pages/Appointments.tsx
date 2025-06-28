@@ -35,6 +35,8 @@ const Appointments = () => {
       
       setIsLoading(true);
       try {
+        console.log('Fetching appointments for user:', user.id);
+        
         const { data, error } = await supabase
           .from('appointments')
           .select(`
@@ -54,7 +56,12 @@ const Appointments = () => {
           .eq('user_id', user.id)
           .order('date', { ascending: true });
         
-        if (error) throw error;
+        if (error) {
+          console.error('Supabase error:', error);
+          throw error;
+        }
+        
+        console.log('Raw appointments data:', data);
         
         if (data) {
           const formattedData = data.map(apt => ({
@@ -66,9 +73,10 @@ const Appointments = () => {
             status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
             service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
             notes: apt.notes || undefined,
-            provider_name: apt.provider_profiles?.users?.user_metadata?.name
+            provider_name: apt.provider_profiles?.users?.user_metadata?.name || null
           }));
           
+          console.log('Formatted appointments:', formattedData);
           setAppointments(formattedData);
         }
       } catch (error: any) {
@@ -303,7 +311,7 @@ const Appointments = () => {
                 </div>
               ) : (
                 <div className="text-center py-20 bg-secondary/30 rounded-lg">
-                  <Dog className="w-12 h-12 mx-auto mb-4 text-primary opacity-70" />
+                  <Dog className="w-12 w-12 mx-auto mb-4 text-primary opacity-70" />
                   <h3 className="text-xl font-bold mb-2">Nenhum Agendamento Passado</h3>
                   <p className="text-muted-foreground mb-6">
                     Seu histórico de agendamentos aparecerá aqui depois que você tiver serviços conosco.

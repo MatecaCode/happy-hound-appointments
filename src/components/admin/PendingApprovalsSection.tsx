@@ -64,7 +64,7 @@ const PendingApprovalsSection = () => {
             service_name: apt.services?.name || 'Serviço',
             user_name: userData.user?.user_metadata?.name || 'Cliente',
             user_email: userData.user?.email || 'N/A',
-            provider_name: apt.provider_profiles?.users?.user_metadata?.name
+            provider_name: apt.provider_profiles?.users?.user_metadata?.name || null
           };
         })
       );
