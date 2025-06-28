@@ -1,29 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Debug function to show the exact SQL function body
-export async function debugRPCFunction() {
-  try {
-    console.log('🔍 [DEBUG] Fetching create_booking_atomic function definition...');
-    
-    const { data, error } = await supabase
-      .from('pg_proc')
-      .select('prosrc')
-      .eq('proname', 'create_booking_atomic')
-      .single();
-
-    if (error) {
-      console.error('❌ [DEBUG] Error fetching RPC function:', error);
-      return;
-    }
-
-    console.log('📋 [DEBUG] create_booking_atomic SQL body:', data?.prosrc);
-    return data?.prosrc;
-  } catch (error) {
-    console.error('💥 [DEBUG] Critical error:', error);
-  }
-}
-
 // Debug function to check provider availability for specific parameters
 export async function debugProviderAvailability(
   providerId: string,

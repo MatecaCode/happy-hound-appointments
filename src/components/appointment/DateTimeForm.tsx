@@ -147,7 +147,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             <NextAvailableAppointment
               nextAvailable={nextAvailable}
               onSelect={handleNextAvailableSelect}
-              isLoading={isLoading}
+              loading={isLoading}
             />
           </TabsContent>
         </Tabs>
