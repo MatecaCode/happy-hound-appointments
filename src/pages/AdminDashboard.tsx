@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, LogOut, Users, Calendar, PawPrint, Clock } from 'lucide-react';
+import { RefreshCw, LogOut, Users, Calendar, PawPrint, Clock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
@@ -13,7 +14,6 @@ import ServiceStatusSection from '@/components/admin/ServiceStatusSection';
 const AdminDashboard = () => {
   const { user, signOut, isAdmin, loading } = useAuth();
   const navigate = useNavigate();
-  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalPets: 0,
@@ -41,48 +41,54 @@ const AdminDashboard = () => {
 
   const loadStats = async () => {
     try {
-      const [usersRes, petsRes, appointmentsRes, slotsRes] = await Promise.all([
-        supabase.from('user_roles').select('id', { count: 'exact' }).eq('role', 'client'),
-        supabase.from('pets').select('id', { count: 'exact' }),
-        supabase.from('appointments').select('id', { count: 'exact' }),
-        supabase.from('provider_availability').select('id', { count: 'exact' })
-      ]);
+      // Get total users (clients)
+      const { count: usersCount, error: usersError } = await supabase
+        .from('user_roles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'client');
+
+      if (usersError) {
+        console.error('Error fetching users count:', usersError);
+      }
+
+      // Get total pets
+      const { count: petsCount, error: petsError } = await supabase
+        .from('pets')
+        .select('*', { count: 'exact', head: true });
+
+      if (petsError) {
+        console.error('Error fetching pets count:', petsError);
+      }
+
+      // Get total appointments
+      const { count: appointmentsCount, error: appointmentsError } = await supabase
+        .from('appointments')
+        .select('*', { count: 'exact', head: true });
+
+      if (appointmentsError) {
+        console.error('Error fetching appointments count:', appointmentsError);
+      }
+
+      // Get total availability slots
+      const { count: slotsCount, error: slotsError } = await supabase
+        .from('provider_availability')
+        .select('*', { count: 'exact', head: true })
+        .eq('available', true);
+
+      if (slotsError) {
+        console.error('Error fetching slots count:', slotsError);
+      }
+
       setStats({
-        totalUsers: usersRes.count || 0,
-        totalPets: petsRes.count || 0,
-        totalAppointments: appointmentsRes.count || 0,
-        serviceSlots: slotsRes.count || 0
+        totalUsers: usersCount || 0,
+        totalPets: petsCount || 0,
+        totalAppointments: appointmentsCount || 0,
+        serviceSlots: slotsCount || 0
       });
     } catch (error) {
       console.error('Error loading stats:', error);
     } finally {
       setLoadingStats(false);
-    }
-  };
-
-  const handleRefreshAvailability = async () => {
-    setRefreshing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('refresh-availability', {
-        body: {}
-      });
-
-      if (error) {
-        console.error('Error refreshing availability:', error);
-        toast.error('Erro ao atualizar disponibilidade: ' + error.message);
-        return;
-      }
-
-      if (data.success) {
-        toast.success(data.message);
-      } else {
-        toast.error('Erro ao atualizar disponibilidade: ' + data.error);
-      }
-    } catch (error: any) {
-      console.error('Unexpected error:', error);
-      toast.error('Erro inesperado ao atualizar disponibilidade');
-    } finally {
-      setRefreshing(false);
     }
   };
 
@@ -215,24 +221,47 @@ const AdminDashboard = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <RefreshCw className="h-5 w-5" />
+                  <Calendar className="h-5 w-5" />
                   Gerenciar Disponibilidade
                 </CardTitle>
                 <CardDescription>
-                  Atualizar horários disponíveis para todos os profissionais
+                  Controle completo sobre horários disponíveis por profissional e data
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Button 
-                  onClick={handleRefreshAvailability}
-                  disabled={refreshing}
+                  onClick={() => navigate('/admin/availability')}
                   className="w-full sm:w-auto"
                 >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-                  {refreshing ? 'Atualizando...' : '🔁 Refresh Availability'}
+                  <Clock className="h-4 w-4 mr-2" />
+                  Gerenciar Horários
                 </Button>
                 <p className="text-sm text-gray-500 mt-3">
-                  Gera horários de 30 minutos das 09:00 às 17:00 para os próximos 7 dias
+                  Edite horários disponíveis por profissional, data e tipo de serviço
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="h-5 w-5" />
+                  Agendar para Clientes
+                </CardTitle>
+                <CardDescription>
+                  Crie agendamentos em nome dos clientes via telefone ou presencialmente
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button 
+                  onClick={() => navigate('/admin/book-for-client')}
+                  className="w-full sm:w-auto"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Agendamento
+                </Button>
+                <p className="text-sm text-gray-500 mt-3">
+                  Selecione cliente, pet e serviço para criar agendamentos
                 </p>
               </CardContent>
             </Card>
