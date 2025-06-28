@@ -265,15 +265,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(null);
       setUserRoles([]);
 
-      // Attempt to sign out from Supabase
-      // Use a more robust approach that doesn't depend on session state
-      const { error } = await supabase.auth.signOut({ scope: 'global' });
-      
-      if (error) {
-        console.warn('⚠️ Logout error (continuing anyway):', error);
-        // Don't throw the error - we'll handle it gracefully
-      } else {
-        console.log('✅ Logout successful');
+      // Try multiple logout approaches to handle edge cases
+      try {
+        // First attempt: standard logout
+        await supabase.auth.signOut();
+        console.log('✅ Standard logout successful');
+      } catch (standardError: any) {
+        console.warn('⚠️ Standard logout failed, trying global logout:', standardError);
+        
+        try {
+          // Second attempt: global logout
+          await supabase.auth.signOut({ scope: 'global' });
+          console.log('✅ Global logout successful');
+        } catch (globalError: any) {
+          console.warn('⚠️ Global logout also failed:', globalError);
+          
+          // Third attempt: Clear session locally and continue
+          // This handles cases where the server session is already invalid
+          if (globalError.message?.includes('session_not_found') || 
+              globalError.message?.includes('Session not found') ||
+              globalError.status === 403) {
+            console.log('🔄 Session already invalid on server, proceeding with local cleanup');
+          } else {
+            throw globalError; // Re-throw if it's a different error
+          }
+        }
       }
 
       toast.success('Logout realizado com sucesso!');
@@ -290,7 +306,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setSession(null);
       setUserRoles([]);
       
-      // Show a gentle warning but still navigate
+      // Show a gentle message but still navigate
       toast.success('Sessão encerrada');
       navigate('/', { replace: true });
     }
