@@ -26,6 +26,22 @@ export async function createAppointment(
 
     const isoDate = date.toISOString().split('T')[0];
     
+    // 🔥 ENHANCED LOGGING: Log exact parameters for create_booking_atomic
+    const bookingParams = {
+      _user_id: userId,
+      _pet_id: petId,
+      _service_id: serviceId,
+      _provider_ids: providerProfileId ? [providerProfileId] : [],
+      _booking_date: isoDate,
+      _time_slot: timeSlot + ':00', // Ensure proper time format
+      _notes: notes || null
+    };
+
+    console.log('📤 [CREATE_APPOINTMENT] 🔥 CALLING create_booking_atomic RPC with EXACT params:', {
+      ...bookingParams,
+      timestamp: new Date().toISOString()
+    });
+
     // 🔍 COMPREHENSIVE DEBUG ANALYSIS
     console.log('🔍 [CREATE_APPOINTMENT] Running comprehensive debug analysis...');
     const debugResult = await compareSlotFetchVsBooking(
@@ -35,8 +51,22 @@ export async function createAppointment(
       timeSlot
     );
     
+    console.log('📊 [CREATE_APPOINTMENT] 🔥 DEBUG ANALYSIS RESULTS:', {
+      slot_shown_as_available: debugResult.analysis.slotShownAsAvailable,
+      all_slots_valid: debugResult.analysis.allSlotsValid,
+      failure_reasons: debugResult.analysis.failureReasons,
+      full_debug_result: debugResult,
+      timestamp: new Date().toISOString()
+    });
+    
     if (!debugResult.analysis.slotShownAsAvailable) {
       console.error('❌ [CREATE_APPOINTMENT] CRITICAL: Slot not shown as available in RPC but booking attempted');
+      console.error('❌ [CREATE_APPOINTMENT] DETAILED COMPARISON:', {
+        requested_slot: timeSlot,
+        available_slots_from_rpc: debugResult.fetchedSlots,
+        booking_params: bookingParams,
+        debug_analysis: debugResult.analysis
+      });
       toast.error('Erro interno: horário não validado pelo sistema');
       return { success: false };
     }
@@ -112,33 +142,20 @@ export async function createAppointment(
       }
     }
 
-    // Call the atomic booking RPC with correct provider_profile_id
-    console.log('🔄 [CREATE_APPOINTMENT] CALLING RPC: create_booking_atomic with parameters:', {
-      _user_id: userId,
-      _pet_id: petId,
-      _service_id: serviceId,
-      _provider_ids: providerProfileId ? [providerProfileId] : [],
-      _booking_date: isoDate,
-      _time_slot: timeSlot + ':00', // Ensure proper time format
-      _notes: notes || null
+    console.log('📞 [CREATE_APPOINTMENT] 🔥 ABOUT TO CALL create_booking_atomic RPC with final params:', {
+      ...bookingParams,
+      provider_data: providerData,
+      timestamp: new Date().toISOString()
     });
     
-    const providerIds = providerProfileId ? [providerProfileId] : [];
-    
-    const { data: appointmentId, error } = await supabase.rpc('create_booking_atomic', {
-      _user_id: userId,
-      _pet_id: petId,
-      _service_id: serviceId,
-      _provider_ids: providerIds, // Using provider_profile_id directly
-      _booking_date: isoDate,
-      _time_slot: timeSlot + ':00', // Ensure proper time format
-      _notes: notes || null
-    });
+    const { data: appointmentId, error } = await supabase.rpc('create_booking_atomic', bookingParams);
 
-    console.log('📞 [CREATE_APPOINTMENT] RPC create_booking_atomic result:', {
+    console.log('📨 [CREATE_APPOINTMENT] 🔥 RPC create_booking_atomic RESPONSE:', {
       appointmentId,
       error,
-      success: !error && !!appointmentId
+      success: !error && !!appointmentId,
+      request_params: bookingParams,
+      timestamp: new Date().toISOString()
     });
 
     if (error) {
@@ -147,7 +164,8 @@ export async function createAppointment(
         error_details: error.details,
         error_hint: error.hint,
         error_code: error.code,
-        full_error: error
+        full_error: error,
+        request_params: bookingParams
       });
       
       if (error.message.includes('not available') || error.message.includes('Provider') && error.message.includes('not available')) {
@@ -186,7 +204,8 @@ export async function createAppointment(
 
     console.log('🎉 [CREATE_APPOINTMENT] BOOKING SUCCESS: Complete appointment record created:', {
       appointmentId,
-      bookingData
+      bookingData,
+      timestamp: new Date().toISOString()
     });
     toast.success('Agendamento enviado com sucesso!');
     
@@ -200,7 +219,8 @@ export async function createAppointment(
     console.error('💥 [CREATE_APPOINTMENT] CRITICAL ERROR: Unexpected error in createAppointment:', {
       error_message: error?.message,
       error_stack: error?.stack,
-      full_error: error
+      full_error: error,
+      timestamp: new Date().toISOString()
     });
     toast.error('Erro crítico no sistema de agendamento');
     return { success: false };

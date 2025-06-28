@@ -221,25 +221,33 @@ export const useAppointmentData = () => {
         });
       }
 
-      // 🔥 FIXED: Use correct RPC parameter names with underscores
-      console.log('🔍 [FETCH_TIME_SLOTS] Calling RPC with CORRECTED params:', {
+      // 🔥 ENHANCED LOGGING: Log exact RPC parameters
+      const rpcParams = {
         _service_id: selectedService.id,
         _date: dateStr,
         _provider_id: providerProfileId
+      };
+
+      console.log('📤 [FETCH_TIME_SLOTS] 🔥 CALLING get_available_slots_for_service RPC with EXACT params:', {
+        ...rpcParams,
+        service_name: selectedService.name,
+        service_duration_minutes: selectedService.duration_minutes,
+        timestamp: new Date().toISOString()
       });
 
-      const { data: availableSlots, error } = await supabase.rpc('get_available_slots_for_service', {
-        _service_id: selectedService.id,
-        _date: dateStr,
-        _provider_id: providerProfileId
-      });
+      const { data: availableSlots, error } = await supabase.rpc('get_available_slots_for_service', rpcParams);
 
       if (error) {
         console.error('❌ [FETCH_TIME_SLOTS] RPC error:', error);
         throw error;
       }
 
-      console.log('📊 [FETCH_TIME_SLOTS] Available slots from RPC:', availableSlots);
+      console.log('📨 [FETCH_TIME_SLOTS] 🔥 RPC RESPONSE from get_available_slots_for_service:', {
+        slots_count: availableSlots?.length || 0,
+        slots: availableSlots,
+        request_params: rpcParams,
+        timestamp: new Date().toISOString()
+      });
 
       // Transform to TimeSlot format
       const timeSlotData: TimeSlot[] = (availableSlots || []).map(slot => ({
@@ -248,7 +256,12 @@ export const useAppointmentData = () => {
         available: true
       }));
 
-      console.log('✅ [FETCH_TIME_SLOTS] Final time slots:', timeSlotData);
+      console.log('✅ [FETCH_TIME_SLOTS] Final time slots for UI:', {
+        count: timeSlotData.length,
+        slots: timeSlotData.map(s => ({ id: s.id, time: s.time, available: s.available })),
+        timestamp: new Date().toISOString()
+      });
+      
       setTimeSlots(timeSlotData);
 
       // Fetch next available appointment
