@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -7,7 +6,7 @@ export async function createAppointment(
   userId: string,
   petId: string,
   serviceId: string,
-  providerId: string | null,
+  providerId: string | null, // This is user_id from groomer selection
   date: Date,
   timeSlot: string,
   notes?: string
@@ -17,7 +16,7 @@ export async function createAppointment(
       userId,
       petId,
       serviceId,
-      providerId,
+      providerId, // This is user_id
       date: date.toISOString(),
       timeSlot,
       notes,
@@ -42,43 +41,54 @@ export async function createAppointment(
 
     let providerData = null;
     let providerProfileId = null;
+    
+    // CRITICAL FIX: Convert user_id to provider_profile_id if provider is selected
     if (providerId) {
-      // Get the provider profile ID from the provider_profiles table
-      const { data: providerProfile } = await supabase
+      console.log('🔍 CONVERTING USER_ID TO PROVIDER_PROFILE_ID:', providerId);
+      
+      // Get the provider profile ID from the provider_profiles table using user_id
+      const { data: providerProfile, error: profileError } = await supabase
         .from('provider_profiles')
         .select('id, user_id')
+        .eq('user_id', providerId) // providerId is actually user_id from groomer selection
+        .single();
+      
+      if (profileError || !providerProfile) {
+        console.error('❌ PROVIDER PROFILE CONVERSION ERROR:', profileError);
+        console.log('❌ Cannot find provider_profile for user_id:', providerId);
+        toast.error('Erro: Perfil do profissional não encontrado');
+        return { success: false };
+      }
+
+      providerProfileId = providerProfile.id;
+      console.log('✅ PROVIDER CONVERSION SUCCESS:', { 
+        user_id: providerId, 
+        provider_profile_id: providerProfileId 
+      });
+      
+      // Get user data for the provider
+      const { data: providerUserData } = await supabase
+        .from('clients')
+        .select('name')
         .eq('user_id', providerId)
         .single();
       
-      if (providerProfile) {
-        providerProfileId = providerProfile.id;
-        // Get user data for the provider
-        const { data: providerUserData } = await supabase
-          .from('clients')
-          .select('name')
-          .eq('user_id', providerId)
-          .single();
-        
-        // Also try groomers table
-        const { data: groomerData } = await supabase
-          .from('groomers')
-          .select('name')
-          .eq('user_id', providerId)
-          .single();
-        
-        providerData = {
-          id: providerProfileId,
-          user_id: providerId,
-          name: providerUserData?.name || groomerData?.name || 'Provider'
-        };
-      }
+      // Also try groomers table
+      const { data: groomerData } = await supabase
+        .from('groomers')
+        .select('name')
+        .eq('user_id', providerId)
+        .single();
+      
+      providerData = {
+        id: providerProfileId,
+        user_id: providerId,
+        name: providerUserData?.name || groomerData?.name || 'Provider'
+      };
     }
 
-    // STEP 2: Call the atomic booking RPC with provider profile IDs
-    console.log('🔄 STEP 2: Calling create_booking_atomic RPC...', {
-      provider_profile_id: providerProfileId,
-      provider_user_id: providerId
-    });
+    // STEP 2: Call the atomic booking RPC with correct provider profile IDs
+    console.log('🔄 STEP 2: Calling create_booking_atomic RPC with provider_profile_id:', providerProfileId);
     
     const providerIds = providerProfileId ? [providerProfileId] : [];
     
@@ -86,7 +96,7 @@ export async function createAppointment(
       _user_id: userId,
       _pet_id: petId,
       _service_id: serviceId,
-      _provider_ids: providerIds,
+      _provider_ids: providerIds, // Now using correct provider_profile_id
       _booking_date: isoDate,
       _time_slot: timeSlot,
       _notes: notes || null
