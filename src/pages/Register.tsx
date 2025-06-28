@@ -17,7 +17,7 @@ const Register = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'client' | 'groomer' | 'vet'>('client');
+  const [role, setRole] = useState<'client' | 'groomer' | 'vet' | 'admin'>('client');
   const [registrationCode, setRegistrationCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +43,7 @@ const Register = () => {
 
   // Update code requirement when role changes
   useEffect(() => {
-    setCodeRequired(role === 'groomer' || role === 'vet');
+    setCodeRequired(role === 'groomer' || role === 'vet' || role === 'admin');
   }, [role]);
   
   const validateAndUseRegistrationCode = async () => {
@@ -63,7 +63,10 @@ const Register = () => {
       }
       
       if (!isValid) {
-        setError(`Código de registro inválido para ${role === 'groomer' ? 'tosador' : 'veterinário'}.`);
+        const roleText = role === 'groomer' ? 'tosador' : 
+                        role === 'vet' ? 'veterinário' : 
+                        role === 'admin' ? 'administrador' : role;
+        setError(`Código de registro inválido para ${roleText}.`);
         return false;
       }
       
@@ -102,7 +105,10 @@ const Register = () => {
     }
     
     if (codeRequired && !registrationCode) {
-      setError(`Código de registro é obrigatório para ${role === 'groomer' ? 'tosadores' : 'veterinários'}.`);
+      const roleText = role === 'groomer' ? 'tosadores' : 
+                      role === 'vet' ? 'veterinários' : 
+                      role === 'admin' ? 'administradores' : role;
+      setError(`Código de registro é obrigatório para ${roleText}.`);
       return;
     }
     
@@ -131,6 +137,8 @@ const Register = () => {
         toast.success('Registro realizado! Sua disponibilidade foi configurada automaticamente. Verifique seu email para confirmar a conta.');
       } else if (role === 'vet') {
         toast.success('Registro realizado! Sua agenda foi configurada automaticamente. Verifique seu email para confirmar a conta.');
+      } else if (role === 'admin') {
+        toast.success('Registro de administrador realizado! Verifique seu email para confirmar a conta.');
       } else {
         toast.success('Registro realizado! Verifique seu email para confirmar a conta.');
       }
@@ -209,8 +217,8 @@ const Register = () => {
                   <Label>Tipo de Conta</Label>
                   <RadioGroup
                     value={role}
-                    onValueChange={(value: 'client' | 'groomer' | 'vet') => setRole(value)}
-                    className="grid grid-cols-3 gap-2"
+                    onValueChange={(value: 'client' | 'groomer' | 'vet' | 'admin') => setRole(value)}
+                    className="grid grid-cols-2 gap-2"
                   >
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="client" id="client" />
@@ -224,16 +232,33 @@ const Register = () => {
                       <RadioGroupItem value="vet" id="vet" />
                       <Label htmlFor="vet">Veterinário</Label>
                     </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="admin" id="admin" />
+                      <Label htmlFor="admin">Administrador</Label>
+                    </div>
                   </RadioGroup>
                   
                   {role !== 'client' && (
                     <Alert className="mt-2">
                       <AlertDescription>
-                        Ao se cadastrar como {role === 'groomer' ? 'tosador' : 'veterinário'}, 
-                        você terá acesso ao calendário de agendamentos e será listado como 
-                        profissional disponível para os clientes.
-                        {role === 'groomer' && ' Sua disponibilidade será configurada automaticamente para os próximos 90 dias.'}
-                        {role === 'vet' && ' Sua agenda será configurada automaticamente para os próximos 90 dias.'}
+                        {role === 'groomer' && (
+                          <>
+                            Ao se cadastrar como tosador, você terá acesso ao calendário de agendamentos e será listado como 
+                            profissional disponível para os clientes. Sua disponibilidade será configurada automaticamente para os próximos 90 dias.
+                          </>
+                        )}
+                        {role === 'vet' && (
+                          <>
+                            Ao se cadastrar como veterinário, você terá acesso ao calendário de agendamentos e será listado como 
+                            profissional disponível para os clientes. Sua agenda será configurada automaticamente para os próximos 90 dias.
+                          </>
+                        )}
+                        {role === 'admin' && (
+                          <>
+                            Ao se cadastrar como administrador, você terá acesso completo ao sistema, incluindo o painel administrativo 
+                            para gerenciar agendamentos, usuários e configurações.
+                          </>
+                        )}
                       </AlertDescription>
                     </Alert>
                   )}
@@ -245,7 +270,11 @@ const Register = () => {
                     <Input
                       id="registrationCode"
                       type="text"
-                      placeholder={`Insira o código de registro de ${role === 'groomer' ? 'tosador' : 'veterinário'}`}
+                      placeholder={`Insira o código de registro de ${
+                        role === 'groomer' ? 'tosador' : 
+                        role === 'vet' ? 'veterinário' : 
+                        role === 'admin' ? 'administrador' : role
+                      }`}
                       value={registrationCode}
                       onChange={(e) => setRegistrationCode(e.target.value)}
                       required
