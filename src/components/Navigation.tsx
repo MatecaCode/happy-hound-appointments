@@ -28,14 +28,22 @@ const Navigation = () => {
     }
   };
 
+  const handleSmoothScroll = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const navItems = [
     { name: 'Início', href: '/' },
     { name: 'Serviços', href: '/services' },
+    { name: 'Banho & Tosa', href: '/', scrollTo: 'banho-e-tosa' },
     { name: 'Sobre', href: '/about' },
   ];
 
   return (
-    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -50,13 +58,32 @@ const Navigation = () => {
           <div className="hidden md:flex items-center justify-center flex-1">
             <div className="flex items-center space-x-8">
               {navItems.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
-                >
-                  {item.name}
-                </Link>
+                item.scrollTo ? (
+                  <button
+                    key={item.name}
+                    onClick={() => {
+                      if (window.location.pathname !== '/') {
+                        navigate('/');
+                        setTimeout(() => handleSmoothScroll(item.scrollTo!), 100);
+                      } else {
+                        handleSmoothScroll(item.scrollTo!);
+                      }
+                    }}
+                    className="text-gray-700 hover:text-primary hover:font-medium px-3 py-2 text-sm font-medium transition-all duration-300 relative group"
+                  >
+                    {item.name}
+                    <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full group-hover:left-0"></span>
+                  </button>
+                ) : (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className="text-gray-700 hover:text-primary hover:font-medium px-3 py-2 text-sm font-medium transition-all duration-300 relative group"
+                  >
+                    {item.name}
+                    <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full group-hover:left-0"></span>
+                  </Link>
+                )
               ))}
             </div>
           </div>
@@ -67,9 +94,9 @@ const Navigation = () => {
               <>
                 <Link
                   to="/book"
-                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-all duration-300 hover:shadow-md"
                 >
-                  Agendar
+                  Agendar Consulta
                 </Link>
                 
                 {/* Role-based navigation using hasRole */}
@@ -164,9 +191,15 @@ const Navigation = () => {
                 </Link>
                 <Link
                   to="/register"
-                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors"
+                  className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition-all duration-300 hover:shadow-md"
                 >
                   Cadastrar
+                </Link>
+                <Link
+                  to="/book"
+                  className="border border-primary text-primary px-4 py-2 rounded-lg hover:bg-primary/5 transition-all duration-300"
+                >
+                  Agendar Consulta
                 </Link>
               </div>
             )}
@@ -189,14 +222,32 @@ const Navigation = () => {
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white border-t border-gray-200">
               {navItems.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
-                  onClick={() => setIsOpen(false)}
-                >
-                  {item.name}
-                </Link>
+                item.scrollTo ? (
+                  <button
+                    key={item.name}
+                    onClick={() => {
+                      if (window.location.pathname !== '/') {
+                        navigate('/');
+                        setTimeout(() => handleSmoothScroll(item.scrollTo!), 100);
+                      } else {
+                        handleSmoothScroll(item.scrollTo!);
+                      }
+                      setIsOpen(false);
+                    }}
+                    className="text-gray-700 hover:text-primary block w-full text-left px-3 py-2 text-base font-medium transition-colors"
+                  >
+                    {item.name}
+                  </button>
+                ) : (
+                  <Link
+                    key={item.name}
+                    to={item.href}
+                    className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                    onClick={() => setIsOpen(false)}
+                  >
+                    {item.name}
+                  </Link>
+                )
               ))}
               
               {user ? (
@@ -206,7 +257,7 @@ const Navigation = () => {
                     className="block w-full text-left bg-primary text-white px-3 py-2 rounded-lg hover:bg-primary/90 transition-colors"
                     onClick={() => setIsOpen(false)}
                   >
-                    Agendar
+                    Agendar Consulta
                   </Link>
                   
                   {/* Role-based mobile navigation */}

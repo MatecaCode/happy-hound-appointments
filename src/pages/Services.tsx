@@ -5,14 +5,21 @@ import { Scissors, ShowerHead, Dog, Sparkles, Smile, Syringe, Heart, Calendar, P
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Separator } from "@/components/ui/separator";
+import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
 
 const Services = () => {
+  const headerAnimation = useScrollAnimation({ delay: 100 });
+  const vetHeaderAnimation = useScrollAnimation({ delay: 100 });
+  const groomingHeaderAnimation = useScrollAnimation({ delay: 100 });
+  const ctaAnimation = useScrollAnimation({ delay: 200 });
+
   const groomingServices = [
     {
       title: "Banho & Escovação Básica",
-      description: "Banho, secagem, escovação, limpeza de ouvidos, corte de unhas e borrifada de colônia.",
+      description: "Banho com carinho, escovação cuidadosa e colônia leve para deixar seu pet renovado e feliz.",
       price: "R$40",
       icon: <ShowerHead className="h-6 w-6" />,
+      backgroundColor: "#FDECE4", // Soft blush/peach
       details: [
         "Banho com água morna e shampoo suave",
         "Escovação completa",
@@ -28,6 +35,8 @@ const Services = () => {
       price: "R$60",
       icon: <Scissors className="h-6 w-6" />,
       popular: true,
+      badge: "Mais Popular",
+      backgroundColor: "#F5EEE5",
       details: [
         "Todos os serviços do Banho & Escovação Básica",
         "Corte personalizado",
@@ -41,6 +50,7 @@ const Services = () => {
       description: "Tosa completa com shampoo especial, condicionador, limpeza de dentes e tratamento de patas.",
       price: "R$80",
       icon: <Sparkles className="h-6 w-6" />,
+      backgroundColor: "#EAF4FB", // Light blue
       details: [
         "Todos os serviços da Tosa Completa",
         "Shampoo e condicionador premium",
@@ -55,6 +65,7 @@ const Services = () => {
       description: "Serviço rápido de corte de unhas para manter as patas do seu cachorro saudáveis.",
       price: "R$15",
       icon: <Scissors className="h-6 w-6" />,
+      backgroundColor: "#FDECE4",
       details: [
         "Corte de unhas",
         "Lixamento de unhas",
@@ -66,6 +77,7 @@ const Services = () => {
       description: "Serviço de higiene dental para manter a saúde bucal do seu cachorro.",
       price: "R$25",
       icon: <Smile className="h-6 w-6" />,
+      backgroundColor: "#F5EEE5",
       details: [
         "Escovação com pasta de dente própria para cães",
         "Exame de gengivas",
@@ -77,6 +89,7 @@ const Services = () => {
       description: "Introdução suave à tosa para filhotes com menos de 6 meses.",
       price: "R$45",
       icon: <Dog className="h-6 w-6" />,
+      backgroundColor: "#EAF4FB",
       details: [
         "Shampoo suave para filhotes",
         "Tosa leve para acostumar o filhote",
@@ -93,6 +106,7 @@ const Services = () => {
       description: "Avaliação completa da saúde do seu pet com médico veterinário especializado.",
       price: "R$120",
       icon: <Syringe className="h-6 w-6" />,
+      backgroundColor: "#E9F3E1", // Soft green
       details: [
         "Exame físico completo",
         "Avaliação de saúde geral",
@@ -107,6 +121,8 @@ const Services = () => {
       price: "A partir de R$80",
       icon: <Syringe className="h-6 w-6" />,
       popular: true,
+      badge: "Mais Agendado",
+      backgroundColor: "#EAF4FB", // Light blue
       details: [
         "Avaliação pré-vacinação",
         "Vacinas importadas",
@@ -174,7 +190,12 @@ const Services = () => {
     <Layout>
       <section className="bg-secondary/50 py-16">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
+          <div 
+            ref={headerAnimation.ref}
+            className={`text-center mb-12 ${animationClasses.fadeIn} ${
+              headerAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+            }`}
+          >
             <h1 className="mb-4">Nossos <span className="text-primary">Serviços</span></h1>
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Oferecemos serviços completos de saúde e bem-estar para seu pet, desde consultas veterinárias 
@@ -187,7 +208,12 @@ const Services = () => {
       {/* Serviços Veterinários */}
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-center mb-12">
+          <div 
+            ref={vetHeaderAnimation.ref}
+            className={`flex items-center justify-center mb-12 ${animationClasses.fadeIn} ${
+              vetHeaderAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+            }`}
+          >
             <div className="w-16 h-0.5 bg-primary mr-4"></div>
             <h2 className="text-3xl font-bold">Serviços Veterinários</h2>
             <div className="w-16 h-0.5 bg-primary ml-4"></div>
@@ -202,6 +228,8 @@ const Services = () => {
                 price={service.price}
                 icon={service.icon}
                 popular={service.popular}
+                badge={service.badge}
+                backgroundColor={service.backgroundColor}
               />
             ))}
           </div>
@@ -215,7 +243,12 @@ const Services = () => {
       {/* Banho & Tosa */}
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-center mb-12">
+          <div 
+            ref={groomingHeaderAnimation.ref}
+            className={`flex items-center justify-center mb-12 ${animationClasses.fadeIn} ${
+              groomingHeaderAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+            }`}
+          >
             <div className="w-16 h-0.5 bg-primary mr-4"></div>
             <h2 className="text-3xl font-bold">Banho & Tosa</h2>
             <div className="w-16 h-0.5 bg-primary ml-4"></div>
@@ -230,16 +263,23 @@ const Services = () => {
                 price={service.price}
                 icon={service.icon}
                 popular={service.popular}
+                badge={service.badge}
+                backgroundColor={service.backgroundColor}
               />
             ))}
           </div>
           
-          <div className="mt-16 text-center bg-secondary rounded-xl p-8">
+          <div 
+            ref={ctaAnimation.ref}
+            className={`mt-16 text-center bg-secondary rounded-xl p-8 ${animationClasses.scaleIn} ${
+              ctaAnimation.isVisible ? animationClasses.scaleInActive : animationClasses.scaleInInactive
+            }`}
+          >
             <h3 className="text-2xl font-bold mb-4">Precisa de Algo Especial?</h3>
             <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
               Tem uma necessidade específica que não está listada aqui? Oferecemos serviços personalizados adaptados às necessidades específicas do seu pet.
             </p>
-            <Button asChild size="lg">
+            <Button asChild size="lg" className="transition-all duration-300 hover:shadow-lg hover:scale-105">
               <Link to="/book">Contate-nos Para Serviços Personalizados</Link>
             </Button>
           </div>
