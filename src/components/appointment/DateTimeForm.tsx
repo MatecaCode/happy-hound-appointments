@@ -122,7 +122,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setActiveTab('next')}
+                    onClick={() => setActiveTab('next-available')}
                   >
                     Ver Próximo Disponível
                   </Button>
@@ -171,7 +171,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             </Card>
 
             {/* Next Available Option */}
-            {activeTab === 'next' && (
+            {activeTab === 'next-available' && (
               <Card>
                 <CardContent className="p-4">
                   <NextAvailableAppointment

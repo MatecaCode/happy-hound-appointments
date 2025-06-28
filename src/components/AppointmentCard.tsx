@@ -1,102 +1,132 @@
 
 import React from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { CalendarCheck, Clock, Dog, Scissors } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { CalendarDays, Clock, Dog, User, FileText } from 'lucide-react';
 import { format } from 'date-fns';
-import { toast } from 'sonner';
-
-export interface Appointment {
-  id: string;
-  petName: string;
-  service: string;
-  date: Date;
-  time: string;
-  status: 'upcoming' | 'completed' | 'cancelled';
-}
+import { ptBR } from 'date-fns/locale';
+import AppointmentActions from './appointment/AppointmentActions';
 
 interface AppointmentCardProps {
-  appointment: Appointment;
-  onCancel?: (id: string) => void;
+  appointment: {
+    id: string;
+    date: string;
+    time: string;
+    status: string;
+    service_status: string;
+    notes?: string;
+    service: {
+      name: string;
+      price: number;
+    };
+    pet: {
+      name: string;
+      breed?: string;
+    };
+    provider?: {
+      name: string;
+    };
+  };
+  onUpdate?: () => void;
 }
 
-const AppointmentCard: React.FC<AppointmentCardProps> = ({ 
-  appointment,
-  onCancel 
-}) => {
-  const { id, petName, service, date, time, status } = appointment;
-  
-  const handleCancel = () => {
-    if (onCancel) {
-      onCancel(id);
-    } else {
-      toast.success(`Agendamento para ${petName} foi cancelado.`);
-    }
-  };
-  
-  const getStatusColor = () => {
+const AppointmentCard = ({ appointment, onUpdate }: AppointmentCardProps) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
-      case 'upcoming': return 'bg-blue-100 text-blue-700';
-      case 'completed': return 'bg-green-100 text-green-700';
-      case 'cancelled': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-700';
+      case 'confirmed':
+        return 'bg-green-100 text-green-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
-  
-  const getStatusText = () => {
+
+  const getStatusText = (status: string) => {
     switch (status) {
-      case 'upcoming': return 'próximo';
-      case 'completed': return 'concluído';
-      case 'cancelled': return 'cancelado';
-      default: return status;
+      case 'confirmed':
+        return 'Confirmado';
+      case 'pending':
+        return 'Aguardando Aprovação';
+      case 'cancelled':
+        return 'Cancelado';
+      case 'completed':
+        return 'Concluído';
+      default:
+        return status;
     }
   };
-  
+
   return (
-    <Card className={status === 'cancelled' ? 'opacity-70' : ''}>
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
-          <CardTitle>Agendamento de {petName}</CardTitle>
-          <div className={`px-3 py-1 rounded-full text-xs font-medium capitalize ${getStatusColor()}`}>
-            {getStatusText()}
+    <Card className="w-full">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-semibold">
+            {appointment.service.name}
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Badge className={getStatusColor(appointment.status)}>
+              {getStatusText(appointment.status)}
+            </Badge>
+            <AppointmentActions 
+              appointmentId={appointment.id}
+              status={appointment.status}
+              onCancel={onUpdate}
+            />
           </div>
         </div>
-        <CardDescription>
-          {service}
-        </CardDescription>
       </CardHeader>
       
-      <CardContent className="pb-4">
-        <div className="space-y-3">
-          <div className="flex items-center text-sm">
-            <CalendarCheck className="mr-2 h-4 w-4 text-primary" />
-            <span>{format(date, 'EEEE, d \'de\' MMMM \'de\' yyyy')}</span>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex items-center space-x-2">
+            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">
+              {format(new Date(appointment.date), "EEEE, d 'de' MMMM", { locale: ptBR })}
+            </span>
           </div>
           
-          <div className="flex items-center text-sm">
-            <Clock className="mr-2 h-4 w-4 text-primary" />
-            <span>{time}</span>
+          <div className="flex items-center space-x-2">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">{appointment.time}</span>
           </div>
           
-          <div className="flex items-center text-sm">
-            <Dog className="mr-2 h-4 w-4 text-primary" />
-            <span>Pet: {petName}</span>
+          <div className="flex items-center space-x-2">
+            <Dog className="h-4 w-4 text-muted-foreground" />
+            <span className="text-sm">
+              {appointment.pet.name}
+              {appointment.pet.breed && ` (${appointment.pet.breed})`}
+            </span>
           </div>
           
-          <div className="flex items-center text-sm">
-            <Scissors className="mr-2 h-4 w-4 text-primary" />
-            <span>Serviço: {service}</span>
+          {appointment.provider && (
+            <div className="flex items-center space-x-2">
+              <User className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">{appointment.provider.name}</span>
+            </div>
+          )}
+        </div>
+        
+        {appointment.notes && (
+          <div className="flex items-start space-x-2 pt-2 border-t">
+            <FileText className="h-4 w-4 text-muted-foreground mt-0.5" />
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Observações:</p>
+              <p className="text-sm">{appointment.notes}</p>
+            </div>
           </div>
+        )}
+        
+        <div className="flex justify-between items-center pt-2 border-t">
+          <span className="text-sm text-muted-foreground">
+            Preço: R$ {appointment.service.price.toFixed(2)}
+          </span>
         </div>
       </CardContent>
-      
-      {status === 'upcoming' && (
-        <CardFooter className="pt-0">
-          <Button variant="outline" onClick={handleCancel} className="w-full">
-            Cancelar Agendamento
-          </Button>
-        </CardFooter>
-      )}
     </Card>
   );
 };
