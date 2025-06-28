@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { debugBookingState, compareSlotFetchVsBooking } from './bookingDebugger';
 
 // ENHANCED LOGGING: Accept provider_profile_id directly with comprehensive tracking
 export async function createAppointment(
@@ -25,6 +26,27 @@ export async function createAppointment(
 
     const isoDate = date.toISOString().split('T')[0];
     
+    // 🔍 COMPREHENSIVE DEBUG ANALYSIS
+    console.log('🔍 [CREATE_APPOINTMENT] Running comprehensive debug analysis...');
+    const debugResult = await compareSlotFetchVsBooking(
+      serviceId,
+      providerProfileId,
+      isoDate,
+      timeSlot
+    );
+    
+    if (!debugResult.analysis.slotShownAsAvailable) {
+      console.error('❌ [CREATE_APPOINTMENT] CRITICAL: Slot not shown as available in RPC but booking attempted');
+      toast.error('Erro interno: horário não validado pelo sistema');
+      return { success: false };
+    }
+    
+    if (!debugResult.analysis.allSlotsValid) {
+      console.error('❌ [CREATE_APPOINTMENT] CRITICAL: Slot validation failed:', debugResult.analysis.failureReasons);
+      toast.error('Horário não disponível devido a conflitos detectados');
+      return { success: false };
+    }
+
     // Get user, pet, service data for notifications
     const { data: userData } = await supabase.auth.getUser();
     const { data: petData } = await supabase
@@ -87,30 +109,6 @@ export async function createAppointment(
         };
 
         console.log('✅ [CREATE_APPOINTMENT] Provider data assembled:', providerData);
-      }
-    }
-
-    // CRITICAL: Validate the provider_profile_id exists in provider_availability before booking
-    if (providerProfileId) {
-      console.log('🔍 [CREATE_APPOINTMENT] PRE-VALIDATION: Checking provider availability before RPC call');
-
-      // 🔥 FIXED: Use correct RPC parameter names
-      const { data: availableSlots } = await supabase.rpc('get_available_slots_for_service', {
-        _service_id: serviceId,
-        _date: isoDate,
-        _provider_id: providerProfileId
-      });
-
-      console.log('📊 [CREATE_APPOINTMENT] PRE-VALIDATION result:', {
-        available_slots: availableSlots,
-        requested_time: timeSlot,
-        slot_available: availableSlots?.some(slot => slot.time_slot === timeSlot + ':00')
-      });
-
-      if (!availableSlots?.some(slot => slot.time_slot === timeSlot + ':00')) {
-        console.error('❌ [CREATE_APPOINTMENT] PRE-VALIDATION FAILED: Time slot not available');
-        toast.error('Horário não disponível para este serviço.');
-        return { success: false };
       }
     }
 
