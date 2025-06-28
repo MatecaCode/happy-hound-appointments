@@ -730,6 +730,12 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_available_slots_for_service: {
+        Args: { _service_id: string; _date: string; _provider_id?: string }
+        Returns: {
+          time_slot: string
+        }[]
+      }
       get_shower_capacity: {
         Args: { target_date: string }
         Returns: number

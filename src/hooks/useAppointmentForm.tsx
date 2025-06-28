@@ -1,3 +1,4 @@
+
 import React, { useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -80,13 +81,19 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   const requiresVet = serviceRequirements?.requires_vet || false;
   const serviceRequirementsLoaded = Boolean(serviceRequirements);
 
-  console.log('🔍 [APPOINTMENT_FORM] Service requirements from view:', {
+  // NEW: Check if service is shower-only
+  const isShowerOnlyService = serviceRequirementsLoaded && 
+    requiresShower && 
+    !requiresGroomer && 
+    !requiresVet;
+
+  console.log('🔍 [APPOINTMENT_FORM] Service requirements analysis:', {
     service_id: formState.selectedService,
     requirements: serviceRequirements,
     requires_groomer: requiresGroomer,
     requires_shower: requiresShower,
     requires_vet: requiresVet,
-    combo: serviceRequirements?.combo
+    is_shower_only: isShowerOnlyService
   });
 
   // Clear selected groomer if service doesn't require one
@@ -119,6 +126,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       time_slot: formState.selectedTimeSlotId,
       notes: formState.notes,
       requires_groomer: requiresGroomer,
+      is_shower_only: isShowerOnlyService,
       service_requirements: serviceRequirements,
       timestamp: new Date().toISOString()
     });
@@ -139,7 +147,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       return;
     }
 
-    // Only require groomer if service requires one
+    // Only require groomer if service requires one (not for shower-only services)
     if (requiresGroomer && !formState.selectedGroomerId) {
       console.log('❌ [APPOINTMENT_FORM] Service requires groomer but none selected');
       return;
@@ -154,12 +162,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       console.log('🎯 [APPOINTMENT_FORM] SUBMIT: Provider ID mapping for submission:', {
         groomer_user_id: formState.selectedGroomerId,
         provider_profile_id: providerProfileId,
-        selected_groomer: selectedGroomer,
-        all_groomers_mapping: groomers.map(g => ({
-          user_id: g.id,
-          provider_profile_id: (g as any).provider_profile_id,
-          name: g.name
-        }))
+        selected_groomer: selectedGroomer
       });
 
       if (!providerProfileId) {
@@ -172,7 +175,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     formState.setIsLoading(true);
     
     // 🔥 CRITICAL DEBUG: Final payload logging
-    const finalPayload = {
+    console.log('📤 [APPOINTMENT_FORM] 🔥 FINAL PAYLOAD TO createAppointment:', {
       user_id: user.id,
       pet_id: formState.selectedPet,
       service_id: formState.selectedService,
@@ -180,17 +183,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       date: formState.date,
       time_slot: formState.selectedTimeSlotId,
       notes: formState.notes
-    };
-    
-    console.log('📤 [APPOINTMENT_FORM] 🔥 FINAL PAYLOAD TO createAppointment:', finalPayload);
-    console.log('📤 [APPOINTMENT_FORM] 🔥 EXACT VALUES BEING SENT TO RPC:', {
-      _user_id: user.id,
-      _pet_id: formState.selectedPet,
-      _service_id: formState.selectedService,
-      _provider_ids: providerProfileId ? [providerProfileId] : [],
-      _booking_date: formState.date.toISOString().split('T')[0],
-      _time_slot: formState.selectedTimeSlotId + ':00',
-      _notes: formState.notes
     });
 
     // Pass the provider_profile_id directly (not user_id)
@@ -225,29 +217,33 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [user, fetchUserPets]);
 
+  // NEW: Handle shower-only services - skip to step 4 directly
+  useEffect(() => {
+    if (isShowerOnlyService && formState.formStep === 2 && formState.date) {
+      console.log('🚿 [APPOINTMENT_FORM] Shower-only service detected, skipping to step 4');
+      formState.setFormStep(4); // Skip groomer selection, go directly to time slots
+    }
+  }, [isShowerOnlyService, formState.formStep, formState.date, formState]);
+
   // Fetch available providers when date changes and service requires groomer
   useEffect(() => {
-    if (formState.formStep === 3 && formState.date && requiresGroomer && serviceRequirementsLoaded) {
-      console.log('🔍 [APPOINTMENT_FORM] useEffect triggered for step 3 provider fetch:', {
-        step: formState.formStep,
-        date: formState.date,
-        requires_groomer: requiresGroomer,
-        service: selectedServiceObj
-      });
+    if (formState.formStep === 3 && formState.date && requiresGroomer && serviceRequirementsLoaded && !isShowerOnlyService) {
+      console.log('🔍 [APPOINTMENT_FORM] useEffect triggered for step 3 provider fetch');
       fetchAvailableProviders(serviceType, formState.date, selectedServiceObj);
     }
-  }, [formState.formStep, formState.date, serviceType, selectedServiceObj, fetchAvailableProviders, requiresGroomer, serviceRequirementsLoaded]);
+  }, [formState.formStep, formState.date, serviceType, selectedServiceObj, fetchAvailableProviders, requiresGroomer, serviceRequirementsLoaded, isShowerOnlyService]);
 
   // Fetch time slots for final step
   useEffect(() => {
-    // Final step is step 3 (no groomer) or step 4 (with groomer)
-    const isFinalStep = (formState.formStep === 3 && !requiresGroomer) || (formState.formStep === 4);
+    // Final step is step 4 (with/without groomer) OR step 3 for shower-only
+    const isFinalStep = formState.formStep === 4 || (isShowerOnlyService && formState.formStep === 3);
     
     if (isFinalStep && formState.date && serviceRequirementsLoaded) {
       console.log('🔍 [APPOINTMENT_FORM] useEffect triggered for time slots fetch:', {
         step: formState.formStep,
         is_final_step: isFinalStep,
         requires_groomer: requiresGroomer,
+        is_shower_only: isShowerOnlyService,
         groomer_user_id: formState.selectedGroomerId,
         date: formState.date
       });
@@ -255,7 +251,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       // Pass user_id to fetchTimeSlots - it will handle the conversion internally
       fetchTimeSlots(formState.date, formState.selectedGroomerId, formState.setIsLoading, selectedServiceObj);
     }
-  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresGroomer, serviceRequirementsLoaded]);
+  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresGroomer, serviceRequirementsLoaded, isShowerOnlyService]);
 
   return {
     // Spread all form state
@@ -274,6 +270,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     serviceRequiresVet: requiresVet,
     serviceRequirementsLoaded,
     serviceRequirements,
+    isShowerOnlyService, // NEW: Expose shower-only detection
     
     // Actions
     handleNextAvailableSelect,

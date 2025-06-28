@@ -11,7 +11,6 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import TimeSlotSelector from '@/components/TimeSlotSelector';
 import NextAvailableAppointment from '@/components/NextAvailableAppointment';
-import { debugProviderAvailability, debugGroomerProviderMapping } from '@/utils/debugBookingFlow';
 
 interface DateTimeFormProps {
   date: Date;
@@ -32,6 +31,7 @@ interface DateTimeFormProps {
   showTimeSlots: boolean;
   showSubmitButton: boolean;
   stepTitle: string;
+  isShowerOnlyService?: boolean;
 }
 
 const DateTimeForm: React.FC<DateTimeFormProps> = ({
@@ -53,29 +53,12 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   showTimeSlots,
   showSubmitButton,
   stepTitle,
+  isShowerOnlyService = false,
 }) => {
   const handleDateSelect = (selectedDate: Date | undefined) => {
     if (selectedDate) {
       setDate(selectedDate);
       setSelectedTimeSlotId(''); // Reset time slot when date changes
-    }
-  };
-
-  // 🔥 DEBUG: Add button to trigger debug functions
-  const handleDebugClick = async () => {
-    console.log('🔥 [DEBUG] Starting comprehensive debug analysis...');
-    
-    // Debug groomer mapping
-    await debugGroomerProviderMapping();
-    
-    // If we have a selected time slot, debug availability
-    if (selectedTimeSlotId && date) {
-      const dateStr = date.toISOString().split('T')[0];
-      // This will need the actual provider_profile_id - we'll get it from the form state
-      console.log('🔥 [DEBUG] Would check availability for:', {
-        date: dateStr,
-        time_slot: selectedTimeSlotId
-      });
     }
   };
 
@@ -87,19 +70,14 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
         <CardTitle className="flex items-center gap-2">
           <CalendarIcon className="h-5 w-5" />
           {stepTitle}
+          {isShowerOnlyService && (
+            <span className="text-sm text-blue-600 font-normal">
+              (Serviço apenas banho)
+            </span>
+          )}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* 🔥 DEBUG BUTTON - Remove in production */}
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={handleDebugClick}
-          className="bg-red-50 border-red-200 text-red-700"
-        >
-          🔥 DEBUG: Analyze Booking Flow
-        </Button>
-
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'calendar' | 'next-available')}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="calendar">Escolher Data</TabsTrigger>
@@ -129,7 +107,9 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                 {isLoading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="mt-2 text-muted-foreground">Carregando horários...</p>
+                    <p className="mt-2 text-muted-foreground">
+                      {isShowerOnlyService ? 'Carregando horários de banho...' : 'Carregando horários...'}
+                    </p>
                   </div>
                 ) : (
                   <TimeSlotSelector
