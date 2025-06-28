@@ -703,6 +703,14 @@ export type Database = {
         Args: { start_date: string; end_date: string }
         Returns: undefined
       }
+      fix_missing_provider_profiles: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          user_id: string
+          provider_type: string
+          action: string
+        }[]
+      }
       generate_time_slots: {
         Args: Record<PropertyKey, never>
         Returns: {
