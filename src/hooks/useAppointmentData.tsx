@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Pet, Service, Provider, TimeSlot, NextAvailable } from './useAppointmentForm';
@@ -48,10 +47,13 @@ export const useAppointmentData = () => {
     if (!selectedService) return;
 
     try {
-      console.log('🔍 [FETCH_PROVIDERS] Fetching available providers for:', {
+      const dateStr = date.toISOString().split('T')[0];
+      
+      console.log('🔍 [FETCH_PROVIDERS] Starting with params:', {
         service_type: serviceType,
         service_id: selectedService.id,
-        date: date.toISOString().split('T')[0]
+        date: dateStr,
+        service_name: selectedService.name
       });
 
       // First check if service requires a provider
@@ -62,6 +64,11 @@ export const useAppointmentData = () => {
 
       const requiresProvider = serviceResources?.some(r => r.resource_type === 'provider');
       
+      console.log('🔍 [FETCH_PROVIDERS] Service requirements:', {
+        requires_provider: requiresProvider,
+        resources: serviceResources
+      });
+      
       if (!requiresProvider) {
         console.log('🔍 [FETCH_PROVIDERS] Service does not require provider, skipping fetch');
         setGroomers([]);
@@ -70,43 +77,120 @@ export const useAppointmentData = () => {
 
       const providerType = serviceType === 'grooming' ? 'groomer' : 'vet';
       
-      // Get providers with their profile information
-      const { data: providerProfiles, error: profileError } = await supabase
+      // Get ALL provider profiles of the correct type first
+      const { data: allProviderProfiles, error: profileError } = await supabase
         .from('provider_profiles')
         .select(`
           id,
           user_id,
           type,
           bio,
-          rating,
-          ${providerType === 'groomer' ? 'groomers!inner(name)' : 'veterinarians!inner(name)'}
+          rating
         `)
         .eq('type', providerType);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('❌ [FETCH_PROVIDERS] Error fetching provider profiles:', profileError);
+        throw profileError;
+      }
 
-      // Transform to Provider format with correct ID mapping
-      const providers: Provider[] = (providerProfiles || []).map(profile => ({
-        id: profile.user_id, // UI uses user_id for backward compatibility
-        provider_profile_id: profile.id, // Store the actual provider_profile_id
-        name: (profile as any)[`${providerType}s`]?.name || 'Provider',
-        role: providerType,
-        rating: profile.rating || 0,
-        about: profile.bio || ''
-      }));
+      console.log('📊 [FETCH_PROVIDERS] All provider profiles found:', {
+        count: allProviderProfiles?.length || 0,
+        profiles: allProviderProfiles?.map(p => ({ id: p.id, user_id: p.user_id, type: p.type }))
+      });
 
-      console.log('✅ [FETCH_PROVIDERS] Providers fetched with ID mapping:', {
-        count: providers.length,
-        mapping: providers.map(p => ({
-          user_id: p.id,
+      if (!allProviderProfiles || allProviderProfiles.length === 0) {
+        console.log('❌ [FETCH_PROVIDERS] No provider profiles found for type:', providerType);
+        setGroomers([]);
+        return;
+      }
+
+      // Now check which of these providers have availability on the selected date
+      const providerIds = allProviderProfiles.map(p => p.id);
+      
+      console.log('🔍 [FETCH_PROVIDERS] Checking availability for provider IDs:', providerIds);
+      
+      const { data: availabilityData, error: availError } = await supabase
+        .from('provider_availability')
+        .select('provider_id, date, time_slot, available')
+        .eq('date', dateStr)
+        .in('provider_id', providerIds)
+        .eq('available', true);
+
+      if (availError) {
+        console.error('❌ [FETCH_PROVIDERS] Error fetching availability:', availError);
+        throw availError;
+      }
+
+      console.log('📊 [FETCH_PROVIDERS] Availability data found:', {
+        total_slots: availabilityData?.length || 0,
+        availability_by_provider: availabilityData?.reduce((acc: any, curr) => {
+          acc[curr.provider_id] = (acc[curr.provider_id] || 0) + 1;
+          return acc;
+        }, {})
+      });
+
+      // Get unique provider IDs that have availability
+      const availableProviderIds = [...new Set(availabilityData?.map(a => a.provider_id) || [])];
+      
+      console.log('✅ [FETCH_PROVIDERS] Providers with availability:', availableProviderIds);
+
+      // Filter profiles to only those with availability
+      const availableProfiles = allProviderProfiles.filter(profile => 
+        availableProviderIds.includes(profile.id)
+      );
+
+      console.log('📊 [FETCH_PROVIDERS] Available profiles after filtering:', {
+        count: availableProfiles.length,
+        profiles: availableProfiles.map(p => ({ id: p.id, user_id: p.user_id }))
+      });
+
+      // Get names for these providers
+      const availableProviders: Provider[] = [];
+      
+      for (const profile of availableProfiles) {
+        let providerName = 'Provider';
+        
+        // Get name from appropriate table
+        if (providerType === 'groomer') {
+          const { data: groomerData } = await supabase
+            .from('groomers')
+            .select('name')
+            .eq('user_id', profile.user_id)
+            .single();
+          providerName = groomerData?.name || 'Groomer';
+        } else {
+          const { data: vetData } = await supabase
+            .from('veterinarians')
+            .select('name')
+            .eq('user_id', profile.user_id)
+            .single();
+          providerName = vetData?.name || 'Veterinarian';
+        }
+
+        availableProviders.push({
+          id: profile.user_id, // UI compatibility: use user_id as id
+          provider_profile_id: profile.id, // Store actual provider_profile_id
+          name: providerName,
+          role: providerType,
+          rating: profile.rating || 0,
+          about: profile.bio || ''
+        });
+      }
+
+      console.log('🎉 [FETCH_PROVIDERS] Final available providers:', {
+        count: availableProviders.length,
+        providers: availableProviders.map(p => ({
+          id: p.id,
           provider_profile_id: p.provider_profile_id,
-          name: p.name
+          name: p.name,
+          role: p.role
         }))
       });
 
-      setGroomers(providers);
+      setGroomers(availableProviders);
     } catch (error) {
-      console.error('❌ [FETCH_PROVIDERS] Error fetching providers:', error);
+      console.error('❌ [FETCH_PROVIDERS] Critical error:', error);
       setGroomers([]);
     }
   }, []);
