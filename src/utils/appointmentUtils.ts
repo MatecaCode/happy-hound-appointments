@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -93,6 +94,24 @@ export async function createAppointment(
       }
     }
 
+    // 🔧 FIXED: Ensure time slot is in correct HH:MM:SS format
+    let formattedTimeSlot = timeSlot;
+    
+    // If timeSlot is already in HH:MM:SS format, use it as-is
+    // If it's in HH:MM format, add :00
+    if (timeSlot.split(':').length === 2) {
+      formattedTimeSlot = timeSlot + ':00';
+    } else if (timeSlot.split(':').length === 3) {
+      formattedTimeSlot = timeSlot; // Already in correct format
+    }
+
+    console.log('🕐 [CREATE_APPOINTMENT] Time slot formatting:', {
+      original_time_slot: timeSlot,
+      formatted_time_slot: formattedTimeSlot,
+      segments_original: timeSlot.split(':').length,
+      segments_formatted: formattedTimeSlot.split(':').length
+    });
+
     // ✅ SIMPLIFIED: Direct booking call with enhanced error handling
     const bookingParams = {
       _user_id: userId,
@@ -100,7 +119,7 @@ export async function createAppointment(
       _service_id: serviceId,
       _provider_ids: providerProfileId ? [providerProfileId] : [],
       _booking_date: isoDate,
-      _time_slot: timeSlot + ':00', // Ensure proper time format
+      _time_slot: formattedTimeSlot, // Use properly formatted time slot
       _notes: notes || null
     };
 
@@ -139,6 +158,8 @@ export async function createAppointment(
         userErrorMessage = 'Erro de permissão. Verifique se você está logado.';
       } else if (error.message.includes('violates')) {
         userErrorMessage = 'Erro de validação de dados.';
+      } else if (error.message.includes('invalid input syntax for type time')) {
+        userErrorMessage = 'Formato de horário inválido. Por favor, tente novamente.';
       } else {
         userErrorMessage = `Erro: ${error.message}`;
       }
@@ -147,7 +168,10 @@ export async function createAppointment(
       
       return { 
         success: false, 
-        error
+        error: {
+          ...error,
+          userMessage: userErrorMessage
+        }
       };
     }
 
