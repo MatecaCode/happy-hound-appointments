@@ -1,4 +1,5 @@
 
+
 -- Fix the get_available_slots_for_service function to use manual loops instead of generate_series
 CREATE OR REPLACE FUNCTION public.get_available_slots_for_service(
     _service_id uuid,
@@ -36,13 +37,13 @@ BEGIN
   
   -- Check service requirements
   SELECT EXISTS(
-    SELECT 1 FROM service_resources 
-    WHERE service_id = _service_id AND resource_type = 'shower'
+    SELECT 1 FROM service_resources sr
+    WHERE sr.service_id = _service_id AND sr.resource_type = 'shower'
   ) INTO requires_shower;
   
   SELECT EXISTS(
-    SELECT 1 FROM service_resources 
-    WHERE service_id = _service_id AND resource_type = 'provider'
+    SELECT 1 FROM service_resources sr
+    WHERE sr.service_id = _service_id AND sr.resource_type = 'provider'
   ) INTO requires_provider;
   
   RAISE NOTICE '[GET_AVAILABLE_SLOTS] Service analysis: duration=%min, requires_shower=%, requires_provider=%', 
@@ -172,8 +173,8 @@ BEGIN
 
     -- Get service details
     SELECT duration INTO service_duration 
-    FROM services 
-    WHERE id = _service_id;
+    FROM services s
+    WHERE s.id = _service_id;
     
     IF service_duration IS NULL THEN
         RAISE EXCEPTION 'Service not found or has no duration: %', _service_id;
@@ -188,14 +189,14 @@ BEGIN
 
     -- Check if service requires shower
     SELECT EXISTS(
-        SELECT 1 FROM service_resources 
-        WHERE service_id = _service_id AND resource_type = 'shower'
+        SELECT 1 FROM service_resources sr
+        WHERE sr.service_id = _service_id AND sr.resource_type = 'shower'
     ) INTO shower_required;
     
     -- Check if service requires provider
     SELECT EXISTS(
-        SELECT 1 FROM service_resources 
-        WHERE service_id = _service_id AND resource_type = 'provider'
+        SELECT 1 FROM service_resources sr
+        WHERE sr.service_id = _service_id AND sr.resource_type = 'provider'
     ) INTO requires_provider;
     
     RAISE NOTICE '[create_booking_atomic] REQUIREMENTS: shower=%, provider=%', shower_required, requires_provider;
@@ -211,11 +212,11 @@ BEGIN
                 check_time := _time_slot + (check_minutes || ' minutes')::interval;
                 
                 IF NOT EXISTS(
-                    SELECT 1 FROM provider_availability 
-                    WHERE provider_id = provider_id 
-                    AND date = _booking_date 
-                    AND time_slot = check_time 
-                    AND available = TRUE
+                    SELECT 1 FROM provider_availability pa
+                    WHERE pa.provider_id = provider_id 
+                    AND pa.date = _booking_date 
+                    AND pa.time_slot = check_time 
+                    AND pa.available = TRUE
                 ) THEN
                     RAISE EXCEPTION 'Provider % not available for date % at time %', provider_id, _booking_date, check_time;
                 END IF;
@@ -237,10 +238,10 @@ BEGIN
             check_time := _time_slot + (check_minutes || ' minutes')::interval;
             
             IF NOT EXISTS(
-                SELECT 1 FROM shower_availability 
-                WHERE date = _booking_date 
-                AND time_slot = check_time 
-                AND available_spots > 0
+                SELECT 1 FROM shower_availability sa
+                WHERE sa.date = _booking_date 
+                AND sa.time_slot = check_time 
+                AND sa.available_spots > 0
             ) THEN
                 RAISE EXCEPTION 'Shower not available for date % at time %', _booking_date, check_time;
             END IF;
@@ -291,10 +292,10 @@ BEGIN
         WHILE check_minutes < service_duration LOOP
             check_time := _time_slot + (check_minutes || ' minutes')::interval;
             
-            UPDATE shower_availability 
+            UPDATE shower_availability sa
             SET available_spots = available_spots - 1
-            WHERE date = _booking_date 
-            AND time_slot = check_time;
+            WHERE sa.date = _booking_date 
+            AND sa.time_slot = check_time;
             
             check_minutes := check_minutes + 30;
         END LOOP;
@@ -310,11 +311,11 @@ BEGIN
             WHILE check_minutes < service_duration LOOP
                 check_time := _time_slot + (check_minutes || ' minutes')::interval;
                 
-                UPDATE provider_availability 
+                UPDATE provider_availability pa
                 SET available = FALSE
-                WHERE provider_id = provider_id 
-                AND date = _booking_date 
-                AND time_slot = check_time;
+                WHERE pa.provider_id = provider_id 
+                AND pa.date = _booking_date 
+                AND pa.time_slot = check_time;
                 
                 check_minutes := check_minutes + 30;
             END LOOP;
@@ -332,3 +333,4 @@ EXCEPTION
         RAISE;
 END;
 $$ LANGUAGE plpgsql;
+
