@@ -38,13 +38,11 @@ const TimeSlotSelector = ({
       total_slots: timeSlots.length,
       available_slots: timeSlots.filter(s => s.available).length,
       selected_slot: selectedTimeSlotId,
-      selected_slot_in_list: timeSlots.some(s => s.id === selectedTimeSlotId),
-      selected_slot_available: timeSlots.some(s => s.id === selectedTimeSlotId && s.available),
       all_slots: timeSlots.map(s => ({ id: s.id, time: s.time, available: s.available }))
     });
   }, [timeSlots, selectedTimeSlotId]);
 
-  // 🚨 CRITICAL: Handle slot selection with validation
+  // ✅ SIMPLIFIED: Just handle slot selection - no booking logic here
   const handleSlotSelection = (slotId: string) => {
     const slot = timeSlots.find(s => s.id === slotId);
     
@@ -54,13 +52,7 @@ const TimeSlotSelector = ({
       return;
     }
     
-    if (!slot.available) {
-      console.error('❌ [TIME_SLOT_SELECTOR] Slot not available:', slotId);
-      toast.error('Horário não está disponível');
-      return;
-    }
-    
-    console.log('🎯 [TIME_SLOT_SELECTOR] Valid slot selected:', slot);
+    console.log('🎯 [TIME_SLOT_SELECTOR] Slot selected (no booking yet):', slot);
     onSelectTimeSlot(slotId);
     toast.success(`Horário ${slot.time} selecionado`);
   };
@@ -117,7 +109,7 @@ const TimeSlotSelector = ({
       
       <ScrollArea className="h-64 pr-4">
         <div className="grid grid-cols-3 gap-2">
-          {/* 🔒 CRITICAL: Only render AVAILABLE slots */}
+          {/* ✅ CLEAN: Only render available slots - they're already validated by RPC */}
           {timeSlots
             .filter(slot => slot.available) // Only show available slots
             .map((slot) => (

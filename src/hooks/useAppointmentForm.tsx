@@ -95,32 +95,19 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     is_shower_only: isShowerOnlyService
   });
 
-  // 🔒 CRITICAL: Validate selected time slot is in available slots  
+  // ✅ SIMPLIFIED: Only validate that slot exists in current timeSlots array
   const isSelectedSlotValid = React.useMemo(() => {
     if (!formState.selectedTimeSlotId) return false;
     const validSlot = timeSlots.find(slot => 
       slot.id === formState.selectedTimeSlotId && slot.available
     );
-    console.log('🔒 [APPOINTMENT_FORM] Slot validation:', {
+    console.log('🔒 [APPOINTMENT_FORM] Simple slot validation:', {
       selected_slot: formState.selectedTimeSlotId,
-      available_slots: timeSlots.map(s => s.id),
-      is_valid: Boolean(validSlot),
-      valid_slot: validSlot,
-      last_fetched_slots: (window as any).lastFetchedSlots,
-      slot_in_fetched: Array.isArray((window as any).lastFetchedSlots) && 
-        (window as any).lastFetchedSlots.some(slot => slot.time_slot === formState.selectedTimeSlotId)
+      slot_exists_and_available: Boolean(validSlot),
+      total_available_slots: timeSlots.filter(s => s.available).length
     });
     return Boolean(validSlot);
   }, [formState.selectedTimeSlotId, timeSlots]);
-
-  // 🔒 CRITICAL: Reset selected slot if it becomes invalid
-  React.useEffect(() => {
-    if (formState.selectedTimeSlotId && !isSelectedSlotValid) {
-      console.log('⚠️ [APPOINTMENT_FORM] Selected slot is no longer valid, clearing selection');
-      toast.warning('Horário selecionado não está mais disponível. Selecione novamente.');
-      formState.setSelectedTimeSlotId('');
-    }
-  }, [isSelectedSlotValid, formState.selectedTimeSlotId, formState]);
 
   // Clear selected groomer if service doesn't require one
   useEffect(() => {
@@ -130,7 +117,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [requiresGroomer, serviceRequirementsLoaded, formState.selectedGroomerId, formState]);
 
-  // 🔒 CRITICAL: Reset time slot when dependencies change - WITH ENHANCED LOGGING
+  // ✅ IMPROVED: Only reset time slot when NECESSARY (not aggressively)
   React.useEffect(() => {
     console.log('🔄 [APPOINTMENT_FORM] Dependency change detected:', {
       service: formState.selectedService,
@@ -145,16 +132,12 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       console.log('🔄 [APPOINTMENT_FORM] Dependencies changed, clearing time slot selection');
       formState.setSelectedTimeSlotId('');
       
-      // 🔒 CRITICAL: Clear stored slot data to prevent stale validation
-      (window as any).lastFetchedSlots = null;
-      (window as any).lastFetchParams = null;
-      
       // Show user feedback about slot reset
       toast.info('Seleção de horário foi resetada devido à mudança de parâmetros');
     }
   }, [formState.selectedService, formState.selectedGroomerId, formState.date]);
 
-  // 🔒 NEW: Watch timeSlots changes and validate selected slot
+  // ✅ SMART: Only reset slot if it's NOT in the new available slots
   React.useEffect(() => {
     console.log('🕐 [APPOINTMENT_FORM] Time slots updated:', {
       slots_count: timeSlots.length,
@@ -164,7 +147,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       selected_slot_available: timeSlots.some(s => s.id === formState.selectedTimeSlotId && s.available)
     });
 
-    // If selected slot is not in the new slots list, clear it
+    // ✅ IMPROVED: Only clear if selected slot is NOT in the new available slots
     if (formState.selectedTimeSlotId && 
         !timeSlots.some(s => s.id === formState.selectedTimeSlotId && s.available)) {
       console.log('⚠️ [APPOINTMENT_FORM] Selected slot not in new available slots, clearing');
@@ -182,19 +165,18 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   };
 
-  // ENHANCED SUBMIT with comprehensive logging and error handling
+  // ✅ CLEAN SUBMIT: Only called when user clicks "Confirmar Agendamento"
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🚀 [APPOINTMENT_FORM] SUBMIT: Starting validation with current state:', {
+    console.log('🚀 [APPOINTMENT_FORM] SUBMIT: User clicked confirmation button:', {
       selected_slot: formState.selectedTimeSlotId,
       is_slot_valid: isSelectedSlotValid,
-      available_slots: timeSlots.map(s => ({ id: s.id, available: s.available })),
-      last_fetched_slots: (window as any).lastFetchedSlots,
+      available_slots_count: timeSlots.filter(s => s.available).length,
       timestamp: new Date().toISOString()
     });
     
-    // 🔒 CRITICAL: Final validation - block if no valid slot selected
+    // ✅ SIMPLIFIED: Basic validation only
     if (!formState.selectedTimeSlotId) {
       console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: No slot selected');
       toast.error('Por favor, selecione um horário');
@@ -202,35 +184,12 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
 
     if (!isSelectedSlotValid) {
-      console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: Selected slot is not valid');
+      console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: Selected slot not valid');
       toast.error('Horário selecionado não está mais disponível. Selecione novamente.');
       return;
     }
-
-    const selectedSlot = timeSlots.find(slot => slot.id === formState.selectedTimeSlotId);
-    if (!selectedSlot) {
-      console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: Selected slot not found in current slots');
-      toast.error('Horário selecionado não foi encontrado na lista atual');
-      return;
-    }
-
-    // 🔒 CRITICAL: Double-check against last fetched slots
-    const lastFetchedSlots = (window as any).lastFetchedSlots;
-    const slotInFetchedList = Array.isArray(lastFetchedSlots) && 
-      lastFetchedSlots.some(slot => slot.time_slot === formState.selectedTimeSlotId);
     
-    if (!slotInFetchedList) {
-      console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: Selected slot not in last fetched slots');
-      console.error('❌ [APPOINTMENT_FORM] Debug info:', {
-        selected_slot: formState.selectedTimeSlotId,
-        last_fetched_slots: lastFetchedSlots,
-        slot_exists_in_fetched: slotInFetchedList
-      });
-      toast.error('Horário não foi validado pelo sistema. Por favor, selecione novamente.');
-      return;
-    }
-    
-    console.log('🚀 [APPOINTMENT_FORM] SUBMIT: All validations passed, proceeding with booking');
+    console.log('🚀 [APPOINTMENT_FORM] SUBMIT: Basic validations passed, proceeding with booking');
     
     if (!user) {
       console.log('❌ [APPOINTMENT_FORM] No user, redirecting to login');
@@ -277,7 +236,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
     formState.setIsLoading(true);
     
-    // 🔥 CRITICAL DEBUG: Final payload logging with slot validation
+    // ✅ CLEAN: Final payload - no redundant slot validation
     console.log('📤 [APPOINTMENT_FORM] 🔥 FINAL PAYLOAD TO createAppointment:', {
       user_id: user.id,
       pet_id: formState.selectedPet,
@@ -285,15 +244,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       provider_profile_id: providerProfileId,
       date: formState.date,
       time_slot: formState.selectedTimeSlotId,
-      time_slot_actual_value: selectedSlot.time,
       notes: formState.notes,
-      final_validation: {
-        slot_in_available_list: isSelectedSlotValid,
-        available_slots_count: timeSlots.filter(s => s.available).length,
-        selected_slot_details: selectedSlot,
-        last_fetched_validation: slotInFetchedList,
-        all_checks_passed: true
-      }
+      slots_already_validated_by_rpc: true
     });
 
     // Pass the provider_profile_id directly (not user_id)
@@ -307,15 +259,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       formState.notes
     );
 
-    console.log('📨 [APPOINTMENT_FORM] SUBMIT: createAppointment result:', {
-      ...result,
-      error_details: result.error ? {
-        message: result.error.message,
-        details: result.error.details,
-        hint: result.error.hint,
-        code: result.error.code
-      } : null
-    });
+    console.log('📨 [APPOINTMENT_FORM] SUBMIT: createAppointment result:', result);
 
     if (result.success && result.bookingData) {
       console.log('🎉 [APPOINTMENT_FORM] SUBMIT: Success! Navigating to booking-success');
@@ -327,17 +271,13 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       
       // Display detailed error information for debugging
       if (result.error) {
-        console.error('💥 [APPOINTMENT_FORM] DETAILED ERROR:', {
-          message: result.error.message,
-          details: result.error.details,
-          hint: result.error.hint,
-          code: result.error.code,
-          fullError: result.error
-        });
+        console.error('💥 [APPOINTMENT_FORM] DETAILED ERROR:', result.error);
         
         // Show a more specific toast based on the error
         if (result.error.message) {
-          toast.error(`Erro detalhado: ${result.error.message}`);
+          toast.error(`Erro: ${result.error.message}`);
+        } else {
+          toast.error('Erro no agendamento. Tente novamente.');
         }
       }
     }
@@ -407,7 +347,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     serviceRequirements,
     isShowerOnlyService, // NEW: Expose shower-only detection
     
-    // 🔒 NEW: Expose slot validation
+    // ✅ CLEAN: Expose slot validation
     isSelectedSlotValid,
     
     // Actions

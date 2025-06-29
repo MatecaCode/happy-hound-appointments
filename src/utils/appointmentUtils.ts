@@ -1,8 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { debugBookingState, compareSlotFetchVsBooking } from './bookingDebugger';
 
-// ENHANCED LOGGING: Accept provider_profile_id directly with comprehensive tracking
+// ✅ CLEAN BOOKING: Minimal validation, trust the RPC-validated slots
 export async function createAppointment(
   userId: string,
   petId: string,
@@ -13,7 +12,7 @@ export async function createAppointment(
   notes?: string
 ): Promise<{ success: boolean; appointmentId?: string; bookingData?: any; error?: any }> {
   try {
-    console.log('🚀 [CREATE_APPOINTMENT] Starting appointment creation with enhanced logging:', {
+    console.log('🚀 [CREATE_APPOINTMENT] Starting booking (slots already validated by RPC):', {
       userId,
       petId,
       serviceId,
@@ -26,88 +25,8 @@ export async function createAppointment(
 
     const isoDate = date.toISOString().split('T')[0];
     
-    // 🔥 CRITICAL: Get the latest fetched slots for validation
-    const lastFetchedSlots = (window as any).lastFetchedSlots;
-    const lastFetchParams = (window as any).lastFetchParams;
-    
-    console.log('📤 [CREATE_APPOINTMENT] 🔥 CRITICAL VALIDATION - Last fetched slots:', {
-      lastFetchedSlots,
-      lastFetchParams,
-      current_slot: timeSlot + ':00',
-      slot_exists_in_fetched: Array.isArray(lastFetchedSlots) ? 
-        lastFetchedSlots.some(slot => slot.time_slot === timeSlot + ':00') : false,
-      timestamp: new Date().toISOString()
-    });
-
-    // 🔒 CRITICAL: Block booking if no fetched slots or slot not in list
-    if (!Array.isArray(lastFetchedSlots)) {
-      console.error('❌ [CREATE_APPOINTMENT] CRITICAL: No fetched slots available for validation');
-      toast.error('Erro: dados de horários não disponíveis. Recarregue a página.');
-      return { success: false, error: 'No fetched slots available for validation' };
-    }
-
-    const slotExistsInFetched = lastFetchedSlots.some(slot => slot.time_slot === timeSlot + ':00');
-    if (!slotExistsInFetched) {
-      console.error('❌ [CREATE_APPOINTMENT] CRITICAL: Selected slot not in fetched slots:', {
-        selected_slot: timeSlot + ':00',
-        available_slots: lastFetchedSlots.map(s => s.time_slot),
-        timestamp: new Date().toISOString()
-      });
-      toast.error('Horário selecionado não está mais disponível');
-      return { success: false, error: 'Selected slot not in fetched slots' };
-    }
-
-    // 🔥 ENHANCED LOGGING: Log exact parameters for create_booking_atomic
-    const bookingParams = {
-      _user_id: userId,
-      _pet_id: petId,
-      _service_id: serviceId,
-      _provider_ids: providerProfileId ? [providerProfileId] : [],
-      _booking_date: isoDate,
-      _time_slot: timeSlot + ':00', // Ensure proper time format
-      _notes: notes || null
-    };
-
-    console.log('📤 [CREATE_APPOINTMENT] 🔥 CALLING create_booking_atomic RPC with EXACT params:', {
-      ...bookingParams,
-      timestamp: new Date().toISOString()
-    });
-
-    // 🔍 COMPREHENSIVE DEBUG ANALYSIS
-    console.log('🔍 [CREATE_APPOINTMENT] Running comprehensive debug analysis...');
-    const debugResult = await compareSlotFetchVsBooking(
-      serviceId,
-      providerProfileId,
-      isoDate,
-      timeSlot
-    );
-    
-    console.log('📊 [CREATE_APPOINTMENT] 🔥 DEBUG ANALYSIS RESULTS:', {
-      slot_shown_as_available: debugResult.analysis.slotShownAsAvailable,
-      all_slots_valid: debugResult.analysis.allSlotsValid,
-      failure_reasons: debugResult.analysis.failureReasons,
-      available_slots_from_debug: debugResult.availableSlots,
-      full_debug_result: debugResult,
-      timestamp: new Date().toISOString()
-    });
-    
-    if (!debugResult.analysis.slotShownAsAvailable) {
-      console.error('❌ [CREATE_APPOINTMENT] CRITICAL: Slot not shown as available in RPC but booking attempted');
-      console.error('❌ [CREATE_APPOINTMENT] DETAILED COMPARISON:', {
-        requested_slot: timeSlot,
-        available_slots_from_rpc: debugResult.availableSlots,
-        booking_params: bookingParams,
-        debug_analysis: debugResult.analysis
-      });
-      toast.error('Erro interno: horário não validado pelo sistema');
-      return { success: false, error: 'Slot not shown as available in RPC validation' };
-    }
-    
-    if (!debugResult.analysis.allSlotsValid) {
-      console.error('❌ [CREATE_APPOINTMENT] CRITICAL: Slot validation failed:', debugResult.analysis.failureReasons);
-      toast.error('Horário não disponível devido a conflitos detectados');
-      return { success: false, error: 'Slot validation failed: ' + debugResult.analysis.failureReasons.join(', ') };
-    }
+    // ✅ SIMPLIFIED: Trust the slots already validated by get_available_slots_for_service RPC
+    console.log('📤 [CREATE_APPOINTMENT] Proceeding with booking - slots already validated by RPC');
 
     // Get user, pet, service data for notifications
     const { data: userData } = await supabase.auth.getUser();
@@ -174,34 +93,35 @@ export async function createAppointment(
       }
     }
 
-    console.log('📞 [CREATE_APPOINTMENT] 🔥 ABOUT TO CALL create_booking_atomic RPC with final params:', {
-      ...bookingParams,
-      provider_data: providerData,
-      timestamp: new Date().toISOString()
-    });
+    // ✅ SIMPLIFIED: Direct booking call with enhanced error handling
+    const bookingParams = {
+      _user_id: userId,
+      _pet_id: petId,
+      _service_id: serviceId,
+      _provider_ids: providerProfileId ? [providerProfileId] : [],
+      _booking_date: isoDate,
+      _time_slot: timeSlot + ':00', // Ensure proper time format
+      _notes: notes || null
+    };
+
+    console.log('📤 [CREATE_APPOINTMENT] 🔥 CALLING create_booking_atomic RPC:', bookingParams);
     
     const { data: appointmentId, error } = await supabase.rpc('create_booking_atomic', bookingParams);
 
     console.log('📨 [CREATE_APPOINTMENT] 🔥 RPC create_booking_atomic RESPONSE:', {
       appointmentId,
       error,
-      error_message: error?.message,
-      error_details: error?.details,
-      error_hint: error?.hint,
-      error_code: error?.code,
       success: !error && !!appointmentId,
-      request_params: bookingParams,
       timestamp: new Date().toISOString()
     });
 
     if (error) {
-      console.error('❌ [CREATE_APPOINTMENT] RPC ERROR: Booking failed:', {
-        error_message: error.message,
-        error_details: error.details,
-        error_hint: error.hint,
-        error_code: error.code,
-        full_error: error,
-        request_params: bookingParams
+      console.error('❌ [CREATE_APPOINTMENT] RPC ERROR:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+        full_error: error
       });
       
       // Enhanced error message handling
@@ -227,13 +147,7 @@ export async function createAppointment(
       
       return { 
         success: false, 
-        error: {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-          fullError: error
-        }
+        error
       };
     }
 
@@ -259,7 +173,7 @@ export async function createAppointment(
       userEmail: userData?.user?.email
     };
 
-    console.log('🎉 [CREATE_APPOINTMENT] BOOKING SUCCESS: Complete appointment record created:', {
+    console.log('🎉 [CREATE_APPOINTMENT] BOOKING SUCCESS:', {
       appointmentId,
       bookingData,
       timestamp: new Date().toISOString()
@@ -273,7 +187,7 @@ export async function createAppointment(
     };
 
   } catch (error: any) {
-    console.error('💥 [CREATE_APPOINTMENT] CRITICAL ERROR: Unexpected error in createAppointment:', {
+    console.error('💥 [CREATE_APPOINTMENT] CRITICAL ERROR:', {
       error_message: error?.message,
       error_stack: error?.stack,
       full_error: error,

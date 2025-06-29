@@ -62,7 +62,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     }
   };
 
-  // 🔒 CRITICAL: Validate selected slot is in available slots
+  // ✅ SIMPLIFIED: Only check if slot is selected and exists in available slots
   const isSelectedSlotValid = React.useMemo(() => {
     if (!selectedTimeSlotId) return false;
     const validSlot = timeSlots.find(slot => 
@@ -71,20 +71,12 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     return Boolean(validSlot);
   }, [selectedTimeSlotId, timeSlots]);
 
-  // 🔒 ENHANCED: Show validation state clearly
-  const getValidationMessage = () => {
-    if (!selectedTimeSlotId) return null;
-    if (!isSelectedSlotValid) return 'Horário selecionado não está mais disponível';
-    return 'Horário válido selecionado';
-  };
-
   const canProceed = showTimeSlots ? isSelectedSlotValid : date;
 
   // Debug logging for time slots 
   React.useEffect(() => {
     if (showTimeSlots) {
-      console.log('🔍 [DateTimeForm] Time slots data with validation:', {
-        timeSlots,
+      console.log('🔍 [DateTimeForm] Time slots data:', {
         timeSlots_count: timeSlots.length,
         available_count: timeSlots.filter(s => s.available).length,
         isLoading,
@@ -92,8 +84,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
         showTimeSlots,
         selected_slot: selectedTimeSlotId,
         is_selected_valid: isSelectedSlotValid,
-        can_proceed: canProceed,
-        validation_message: getValidationMessage()
+        can_proceed: canProceed
       });
     }
   }, [timeSlots, isLoading, showTimeSlots, date, selectedTimeSlotId, isSelectedSlotValid, canProceed]);
@@ -162,23 +153,15 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               </div>
             )}
 
-            {/* 🔒 CRITICAL: Show slot validation status */}
+            {/* ✅ CLEAN: Simple slot selection feedback */}
             {selectedTimeSlotId && (
-              <div className={`p-3 rounded-lg border ${
-                isSelectedSlotValid 
-                  ? 'bg-green-50 border-green-200' 
-                  : 'bg-red-50 border-red-200'
-              }`}>
-                <p className={`text-sm font-medium ${
-                  isSelectedSlotValid ? 'text-green-800' : 'text-red-800'
-                }`}>
-                  {isSelectedSlotValid ? '✅' : '⚠️'} {getValidationMessage()}
+              <div className="p-3 rounded-lg border bg-green-50 border-green-200">
+                <p className="text-sm font-medium text-green-800">
+                  ✅ Horário {timeSlots.find(s => s.id === selectedTimeSlotId)?.time} selecionado
                 </p>
-                {!isSelectedSlotValid && (
-                  <p className="text-red-600 text-sm mt-1">
-                    Por favor, selecione outro horário da lista atualizada.
-                  </p>
-                )}
+                <p className="text-green-600 text-sm mt-1">
+                  Clique em "Confirmar Agendamento" para finalizar.
+                </p>
               </div>
             )}
 
@@ -249,11 +232,6 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Processando...
-                </>
-              ) : !isSelectedSlotValid && selectedTimeSlotId ? (
-                <>
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Selecione Horário Válido
                 </>
               ) : !selectedTimeSlotId ? (
                 <>
