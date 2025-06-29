@@ -26,6 +26,37 @@ export async function createAppointment(
 
     const isoDate = date.toISOString().split('T')[0];
     
+    // 🔥 CRITICAL: Get the latest fetched slots for validation
+    const lastFetchedSlots = (window as any).lastFetchedSlots;
+    const lastFetchParams = (window as any).lastFetchParams;
+    
+    console.log('📤 [CREATE_APPOINTMENT] 🔥 CRITICAL VALIDATION - Last fetched slots:', {
+      lastFetchedSlots,
+      lastFetchParams,
+      current_slot: timeSlot + ':00',
+      slot_exists_in_fetched: Array.isArray(lastFetchedSlots) ? 
+        lastFetchedSlots.some(slot => slot.time_slot === timeSlot + ':00') : false,
+      timestamp: new Date().toISOString()
+    });
+
+    // 🔒 CRITICAL: Block booking if no fetched slots or slot not in list
+    if (!Array.isArray(lastFetchedSlots)) {
+      console.error('❌ [CREATE_APPOINTMENT] CRITICAL: No fetched slots available for validation');
+      toast.error('Erro: dados de horários não disponíveis. Recarregue a página.');
+      return { success: false };
+    }
+
+    const slotExistsInFetched = lastFetchedSlots.some(slot => slot.time_slot === timeSlot + ':00');
+    if (!slotExistsInFetched) {
+      console.error('❌ [CREATE_APPOINTMENT] CRITICAL: Selected slot not in fetched slots:', {
+        selected_slot: timeSlot + ':00',
+        available_slots: lastFetchedSlots.map(s => s.time_slot),
+        timestamp: new Date().toISOString()
+      });
+      toast.error('Horário selecionado não está mais disponível');
+      return { success: false };
+    }
+
     // 🔥 ENHANCED LOGGING: Log exact parameters for create_booking_atomic
     const bookingParams = {
       _user_id: userId,
@@ -55,6 +86,7 @@ export async function createAppointment(
       slot_shown_as_available: debugResult.analysis.slotShownAsAvailable,
       all_slots_valid: debugResult.analysis.allSlotsValid,
       failure_reasons: debugResult.analysis.failureReasons,
+      available_slots_from_debug: debugResult.availableSlots, // Fixed: use availableSlots instead of fetchedSlots
       full_debug_result: debugResult,
       timestamp: new Date().toISOString()
     });
@@ -63,7 +95,7 @@ export async function createAppointment(
       console.error('❌ [CREATE_APPOINTMENT] CRITICAL: Slot not shown as available in RPC but booking attempted');
       console.error('❌ [CREATE_APPOINTMENT] DETAILED COMPARISON:', {
         requested_slot: timeSlot,
-        available_slots_from_rpc: debugResult.fetchedSlots,
+        available_slots_from_rpc: debugResult.availableSlots, // Fixed: use availableSlots
         booking_params: bookingParams,
         debug_analysis: debugResult.analysis
       });

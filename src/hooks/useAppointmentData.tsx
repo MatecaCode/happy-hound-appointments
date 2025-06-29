@@ -185,6 +185,10 @@ export const useAppointmentData = () => {
     });
 
     setIsLoading(true);
+    
+    // 🔒 CRITICAL: Reset slots immediately to prevent stale data
+    setTimeSlots([]);
+    
     try {
       const dateStr = date.toISOString().split('T')[0];
       
@@ -231,7 +235,7 @@ export const useAppointmentData = () => {
       console.log('📤 [FETCH_TIME_SLOTS] 🔥 CALLING get_available_slots_for_service RPC with EXACT params:', {
         ...rpcParams,
         service_name: selectedService.name,
-        service_duration_minutes: selectedService.duration_minutes,
+        service_duration_minutes: selectedService.duration, // Fixed: use duration instead of duration_minutes
         timestamp: new Date().toISOString()
       });
 
@@ -249,8 +253,15 @@ export const useAppointmentData = () => {
         timestamp: new Date().toISOString()
       });
 
+      // 🔒 CRITICAL: Only proceed if we have valid slots
+      if (!availableSlots || !Array.isArray(availableSlots)) {
+        console.error('❌ [FETCH_TIME_SLOTS] Invalid slots response:', availableSlots);
+        setTimeSlots([]);
+        return;
+      }
+
       // Transform to TimeSlot format
-      const timeSlotData: TimeSlot[] = (availableSlots || []).map(slot => ({
+      const timeSlotData: TimeSlot[] = availableSlots.map(slot => ({
         id: slot.time_slot,
         time: slot.time_slot.substring(0, 5), // Format HH:MM
         available: true
@@ -261,6 +272,10 @@ export const useAppointmentData = () => {
         slots: timeSlotData.map(s => ({ id: s.id, time: s.time, available: s.available })),
         timestamp: new Date().toISOString()
       });
+      
+      // 🔒 CRITICAL: Store the raw RPC response for validation
+      (window as any).lastFetchedSlots = availableSlots;
+      (window as any).lastFetchParams = rpcParams;
       
       setTimeSlots(timeSlotData);
 

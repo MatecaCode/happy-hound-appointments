@@ -102,6 +102,12 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     const validSlot = timeSlots.find(slot => 
       slot.id === formState.selectedTimeSlotId && slot.available
     );
+    console.log('🔒 [APPOINTMENT_FORM] Slot validation:', {
+      selected_slot: formState.selectedTimeSlotId,
+      available_slots: timeSlots.map(s => s.id),
+      is_valid: Boolean(validSlot),
+      valid_slot: validSlot
+    });
     return Boolean(validSlot);
   }, [formState.selectedTimeSlotId, timeSlots]);
 
@@ -121,12 +127,24 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [requiresGroomer, serviceRequirementsLoaded, formState.selectedGroomerId, formState]);
 
-  // 🔒 CRITICAL: Reset time slot when dependencies change
+  // 🔒 CRITICAL: Reset time slot when dependencies change - WITH ENHANCED LOGGING
   React.useEffect(() => {
+    console.log('🔄 [APPOINTMENT_FORM] Dependency change detected:', {
+      service: formState.selectedService,
+      groomer: formState.selectedGroomerId,
+      date: formState.date?.toISOString(),
+      current_slot: formState.selectedTimeSlotId,
+      will_clear_slot: Boolean(formState.selectedTimeSlotId)
+    });
+    
     // Reset time slot when service, groomer, or date changes
     if (formState.selectedTimeSlotId) {
       console.log('🔄 [APPOINTMENT_FORM] Dependencies changed, clearing time slot selection');
       formState.setSelectedTimeSlotId('');
+      
+      // 🔒 CRITICAL: Clear stored slot data to prevent stale validation
+      (window as any).lastFetchedSlots = null;
+      (window as any).lastFetchParams = null;
     }
   }, [formState.selectedService, formState.selectedGroomerId, formState.date]);
 
@@ -143,6 +161,14 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('🚀 [APPOINTMENT_FORM] SUBMIT: Starting validation with current state:', {
+      selected_slot: formState.selectedTimeSlotId,
+      is_slot_valid: isSelectedSlotValid,
+      available_slots: timeSlots.map(s => ({ id: s.id, available: s.available })),
+      last_fetched_slots: (window as any).lastFetchedSlots,
+      timestamp: new Date().toISOString()
+    });
+    
     // 🔒 CRITICAL: Final validation before submission
     if (!isSelectedSlotValid) {
       console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: Selected slot is not valid');
@@ -154,6 +180,14 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     if (!selectedSlot) {
       console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: Selected slot not found in current slots');
       toast.error('Horário selecionado não foi encontrado');
+      return;
+    }
+
+    // 🔒 CRITICAL: Validate against last fetched slots
+    const lastFetchedSlots = (window as any).lastFetchedSlots;
+    if (!Array.isArray(lastFetchedSlots) || !lastFetchedSlots.some(slot => slot.time_slot === formState.selectedTimeSlotId)) {
+      console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: Selected slot not in last fetched slots');
+      toast.error('Horário não foi validado pelo sistema. Selecione novamente.');
       return;
     }
     
@@ -172,7 +206,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       slot_validation: {
         is_valid: isSelectedSlotValid,
         slot_exists: Boolean(selectedSlot),
-        slot_available: selectedSlot?.available
+        slot_available: selectedSlot?.available,
+        in_fetched_slots: Array.isArray(lastFetchedSlots) && lastFetchedSlots.some(slot => slot.time_slot === formState.selectedTimeSlotId)
       },
       timestamp: new Date().toISOString()
     });
@@ -233,7 +268,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       final_validation: {
         slot_in_available_list: isSelectedSlotValid,
         available_slots_count: timeSlots.filter(s => s.available).length,
-        selected_slot_details: selectedSlot
+        selected_slot_details: selectedSlot,
+        last_fetched_validation: Array.isArray(lastFetchedSlots) && lastFetchedSlots.some(slot => slot.time_slot === formState.selectedTimeSlotId)
       }
     });
 
