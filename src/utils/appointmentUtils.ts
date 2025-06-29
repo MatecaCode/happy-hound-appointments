@@ -11,7 +11,7 @@ export async function createAppointment(
   date: Date,
   timeSlot: string,
   notes?: string
-): Promise<{ success: boolean; appointmentId?: string; bookingData?: any }> {
+): Promise<{ success: boolean; appointmentId?: string; bookingData?: any; error?: any }> {
   try {
     console.log('🚀 [CREATE_APPOINTMENT] Starting appointment creation with enhanced logging:', {
       userId,
@@ -43,7 +43,7 @@ export async function createAppointment(
     if (!Array.isArray(lastFetchedSlots)) {
       console.error('❌ [CREATE_APPOINTMENT] CRITICAL: No fetched slots available for validation');
       toast.error('Erro: dados de horários não disponíveis. Recarregue a página.');
-      return { success: false };
+      return { success: false, error: 'No fetched slots available for validation' };
     }
 
     const slotExistsInFetched = lastFetchedSlots.some(slot => slot.time_slot === timeSlot + ':00');
@@ -54,7 +54,7 @@ export async function createAppointment(
         timestamp: new Date().toISOString()
       });
       toast.error('Horário selecionado não está mais disponível');
-      return { success: false };
+      return { success: false, error: 'Selected slot not in fetched slots' };
     }
 
     // 🔥 ENHANCED LOGGING: Log exact parameters for create_booking_atomic
@@ -86,7 +86,7 @@ export async function createAppointment(
       slot_shown_as_available: debugResult.analysis.slotShownAsAvailable,
       all_slots_valid: debugResult.analysis.allSlotsValid,
       failure_reasons: debugResult.analysis.failureReasons,
-      available_slots_from_debug: debugResult.availableSlots, // Fixed: use availableSlots instead of fetchedSlots
+      available_slots_from_debug: debugResult.availableSlots,
       full_debug_result: debugResult,
       timestamp: new Date().toISOString()
     });
@@ -95,18 +95,18 @@ export async function createAppointment(
       console.error('❌ [CREATE_APPOINTMENT] CRITICAL: Slot not shown as available in RPC but booking attempted');
       console.error('❌ [CREATE_APPOINTMENT] DETAILED COMPARISON:', {
         requested_slot: timeSlot,
-        available_slots_from_rpc: debugResult.availableSlots, // Fixed: use availableSlots
+        available_slots_from_rpc: debugResult.availableSlots,
         booking_params: bookingParams,
         debug_analysis: debugResult.analysis
       });
       toast.error('Erro interno: horário não validado pelo sistema');
-      return { success: false };
+      return { success: false, error: 'Slot not shown as available in RPC validation' };
     }
     
     if (!debugResult.analysis.allSlotsValid) {
       console.error('❌ [CREATE_APPOINTMENT] CRITICAL: Slot validation failed:', debugResult.analysis.failureReasons);
       toast.error('Horário não disponível devido a conflitos detectados');
-      return { success: false };
+      return { success: false, error: 'Slot validation failed: ' + debugResult.analysis.failureReasons.join(', ') };
     }
 
     // Get user, pet, service data for notifications
@@ -185,6 +185,10 @@ export async function createAppointment(
     console.log('📨 [CREATE_APPOINTMENT] 🔥 RPC create_booking_atomic RESPONSE:', {
       appointmentId,
       error,
+      error_message: error?.message,
+      error_details: error?.details,
+      error_hint: error?.hint,
+      error_code: error?.code,
       success: !error && !!appointmentId,
       request_params: bookingParams,
       timestamp: new Date().toISOString()
@@ -200,25 +204,46 @@ export async function createAppointment(
         request_params: bookingParams
       });
       
+      // Enhanced error message handling
+      let userErrorMessage = 'Erro no agendamento';
+      
       if (error.message.includes('not available') || error.message.includes('Provider') && error.message.includes('not available')) {
-        toast.error('Profissional não disponível para o horário selecionado.');
+        userErrorMessage = 'Profissional não disponível para o horário selecionado.';
       } else if (error.message.includes('capacity exceeded') || error.message.includes('Shower capacity exceeded')) {
-        toast.error('Capacidade de banho excedida para este horário.');
+        userErrorMessage = 'Capacidade de banho excedida para este horário.';
       } else if (error.message.includes('conflicting appointment')) {
-        toast.error('Profissional já tem compromisso neste horário.');
+        userErrorMessage = 'Profissional já tem compromisso neste horário.';
       } else if (error.message.includes('Vagas de banho esgotadas')) {
-        toast.error('Vagas de banho esgotadas para este horário.');
+        userErrorMessage = 'Vagas de banho esgotadas para este horário.';
+      } else if (error.message.includes('permission denied') || error.message.includes('row-level security')) {
+        userErrorMessage = 'Erro de permissão. Verifique se você está logado.';
+      } else if (error.message.includes('violates')) {
+        userErrorMessage = 'Erro de validação de dados.';
       } else {
-        toast.error(`Erro: ${error.message}`);
+        userErrorMessage = `Erro: ${error.message}`;
       }
       
-      return { success: false };
+      toast.error(userErrorMessage);
+      
+      return { 
+        success: false, 
+        error: {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+          fullError: error
+        }
+      };
     }
 
     if (!appointmentId) {
       console.error('❌ [CREATE_APPOINTMENT] NO APPOINTMENT ID: RPC succeeded but returned no ID');
       toast.error('Erro interno: ID do agendamento não foi retornado');
-      return { success: false };
+      return { 
+        success: false, 
+        error: 'No appointment ID returned from RPC'
+      };
     }
 
     // Prepare booking data for success page
@@ -255,7 +280,14 @@ export async function createAppointment(
       timestamp: new Date().toISOString()
     });
     toast.error('Erro crítico no sistema de agendamento');
-    return { success: false };
+    return { 
+      success: false, 
+      error: {
+        message: error?.message || 'Unknown error',
+        stack: error?.stack,
+        fullError: error
+      }
+    };
   }
 }
 

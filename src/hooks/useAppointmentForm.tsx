@@ -1,4 +1,3 @@
-
 import React, { useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -157,7 +156,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   };
 
-  // ENHANCED SUBMIT with comprehensive logging
+  // ENHANCED SUBMIT with comprehensive logging and error handling
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -284,7 +283,15 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       formState.notes
     );
 
-    console.log('📨 [APPOINTMENT_FORM] SUBMIT: createAppointment result:', result);
+    console.log('📨 [APPOINTMENT_FORM] SUBMIT: createAppointment result:', {
+      ...result,
+      error_details: result.error ? {
+        message: result.error.message,
+        details: result.error.details,
+        hint: result.error.hint,
+        code: result.error.code
+      } : null
+    });
 
     if (result.success && result.bookingData) {
       console.log('🎉 [APPOINTMENT_FORM] SUBMIT: Success! Navigating to booking-success');
@@ -292,7 +299,23 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         state: { bookingData: result.bookingData } 
       });
     } else {
-      console.log('❌ [APPOINTMENT_FORM] SUBMIT: Booking failed, staying on form');
+      console.log('❌ [APPOINTMENT_FORM] SUBMIT: Booking failed with error:', result.error);
+      
+      // Display detailed error information for debugging
+      if (result.error) {
+        console.error('💥 [APPOINTMENT_FORM] DETAILED ERROR:', {
+          message: result.error.message,
+          details: result.error.details,
+          hint: result.error.hint,
+          code: result.error.code,
+          fullError: result.error
+        });
+        
+        // Show a more specific toast based on the error
+        if (result.error.message) {
+          toast.error(`Erro detalhado: ${result.error.message}`);
+        }
+      }
     }
     
     formState.setIsLoading(false);
