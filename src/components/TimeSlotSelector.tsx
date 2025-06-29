@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, isWeekend } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Clock, AlertTriangle, Calendar as CalendarIcon } from 'lucide-react';
+import { Clock, AlertTriangle, Calendar as CalendarIcon, RefreshCw } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 export interface TimeSlot {
   id: string;
@@ -38,15 +39,31 @@ const TimeSlotSelector = ({
       available_slots: timeSlots.filter(s => s.available).length,
       selected_slot: selectedTimeSlotId,
       selected_slot_in_list: timeSlots.some(s => s.id === selectedTimeSlotId),
+      selected_slot_available: timeSlots.some(s => s.id === selectedTimeSlotId && s.available),
       all_slots: timeSlots.map(s => ({ id: s.id, time: s.time, available: s.available }))
     });
+  }, [timeSlots, selectedTimeSlotId]);
+
+  // 🚨 CRITICAL: Handle slot selection with validation
+  const handleSlotSelection = (slotId: string) => {
+    const slot = timeSlots.find(s => s.id === slotId);
     
-    // 🚨 CRITICAL: If selected slot is not in available slots, clear it
-    if (selectedTimeSlotId && !timeSlots.some(s => s.id === selectedTimeSlotId && s.available)) {
-      console.log('⚠️ [TIME_SLOT_SELECTOR] Selected slot not in available slots, clearing selection');
-      onSelectTimeSlot('');
+    if (!slot) {
+      console.error('❌ [TIME_SLOT_SELECTOR] Slot not found:', slotId);
+      toast.error('Horário não encontrado');
+      return;
     }
-  }, [timeSlots, selectedTimeSlotId, onSelectTimeSlot]);
+    
+    if (!slot.available) {
+      console.error('❌ [TIME_SLOT_SELECTOR] Slot not available:', slotId);
+      toast.error('Horário não está disponível');
+      return;
+    }
+    
+    console.log('🎯 [TIME_SLOT_SELECTOR] Valid slot selected:', slot);
+    onSelectTimeSlot(slotId);
+    toast.success(`Horário ${slot.time} selecionado`);
+  };
 
   // Check if there are any available time slots
   const hasAvailableSlots = timeSlots.some(slot => slot.available);
@@ -66,7 +83,8 @@ const TimeSlotSelector = ({
     return (
       <div className="text-center py-8">
         <Clock className="mx-auto h-8 w-8 text-muted-foreground mb-2" />
-        <p className="text-muted-foreground">Não há horários disponíveis para esta data</p>
+        <p className="text-muted-foreground">Carregando horários disponíveis...</p>
+        <RefreshCw className="mx-auto h-4 w-4 text-muted-foreground mt-2 animate-spin" />
       </div>
     );
   }
@@ -90,6 +108,11 @@ const TimeSlotSelector = ({
         <p className="text-sm text-muted-foreground">
           {formattedDate}
         </p>
+        {selectedTimeSlotId && (
+          <p className="text-sm text-blue-600 mt-1">
+            Selecionado: {timeSlots.find(s => s.id === selectedTimeSlotId)?.time || 'N/A'}
+          </p>
+        )}
       </div>
       
       <ScrollArea className="h-64 pr-4">
@@ -101,10 +124,8 @@ const TimeSlotSelector = ({
               <Button
                 key={slot.id}
                 variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
-                onClick={() => {
-                  console.log('🎯 [TIME_SLOT_SELECTOR] Slot selected:', slot);
-                  onSelectTimeSlot(slot.id);
-                }}
+                onClick={() => handleSlotSelection(slot.id)}
+                className={selectedTimeSlotId === slot.id ? "ring-2 ring-primary" : ""}
               >
                 {slot.time}
               </Button>

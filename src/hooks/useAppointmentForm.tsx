@@ -105,7 +105,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       selected_slot: formState.selectedTimeSlotId,
       available_slots: timeSlots.map(s => s.id),
       is_valid: Boolean(validSlot),
-      valid_slot: validSlot
+      valid_slot: validSlot,
+      last_fetched_slots: (window as any).lastFetchedSlots,
+      slot_in_fetched: Array.isArray((window as any).lastFetchedSlots) && 
+        (window as any).lastFetchedSlots.some(slot => slot.time_slot === formState.selectedTimeSlotId)
     });
     return Boolean(validSlot);
   }, [formState.selectedTimeSlotId, timeSlots]);
@@ -114,6 +117,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   React.useEffect(() => {
     if (formState.selectedTimeSlotId && !isSelectedSlotValid) {
       console.log('⚠️ [APPOINTMENT_FORM] Selected slot is no longer valid, clearing selection');
+      toast.warning('Horário selecionado não está mais disponível. Selecione novamente.');
       formState.setSelectedTimeSlotId('');
     }
   }, [isSelectedSlotValid, formState.selectedTimeSlotId, formState]);
@@ -144,8 +148,30 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       // 🔒 CRITICAL: Clear stored slot data to prevent stale validation
       (window as any).lastFetchedSlots = null;
       (window as any).lastFetchParams = null;
+      
+      // Show user feedback about slot reset
+      toast.info('Seleção de horário foi resetada devido à mudança de parâmetros');
     }
   }, [formState.selectedService, formState.selectedGroomerId, formState.date]);
+
+  // 🔒 NEW: Watch timeSlots changes and validate selected slot
+  React.useEffect(() => {
+    console.log('🕐 [APPOINTMENT_FORM] Time slots updated:', {
+      slots_count: timeSlots.length,
+      available_count: timeSlots.filter(s => s.available).length,
+      selected_slot: formState.selectedTimeSlotId,
+      selected_slot_exists: timeSlots.some(s => s.id === formState.selectedTimeSlotId),
+      selected_slot_available: timeSlots.some(s => s.id === formState.selectedTimeSlotId && s.available)
+    });
+
+    // If selected slot is not in the new slots list, clear it
+    if (formState.selectedTimeSlotId && 
+        !timeSlots.some(s => s.id === formState.selectedTimeSlotId && s.available)) {
+      console.log('⚠️ [APPOINTMENT_FORM] Selected slot not in new available slots, clearing');
+      toast.warning('Horário selecionado não está mais disponível');
+      formState.setSelectedTimeSlotId('');
+    }
+  }, [timeSlots, formState.selectedTimeSlotId, formState]);
 
   // Handle next available appointment selection
   const handleNextAvailableSelect = () => {
@@ -168,48 +194,43 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       timestamp: new Date().toISOString()
     });
     
-    // 🔒 CRITICAL: Final validation before submission
+    // 🔒 CRITICAL: Final validation - block if no valid slot selected
+    if (!formState.selectedTimeSlotId) {
+      console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: No slot selected');
+      toast.error('Por favor, selecione um horário');
+      return;
+    }
+
     if (!isSelectedSlotValid) {
       console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: Selected slot is not valid');
-      toast.error('Horário selecionado não está mais disponível');
+      toast.error('Horário selecionado não está mais disponível. Selecione novamente.');
       return;
     }
 
     const selectedSlot = timeSlots.find(slot => slot.id === formState.selectedTimeSlotId);
     if (!selectedSlot) {
       console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: Selected slot not found in current slots');
-      toast.error('Horário selecionado não foi encontrado');
+      toast.error('Horário selecionado não foi encontrado na lista atual');
       return;
     }
 
-    // 🔒 CRITICAL: Validate against last fetched slots
+    // 🔒 CRITICAL: Double-check against last fetched slots
     const lastFetchedSlots = (window as any).lastFetchedSlots;
-    if (!Array.isArray(lastFetchedSlots) || !lastFetchedSlots.some(slot => slot.time_slot === formState.selectedTimeSlotId)) {
+    const slotInFetchedList = Array.isArray(lastFetchedSlots) && 
+      lastFetchedSlots.some(slot => slot.time_slot === formState.selectedTimeSlotId);
+    
+    if (!slotInFetchedList) {
       console.error('❌ [APPOINTMENT_FORM] SUBMIT BLOCKED: Selected slot not in last fetched slots');
-      toast.error('Horário não foi validado pelo sistema. Selecione novamente.');
+      console.error('❌ [APPOINTMENT_FORM] Debug info:', {
+        selected_slot: formState.selectedTimeSlotId,
+        last_fetched_slots: lastFetchedSlots,
+        slot_exists_in_fetched: slotInFetchedList
+      });
+      toast.error('Horário não foi validado pelo sistema. Por favor, selecione novamente.');
       return;
     }
     
-    console.log('🚀 [APPOINTMENT_FORM] SUBMIT: Starting form submission with validated slot:', {
-      user_id: user?.id,
-      selected_pet: formState.selectedPet,
-      selected_service: formState.selectedService,
-      selected_groomer_user_id: formState.selectedGroomerId,
-      date: formState.date?.toISOString(),
-      time_slot: formState.selectedTimeSlotId,
-      time_slot_value: selectedSlot.time,
-      notes: formState.notes,
-      requires_groomer: requiresGroomer,
-      is_shower_only: isShowerOnlyService,
-      service_requirements: serviceRequirements,
-      slot_validation: {
-        is_valid: isSelectedSlotValid,
-        slot_exists: Boolean(selectedSlot),
-        slot_available: selectedSlot?.available,
-        in_fetched_slots: Array.isArray(lastFetchedSlots) && lastFetchedSlots.some(slot => slot.time_slot === formState.selectedTimeSlotId)
-      },
-      timestamp: new Date().toISOString()
-    });
+    console.log('🚀 [APPOINTMENT_FORM] SUBMIT: All validations passed, proceeding with booking');
     
     if (!user) {
       console.log('❌ [APPOINTMENT_FORM] No user, redirecting to login');
@@ -217,19 +238,21 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       return;
     }
     
-    if (!formState.selectedPet || !formState.selectedService || !formState.date || !formState.selectedTimeSlotId) {
+    if (!formState.selectedPet || !formState.selectedService || !formState.date) {
       console.log('❌ [APPOINTMENT_FORM] Missing required fields for submission:', {
         has_pet: !!formState.selectedPet,
         has_service: !!formState.selectedService,
         has_date: !!formState.date,
         has_time_slot: !!formState.selectedTimeSlotId
       });
+      toast.error('Por favor, preencha todos os campos obrigatórios');
       return;
     }
 
     // Only require groomer if service requires one (not for shower-only services)
     if (requiresGroomer && !formState.selectedGroomerId) {
       console.log('❌ [APPOINTMENT_FORM] Service requires groomer but none selected');
+      toast.error('Por favor, selecione um profissional');
       return;
     }
 
@@ -268,7 +291,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         slot_in_available_list: isSelectedSlotValid,
         available_slots_count: timeSlots.filter(s => s.available).length,
         selected_slot_details: selectedSlot,
-        last_fetched_validation: Array.isArray(lastFetchedSlots) && lastFetchedSlots.some(slot => slot.time_slot === formState.selectedTimeSlotId)
+        last_fetched_validation: slotInFetchedList,
+        all_checks_passed: true
       }
     });
 

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,7 +71,14 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     return Boolean(validSlot);
   }, [selectedTimeSlotId, timeSlots]);
 
-  const canProceed = showTimeSlots ? isSelectedSlotValid : date; // Use slot validation instead of just ID
+  // 🔒 ENHANCED: Show validation state clearly
+  const getValidationMessage = () => {
+    if (!selectedTimeSlotId) return null;
+    if (!isSelectedSlotValid) return 'Horário selecionado não está mais disponível';
+    return 'Horário válido selecionado';
+  };
+
+  const canProceed = showTimeSlots ? isSelectedSlotValid : date;
 
   // Debug logging for time slots 
   React.useEffect(() => {
@@ -84,7 +92,8 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
         showTimeSlots,
         selected_slot: selectedTimeSlotId,
         is_selected_valid: isSelectedSlotValid,
-        can_proceed: canProceed
+        can_proceed: canProceed,
+        validation_message: getValidationMessage()
       });
     }
   }, [timeSlots, isLoading, showTimeSlots, date, selectedTimeSlotId, isSelectedSlotValid, canProceed]);
@@ -153,15 +162,23 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               </div>
             )}
 
-            {/* 🔒 CRITICAL: Show slot validation warning */}
-            {selectedTimeSlotId && !isSelectedSlotValid && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-800 text-sm font-medium">
-                  ⚠️ Horário selecionado não está mais disponível
+            {/* 🔒 CRITICAL: Show slot validation status */}
+            {selectedTimeSlotId && (
+              <div className={`p-3 rounded-lg border ${
+                isSelectedSlotValid 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-red-50 border-red-200'
+              }`}>
+                <p className={`text-sm font-medium ${
+                  isSelectedSlotValid ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {isSelectedSlotValid ? '✅' : '⚠️'} {getValidationMessage()}
                 </p>
-                <p className="text-red-600 text-sm">
-                  Por favor, selecione outro horário da lista atualizada.
-                </p>
+                {!isSelectedSlotValid && (
+                  <p className="text-red-600 text-sm mt-1">
+                    Por favor, selecione outro horário da lista atualizada.
+                  </p>
+                )}
               </div>
             )}
 
@@ -236,7 +253,12 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               ) : !isSelectedSlotValid && selectedTimeSlotId ? (
                 <>
                   <AlertTriangle className="h-4 w-4 mr-2" />
-                  Horário Indisponível
+                  Selecione Horário Válido
+                </>
+              ) : !selectedTimeSlotId ? (
+                <>
+                  <Clock className="h-4 w-4 mr-2" />
+                  Selecione um Horário
                 </>
               ) : (
                 <>
