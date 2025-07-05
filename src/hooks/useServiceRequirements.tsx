@@ -1,115 +1,148 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
-export interface ServiceRequirements {
-  service_id: string;
-  service_name: string;
-  service_type: string;
-  requires_shower: boolean;
-  requires_groomer: boolean;
+interface ServiceRequirements {
+  requires_bath: boolean;
+  requires_grooming: boolean;
   requires_vet: boolean;
-  combo: 'groomer+shower' | 'vet' | 'groomer' | 'shower' | 'none';
-  required_resource_count: number;
-  required_resources: string[];
+  service_type: string;
+  default_duration: number;
+  base_price: number;
 }
 
 export const useServiceRequirements = () => {
-  const [serviceRequirements, setServiceRequirements] = useState<ServiceRequirements[]>([]);
+  const [serviceRequirements, setServiceRequirements] = useState<Record<string, ServiceRequirements>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const fetchServiceRequirements = useCallback(async () => {
+  // Load all service requirements on mount
+  useEffect(() => {
+    loadAllServiceRequirements();
+  }, []);
+
+  const loadAllServiceRequirements = async () => {
     setIsLoading(true);
+    setError(null);
+    
     try {
-      console.log('🔍 DEBUG: Fetching service requirements...');
+      console.log('🔍 [SERVICE_REQUIREMENTS] Loading all service requirements from Phase 1 schema');
       
-      // Query services with their resources directly
-      const { data: fallbackData, error: fallbackError } = await supabase
+      // Updated for Phase 1: Get requirements directly from services table
+      const { data: services, error } = await supabase
         .from('services')
         .select(`
           id,
-          name,
+          requires_bath,
+          requires_grooming,
+          requires_vet,
           service_type,
-          service_resources (
-            resource_type,
-            provider_type,
-            required
-          )
-        `);
+          default_duration,
+          base_price
+        `)
+        .eq('active', true);
 
-      if (fallbackError) {
-        console.error('Error fetching service requirements:', fallbackError);
-        toast.error('Erro ao carregar requisitos dos serviços');
-        return;
+      if (error) {
+        console.error('❌ [SERVICE_REQUIREMENTS] Error loading requirements:', error);
+        throw error;
       }
 
-      console.log('🔍 DEBUG: Raw service data:', fallbackData);
+      console.log('📊 [SERVICE_REQUIREMENTS] Raw services data:', services);
 
-      // Transform the data to match our interface
-      const transformedData: ServiceRequirements[] = (fallbackData || []).map(service => {
-        const resources = service.service_resources || [];
-        const requiresShower = resources.some(r => r.resource_type === 'shower' && r.required);
-        const requiresGroomer = resources.some(r => r.resource_type === 'provider' && r.provider_type === 'groomer' && r.required);
-        const requiresVet = resources.some(r => r.resource_type === 'provider' && r.provider_type === 'vet' && r.required);
-        
-        let combo: ServiceRequirements['combo'] = 'none';
-        if (requiresGroomer && requiresShower) combo = 'groomer+shower';
-        else if (requiresVet) combo = 'vet';
-        else if (requiresGroomer) combo = 'groomer';
-        else if (requiresShower) combo = 'shower';
-
-        const requiredResources = resources
-          .filter(r => r.required)
-          .map(r => r.resource_type === 'provider' ? r.provider_type : r.resource_type)
-          .filter(Boolean);
-
-        const result = {
-          service_id: service.id,
-          service_name: service.name,
+      // Build requirements map
+      const requirementsMap: Record<string, ServiceRequirements> = {};
+      
+      services?.forEach(service => {
+        requirementsMap[service.id] = {
+          requires_bath: service.requires_bath || false,
+          requires_grooming: service.requires_grooming || false,
+          requires_vet: service.requires_vet || false,
           service_type: service.service_type,
-          requires_shower: requiresShower,
-          requires_groomer: requiresGroomer,
-          requires_vet: requiresVet,
-          combo,
-          required_resource_count: requiredResources.length,
-          required_resources: requiredResources
+          default_duration: service.default_duration || 30,
+          base_price: service.base_price || 0
         };
-        
-        console.log(`🔍 DEBUG: Service ${service.name} requirements:`, result);
-        return result;
       });
 
-      console.log('🔍 DEBUG: Final transformed service requirements:', transformedData);
-      setServiceRequirements(transformedData);
-
-    } catch (error) {
-      console.error('Error in fetchServiceRequirements:', error);
-      toast.error('Erro ao carregar requisitos dos serviços');
+      console.log('✅ [SERVICE_REQUIREMENTS] Requirements map built:', requirementsMap);
+      setServiceRequirements(requirementsMap);
+      
+    } catch (err: any) {
+      console.error('💥 [SERVICE_REQUIREMENTS] Critical error:', err);
+      setError(err.message || 'Failed to load service requirements');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  };
 
-  const getServiceRequirements = useCallback((serviceId: string): ServiceRequirements | null => {
-    const result = serviceRequirements.find(req => req.service_id === serviceId) || null;
-    console.log(`🔍 DEBUG: Getting requirements for service ${serviceId}:`, result);
-    return result;
-  }, [serviceRequirements]);
+  const getServiceRequirements = (serviceId: string): ServiceRequirements | null => {
+    const requirements = serviceRequirements[serviceId];
+    
+    console.log('🔍 [SERVICE_REQUIREMENTS] Getting requirements for service:', {
+      serviceId,
+      requirements,
+      available_services: Object.keys(serviceRequirements)
+    });
+    
+    return requirements || null;
+  };
 
-  const getRequirementsForServices = useCallback((serviceIds: string[]): ServiceRequirements[] => {
-    return serviceRequirements.filter(req => serviceIds.includes(req.service_id));
-  }, [serviceRequirements]);
+  const refreshServiceRequirements = () => {
+    console.log('🔄 [SERVICE_REQUIREMENTS] Refreshing service requirements');
+    loadAllServiceRequirements();
+  };
 
-  useEffect(() => {
-    fetchServiceRequirements();
-  }, [fetchServiceRequirements]);
+  // Helper functions for common checks
+  const serviceRequiresBath = (serviceId: string): boolean => {
+    const requirements = getServiceRequirements(serviceId);
+    return requirements?.requires_bath || false;
+  };
+
+  const serviceRequiresGrooming = (serviceId: string): boolean => {
+    const requirements = getServiceRequirements(serviceId);
+    return requirements?.requires_grooming || false;
+  };
+
+  const serviceRequiresVet = (serviceId: string): boolean => {
+    const requirements = getServiceRequirements(serviceId);
+    return requirements?.requires_vet || false;
+  };
+
+  const serviceRequiresStaff = (serviceId: string): boolean => {
+    const requirements = getServiceRequirements(serviceId);
+    return requirements?.requires_grooming || requirements?.requires_vet || false;
+  };
+
+  const getServiceDuration = (serviceId: string): number => {
+    const requirements = getServiceRequirements(serviceId);
+    return requirements?.default_duration || 30;
+  };
+
+  const getServicePrice = (serviceId: string): number => {
+    const requirements = getServiceRequirements(serviceId);
+    return requirements?.base_price || 0;
+  };
+
+  const isShowerOnlyService = (serviceId: string): boolean => {
+    const requirements = getServiceRequirements(serviceId);
+    return requirements?.requires_bath === true && 
+           requirements?.requires_grooming === false && 
+           requirements?.requires_vet === false;
+  };
 
   return {
     serviceRequirements,
     isLoading,
-    fetchServiceRequirements,
+    error,
     getServiceRequirements,
-    getRequirementsForServices,
+    refreshServiceRequirements,
+    
+    // Helper functions
+    serviceRequiresBath,
+    serviceRequiresGrooming,
+    serviceRequiresVet,
+    serviceRequiresStaff,
+    getServiceDuration,
+    getServicePrice,
+    isShowerOnlyService,
   };
 };

@@ -10,13 +10,14 @@ import { Calendar } from '@/components/ui/calendar';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { createAppointment } from '@/utils/appointmentUtils';
+import { createAppointment, trackAdminAction } from '@/utils/appointmentUtils';
 import { toast } from 'sonner';
 import { Users, PawPrint, Calendar as CalendarIcon, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Client {
+  id: string; // Updated for Phase 1: now using clients.id
   user_id: string;
   name: string;
 }
@@ -31,14 +32,17 @@ interface Service {
   id: string;
   name: string;
   service_type: string;
-  duration: number;
-  price: number;
+  default_duration: number;
+  base_price: number;
 }
 
-interface Provider {
-  id: string;
+interface Staff {
+  id: string; // This is staff_profile_id
+  user_id: string;
   name: string;
-  type: string;
+  can_bathe: boolean;
+  can_groom: boolean;
+  can_vet: boolean;
 }
 
 interface TimeSlot {
@@ -54,8 +58,8 @@ const AdminBookingPage = () => {
   const [selectedPet, setSelectedPet] = useState<string>('');
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState<string>('');
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<string>('');
+  const [staff, setStaff] = useState<Staff[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<string>('');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [selectedTime, setSelectedTime] = useState<string>('');
@@ -80,27 +84,27 @@ const AdminBookingPage = () => {
 
   useEffect(() => {
     if (selectedService) {
-      fetchProviders();
+      fetchStaff();
     } else {
-      setProviders([]);
-      setSelectedProvider('');
+      setStaff([]);
+      setSelectedStaff('');
     }
   }, [selectedService]);
 
   useEffect(() => {
-    if (selectedDate && selectedService && (selectedProvider || !requiresProvider())) {
+    if (selectedDate && selectedService && (selectedStaff || !requiresStaff())) {
       fetchTimeSlots();
     } else {
       setTimeSlots([]);
       setSelectedTime('');
     }
-  }, [selectedDate, selectedService, selectedProvider]);
+  }, [selectedDate, selectedService, selectedStaff]);
 
   const fetchClients = async () => {
     try {
       const { data, error } = await supabase
         .from('clients')
-        .select('user_id, name')
+        .select('id, user_id, name')
         .order('name');
 
       if (error) throw error;
@@ -118,7 +122,7 @@ const AdminBookingPage = () => {
       const { data, error } = await supabase
         .from('pets')
         .select('id, name, breed')
-        .eq('user_id', selectedClient)
+        .eq('client_id', selectedClient) // Updated for Phase 1: using client_id
         .order('name');
 
       if (error) throw error;
@@ -134,6 +138,7 @@ const AdminBookingPage = () => {
       const { data, error } = await supabase
         .from('services')
         .select('*')
+        .eq('active', true)
         .order('name');
 
       if (error) throw error;
@@ -144,64 +149,33 @@ const AdminBookingPage = () => {
     }
   };
 
-  const fetchProviders = async () => {
+  const fetchStaff = async () => {
     if (!selectedService) return;
 
     const service = services.find(s => s.id === selectedService);
     if (!service) return;
 
     try {
-      let providerType = '';
-      if (service.service_type === 'grooming') {
-        providerType = 'groomer';
-      } else if (service.service_type === 'veterinary') {
-        providerType = 'vet';
-      }
+      // Updated for Phase 1: Use staff_profiles and staff_services
+      const { data: staffData, error } = await supabase
+        .from('staff_profiles')
+        .select(`
+          id,
+          user_id,
+          name,
+          can_bathe,
+          can_groom,
+          can_vet,
+          staff_services!inner(service_id)
+        `)
+        .eq('active', true)
+        .eq('staff_services.service_id', selectedService);
 
-      if (providerType) {
-        const { data: providerProfiles, error } = await supabase
-          .from('provider_profiles')
-          .select('*')
-          .eq('type', providerType);
+      if (error) throw error;
 
-        if (error) throw error;
-
-        if (providerProfiles) {
-          const providersWithNames = await Promise.all(
-            providerProfiles.map(async (profile) => {
-              let name = 'Provider';
-              
-              if (profile.type === 'groomer') {
-                const { data: groomerData } = await supabase
-                  .from('groomers')
-                  .select('name')
-                  .eq('user_id', profile.user_id)
-                  .single();
-                name = groomerData?.name || 'Tosador';
-              } else if (profile.type === 'vet') {
-                const { data: vetData } = await supabase
-                  .from('veterinarians')
-                  .select('name')
-                  .eq('user_id', profile.user_id)
-                  .single();
-                name = vetData?.name || 'Veterinário';
-              }
-
-              return {
-                id: profile.user_id,
-                name,
-                type: profile.type
-              };
-            })
-          );
-
-          setProviders(providersWithNames);
-        }
-      } else {
-        setProviders([]);
-      }
+      setStaff(staffData || []);
     } catch (error) {
-      console.error('Error fetching providers:', error);
+      console.error('Error fetching staff:', error);
       toast.error('Erro ao carregar profissionais');
     }
   };
@@ -212,69 +186,22 @@ const AdminBookingPage = () => {
     setIsLoading(true);
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
-      const service = services.find(s => s.id === selectedService);
-      if (!service) return;
+      
+      // Use the new Phase 1 RPC function
+      const { data: availableSlots, error } = await supabase
+        .rpc('get_available_slots_for_service', {
+          _service_id: selectedService,
+          _date: dateStr,
+          _staff_profile_id: selectedStaff || null
+        });
 
-      // Get service requirements
-      const { data: serviceResources } = await supabase
-        .from('service_resources')
-        .select('*')
-        .eq('service_id', selectedService);
+      if (error) throw error;
 
-      const requiresShower = serviceResources?.some(r => r.resource_type === 'shower');
-      const requiresProvider = serviceResources?.some(r => r.resource_type === 'provider');
-
-      const slots: TimeSlot[] = [];
-      for (let hour = 9; hour < 17; hour++) {
-        for (const minutes of [0, 30]) {
-          if (hour === 16 && minutes === 30) break;
-          
-          const timeSlot = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
-          let isAvailable = true;
-
-          // Check provider availability if required
-          if (requiresProvider && selectedProvider) {
-            const { data: providerProfile } = await supabase
-              .from('provider_profiles')
-              .select('id')
-              .eq('user_id', selectedProvider)
-              .single();
-
-            if (providerProfile) {
-              const { data: providerAvail } = await supabase
-                .from('provider_availability')
-                .select('available')
-                .eq('provider_id', providerProfile.id)
-                .eq('date', dateStr)
-                .eq('time_slot', timeSlot)
-                .single();
-
-              if (!providerAvail || !providerAvail.available) {
-                isAvailable = false;
-              }
-            }
-          }
-
-          // Check shower availability if required
-          if (requiresShower && isAvailable) {
-            const { data: showerAvail } = await supabase
-              .from('shower_availability')
-              .select('available_spots')
-              .eq('date', dateStr)
-              .eq('time_slot', timeSlot)
-              .single();
-
-            if (!showerAvail || showerAvail.available_spots <= 0) {
-              isAvailable = false;
-            }
-          }
-
-          slots.push({
-            time: timeSlot.substring(0, 5),
-            available: isAvailable
-          });
-        }
-      }
+      // Convert to TimeSlot format
+      const slots: TimeSlot[] = (availableSlots || []).map((slot: any) => ({
+        time: slot.time_slot?.substring(0, 5) || slot, // Handle both formats
+        available: true
+      }));
 
       setTimeSlots(slots);
     } catch (error) {
@@ -285,7 +212,7 @@ const AdminBookingPage = () => {
     }
   };
 
-  const requiresProvider = () => {
+  const requiresStaff = () => {
     if (!selectedService) return false;
     const service = services.find(s => s.id === selectedService);
     return service?.service_type === 'grooming' || service?.service_type === 'veterinary';
@@ -297,35 +224,82 @@ const AdminBookingPage = () => {
       return;
     }
 
-    if (requiresProvider() && !selectedProvider) {
+    if (requiresStaff() && !selectedStaff) {
       toast.error('Por favor, selecione um profissional');
+      return;
+    }
+
+    // Get client's user_id for the booking
+    const selectedClientData = clients.find(c => c.id === selectedClient);
+    if (!selectedClientData) {
+      toast.error('Dados do cliente não encontrados');
       return;
     }
 
     setIsLoading(true);
     try {
+      console.log('🔥 [ADMIN_BOOKING] Creating admin override booking:', {
+        user_id: selectedClientData.user_id,
+        pet_id: selectedPet,
+        service_id: selectedService,
+        staff_profile_id: selectedStaff,
+        date: selectedDate,
+        time: selectedTime + ':00',
+        notes,
+        is_admin_override: true
+      });
+
       const result = await createAppointment(
-        selectedClient,
+        selectedClientData.user_id, // Use client's user_id
         selectedPet,
         selectedService,
-        selectedProvider || null,
+        selectedStaff || null, // Pass staff_profile_id directly
         selectedDate,
         selectedTime + ':00',
-        notes || undefined
+        notes || undefined,
+        true // Mark as admin override
       );
 
       if (result.success) {
         toast.success('Agendamento criado com sucesso!');
+        
+        // 🆕 ADDITIONAL: Track the specific admin override action
+        if (user?.id && result.appointmentId) {
+          try {
+            await trackAdminAction(
+              user.id,
+              'create_appointment',
+              'appointment',
+              result.appointmentId,
+              'Admin created booking for client',
+              null,
+              {
+                client_id: selectedClient,
+                pet_id: selectedPet,
+                service_id: selectedService,
+                staff_profile_id: selectedStaff,
+                booking_date: selectedDate.toISOString().split('T')[0],
+                time_slot: selectedTime,
+                created_via: 'admin_panel'
+              },
+              `Admin ${user.email} created booking for client ${selectedClientData.name}`
+            );
+          } catch (trackingError) {
+            console.error('Failed to track admin action:', trackingError);
+            // Don't fail the booking if tracking fails
+          }
+        }
+
         // Reset form
         setSelectedClient('');
         setSelectedPet('');
         setSelectedService('');
-        setSelectedProvider('');
+        setSelectedStaff('');
         setSelectedDate(undefined);
         setSelectedTime('');
         setNotes('');
         setClientPets([]);
-        setProviders([]);
+        setStaff([]);
         setTimeSlots([]);
       }
     } catch (error) {
@@ -360,6 +334,9 @@ const AdminBookingPage = () => {
             <p className="text-gray-600">
               Crie agendamentos em nome dos clientes via telefone ou presencialmente
             </p>
+            <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+              ⚠️ Agendamentos criados aqui são registrados como override administrativo
+            </div>
           </div>
 
           <div className="grid lg:grid-cols-2 gap-6">
@@ -380,7 +357,7 @@ const AdminBookingPage = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {clients.map((client) => (
-                          <SelectItem key={client.user_id} value={client.user_id}>
+                          <SelectItem key={client.id} value={client.id}>
                             {client.name}
                           </SelectItem>
                         ))}
@@ -423,24 +400,28 @@ const AdminBookingPage = () => {
                       <SelectContent>
                         {services.map((service) => (
                           <SelectItem key={service.id} value={service.id}>
-                            {service.name} - R$ {service.price.toFixed(2)}
+                            {service.name} - R$ {service.base_price?.toFixed(2) || '0.00'}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {requiresProvider() && (
+                  {requiresStaff() && (
                     <div>
-                      <Label htmlFor="provider-select">Profissional</Label>
-                      <Select value={selectedProvider} onValueChange={setSelectedProvider} disabled={!selectedService}>
-                        <SelectTrigger id="provider-select">
+                      <Label htmlFor="staff-select">Profissional</Label>
+                      <Select value={selectedStaff} onValueChange={setSelectedStaff} disabled={!selectedService}>
+                        <SelectTrigger id="staff-select">
                           <SelectValue placeholder="Selecione um profissional" />
                         </SelectTrigger>
                         <SelectContent>
-                          {providers.map((provider) => (
-                            <SelectItem key={provider.id} value={provider.id}>
-                              {provider.name} ({provider.type === 'groomer' ? 'Tosador' : 'Veterinário'})
+                          {staff.map((member) => (
+                            <SelectItem key={member.id} value={member.id}>
+                              {member.name} ({
+                                member.can_vet ? 'Veterinário' :
+                                member.can_groom ? 'Tosador' :
+                                member.can_bathe ? 'Banhista' : 'Staff'
+                              })
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -525,7 +506,7 @@ const AdminBookingPage = () => {
           <div className="mt-8 flex justify-end">
             <Button
               onClick={handleSubmit}
-              disabled={isLoading || !selectedClient || !selectedPet || !selectedService || !selectedDate || !selectedTime || (requiresProvider() && !selectedProvider)}
+              disabled={isLoading || !selectedClient || !selectedPet || !selectedService || !selectedDate || !selectedTime || (requiresStaff() && !selectedStaff)}
               className="w-full sm:w-auto"
             >
               {isLoading ? (
@@ -536,7 +517,7 @@ const AdminBookingPage = () => {
               ) : (
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4" />
-                  Criar Agendamento
+                  Criar Agendamento (Admin Override)
                 </div>
               )}
             </Button>

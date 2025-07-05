@@ -2,33 +2,32 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// ✅ CLEAN BOOKING: Minimal validation, trust the RPC-validated slots
+// ✅ CLEAN BOOKING: Updated for Phase 1 schema with client_id and staff_profiles
 export async function createAppointment(
   userId: string,
   petId: string,
   serviceId: string,
-  providerProfileId: string | null, // This is now provider_profile_id directly
+  staffProfileId: string | null, // Now uses staff_profile_id directly
   date: Date,
   timeSlot: string,
-  notes?: string
+  notes?: string,
+  isAdminOverride: boolean = false
 ): Promise<{ success: boolean; appointmentId?: string; bookingData?: any; error?: any }> {
   try {
-    console.log('🚀 [CREATE_APPOINTMENT] Starting booking (slots already validated by RPC):', {
+    console.log('🚀 [CREATE_APPOINTMENT] Starting booking with Phase 1 schema:', {
       userId,
       petId,
       serviceId,
-      providerProfileId, // This is provider_profile_id
+      staffProfileId, // This is now staff_profile_id
       date: date.toISOString(),
       timeSlot,
       notes,
+      isAdminOverride,
       timestamp: new Date().toISOString()
     });
 
     const isoDate = date.toISOString().split('T')[0];
     
-    // ✅ SIMPLIFIED: Trust the slots already validated by get_available_slots_for_service RPC
-    console.log('📤 [CREATE_APPOINTMENT] Proceeding with booking - slots already validated by RPC');
-
     // Get user, pet, service data for notifications
     const { data: userData } = await supabase.auth.getUser();
     const { data: petData } = await supabase
@@ -39,7 +38,7 @@ export async function createAppointment(
     
     const { data: serviceData } = await supabase
       .from('services')
-      .select('name, duration_minutes')
+      .select('name, default_duration')
       .eq('id', serviceId)
       .single();
 
@@ -47,62 +46,41 @@ export async function createAppointment(
       user: userData?.user?.user_metadata?.name,
       pet: petData?.name,
       service: serviceData?.name,
-      duration: serviceData?.duration_minutes
+      duration: serviceData?.default_duration
     });
 
-    let providerData = null;
+    let staffData = null;
     
-    // Get provider data if provider is selected
-    if (providerProfileId) {
-      console.log('👥 [CREATE_APPOINTMENT] Fetching provider data for:', providerProfileId);
+    // Get staff data if staff is selected
+    if (staffProfileId) {
+      console.log('👥 [CREATE_APPOINTMENT] Fetching staff data for:', staffProfileId);
 
-      const { data: providerProfile } = await supabase
-        .from('provider_profiles')
-        .select('user_id, type')
-        .eq('id', providerProfileId)
+      const { data: staffProfile } = await supabase
+        .from('staff_profiles')
+        .select('user_id, name, can_bathe, can_groom, can_vet')
+        .eq('id', staffProfileId)
         .single();
       
-      console.log('📊 [CREATE_APPOINTMENT] Provider profile data:', providerProfile);
+      console.log('📊 [CREATE_APPOINTMENT] Staff profile data:', staffProfile);
 
-      if (providerProfile) {
-        // Get user name for the provider
-        const { data: providerUserData } = await supabase
-          .from('clients')
-          .select('name')
-          .eq('user_id', providerProfile.user_id)
-          .single();
-        
-        const { data: groomerData } = await supabase
-          .from('groomers')
-          .select('name')
-          .eq('user_id', providerProfile.user_id)
-          .single();
-        
-        const { data: vetData } = await supabase
-          .from('veterinarians')
-          .select('name')
-          .eq('user_id', providerProfile.user_id)
-          .single();
-        
-        providerData = {
-          id: providerProfileId,
-          user_id: providerProfile.user_id,
-          name: providerUserData?.name || groomerData?.name || vetData?.name || 'Provider'
+      if (staffProfile) {
+        staffData = {
+          id: staffProfileId,
+          user_id: staffProfile.user_id,
+          name: staffProfile.name || 'Staff Member'
         };
 
-        console.log('✅ [CREATE_APPOINTMENT] Provider data assembled:', providerData);
+        console.log('✅ [CREATE_APPOINTMENT] Staff data assembled:', staffData);
       }
     }
 
     // 🔧 FIXED: Ensure time slot is in correct HH:MM:SS format
     let formattedTimeSlot = timeSlot;
     
-    // If timeSlot is already in HH:MM:SS format, use it as-is
-    // If it's in HH:MM format, add :00
     if (timeSlot.split(':').length === 2) {
       formattedTimeSlot = timeSlot + ':00';
     } else if (timeSlot.split(':').length === 3) {
-      formattedTimeSlot = timeSlot; // Already in correct format
+      formattedTimeSlot = timeSlot;
     }
 
     console.log('🕐 [CREATE_APPOINTMENT] Time slot formatting:', {
@@ -112,14 +90,14 @@ export async function createAppointment(
       segments_formatted: formattedTimeSlot.split(':').length
     });
 
-    // ✅ SIMPLIFIED: Direct booking call with enhanced error handling
+    // ✅ UPDATED: Direct booking call with new Phase 1 RPC
     const bookingParams = {
       _user_id: userId,
       _pet_id: petId,
       _service_id: serviceId,
-      _provider_ids: providerProfileId ? [providerProfileId] : [],
+      _staff_profile_ids: staffProfileId ? [staffProfileId] : [],
       _booking_date: isoDate,
-      _time_slot: formattedTimeSlot, // Use properly formatted time slot
+      _time_slot: formattedTimeSlot,
       _notes: notes || null
     };
 
@@ -146,14 +124,10 @@ export async function createAppointment(
       // Enhanced error message handling
       let userErrorMessage = 'Erro no agendamento';
       
-      if (error.message.includes('not available') || error.message.includes('Provider') && error.message.includes('not available')) {
+      if (error.message.includes('not available') || error.message.includes('Staff') && error.message.includes('not available')) {
         userErrorMessage = 'Profissional não disponível para o horário selecionado.';
-      } else if (error.message.includes('capacity exceeded') || error.message.includes('Shower capacity exceeded')) {
-        userErrorMessage = 'Capacidade de banho excedida para este horário.';
-      } else if (error.message.includes('conflicting appointment')) {
-        userErrorMessage = 'Profissional já tem compromisso neste horário.';
-      } else if (error.message.includes('Vagas de banho esgotadas')) {
-        userErrorMessage = 'Vagas de banho esgotadas para este horário.';
+      } else if (error.message.includes('not qualified')) {
+        userErrorMessage = 'Profissional não qualificado para este serviço.';
       } else if (error.message.includes('permission denied') || error.message.includes('row-level security')) {
         userErrorMessage = 'Erro de permissão. Verifique se você está logado.';
       } else if (error.message.includes('violates')) {
@@ -184,6 +158,30 @@ export async function createAppointment(
       };
     }
 
+    // 🆕 ADMIN OVERRIDE TRACKING: Track if this was an admin override
+    if (isAdminOverride && userData?.user) {
+      try {
+        console.log('📝 [CREATE_APPOINTMENT] Recording admin override action');
+        await trackAdminAction(
+          userData.user.id,
+          'create_appointment',
+          'appointment',
+          appointmentId,
+          'Admin override booking',
+          null, // no old values for creation
+          {
+            appointment_id: appointmentId,
+            created_by_admin: true,
+            override_reason: 'Manual admin booking'
+          },
+          'Appointment created by admin with potential availability override'
+        );
+      } catch (adminError) {
+        console.error('⚠️ [CREATE_APPOINTMENT] Failed to track admin action:', adminError);
+        // Don't fail the booking if admin tracking fails
+      }
+    }
+
     // Prepare booking data for success page
     const bookingData = {
       appointmentId,
@@ -191,7 +189,7 @@ export async function createAppointment(
       serviceName: serviceData?.name || 'Serviço',
       date: isoDate,
       time: timeSlot,
-      providerName: providerData?.name,
+      staffName: staffData?.name,
       notes,
       userName: userData?.user?.user_metadata?.name || 'Cliente',
       userEmail: userData?.user?.email
@@ -229,70 +227,126 @@ export async function createAppointment(
   }
 }
 
-// Helper function to get service resource requirements
-export async function getServiceResources(serviceId: string) {
+// 🆕 NEW: Admin action tracking function
+export async function trackAdminAction(
+  adminUserId: string,
+  actionType: string,
+  targetType: string,
+  targetId: string,
+  reason: string,
+  oldValues: any = null,
+  newValues: any = null,
+  notes: string = ''
+): Promise<void> {
   try {
-    const { data, error } = await supabase
-      .from('service_resources')
-      .select('*')
-      .eq('service_id', serviceId);
+    const { error } = await supabase
+      .from('admin_actions')
+      .insert({
+        admin_user_id: adminUserId,
+        action_type: actionType,
+        target_type: targetType,
+        target_id: targetId,
+        reason: reason,
+        old_values: oldValues,
+        new_values: newValues,
+        notes: notes
+      });
 
-    if (error) throw error;
-    return data || [];
+    if (error) {
+      throw error;
+    }
+
+    console.log('✅ Admin action tracked:', {
+      adminUserId,
+      actionType,
+      targetType,
+      targetId,
+      reason
+    });
   } catch (error) {
-    console.error('Error fetching service resources:', error);
-    return [];
+    console.error('❌ Failed to track admin action:', error);
+    throw error;
   }
 }
 
-// Helper function to check if service requires shower
-export async function serviceRequiresShower(serviceId: string): Promise<boolean> {
+// Helper function to get service resource requirements (updated for Phase 1)
+export async function getServiceResources(serviceId: string) {
   try {
     const { data, error } = await supabase
-      .from('service_resources')
-      .select('resource_type')
-      .eq('service_id', serviceId)
-      .eq('resource_type', 'shower')
+      .from('services')
+      .select('requires_bath, requires_grooming, requires_vet')
+      .eq('id', serviceId)
       .single();
 
-    return !error && !!data;
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching service resources:', error);
+    return null;
+  }
+}
+
+// Helper function to check if service requires bath (updated for Phase 1)
+export async function serviceRequiresBath(serviceId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('services')
+      .select('requires_bath')
+      .eq('id', serviceId)
+      .single();
+
+    return !error && !!data?.requires_bath;
   } catch (error) {
     return false;
   }
 }
 
-// Debug function to audit current system state
+// 🆕 NEW: Get available staff for service (Phase 1)
+export async function getAvailableStaffForService(
+  serviceId: string,
+  date: Date,
+  locationId?: string
+) {
+  try {
+    const dateStr = date.toISOString().split('T')[0];
+    
+    const { data, error } = await supabase.rpc('get_available_staff_for_service', {
+      _service_id: serviceId,
+      _date: dateStr,
+      _location_id: locationId || null
+    });
+
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching available staff:', error);
+    return [];
+  }
+}
+
+// Debug function to audit current system state (updated for Phase 1)
 export async function auditBookingSystemState() {
-  console.log('🔍 SYSTEM STATE AUDIT:');
+  console.log('🔍 PHASE 1 SYSTEM STATE AUDIT:');
   
   try {
-    // Check services and their resources
+    // Check services and their requirements
     const { data: services } = await supabase.from('services').select('*');
-    const { data: serviceResources } = await supabase.from('service_resources').select('*');
     
     console.log('📋 SERVICES:', services);
-    console.log('🔧 SERVICE RESOURCES:', serviceResources);
+    
+    // Check staff profiles and availability
+    const { data: staffProfiles } = await supabase.from('staff_profiles').select('*');
+    console.log('👥 STAFF PROFILES:', staffProfiles);
     
     // Check availability data for today
     const today = new Date().toISOString().split('T')[0];
-    const { data: showerAvail } = await supabase
-      .from('shower_availability')
+    const { data: staffAvail } = await supabase
+      .from('staff_availability')
       .select('*')
       .eq('date', today)
       .order('time_slot');
     
-    const { data: providerAvail } = await supabase
-      .from('provider_availability')
-      .select('*')
-      .eq('date', today)
-      .order('time_slot');
-    
-    console.log('🚿 SHOWER AVAILABILITY TODAY:', showerAvail);
-    console.log('👨‍⚕️ PROVIDER AVAILABILITY TODAY:', providerAvail);
-    
-    // Check provider profiles
-    const { data: providers } = await supabase.from('provider_profiles').select('*');
-    console.log('👥 PROVIDER PROFILES:', providers);
+    console.log('🗓️ STAFF AVAILABILITY TODAY:', staffAvail);
     
   } catch (error) {
     console.error('❌ AUDIT ERROR:', error);

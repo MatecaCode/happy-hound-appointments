@@ -1,3 +1,4 @@
+
 import React, { useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
@@ -7,15 +8,17 @@ import { useServiceRequirements } from './useServiceRequirements';
 import { createAppointment } from '@/utils/appointmentUtils';
 import { toast } from 'sonner';
 
-export interface Provider {
+export interface Staff {
   id: string;
+  user_id: string;
   name: string;
-  role: string;
+  can_bathe: boolean;
+  can_groom: boolean;
+  can_vet: boolean;
   profile_image?: string;
   rating?: number;
   specialty?: string;
   about?: string;
-  provider_profile_id?: string; // Store the actual provider profile ID
 }
 
 export interface Pet {
@@ -28,8 +31,8 @@ export interface Pet {
 export interface Service {
   id: string;
   name: string;
-  price: number;
-  duration: number;
+  base_price: number;
+  default_duration: number;
   service_type: string;
 }
 
@@ -42,11 +45,11 @@ export interface TimeSlot {
 export interface NextAvailable {
   date: string;
   time: string;
-  provider_name: string;
+  staff_name: string;
 }
 
 export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   
   // Use the separated hooks
@@ -56,8 +59,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     nextAvailable,
     userPets,
     services,
-    groomers,
-    fetchAvailableProviders,
+    groomers: staff, // Renamed from groomers to staff for Phase 1
+    fetchAvailableProviders: fetchAvailableStaff,
     fetchServices,
     fetchUserPets,
     fetchTimeSlots,
@@ -74,25 +77,25 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     ? getServiceRequirements(formState.selectedService)
     : null;
 
-  // Extract requirements from the centralized data
-  const requiresGroomer = serviceRequirements?.requires_groomer || false;
-  const requiresShower = serviceRequirements?.requires_shower || false;
+  // Extract requirements from the centralized data (updated for Phase 1)
+  const requiresStaff = serviceRequirements?.requires_grooming || serviceRequirements?.requires_vet || false;
+  const requiresBath = serviceRequirements?.requires_bath || false;
   const requiresVet = serviceRequirements?.requires_vet || false;
   const serviceRequirementsLoaded = Boolean(serviceRequirements);
 
-  // NEW: Check if service is shower-only
-  const isShowerOnlyService = serviceRequirementsLoaded && 
-    requiresShower && 
-    !requiresGroomer && 
+  // NEW: Check if service is bath-only
+  const isBathOnlyService = serviceRequirementsLoaded && 
+    requiresBath && 
+    !serviceRequirements?.requires_grooming && 
     !requiresVet;
 
-  console.log('🔍 [APPOINTMENT_FORM] Service requirements analysis:', {
+  console.log('🔍 [APPOINTMENT_FORM] Phase 1 service requirements analysis:', {
     service_id: formState.selectedService,
     requirements: serviceRequirements,
-    requires_groomer: requiresGroomer,
-    requires_shower: requiresShower,
+    requires_staff: requiresStaff,
+    requires_bath: requiresBath,
     requires_vet: requiresVet,
-    is_shower_only: isShowerOnlyService
+    is_bath_only: isBathOnlyService
   });
 
   // ✅ SIMPLIFIED: Only validate that slot exists in current timeSlots array
@@ -109,30 +112,28 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     return Boolean(validSlot);
   }, [formState.selectedTimeSlotId, timeSlots]);
 
-  // Clear selected groomer if service doesn't require one
+  // Clear selected staff if service doesn't require one
   useEffect(() => {
-    if (serviceRequirementsLoaded && !requiresGroomer && formState.selectedGroomerId) {
-      console.log('🔍 [APPOINTMENT_FORM] Service does not require groomer, clearing selected groomer');
+    if (serviceRequirementsLoaded && !requiresStaff && formState.selectedGroomerId) {
+      console.log('🔍 [APPOINTMENT_FORM] Service does not require staff, clearing selected staff');
       formState.setSelectedGroomerId('');
     }
-  }, [requiresGroomer, serviceRequirementsLoaded, formState.selectedGroomerId, formState]);
+  }, [requiresStaff, serviceRequirementsLoaded, formState.selectedGroomerId, formState]);
 
   // ✅ IMPROVED: Only reset time slot when NECESSARY (not aggressively)
   React.useEffect(() => {
     console.log('🔄 [APPOINTMENT_FORM] Dependency change detected:', {
       service: formState.selectedService,
-      groomer: formState.selectedGroomerId,
+      staff: formState.selectedGroomerId,
       date: formState.date?.toISOString(),
       current_slot: formState.selectedTimeSlotId,
       will_clear_slot: Boolean(formState.selectedTimeSlotId)
     });
     
-    // Reset time slot when service, groomer, or date changes
+    // Reset time slot when service, staff, or date changes
     if (formState.selectedTimeSlotId) {
       console.log('🔄 [APPOINTMENT_FORM] Dependencies changed, clearing time slot selection');
       formState.setSelectedTimeSlotId('');
-      
-      // Show user feedback about slot reset
       toast.info('Seleção de horário foi resetada devido à mudança de parâmetros');
     }
   }, [formState.selectedService, formState.selectedGroomerId, formState.date]);
@@ -165,7 +166,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   };
 
-  // ✅ CLEAN SUBMIT: Only called when user clicks "Confirmar Agendamento"
+  // ✅ CLEAN SUBMIT: Updated for Phase 1 schema with admin override tracking
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -173,6 +174,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       selected_slot: formState.selectedTimeSlotId,
       is_slot_valid: isSelectedSlotValid,
       available_slots_count: timeSlots.filter(s => s.available).length,
+      is_admin: isAdmin,
       timestamp: new Date().toISOString()
     });
     
@@ -208,27 +210,27 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       return;
     }
 
-    // Only require groomer if service requires one (not for shower-only services)
-    if (requiresGroomer && !formState.selectedGroomerId) {
-      console.log('❌ [APPOINTMENT_FORM] Service requires groomer but none selected');
+    // Only require staff if service requires one (not for bath-only services)
+    if (requiresStaff && !formState.selectedGroomerId) {
+      console.log('❌ [APPOINTMENT_FORM] Service requires staff but none selected');
       toast.error('Por favor, selecione um profissional');
       return;
     }
 
-    // CRITICAL: Get the provider_profile_id from the selected groomer
-    let providerProfileId: string | null = null;
-    if (requiresGroomer && formState.selectedGroomerId) {
-      const selectedGroomer = groomers.find(g => g.id === formState.selectedGroomerId);
-      providerProfileId = (selectedGroomer as any)?.provider_profile_id || null;
+    // UPDATED: Get the staff_profile_id from the selected staff (Phase 1)
+    let staffProfileId: string | null = null;
+    if (requiresStaff && formState.selectedGroomerId) {
+      const selectedStaff = staff.find(s => s.id === formState.selectedGroomerId);
+      staffProfileId = selectedStaff?.id || null;
       
-      console.log('🎯 [APPOINTMENT_FORM] SUBMIT: Provider ID mapping for submission:', {
-        groomer_user_id: formState.selectedGroomerId,
-        provider_profile_id: providerProfileId,
-        selected_groomer: selectedGroomer
+      console.log('🎯 [APPOINTMENT_FORM] SUBMIT: Staff ID mapping for Phase 1:', {
+        staff_user_id: formState.selectedGroomerId,
+        staff_profile_id: staffProfileId,
+        selected_staff: selectedStaff
       });
 
-      if (!providerProfileId) {
-        console.error('❌ [APPOINTMENT_FORM] CRITICAL: No provider_profile_id found for selected groomer');
+      if (!staffProfileId) {
+        console.error('❌ [APPOINTMENT_FORM] CRITICAL: No staff_profile_id found for selected staff');
         toast.error('Erro: ID do profissional não encontrado');
         return;
       }
@@ -236,27 +238,29 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
     formState.setIsLoading(true);
     
-    // ✅ CLEAN: Final payload - no redundant slot validation
-    console.log('📤 [APPOINTMENT_FORM] 🔥 FINAL PAYLOAD TO createAppointment:', {
+    // ✅ CLEAN: Final payload for Phase 1 - no redundant slot validation
+    console.log('📤 [APPOINTMENT_FORM] 🔥 FINAL PAYLOAD TO createAppointment (Phase 1):', {
       user_id: user.id,
       pet_id: formState.selectedPet,
       service_id: formState.selectedService,
-      provider_profile_id: providerProfileId,
+      staff_profile_id: staffProfileId,
       date: formState.date,
       time_slot: formState.selectedTimeSlotId,
       notes: formState.notes,
+      is_admin_override: isAdmin,
       slots_already_validated_by_rpc: true
     });
 
-    // Pass the provider_profile_id directly (not user_id)
+    // Pass the staff_profile_id directly and track admin overrides
     const result = await createAppointment(
       user.id,
       formState.selectedPet,
       formState.selectedService,
-      providerProfileId, // Pass provider_profile_id directly
+      staffProfileId, // Pass staff_profile_id directly
       formState.date,
       formState.selectedTimeSlotId,
-      formState.notes
+      formState.notes,
+      isAdmin // Track if this is an admin override
     );
 
     console.log('📨 [APPOINTMENT_FORM] SUBMIT: createAppointment result:', result);
@@ -292,60 +296,64 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [user, fetchUserPets]);
 
-  // NEW: Handle shower-only services - skip to step 4 directly
+  // NEW: Handle bath-only services - skip to step 4 directly
   useEffect(() => {
-    if (isShowerOnlyService && formState.formStep === 2 && formState.date) {
-      console.log('🚿 [APPOINTMENT_FORM] Shower-only service detected, skipping to step 4');
-      formState.setFormStep(4); // Skip groomer selection, go directly to time slots
+    if (isBathOnlyService && formState.formStep === 2 && formState.date) {
+      console.log('🛁 [APPOINTMENT_FORM] Bath-only service detected, skipping to step 4');
+      formState.setFormStep(4); // Skip staff selection, go directly to time slots
     }
-  }, [isShowerOnlyService, formState.formStep, formState.date, formState]);
+  }, [isBathOnlyService, formState.formStep, formState.date, formState]);
 
-  // Fetch available providers when date changes and service requires groomer
+  // Fetch available staff when date changes and service requires staff
   useEffect(() => {
-    if (formState.formStep === 3 && formState.date && requiresGroomer && serviceRequirementsLoaded && !isShowerOnlyService) {
-      console.log('🔍 [APPOINTMENT_FORM] useEffect triggered for step 3 provider fetch');
-      fetchAvailableProviders(serviceType, formState.date, selectedServiceObj);
+    if (formState.formStep === 3 && formState.date && requiresStaff && serviceRequirementsLoaded && !isBathOnlyService) {
+      console.log('🔍 [APPOINTMENT_FORM] useEffect triggered for step 3 staff fetch');
+      fetchAvailableStaff(serviceType, formState.date, selectedServiceObj);
     }
-  }, [formState.formStep, formState.date, serviceType, selectedServiceObj, fetchAvailableProviders, requiresGroomer, serviceRequirementsLoaded, isShowerOnlyService]);
+  }, [formState.formStep, formState.date, serviceType, selectedServiceObj, fetchAvailableStaff, requiresStaff, serviceRequirementsLoaded, isBathOnlyService]);
 
   // Fetch time slots for final step
   useEffect(() => {
-    // Final step is step 4 (with/without groomer) OR step 3 for shower-only
-    const isFinalStep = formState.formStep === 4 || (isShowerOnlyService && formState.formStep === 3);
+    // Final step is step 4 (with/without staff) OR step 3 for bath-only
+    const isFinalStep = formState.formStep === 4 || (isBathOnlyService && formState.formStep === 3);
     
     if (isFinalStep && formState.date && serviceRequirementsLoaded) {
       console.log('🔍 [APPOINTMENT_FORM] useEffect triggered for time slots fetch:', {
         step: formState.formStep,
         is_final_step: isFinalStep,
-        requires_groomer: requiresGroomer,
-        is_shower_only: isShowerOnlyService,
-        groomer_user_id: formState.selectedGroomerId,
+        requires_staff: requiresStaff,
+        is_bath_only: isBathOnlyService,
+        staff_user_id: formState.selectedGroomerId,
         date: formState.date
       });
       
-      // Pass user_id to fetchTimeSlots - it will handle the conversion internally
-      fetchTimeSlots(formState.date, formState.selectedGroomerId, formState.setIsLoading, selectedServiceObj);
+      // Pass staff_profile_id to fetchTimeSlots for Phase 1
+      const selectedStaff = staff.find(s => s === formState.selectedGroomerId);
+      const staffProfileId = selectedStaff?.id || null;
+      
+      fetchTimeSlots(formState.date, staffProfileId, formState.setIsLoading, selectedServiceObj);
     }
-  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresGroomer, serviceRequirementsLoaded, isShowerOnlyService]);
+  }, [formState.formStep, formState.date, formState.selectedGroomerId, selectedServiceObj, fetchTimeSlots, requiresStaff, serviceRequirementsLoaded, isBathOnlyService, staff]);
 
   return {
     // Spread all form state
     ...formState,
     
-    // Data state
+    // Data state (renamed for Phase 1)
     timeSlots,
     nextAvailable,
     userPets,
     services,
-    groomers,
+    groomers: staff, // Keep groomers name for backward compatibility
+    staff, // NEW: Also expose as staff
     
-    // Service requirements from centralized hook
-    serviceRequiresGroomer: requiresGroomer,
-    serviceRequiresShower: requiresShower,
+    // Service requirements from centralized hook (updated for Phase 1)
+    serviceRequiresStaff: requiresStaff, // Updated naming
+    serviceRequiresBath: requiresBath, // Updated naming
     serviceRequiresVet: requiresVet,
     serviceRequirementsLoaded,
     serviceRequirements,
-    isShowerOnlyService, // NEW: Expose shower-only detection
+    isBathOnlyService, // NEW: Expose bath-only detection
     
     // ✅ CLEAN: Expose slot validation
     isSelectedSlotValid,
