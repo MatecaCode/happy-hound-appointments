@@ -23,18 +23,19 @@ export async function setupBookingSystemData() {
           {
             name: 'Banho e Tosa',
             description: 'Banho completo com tosa higiênica',
-            price: 50.00,
-            duration: 60,
-            duration_minutes: 60,
-            service_type: 'grooming'
+            base_price: 50.00,
+            default_duration: 60,
+            service_type: 'grooming',
+            requires_grooming: true,
+            requires_bath: true
           },
           {
             name: 'Apenas Banho',
             description: 'Banho completo sem tosa',
-            price: 30.00,
-            duration: 30,
-            duration_minutes: 30,
-            service_type: 'grooming'
+            base_price: 30.00,
+            default_duration: 30,
+            service_type: 'grooming',
+            requires_bath: true
           }
         ])
         .select();
@@ -46,107 +47,76 @@ export async function setupBookingSystemData() {
       }
     }
 
-    // 2. Check if we have provider profiles
-    const { data: providers, error: providersError } = await supabase
-      .from('provider_profiles')
+    // 2. Check if we have staff profiles
+    const { data: staffProfiles, error: staffError } = await supabase
+      .from('staff_profiles')
       .select('*')
-      .eq('type', 'groomer');
+      .eq('can_groom', true);
 
-    console.log('👥 Existing groomer profiles:', providers);
+    console.log('👥 Existing groomer staff profiles:', staffProfiles);
 
-    if (!providers || providers.length === 0) {
-      console.log('➕ Creating default groomer profiles...');
-      
-      // Create test groomer profiles
-      const { data: newProviders, error: createProvidersError } = await supabase
-        .from('provider_profiles')
-        .insert([
-          {
-            user_id: 'b13fb65b-2337-4539-aed0-52e29467b79c', // Test user ID
-            type: 'groomer',
-            bio: 'Tosador experiente especializado em cães de pequeno porte',
-            rating: 4.8
-          },
-          {
-            user_id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890', // Another test user ID
-            type: 'groomer',
-            bio: 'Especialista em tosa de raças grandes e médias',
-            rating: 4.9
-          }
-        ])
-        .select();
-
-      if (createProvidersError) {
-        console.error('❌ Error creating provider profiles:', createProvidersError);
-      } else {
-        console.log('✅ Created provider profiles:', newProviders);
-      }
+    if (!staffProfiles || staffProfiles.length === 0) {
+      console.log('➕ No groomer staff profiles found. Staff profiles should be created through user registration.');
     }
 
-    // 3. Check if we have service resources configured
-    const { data: serviceResources, error: resourcesError } = await supabase
-      .from('service_resources')
-      .select('*');
-
-    console.log('🔧 Existing service resources:', serviceResources);
-
-    if (!serviceResources || serviceResources.length === 0) {
-      console.log('➕ Creating service resource mappings...');
-      
-      // Get all grooming services
-      const { data: allServices } = await supabase
-        .from('services')
-        .select('*')
-        .eq('service_type', 'grooming');
-
-      if (allServices && allServices.length > 0) {
-        const resourceMappings = [];
+    // 3. Ensure staff availability for existing staff
+    if (staffProfiles && staffProfiles.length > 0) {
+      for (const staff of staffProfiles) {
+        console.log(`📅 Checking availability for staff ${staff.id}...`);
         
-        for (const service of allServices) {
-          // Each grooming service needs both a groomer and a shower
-          resourceMappings.push(
-            {
-              service_id: service.id,
-              resource_type: 'provider',
-              provider_type: 'groomer',
-              required: true
-            },
-            {
-              service_id: service.id,
-              resource_type: 'shower',
-              required: true
+        // Check if staff has availability records
+        const { data: existingAvailability } = await supabase
+          .from('staff_availability')
+          .select('id')
+          .eq('staff_profile_id', staff.id)
+          .limit(1);
+        
+        if (!existingAvailability || existingAvailability.length === 0) {
+          console.log(`Creating availability records for staff ${staff.id}`);
+          
+          // Create basic availability for the next 30 days
+          const availabilityRecords = [];
+          const startDate = new Date();
+          
+          for (let i = 0; i < 30; i++) {
+            const currentDate = new Date(startDate);
+            currentDate.setDate(startDate.getDate() + i);
+            
+            // Skip Sundays
+            if (currentDate.getDay() !== 0) {
+              const dateStr = currentDate.toISOString().split('T')[0];
+              
+              // Create slots from 9:00 to 17:00
+              const timeSlots = [
+                '09:00:00', '09:30:00', '10:00:00', '10:30:00', '11:00:00', '11:30:00',
+                '12:00:00', '12:30:00', '13:00:00', '13:30:00', '14:00:00', '14:30:00',
+                '15:00:00', '15:30:00', '16:00:00', '16:30:00'
+              ];
+              
+              for (const timeSlot of timeSlots) {
+                availabilityRecords.push({
+                  staff_profile_id: staff.id,
+                  date: dateStr,
+                  time_slot: timeSlot,
+                  available: true
+                });
+              }
             }
-          );
-        }
-
-        const { data: newResources, error: createResourcesError } = await supabase
-          .from('service_resources')
-          .insert(resourceMappings)
-          .select();
-
-        if (createResourcesError) {
-          console.error('❌ Error creating service resources:', createResourcesError);
+          }
+          
+          if (availabilityRecords.length > 0) {
+            const { error: availabilityError } = await supabase
+              .from('staff_availability')
+              .insert(availabilityRecords);
+            
+            if (availabilityError) {
+              console.error(`❌ Error creating availability for staff ${staff.id}:`, availabilityError);
+            } else {
+              console.log(`✅ Created availability records for staff ${staff.id}`);
+            }
+          }
         } else {
-          console.log('✅ Created service resources:', newResources);
-        }
-      }
-    }
-
-    // 4. Ensure provider availability for the next 90 days
-    if (providers && providers.length > 0) {
-      for (const provider of providers) {
-        console.log(`📅 Ensuring availability for provider ${provider.id}...`);
-        
-        const { error: availabilityError } = await supabase.rpc('ensure_provider_availability', {
-          provider_profile_id: provider.id,
-          start_date: new Date().toISOString().split('T')[0],
-          end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        });
-
-        if (availabilityError) {
-          console.error(`❌ Error ensuring availability for provider ${provider.id}:`, availabilityError);
-        } else {
-          console.log(`✅ Ensured availability for provider ${provider.id}`);
+          console.log(`✅ Staff ${staff.id} already has availability records`);
         }
       }
     }
