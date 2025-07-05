@@ -1,520 +1,316 @@
 
 import React, { useState, useEffect } from 'react';
-import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAuth } from '@/hooks/useAuth';
+import { Calendar } from '@/components/ui/calendar';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Calendar as CalendarIcon, Clock, Users, Droplets, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { CalendarIcon, Clock, User, Plus } from 'lucide-react';
 
-interface Provider {
+interface StaffProfile {
   id: string;
-  user_id: string;
-  type: string;
   name: string;
+  can_bathe: boolean;
+  can_groom: boolean;
+  can_vet: boolean;
+  active: boolean;
 }
 
-interface TimeSlot {
-  time: string;
+interface AvailabilitySlot {
+  id: string;
+  staff_profile_id: string;
+  date: string;
+  time_slot: string;
   available: boolean;
-  hasAppointment: boolean;
-  appointmentDetails?: {
-    id: string;
-    pet_name: string;
-    user_name: string;
-    service_name: string;
-  };
-}
-
-interface ShowerSlot {
-  time: string;
-  availableSpots: number;
-  maxSpots: number;
+  staff_name?: string;
 }
 
 const AdminAvailabilityManager = () => {
-  const { user, isAdmin } = useAuth();
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<string>('');
-  const [selectedType, setSelectedType] = useState<'provider' | 'shower'>('provider');
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
-  const [showerSlots, setShowerSlots] = useState<ShowerSlot[]>([]);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
+  const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchProviders();
-    }
-  }, [isAdmin]);
+    fetchStaffProfiles();
+  }, []);
 
   useEffect(() => {
     if (selectedDate) {
-      if (selectedType === 'provider' && selectedProvider) {
-        fetchProviderAvailability();
-      } else if (selectedType === 'shower') {
-        fetchShowerAvailability();
-      }
+      fetchAvailabilityForDate(selectedDate);
     }
-  }, [selectedDate, selectedProvider, selectedType]);
+  }, [selectedDate]);
 
-  const fetchProviders = async () => {
+  const fetchStaffProfiles = async () => {
     try {
-      const { data: providerProfiles, error } = await supabase
-        .from('provider_profiles')
-        .select('*');
+      const { data, error } = await supabase
+        .from('staff_profiles')
+        .select('id, name, can_bathe, can_groom, can_vet, active')
+        .eq('active', true)
+        .order('name');
 
       if (error) throw error;
-
-      if (!providerProfiles) {
-        setProviders([]);
-        return;
-      }
-
-      // Get names for providers
-      const providersWithNames = await Promise.all(
-        providerProfiles.map(async (profile) => {
-          let name = 'Provider';
-          
-          if (profile.type === 'groomer') {
-            const { data: groomerData } = await supabase
-              .from('groomers')
-              .select('name')
-              .eq('user_id', profile.user_id)
-              .single();
-            name = groomerData?.name || 'Tosador';
-          } else if (profile.type === 'vet') {
-            const { data: vetData } = await supabase
-              .from('veterinarians')
-              .select('name')
-              .eq('user_id', profile.user_id)
-              .single();
-            name = vetData?.name || 'Veterinário';
-          }
-
-          return {
-            id: profile.id,
-            user_id: profile.user_id,
-            type: profile.type,
-            name
-          };
-        })
-      );
-
-      setProviders(providersWithNames);
-    } catch (error) {
-      console.error('Error fetching providers:', error);
+      setStaffProfiles(data || []);
+    } catch (error: any) {
+      console.error('Error fetching staff profiles:', error);
       toast.error('Erro ao carregar profissionais');
     }
   };
 
-  const fetchProviderAvailability = async () => {
-    if (!selectedDate || !selectedProvider) return;
-
+  const fetchAvailabilityForDate = async (date: Date) => {
     setIsLoading(true);
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-
-      // Get provider availability
-      const { data: availability, error: availError } = await supabase
-        .from('provider_availability')
-        .select('*')
-        .eq('provider_id', selectedProvider)
-        .eq('date', dateStr);
-
-      if (availError) throw availError;
-
-      // Get appointments for this provider and date - fix the query structure
-      const { data: appointments, error: apptError } = await supabase
-        .from('appointments')
+      const dateStr = format(date, 'yyyy-MM-dd');
+      
+      const { data, error } = await supabase
+        .from('staff_availability')
         .select(`
           id,
-          time,
-          user_id,
-          pet_id,
-          service_id,
-          appointment_providers!inner(provider_id)
+          staff_profile_id,
+          date,
+          time_slot,
+          available,
+          staff_profiles!inner(name)
         `)
-        .eq('appointment_providers.provider_id', selectedProvider)
-        .eq('date', dateStr)
-        .in('status', ['pending', 'confirmed']);
-
-      if (apptError) throw apptError;
-
-      // Get additional data for appointments
-      const appointmentsWithDetails = await Promise.all(
-        (appointments || []).map(async (apt) => {
-          // Get pet name
-          const { data: petData } = await supabase
-            .from('pets')
-            .select('name')
-            .eq('id', apt.pet_id)
-            .single();
-
-          // Get service name
-          const { data: serviceData } = await supabase
-            .from('services')
-            .select('name')
-            .eq('id', apt.service_id)
-            .single();
-
-          // Get client name
-          const { data: clientData } = await supabase
-            .from('clients')
-            .select('name')
-            .eq('user_id', apt.user_id)
-            .single();
-
-          return {
-            ...apt,
-            pet_name: petData?.name || 'Pet',
-            service_name: serviceData?.name || 'Serviço',
-            user_name: clientData?.name || 'Cliente'
-          };
-        })
-      );
-
-      // Generate time slots
-      const slots: TimeSlot[] = [];
-      for (let hour = 9; hour < 17; hour++) {
-        for (const minutes of [0, 30]) {
-          if (hour === 16 && minutes === 30) break;
-          
-          const timeStr = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-          const availabilityRecord = availability?.find(a => a.time_slot === timeStr + ':00');
-          const appointment = appointmentsWithDetails?.find(a => a.time === timeStr + ':00');
-          
-          slots.push({
-            time: timeStr,
-            available: availabilityRecord ? availabilityRecord.available : true,
-            hasAppointment: !!appointment,
-            appointmentDetails: appointment ? {
-              id: appointment.id,
-              pet_name: appointment.pet_name,
-              user_name: appointment.user_name,
-              service_name: appointment.service_name
-            } : undefined
-          });
-        }
-      }
-
-      setTimeSlots(slots);
-    } catch (error) {
-      console.error('Error fetching provider availability:', error);
-      toast.error('Erro ao carregar disponibilidade do profissional');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchShowerAvailability = async () => {
-    if (!selectedDate) return;
-
-    setIsLoading(true);
-    try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-
-      const { data: showerData, error } = await supabase
-        .from('shower_availability')
-        .select('*')
         .eq('date', dateStr)
         .order('time_slot');
 
       if (error) throw error;
 
-      const slots: ShowerSlot[] = [];
-      for (let hour = 9; hour < 17; hour++) {
-        for (const minutes of [0, 30]) {
-          if (hour === 16 && minutes === 30) break;
-          
-          const timeStr = `${hour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:00`;
-          const showerRecord = showerData?.find(s => s.time_slot === timeStr);
-          
-          slots.push({
-            time: timeStr.substring(0, 5),
-            availableSpots: showerRecord ? showerRecord.available_spots : 5,
-            maxSpots: 5
-          });
-        }
-      }
+      const slotsWithNames = (data || []).map(slot => ({
+        ...slot,
+        staff_name: (slot.staff_profiles as any)?.name || 'Unknown'
+      }));
 
-      setShowerSlots(slots);
-    } catch (error) {
-      console.error('Error fetching shower availability:', error);
-      toast.error('Erro ao carregar disponibilidade do banho');
+      setAvailabilitySlots(slotsWithNames);
+    } catch (error: any) {
+      console.error('Error fetching availability:', error);
+      toast.error('Erro ao carregar disponibilidade');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const toggleProviderAvailability = async (timeSlot: string) => {
-    if (!selectedDate || !selectedProvider) return;
+  const getStaffRole = (staff: StaffProfile) => {
+    const roles = [];
+    if (staff.can_vet) roles.push('Veterinário');
+    if (staff.can_groom) roles.push('Tosador');
+    if (staff.can_bathe) roles.push('Banhista');
+    return roles.join(', ') || 'Indefinido';
+  };
 
-    const dateStr = selectedDate.toISOString().split('T')[0];
-    const slot = timeSlots.find(s => s.time === timeSlot);
-    if (!slot) return;
+  const generateAvailabilityForStaff = async (staffId: string) => {
+    setIsLoading(true);
+    try {
+      const startDate = format(new Date(), 'yyyy-MM-dd');
+      const endDate = format(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd');
+      
+      // Generate availability slots manually since RPC doesn't exist
+      const availabilitySlots = [];
+      const currentDate = new Date();
+      const thirtyDaysLater = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    if (slot.hasAppointment) {
-      const confirmChange = window.confirm(
-        `Este horário tem um agendamento (${slot.appointmentDetails?.pet_name} - ${slot.appointmentDetails?.service_name}). ` +
-        'Alterar a disponibilidade pode afetar o agendamento. Deseja continuar?'
-      );
-      if (!confirmChange) return;
+      for (let d = new Date(currentDate); d <= thirtyDaysLater; d.setDate(d.getDate() + 1)) {
+        const dateStr = format(d, 'yyyy-MM-dd');
+        
+        // Skip Sundays
+        if (d.getDay() === 0) continue;
+        
+        // Generate 10-minute slots from 9:00 to 17:00
+        for (let hour = 9; hour < 17; hour++) {
+          for (let min = 0; min < 60; min += 10) {
+            const timeSlot = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`;
+            availabilitySlots.push({
+              staff_profile_id: staffId,
+              date: dateStr,
+              time_slot: timeSlot,
+              available: true
+            });
+          }
+        }
+      }
+
+      // Insert availability in batches
+      const batchSize = 100;
+      for (let i = 0; i < availabilitySlots.length; i += batchSize) {
+        const batch = availabilitySlots.slice(i, i + batchSize);
+        const { error: batchError } = await supabase
+          .from('staff_availability')
+          .upsert(batch, { onConflict: 'staff_profile_id,date,time_slot' });
+
+        if (batchError) {
+          console.error(`Error inserting batch ${i / batchSize + 1}:`, batchError);
+        }
+      }
+
+      toast.success('Disponibilidade gerada com sucesso!');
+      if (selectedDate) {
+        fetchAvailabilityForDate(selectedDate);
+      }
+    } catch (error: any) {
+      console.error('Error generating availability:', error);
+      toast.error('Erro ao gerar disponibilidade');
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    const newAvailability = !slot.available;
-
+  const toggleSlotAvailability = async (slotId: string, currentAvailability: boolean) => {
     try {
       const { error } = await supabase
-        .from('provider_availability')
-        .upsert({
-          provider_id: selectedProvider,
-          date: dateStr,
-          time_slot: timeSlot + ':00',
-          available: newAvailability
-        }, {
-          onConflict: 'provider_id,date,time_slot'
-        });
+        .from('staff_availability')
+        .update({ available: !currentAvailability })
+        .eq('id', slotId);
 
       if (error) throw error;
 
-      // Update local state
-      setTimeSlots(prev =>
-        prev.map(s =>
-          s.time === timeSlot ? { ...s, available: newAvailability } : s
-        )
-      );
-
-      toast.success(`Disponibilidade ${newAvailability ? 'habilitada' : 'desabilitada'} para ${timeSlot}`);
-    } catch (error) {
+      toast.success('Disponibilidade atualizada!');
+      if (selectedDate) {
+        fetchAvailabilityForDate(selectedDate);
+      }
+    } catch (error: any) {
       console.error('Error updating availability:', error);
       toast.error('Erro ao atualizar disponibilidade');
     }
   };
 
-  const updateShowerCapacity = async (timeSlot: string, newCapacity: number) => {
-    if (!selectedDate) return;
-
-    const dateStr = selectedDate.toISOString().split('T')[0];
-
-    try {
-      const { error } = await supabase
-        .from('shower_availability')
-        .upsert({
-          date: dateStr,
-          time_slot: timeSlot + ':00',
-          available_spots: newCapacity
-        }, {
-          onConflict: 'date,time_slot'
-        });
-
-      if (error) throw error;
-
-      // Update local state
-      setShowerSlots(prev =>
-        prev.map(s =>
-          s.time === timeSlot.substring(0, 5) ? { ...s, availableSpots: newCapacity } : s
-        )
-      );
-
-      toast.success(`Capacidade de banho atualizada para ${timeSlot}`);
-    } catch (error) {
-      console.error('Error updating shower capacity:', error);
-      toast.error('Erro ao atualizar capacidade de banho');
+  const groupedSlots = availabilitySlots.reduce((acc, slot) => {
+    if (!acc[slot.staff_profile_id]) {
+      acc[slot.staff_profile_id] = [];
     }
-  };
-
-  if (!isAdmin) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <Alert variant="destructive" className="max-w-md">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              Acesso negado. Apenas administradores podem acessar esta página.
-            </AlertDescription>
-          </Alert>
-        </div>
-      </Layout>
-    );
-  }
+    acc[slot.staff_profile_id].push(slot);
+    return acc;
+  }, {} as Record<string, AvailabilitySlot[]>);
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Gerenciar Disponibilidade</h1>
-            <p className="text-gray-600">
-              Controle completo sobre horários disponíveis por profissional e serviços de banho
-            </p>
-          </div>
-
-          <div className="grid lg:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarIcon className="h-5 w-5" />
-                  Selecionar Data
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  className="rounded-md border"
-                  disabled={(date) => date < new Date() || date.getDay() === 0}
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Configurações</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="type-select">Tipo de Gerenciamento</Label>
-                  <Select value={selectedType} onValueChange={(value: 'provider' | 'shower') => setSelectedType(value)}>
-                    <SelectTrigger id="type-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="provider">
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4" />
-                          Profissionais
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="shower">
-                        <div className="flex items-center gap-2">
-                          <Droplets className="h-4 w-4" />
-                          Banho e Tosa
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {selectedType === 'provider' && (
-                  <div>
-                    <Label htmlFor="provider-select">Profissional</Label>
-                    <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-                      <SelectTrigger id="provider-select">
-                        <SelectValue placeholder="Selecione um profissional" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {providers.map((provider) => (
-                          <SelectItem key={provider.id} value={provider.id}>
-                            {provider.name} ({provider.type === 'groomer' ? 'Tosador' : 'Veterinário'})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  {selectedDate ? format(selectedDate, "dd/MM/yyyy", { locale: ptBR }) : 'Selecione uma data'}
-                </CardTitle>
-                <CardDescription>
-                  {selectedType === 'provider' 
-                    ? 'Gerenciar horários do profissional selecionado'
-                    : 'Gerenciar capacidade de banho e tosa'
-                  }
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                  </div>
-                ) : selectedType === 'provider' ? (
-                  !selectedProvider ? (
-                    <p className="text-muted-foreground text-center py-8">
-                      Selecione um profissional para ver a disponibilidade
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {timeSlots.map((slot) => (
-                        <div key={slot.time} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium">{slot.time}</span>
-                              {slot.hasAppointment && (
-                                <Badge variant="outline" className="text-xs">
-                                  {slot.appointmentDetails?.pet_name} - {slot.appointmentDetails?.service_name}
-                                </Badge>
-                              )}
-                            </div>
-                            {slot.hasAppointment && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Cliente: {slot.appointmentDetails?.user_name}
-                              </p>
-                            )}
-                          </div>
-                          <Switch
-                            checked={slot.available}
-                            onCheckedChange={() => toggleProviderAvailability(slot.time)}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  )
-                ) : (
-                  <div className="space-y-3">
-                    {showerSlots.map((slot) => (
-                      <div key={slot.time} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex-1">
-                          <span className="font-medium">{slot.time}</span>
-                          <p className="text-xs text-muted-foreground">
-                            {slot.availableSpots} de {slot.maxSpots} vagas disponíveis
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateShowerCapacity(slot.time, Math.max(0, slot.availableSpots - 1))}
-                            disabled={slot.availableSpots <= 0}
-                          >
-                            -
-                          </Button>
-                          <span className="w-8 text-center">{slot.availableSpots}</span>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateShowerCapacity(slot.time, Math.min(slot.maxSpots, slot.availableSpots + 1))}
-                            disabled={slot.availableSpots >= slot.maxSpots}
-                          >
-                            +
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Gerenciamento de Disponibilidade</h1>
       </div>
-    </Layout>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Calendar Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              Selecionar Data
+            </CardTitle>
+            <CardDescription>
+              Escolha uma data para visualizar a disponibilidade
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={(date) => date && setSelectedDate(date)}
+              locale={ptBR}
+              className="rounded-md border"
+            />
+          </CardContent>
+        </Card>
+
+        {/* Staff Profiles Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              Profissionais
+            </CardTitle>
+            <CardDescription>
+              {staffProfiles.length} profissional(is) ativo(s)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {staffProfiles.map((staff) => (
+              <div key={staff.id} className="flex items-center justify-between p-3 border rounded-lg">
+                <div>
+                  <h4 className="font-medium">{staff.name}</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {getStaffRole(staff)}
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => generateAvailabilityForStaff(staff.id)}
+                  disabled={isLoading}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Gerar
+                </Button>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Availability Slots Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Disponibilidade - {format(selectedDate, "dd 'de' MMMM", { locale: ptBR })}
+            </CardTitle>
+            <CardDescription>
+              Clique nos horários para alternar disponibilidade
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-20 bg-gray-200 rounded animate-pulse" />
+                ))}
+              </div>
+            ) : Object.keys(groupedSlots).length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhuma disponibilidade encontrada para esta data.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(groupedSlots).map(([staffId, slots]) => {
+                  const staffName = slots[0]?.staff_name || 'Unknown';
+                  const availableSlots = slots.filter(s => s.available).length;
+                  const totalSlots = slots.length;
+                  
+                  return (
+                    <div key={staffId} className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">{staffName}</h4>
+                        <Badge variant="outline">
+                          {availableSlots}/{totalSlots} disponível(is)
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-4 gap-1">
+                        {slots.slice(0, 20).map((slot) => (
+                          <Button
+                            key={slot.id}
+                            size="sm"
+                            variant={slot.available ? "default" : "secondary"}
+                            onClick={() => toggleSlotAvailability(slot.id, slot.available)}
+                            className="h-8 text-xs"
+                          >
+                            {slot.time_slot.substring(0, 5)}
+                          </Button>
+                        ))}
+                      </div>
+                      {slots.length > 20 && (
+                        <p className="text-xs text-muted-foreground">
+                          ... e mais {slots.length - 20} horários
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 };
 

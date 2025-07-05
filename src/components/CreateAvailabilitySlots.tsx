@@ -26,23 +26,48 @@ export default function CreateAvailabilitySlots() {
 
       console.log('📅 Generating availability for staff:', staffProfiles);
 
-      // Call the database function to generate 10-minute availability slots
-      for (const staff of staffProfiles) {
-        const startDate = new Date().toISOString().split('T')[0];
-        const endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-        
-        const { error: genError } = await supabase.rpc('ensure_staff_availability_10min', {
-          staff_profile_id: staff.id,
-          start_date: startDate,
-          end_date: endDate
-        });
+      // Manually create 10-minute availability slots since the RPC doesn't exist
+      const today = new Date();
+      const endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
 
-        if (genError) {
-          console.error(`Error generating availability for ${staff.name}:`, genError);
-          toast.error(`Failed to generate availability for ${staff.name}: ${genError.message}`);
-        } else {
-          console.log(`✅ Generated availability for ${staff.name}`);
+      for (const staff of staffProfiles) {
+        const availabilitySlots = [];
+        
+        // Generate dates for next 90 days
+        for (let d = new Date(today); d <= endDate; d.setDate(d.getDate() + 1)) {
+          const dateStr = d.toISOString().split('T')[0];
+          
+          // Skip Sundays
+          if (d.getDay() === 0) continue;
+          
+          // Generate 10-minute slots from 9:00 to 17:00
+          for (let hour = 9; hour < 17; hour++) {
+            for (let min = 0; min < 60; min += 10) {
+              const timeSlot = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`;
+              availabilitySlots.push({
+                staff_profile_id: staff.id,
+                date: dateStr,
+                time_slot: timeSlot,
+                available: true
+              });
+            }
+          }
         }
+
+        // Insert availability in batches
+        const batchSize = 100;
+        for (let i = 0; i < availabilitySlots.length; i += batchSize) {
+          const batch = availabilitySlots.slice(i, i + batchSize);
+          const { error: batchError } = await supabase
+            .from('staff_availability')
+            .upsert(batch, { onConflict: 'staff_profile_id,date,time_slot' });
+
+          if (batchError) {
+            console.error(`Error inserting batch ${i / batchSize + 1}:`, batchError);
+          }
+        }
+
+        console.log(`✅ Generated availability for ${staff.name}`);
       }
 
       toast.success(`Generated 10-minute availability slots for ${staffProfiles.length} staff members`);

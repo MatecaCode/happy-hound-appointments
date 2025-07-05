@@ -17,8 +17,8 @@ interface ConfirmedAppointment {
   notes?: string;
   pet_name: string;
   service_name: string;
-  user_name: string;
-  provider_name?: string;
+  client_name: string;
+  staff_names?: string[];
   service_status: 'not_started' | 'in_progress' | 'completed';
 }
 
@@ -33,7 +33,8 @@ const ServiceStatusSection = () => {
 
   const fetchConfirmedAppointments = async () => {
     try {
-      const { data, error } = await supabase
+      // Updated query for Phase 1 schema
+      const { data: appointments, error } = await supabase
         .from('appointments')
         .select(`
           id,
@@ -41,52 +42,35 @@ const ServiceStatusSection = () => {
           time,
           notes,
           service_status,
-          user_id,
-          provider_id,
-          pets:pet_id (name),
-          services:service_id (name)
+          client_id,
+          pets!inner(name),
+          services!inner(name),
+          clients!inner(name),
+          appointment_staff!left(
+            staff_profiles!inner(name)
+          )
         `)
         .eq('status', 'confirmed')
         .order('date', { ascending: true });
 
       if (error) throw error;
 
-      // Get user details and provider details for each appointment
-      const appointmentsWithUserData = await Promise.all(
-        (data || []).map(async (apt) => {
-          // Get user data
-          const { data: userData } = await supabase.auth.admin.getUserById(apt.user_id);
-          
-          // Get provider data if provider_id exists
-          let providerName = null;
-          if (apt.provider_id) {
-            const { data: providerData } = await supabase
-              .from('provider_profiles')
-              .select('user_id')
-              .eq('id', apt.provider_id)
-              .single();
-            
-            if (providerData?.user_id) {
-              const { data: providerUserData } = await supabase.auth.admin.getUserById(providerData.user_id);
-              providerName = providerUserData.user?.user_metadata?.name || null;
-            }
-          }
-          
-          return {
-            id: apt.id,
-            date: apt.date,
-            time: apt.time,
-            notes: apt.notes,
-            pet_name: apt.pets?.name || 'Pet',
-            service_name: apt.services?.name || 'Serviço',
-            user_name: userData.user?.user_metadata?.name || 'Cliente',
-            provider_name: providerName,
-            service_status: (apt.service_status || 'not_started') as 'not_started' | 'in_progress' | 'completed'
-          };
-        })
-      );
+      // Transform the data to match our interface
+      const transformedAppointments: ConfirmedAppointment[] = appointments?.map(apt => ({
+        id: apt.id,
+        date: apt.date,
+        time: apt.time,
+        notes: apt.notes || undefined,
+        pet_name: (apt.pets as any)?.name || 'Pet',
+        service_name: (apt.services as any)?.name || 'Serviço',
+        client_name: (apt.clients as any)?.name || 'Cliente',
+        staff_names: (apt.appointment_staff as any)?.map((as: any) => 
+          as.staff_profiles?.name || 'Staff'
+        ) || [],
+        service_status: (apt.service_status || 'not_started') as 'not_started' | 'in_progress' | 'completed'
+      })) || [];
 
-      setConfirmedAppointments(appointmentsWithUserData);
+      setConfirmedAppointments(transformedAppointments);
     } catch (error: any) {
       console.error('Error fetching confirmed appointments:', error);
       toast.error('Erro ao carregar serviços confirmados');
@@ -213,16 +197,16 @@ const ServiceStatusSection = () => {
                       </span>
                       <span className="flex items-center gap-1">
                         <User className="h-3 w-3" />
-                        {appointment.user_name}
+                        {appointment.client_name}
                       </span>
                     </div>
                   </div>
                   {getStatusBadge(appointment.service_status)}
                 </div>
 
-                {appointment.provider_name && (
+                {appointment.staff_names && appointment.staff_names.length > 0 && (
                   <p className="text-sm mb-2">
-                    <strong>Profissional:</strong> {appointment.provider_name}
+                    <strong>Profissional:</strong> {appointment.staff_names.join(', ')}
                   </p>
                 )}
 

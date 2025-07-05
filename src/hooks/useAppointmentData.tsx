@@ -1,7 +1,16 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Pet, Service, Provider, TimeSlot, NextAvailable } from './useAppointmentForm';
+import { Pet, Service, TimeSlot, NextAvailable } from './useAppointmentForm';
+
+// Define Provider interface locally since it's not exported from useAppointmentForm
+interface Provider {
+  id: string;
+  name: string;
+  role: string;
+  rating: number;
+  about: string;
+}
 
 export const useAppointmentData = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
@@ -88,17 +97,24 @@ export const useAppointmentData = () => {
         return;
       }
 
-      // Get available staff using the new RPC function
-      const { data: availableStaff, error: availError } = await supabase
-        .rpc('get_available_staff_for_service', {
-          _service_id: selectedService.id,
-          _date: dateStr,
-          _location_id: null // You can add location filtering later
-        });
+      // Get available staff manually since RPC doesn't exist
+      const { data: availableStaff, error: staffError } = await supabase
+        .from('staff_profiles')
+        .select(`
+          id,
+          name,
+          can_groom,
+          can_vet,
+          can_bathe,
+          staff_availability!inner(available)
+        `)
+        .eq('active', true)
+        .eq('staff_availability.date', dateStr)
+        .eq('staff_availability.available', true);
 
-      if (availError) {
-        console.error('❌ [FETCH_PROVIDERS] Error fetching available staff:', availError);
-        throw availError;
+      if (staffError) {
+        console.error('❌ [FETCH_PROVIDERS] Error fetching available staff:', staffError);
+        throw staffError;
       }
 
       console.log('📊 [FETCH_PROVIDERS] Raw available staff data:', availableStaff);
@@ -109,14 +125,20 @@ export const useAppointmentData = () => {
         return;
       }
 
-      // Transform staff data to Provider format
-      const availableProviders: Provider[] = availableStaff.map(staff => ({
-        id: staff.staff_profile_id, // Use staff_profile_id as id
-        name: staff.name,
-        role: staff.can_vet ? 'vet' : (staff.can_groom ? 'groomer' : 'bather'),
-        rating: 0, // Default rating
-        about: '' // Default empty about
-      }));
+      // Filter staff based on service requirements and transform to Provider format
+      const availableProviders: Provider[] = availableStaff
+        .filter(staff => {
+          if (selectedService.requires_grooming && !staff.can_groom) return false;
+          if (selectedService.requires_vet && !staff.can_vet) return false;
+          return true;
+        })
+        .map(staff => ({
+          id: staff.id,
+          name: staff.name,
+          role: staff.can_vet ? 'vet' : (staff.can_groom ? 'groomer' : 'bather'),
+          rating: 0, // Default rating
+          about: '' // Default empty about
+        }));
 
       console.log('🎉 [FETCH_PROVIDERS] Final available providers:', {
         count: availableProviders.length,
@@ -157,14 +179,14 @@ export const useAppointmentData = () => {
     try {
       const dateStr = date.toISOString().split('T')[0];
       
-      // Use the new RPC function with proper parameter naming
+      // Use existing RPC function with correct parameters
       const rpcParams = {
         _service_id: selectedService.id,
         _date: dateStr,
-        _staff_profile_id: selectedStaffProfileId || null
+        _provider_id: selectedStaffProfileId || null
       };
 
-      console.log('📤 [FETCH_TIME_SLOTS] 🔥 CALLING get_available_slots_for_service RPC with EXACT params:', {
+      console.log('📤 [FETCH_TIME_SLOTS] 🔥 CALLING get_available_slots_for_service RPC with params:', {
         ...rpcParams,
         service_name: selectedService.name,
         service_duration_minutes: selectedService.default_duration,
@@ -179,7 +201,7 @@ export const useAppointmentData = () => {
       }
 
       console.log('📨 [FETCH_TIME_SLOTS] 🔥 RPC RESPONSE from get_available_slots_for_service:', {
-        slots_count: availableSlots?.length || 0,
+        slots_count: Array.isArray(availableSlots) ? availableSlots.length : 0,
         slots: availableSlots,
         request_params: rpcParams,
         timestamp: new Date().toISOString()
@@ -237,10 +259,10 @@ export const useAppointmentData = () => {
         const { data: availableSlots } = await supabase.rpc('get_available_slots_for_service', {
           _service_id: serviceId,
           _date: dateStr,
-          _staff_profile_id: staffProfileId
+          _provider_id: staffProfileId
         });
 
-        if (availableSlots && availableSlots.length > 0) {
+        if (availableSlots && Array.isArray(availableSlots) && availableSlots.length > 0) {
           setNextAvailable({
             date: dateStr,
             time: availableSlots[0].time_slot,

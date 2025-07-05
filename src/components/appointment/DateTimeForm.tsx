@@ -1,37 +1,34 @@
 
 import React from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar } from '@/components/ui/calendar';
-import { CalendarIcon, Clock, Sparkles, AlertTriangle } from 'lucide-react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import TimeSlotSelector from '@/components/TimeSlotSelector';
+import { TimeSlot } from '@/hooks/useAppointmentForm';
 import NextAvailableAppointment from '@/components/NextAvailableAppointment';
+import { ptBR } from 'date-fns/locale';
 
 interface DateTimeFormProps {
-  date: Date;
-  setDate: (date: Date) => void;
-  timeSlots: Array<{ id: string; time: string; available: boolean }>;
+  date: Date | undefined;
+  setDate: (date: Date | undefined) => void;
+  timeSlots: TimeSlot[];
   selectedTimeSlotId: string;
   setSelectedTimeSlotId: (id: string) => void;
-  nextAvailable: { date: string; time: string; provider_name: string } | null;
+  nextAvailable: { date: string; time: string; provider_name: string; } | null;
   handleNextAvailableSelect: () => void;
   isLoading: boolean;
   activeTab: 'calendar' | 'next-available';
   setActiveTab: (tab: 'calendar' | 'next-available') => void;
   notes: string;
   setNotes: (notes: string) => void;
-  onBack: () => void;
+  onBack?: () => void;
   onNext?: () => void;
   onSubmit?: (e: React.FormEvent) => void;
   showTimeSlots: boolean;
   showSubmitButton: boolean;
   stepTitle: string;
-  isShowerOnlyService?: boolean;
 }
 
 const DateTimeForm: React.FC<DateTimeFormProps> = ({
@@ -52,220 +49,123 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   onSubmit,
   showTimeSlots,
   showSubmitButton,
-  stepTitle,
-  isShowerOnlyService = false,
+  stepTitle
 }) => {
-  const handleDateSelect = (selectedDate: Date | undefined) => {
-    if (selectedDate) {
-      setDate(selectedDate);
-      setSelectedTimeSlotId(''); // Reset time slot when date changes
+  const isNextEnabled = !showTimeSlots || (date && selectedTimeSlotId);
+  const isSubmitEnabled = showSubmitButton && date && selectedTimeSlotId;
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (onSubmit && isSubmitEnabled) {
+      onSubmit(e);
+    } else if (onNext && isNextEnabled) {
+      onNext();
     }
   };
-
-  // ✅ SIMPLIFIED: Only check if slot is selected and exists in available slots
-  const isSelectedSlotValid = React.useMemo(() => {
-    if (!selectedTimeSlotId) return false;
-    const validSlot = timeSlots.find(slot => 
-      slot.id === selectedTimeSlotId && slot.available
-    );
-    return Boolean(validSlot);
-  }, [selectedTimeSlotId, timeSlots]);
-
-  const canProceed = showTimeSlots ? isSelectedSlotValid : date;
-
-  // Debug logging for time slots 
-  React.useEffect(() => {
-    if (showTimeSlots) {
-      console.log('🔍 [DateTimeForm] Time slots data:', {
-        timeSlots_count: timeSlots.length,
-        available_count: timeSlots.filter(s => s.available).length,
-        isLoading,
-        date: date?.toISOString(),
-        showTimeSlots,
-        selected_slot: selectedTimeSlotId,
-        is_selected_valid: isSelectedSlotValid,
-        can_proceed: canProceed
-      });
-    }
-  }, [timeSlots, isLoading, showTimeSlots, date, selectedTimeSlotId, isSelectedSlotValid, canProceed]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CalendarIcon className="h-5 w-5" />
-          {stepTitle}
-          {isShowerOnlyService && (
-            <span className="text-sm text-blue-600 font-normal">
-              (Serviço apenas banho)
-            </span>
-          )}
-        </CardTitle>
+        <CardTitle>{stepTitle}</CardTitle>
+        <CardDescription>
+          {showTimeSlots ? 'Escolha a data e horário para seu agendamento' : 'Escolha a data para seu agendamento'}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Show calendar and tabs only when NOT showing time slots (i.e., step 2) */}
-        {!showTimeSlots && (
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'calendar' | 'next-available')}>
+      <CardContent>
+        <form onSubmit={handleFormSubmit} className="space-y-6">
+          <Tabs value={activeTab} onValueChange={(tab) => setActiveTab(tab as 'calendar' | 'next-available')}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="calendar">Escolher Data</TabsTrigger>
               <TabsTrigger value="next-available">Próximo Disponível</TabsTrigger>
             </TabsList>
             
             <TabsContent value="calendar" className="space-y-4">
-              <div className="flex flex-col items-center space-y-4">
+              <div className="space-y-2">
+                <Label>Selecione uma data</Label>
                 <Calendar
                   mode="single"
                   selected={date}
-                  onSelect={handleDateSelect}
+                  onSelect={setDate}
                   locale={ptBR}
-                  disabled={(date) => date < new Date() || date.getDay() === 0}
+                  disabled={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date < today || date.getDay() === 0; // Disable past dates and Sundays
+                  }}
                   className="rounded-md border"
                 />
-                
-                {date && (
-                  <p className="text-sm text-muted-foreground">
-                    Data selecionada: {format(date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                  </p>
-                )}
               </div>
+
+              {showTimeSlots && date && (
+                <div className="space-y-2">
+                  <Label>Horários disponíveis</Label>
+                  {isLoading ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {[...Array(6)].map((_, i) => (
+                        <div key={i} className="h-10 bg-gray-200 rounded animate-pulse" />
+                      ))}
+                    </div>
+                  ) : timeSlots.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2">
+                      {timeSlots.map((slot) => (
+                        <Button
+                          key={slot.id}
+                          type="button"
+                          variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
+                          onClick={() => setSelectedTimeSlotId(slot.id)}
+                          disabled={!slot.available}
+                          className="h-10"
+                        >
+                          {slot.time}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum horário disponível para esta data.
+                    </p>
+                  )}
+                </div>
+              )}
             </TabsContent>
             
             <TabsContent value="next-available">
               <NextAvailableAppointment
                 nextAvailable={nextAvailable}
                 onSelect={handleNextAvailableSelect}
-                loading={isLoading}
+                isLoading={isLoading}
               />
             </TabsContent>
           </Tabs>
-        )}
 
-        {/* Show time slots section for final step (step 4) */}
-        {showTimeSlots && (
-          <div className="space-y-4">
-            {/* Show selected date info */}
-            {date && (
-              <div className="text-center p-4 bg-secondary/20 rounded-lg">
-                <p className="text-sm text-muted-foreground mb-1">Data selecionada:</p>
-                <p className="font-medium">
-                  {format(date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-                </p>
-              </div>
+          <div className="space-y-2">
+            <Label htmlFor="notes">Observações (opcional)</Label>
+            <Textarea
+              id="notes"
+              placeholder="Alguma informação importante sobre seu pet ou preferências..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+
+          <div className="flex gap-2">
+            {onBack && (
+              <Button type="button" variant="outline" onClick={onBack} className="flex-1">
+                Voltar
+              </Button>
             )}
-
-            {/* ✅ CLEAN: Simple slot selection feedback */}
-            {selectedTimeSlotId && (
-              <div className="p-3 rounded-lg border bg-green-50 border-green-200">
-                <p className="text-sm font-medium text-green-800">
-                  ✅ Horário {timeSlots.find(s => s.id === selectedTimeSlotId)?.time} selecionado
-                </p>
-                <p className="text-green-600 text-sm mt-1">
-                  Clique em "Confirmar Agendamento" para finalizar.
-                </p>
-              </div>
-            )}
-
-            {/* Time slots or loading */}
-            {isLoading ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="mt-2 text-muted-foreground">
-                  {isShowerOnlyService ? 'Carregando horários de banho...' : 'Carregando horários...'}
-                </p>
-              </div>
-            ) : timeSlots.length > 0 ? (
-              <TimeSlotSelector
-                date={date}
-                timeSlots={timeSlots}
-                selectedTimeSlotId={selectedTimeSlotId}
-                onSelectTimeSlot={setSelectedTimeSlotId}
-              />
+            
+            {showSubmitButton ? (
+              <Button type="submit" disabled={!isSubmitEnabled} className="flex-1">
+                Confirmar Agendamento
+              </Button>
             ) : (
-              <div className="text-center py-8">
-                <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">
-                  Não há horários disponíveis para esta data
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Tente selecionar uma data diferente ou use "Próximo Disponível"
-                </p>
-              </div>
-            )}
-
-            {/* Next available option when no slots */}
-            {!isLoading && timeSlots.length === 0 && nextAvailable && (
-              <div className="mt-4">
-                <NextAvailableAppointment
-                  nextAvailable={nextAvailable}
-                  onSelect={handleNextAvailableSelect}
-                  loading={false}
-                />
-              </div>
+              <Button type="submit" disabled={!isNextEnabled} className="flex-1">
+                Continuar
+              </Button>
             )}
           </div>
-        )}
-
-        <div className="space-y-2">
-          <Label htmlFor="notes">Observações (opcional)</Label>
-          <Textarea
-            id="notes"
-            placeholder="Alguma observação especial sobre o atendimento..."
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-          />
-        </div>
-
-        <div className="flex gap-4">
-          <Button type="button" variant="outline" onClick={onBack}>
-            Voltar
-          </Button>
-          
-          {showSubmitButton ? (
-            <Button 
-              type="submit" 
-              onClick={onSubmit}
-              disabled={!canProceed || isLoading}
-              className="flex-1"
-            >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Processando...
-                </>
-              ) : !selectedTimeSlotId ? (
-                <>
-                  <Clock className="h-4 w-4 mr-2" />
-                  Selecione um Horário
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Confirmar Agendamento
-                </>
-              )}
-            </Button>
-          ) : (
-            <Button 
-              type="button" 
-              onClick={onNext}
-              disabled={!canProceed || isLoading}
-              className="flex-1"
-            >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Carregando...
-                </>
-              ) : (
-                <>
-                  <Clock className="h-4 w-4 mr-2" />
-                  Continuar
-                </>
-              )}
-            </Button>
-          )}
-        </div>
+        </form>
       </CardContent>
     </Card>
   );
