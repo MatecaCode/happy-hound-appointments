@@ -12,10 +12,25 @@ export const useAppointmentData = () => {
 
   const fetchUserPets = useCallback(async (userId: string) => {
     try {
+      // Get client_id from user_id first
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (clientError || !clientData) {
+        console.log('No client record found for user:', userId);
+        setUserPets([]);
+        return;
+      }
+
+      // Now get pets using client_id
       const { data, error } = await supabase
         .from('pets')
         .select('*')
-        .eq('user_id', userId);
+        .eq('client_id', clientData.id)
+        .eq('active', true);
 
       if (error) throw error;
       setUserPets(data || []);
@@ -30,7 +45,8 @@ export const useAppointmentData = () => {
       const { data, error } = await supabase
         .from('services')
         .select('*')
-        .eq('service_type', serviceType);
+        .eq('service_type', serviceType)
+        .eq('active', true);
 
       if (error) throw error;
       setServices(data || []);
@@ -57,106 +73,55 @@ export const useAppointmentData = () => {
         service_name: selectedService.name
       });
 
-      // First check if service requires a provider
-      const { data: serviceResources } = await supabase
-        .from('service_resources')
-        .select('resource_type, provider_type')
-        .eq('service_id', selectedService.id);
-
-      const requiresProvider = serviceResources?.some(r => r.resource_type === 'provider');
+      // Check if service requires staff (Phase 1)
+      const requiresStaff = selectedService.requires_grooming || selectedService.requires_vet;
       
       console.log('🔍 [FETCH_PROVIDERS] Service requirements:', {
-        requires_provider: requiresProvider,
-        resources: serviceResources
+        requires_staff: requiresStaff,
+        requires_grooming: selectedService.requires_grooming,
+        requires_vet: selectedService.requires_vet
       });
       
-      if (!requiresProvider) {
-        console.log('🔍 [FETCH_PROVIDERS] Service does not require provider, skipping fetch');
+      if (!requiresStaff) {
+        console.log('🔍 [FETCH_PROVIDERS] Service does not require staff, skipping fetch');
         setGroomers([]);
         return;
       }
 
-      const providerType = serviceType === 'grooming' ? 'groomer' : 'vet';
-      
-      // Get provider profiles that have availability on the selected date
-      const { data: availableProviderData, error: availError } = await supabase
-        .from('provider_availability')
-        .select(`
-          provider_id,
-          provider_profiles!inner(
-            id,
-            user_id,
-            type,
-            bio,
-            rating
-          )
-        `)
-        .eq('date', dateStr)
-        .eq('available', true)
-        .eq('provider_profiles.type', providerType);
+      // Get available staff using the new RPC function
+      const { data: availableStaff, error: availError } = await supabase
+        .rpc('get_available_staff_for_service', {
+          _service_id: selectedService.id,
+          _date: dateStr,
+          _location_id: null // You can add location filtering later
+        });
 
       if (availError) {
-        console.error('❌ [FETCH_PROVIDERS] Error fetching available providers:', availError);
+        console.error('❌ [FETCH_PROVIDERS] Error fetching available staff:', availError);
         throw availError;
       }
 
-      console.log('📊 [FETCH_PROVIDERS] Raw available provider data:', availableProviderData);
+      console.log('📊 [FETCH_PROVIDERS] Raw available staff data:', availableStaff);
 
-      if (!availableProviderData || availableProviderData.length === 0) {
-        console.log('❌ [FETCH_PROVIDERS] No available providers found');
+      if (!availableStaff || availableStaff.length === 0) {
+        console.log('❌ [FETCH_PROVIDERS] No available staff found');
         setGroomers([]);
         return;
       }
 
-      // Get unique providers (since one provider can have multiple time slots)
-      const uniqueProviders = availableProviderData.reduce((acc: any[], curr) => {
-        if (!acc.find(p => p.provider_profiles.id === curr.provider_profiles.id)) {
-          acc.push(curr);
-        }
-        return acc;
-      }, []);
-
-      console.log('📊 [FETCH_PROVIDERS] Unique providers:', uniqueProviders);
-
-      // Get names for these providers
-      const availableProviders: Provider[] = [];
-      
-      for (const providerData of uniqueProviders) {
-        const profile = providerData.provider_profiles;
-        let providerName = 'Provider';
-        
-        // Get name from appropriate table
-        if (providerType === 'groomer') {
-          const { data: groomerData } = await supabase
-            .from('groomers')
-            .select('name')
-            .eq('user_id', profile.user_id)
-            .single();
-          providerName = groomerData?.name || 'Groomer';
-        } else {
-          const { data: vetData } = await supabase
-            .from('veterinarians')
-            .select('name')
-            .eq('user_id', profile.user_id)
-            .single();
-          providerName = vetData?.name || 'Veterinarian';
-        }
-
-        availableProviders.push({
-          id: profile.user_id, // UI compatibility: use user_id as id
-          provider_profile_id: profile.id, // Store actual provider_profile_id
-          name: providerName,
-          role: providerType,
-          rating: profile.rating || 0,
-          about: profile.bio || ''
-        });
-      }
+      // Transform staff data to Provider format
+      const availableProviders: Provider[] = availableStaff.map(staff => ({
+        id: staff.staff_profile_id, // Use staff_profile_id as id
+        name: staff.name,
+        role: staff.can_vet ? 'vet' : (staff.can_groom ? 'groomer' : 'bather'),
+        rating: 0, // Default rating
+        about: '' // Default empty about
+      }));
 
       console.log('🎉 [FETCH_PROVIDERS] Final available providers:', {
         count: availableProviders.length,
         providers: availableProviders.map(p => ({
           id: p.id,
-          provider_profile_id: p.provider_profile_id,
           name: p.name,
           role: p.role
         }))
@@ -171,7 +136,7 @@ export const useAppointmentData = () => {
 
   const fetchTimeSlots = useCallback(async (
     date: Date,
-    selectedGroomerUserId: string,
+    selectedStaffProfileId: string,
     setIsLoading: (loading: boolean) => void,
     selectedService: Service | undefined
   ) => {
@@ -179,63 +144,30 @@ export const useAppointmentData = () => {
 
     console.log('⏰ [FETCH_TIME_SLOTS] Starting with params:', {
       date: date.toISOString().split('T')[0],
-      selectedGroomerUserId,
+      selectedStaffProfileId,
       service_id: selectedService.id,
-      service_duration: selectedService.duration
+      service_duration: selectedService.default_duration
     });
 
     setIsLoading(true);
     
-    // 🔒 CRITICAL: Reset slots immediately to prevent stale data
+    // Reset slots immediately to prevent stale data
     setTimeSlots([]);
     
     try {
       const dateStr = date.toISOString().split('T')[0];
       
-      // Check if service requires provider
-      const { data: serviceResources } = await supabase
-        .from('service_resources')
-        .select('resource_type, provider_type')
-        .eq('service_id', selectedService.id);
-
-      const requiresProvider = serviceResources?.some(r => r.resource_type === 'provider');
-      const requiresShower = serviceResources?.some(r => r.resource_type === 'shower');
-
-      console.log('📋 [FETCH_TIME_SLOTS] Service requirements:', {
-        requires_provider: requiresProvider,
-        requires_shower: requiresShower,
-        resources: serviceResources
-      });
-
-      let providerProfileId = null;
-      
-      // Get provider_profile_id if provider is required
-      if (requiresProvider && selectedGroomerUserId) {
-        const { data: providerProfile } = await supabase
-          .from('provider_profiles')
-          .select('id')
-          .eq('user_id', selectedGroomerUserId)
-          .single();
-        
-        providerProfileId = providerProfile?.id;
-        
-        console.log('🎯 [FETCH_TIME_SLOTS] Provider ID mapping:', {
-          user_id: selectedGroomerUserId,
-          provider_profile_id: providerProfileId
-        });
-      }
-
-      // 🔥 ENHANCED LOGGING: Log exact RPC parameters
+      // Use the new RPC function with proper parameter naming
       const rpcParams = {
         _service_id: selectedService.id,
         _date: dateStr,
-        _provider_id: providerProfileId
+        _staff_profile_id: selectedStaffProfileId || null
       };
 
       console.log('📤 [FETCH_TIME_SLOTS] 🔥 CALLING get_available_slots_for_service RPC with EXACT params:', {
         ...rpcParams,
         service_name: selectedService.name,
-        service_duration_minutes: selectedService.duration, // Fixed: use duration instead of duration_minutes
+        service_duration_minutes: selectedService.default_duration,
         timestamp: new Date().toISOString()
       });
 
@@ -253,7 +185,6 @@ export const useAppointmentData = () => {
         timestamp: new Date().toISOString()
       });
 
-      // 🔒 CRITICAL: Only proceed if we have valid slots
       if (!availableSlots || !Array.isArray(availableSlots)) {
         console.error('❌ [FETCH_TIME_SLOTS] Invalid slots response:', availableSlots);
         setTimeSlots([]);
@@ -273,16 +204,11 @@ export const useAppointmentData = () => {
         timestamp: new Date().toISOString()
       });
       
-      // 🔒 CRITICAL: Store the raw RPC response for validation
-      (window as any).lastFetchedSlots = availableSlots;
-      (window as any).lastFetchParams = rpcParams;
-      
       setTimeSlots(timeSlotData);
 
-      // Fetch next available appointment
+      // Fetch next available appointment if no slots today
       if (timeSlotData.length === 0) {
-        // If no slots today, find next available
-        await fetchNextAvailable(selectedService.id, providerProfileId);
+        await fetchNextAvailable(selectedService.id, selectedStaffProfileId);
       } else {
         setNextAvailable(null);
       }
@@ -295,7 +221,7 @@ export const useAppointmentData = () => {
     }
   }, []);
 
-  const fetchNextAvailable = useCallback(async (serviceId: string, providerProfileId: string | null) => {
+  const fetchNextAvailable = useCallback(async (serviceId: string, staffProfileId: string | null) => {
     try {
       // Simple implementation - check next 7 days
       const today = new Date();
@@ -308,18 +234,17 @@ export const useAppointmentData = () => {
         
         const dateStr = checkDate.toISOString().split('T')[0];
         
-        // 🔥 FIXED: Use correct RPC parameter names
         const { data: availableSlots } = await supabase.rpc('get_available_slots_for_service', {
           _service_id: serviceId,
           _date: dateStr,
-          _provider_id: providerProfileId
+          _staff_profile_id: staffProfileId
         });
 
         if (availableSlots && availableSlots.length > 0) {
           setNextAvailable({
             date: dateStr,
             time: availableSlots[0].time_slot,
-            provider_name: 'Próximo disponível'
+            staff_name: 'Próximo disponível'
           });
           return;
         }

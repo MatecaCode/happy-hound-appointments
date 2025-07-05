@@ -1,30 +1,39 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, Clock, User } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CalendarIcon, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { NextAvailable } from '@/hooks/useAppointmentForm';
 
 interface NextAvailableAppointmentProps {
-  nextAvailable: NextAvailable | null;
+  nextAvailable: {
+    date: string;
+    time: string;
+    staff_name?: string;
+  } | null;
   onSelect: () => void;
-  loading: boolean;
+  isLoading: boolean;
 }
 
-const NextAvailableAppointment = ({ 
-  nextAvailable, 
-  onSelect, 
-  loading 
-}: NextAvailableAppointmentProps) => {
-  if (loading) {
+const NextAvailableAppointment: React.FC<NextAvailableAppointmentProps> = ({
+  nextAvailable,
+  onSelect,
+  isLoading
+}) => {
+  if (isLoading) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Buscando próximo horário disponível...</p>
+      <Card className="w-full">
+        <CardHeader className="text-center pb-4">
+          <CardTitle className="text-lg font-semibold text-gray-700">
+            Buscando próximo horário...
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto mb-4"></div>
+            <div className="h-10 bg-gray-200 rounded w-full"></div>
           </div>
         </CardContent>
       </Card>
@@ -33,52 +42,65 @@ const NextAvailableAppointment = ({
 
   if (!nextAvailable) {
     return (
-      <Card>
-        <CardContent className="flex items-center justify-center py-8">
-          <div className="text-center">
-            <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="font-medium">Nenhum horário disponível encontrado</p>
-            <p className="text-muted-foreground text-sm mt-1">
-              Tente selecionar uma data específica no calendário
-            </p>
-          </div>
+      <Card className="w-full border-yellow-200 bg-yellow-50">
+        <CardHeader className="text-center pb-4">
+          <CardTitle className="text-lg font-semibold text-yellow-800">
+            Sem disponibilidade próxima
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center">
+          <p className="text-yellow-700 mb-4">
+            Não há horários disponíveis nos próximos 7 dias para este serviço.
+          </p>
+          <p className="text-sm text-yellow-600">
+            Entre em contato conosco para agendar em outras datas.
+          </p>
         </CardContent>
       </Card>
     );
   }
 
+  const appointmentDate = new Date(nextAvailable.date);
+  const isToday = appointmentDate.toDateString() === new Date().toDateString();
+  const isTomorrow = appointmentDate.toDateString() === new Date(Date.now() + 86400000).toDateString();
+
+  let dateText = format(appointmentDate, "dd 'de' MMMM", { locale: ptBR });
+  if (isToday) {
+    dateText = "Hoje";
+  } else if (isTomorrow) {
+    dateText = "Amanhã";
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5" />
+    <Card className="w-full border-green-200 bg-green-50">
+      <CardHeader className="text-center pb-4">
+        <CardTitle className="text-lg font-semibold text-green-800">
           Próximo Horário Disponível
         </CardTitle>
-        <CardDescription>
-          O próximo horário livre para agendamento
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-3">
-          <div className="flex items-center gap-3">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">
-              {format(new Date(nextAvailable.date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-            </span>
+        <div className="flex items-center justify-center space-x-6 text-green-700">
+          <div className="flex items-center space-x-2">
+            <CalendarIcon className="h-5 w-5" />
+            <span className="font-medium">{dateText}</span>
           </div>
-          
-          <div className="flex items-center gap-3">
-            <Clock className="h-4 w-4 text-muted-foreground" />
+          <div className="flex items-center space-x-2">
+            <Clock className="h-5 w-5" />
             <span className="font-medium">{nextAvailable.time}</span>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <User className="h-4 w-4 text-muted-foreground" />
-            <span className="font-medium">{nextAvailable.provider_name}</span>
           </div>
         </div>
         
-        <Button onClick={onSelect} className="w-full">
+        {nextAvailable.staff_name && (
+          <div className="flex items-center justify-center space-x-2 text-green-600">
+            <User className="h-4 w-4" />
+            <span className="text-sm">{nextAvailable.staff_name}</span>
+          </div>
+        )}
+        
+        <Button 
+          onClick={onSelect}
+          className="w-full bg-green-600 hover:bg-green-700 text-white"
+        >
           Selecionar Este Horário
         </Button>
       </CardContent>

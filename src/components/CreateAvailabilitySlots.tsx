@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 
 export default function CreateAvailabilitySlots() {
-  const [isCreating, setIsCreating] = useState(false);
   const [isGeneratingStaff, setIsGeneratingStaff] = useState(false);
 
   const generateStaffAvailability = async () => {

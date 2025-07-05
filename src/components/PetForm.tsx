@@ -1,176 +1,195 @@
 
 import React, { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types';
 
 interface PetFormProps {
-  userId: string;
-  initialPet?: {
-    id?: string;
-    name?: string;
-    breed?: string;
-    age?: string;
-  };
   onSuccess?: () => void;
-  editing?: boolean;
+  editingPet?: any;
 }
 
-type PetInsert = Database['public']['Tables']['pets']['Insert'];
-
-export default function PetForm({ userId, initialPet = {}, onSuccess, editing = false }: PetFormProps) {
-  const [name, setName] = useState(initialPet.name || '');
-  const [breed, setBreed] = useState(initialPet.breed || '');
-  const [age, setAge] = useState(initialPet.age || '');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: editingPet?.name || '',
+    breed: editingPet?.breed || '',
+    age: editingPet?.age || '',
+    size: editingPet?.size || '',
+    weight: editingPet?.weight || '',
+    gender: editingPet?.gender || '',
+    notes: editingPet?.notes || ''
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    console.log('🚀 Form submitted - handleSubmit called!');
-    console.log('📋 Form data:', { userId, name, breed, age, editing, petId: initialPet.id });
-    
-    if (!userId || !name.trim()) {
-      console.error('❌ Validation failed:', { userId: !!userId, name: name.trim() });
-      toast.error("Nome do pet é obrigatório.");
+    if (!user) {
+      toast.error('Você precisa estar logado para cadastrar um pet');
       return;
     }
 
-    setIsSubmitting(true);
-    
+    setIsLoading(true);
     try {
-      if (editing && initialPet.id) {
+      // Get client_id from user_id
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (clientError || !clientData) {
+        toast.error('Erro ao encontrar dados do cliente');
+        return;
+      }
+
+      const petData = {
+        name: formData.name,
+        breed: formData.breed || null,
+        age: formData.age || null,
+        size: formData.size || null,
+        weight: formData.weight ? parseFloat(formData.weight) : null,
+        gender: formData.gender || null,
+        notes: formData.notes || null,
+        client_id: clientData.id // Use client_id instead of user_id
+      };
+
+      let error;
+      if (editingPet) {
         // Update existing pet
-        const updatePayload = {
-          name: name.trim(),
-          breed: breed.trim() || null,
-          age: age.trim() || null,
-        };
-        
-        console.log('📝 Updating pet with payload:', updatePayload);
-        
-        const { error, data } = await supabase
+        const { error: updateError } = await supabase
           .from('pets')
-          .update(updatePayload)
-          .eq('id', initialPet.id)
-          .eq('user_id', userId)
-          .select();
-
-        console.log('📝 Update result:', { error, data });
-
-        if (error) {
-          console.error('❌ Update error:', error);
-          // Handle unique constraint violation for updates
-          if (error.code === '23505' && error.message.includes('unique_pet_name_per_user')) {
-            toast.error('Você já tem um pet com este nome. Escolha um nome diferente.');
-          } else {
-            toast.error('Erro ao atualizar pet: ' + error.message);
-          }
-        } else {
-          console.log('✅ Pet updated successfully');
-          toast.success('Pet atualizado com sucesso!');
-          onSuccess?.();
-        }
+          .update(petData)
+          .eq('id', editingPet.id);
+        error = updateError;
       } else {
         // Create new pet
-        console.log('🆕 Creating new pet with direct user_id assignment...');
-        
-        const insertPayload: PetInsert = {
-          name: name.trim(),
-          breed: breed.trim() || null,
-          age: age.trim() || null,
-          user_id: userId
-        };
-        
-        console.log('🆕 Insert payload with user_id:', insertPayload);
-        
-        const { error, data } = await supabase
+        const { error: insertError } = await supabase
           .from('pets')
-          .insert(insertPayload)
-          .select();
-
-        console.log('🆕 Insert result:', { error, data });
-
-        if (error) {
-          console.error('❌ Insert error:', error);
-          // Handle unique constraint violation for inserts
-          if (error.code === '23505' && error.message.includes('unique_pet_name_per_user')) {
-            toast.error('Você já tem um pet com este nome. Escolha um nome diferente.');
-          } else {
-            toast.error('Erro ao adicionar pet: ' + error.message);
-          }
-        } else if (!data || data.length === 0) {
-          console.error('❌ Insert succeeded but returned no data');
-          toast.error('Pet criado mas não foi possível confirmar. Recarregue a página.');
-        } else {
-          console.log('✅ Pet created successfully:', data[0]);
-          toast.success('Pet adicionado com sucesso!');
-          
-          // Clear form for new entries
-          setName('');
-          setBreed('');
-          setAge('');
-          onSuccess?.();
-        }
+          .insert(petData);
+        error = insertError;
       }
-    } catch (err: any) {
-      console.error('💥 Unexpected error in pet submission:', err);
-      toast.error('Erro inesperado: ' + (err.message || 'Erro desconhecido'));
+
+      if (error) throw error;
+
+      toast.success(editingPet ? 'Pet atualizado com sucesso!' : 'Pet cadastrado com sucesso!');
+      
+      // Reset form if creating new pet
+      if (!editingPet) {
+        setFormData({
+          name: '',
+          breed: '',
+          age: '',
+          size: '',
+          weight: '',
+          gender: '',
+          notes: ''
+        });
+      }
+      
+      onSuccess?.();
+    } catch (error: any) {
+      console.error('Error saving pet:', error);
+      toast.error('Erro ao salvar pet: ' + error.message);
     } finally {
-      console.log('🔄 Setting isSubmitting to false');
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
-
-  console.log('🎨 PetForm render:', { userId, editing, isSubmitting, name });
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="name">Nome *</Label>
+        <Label htmlFor="name">Nome do Pet *</Label>
         <Input
           id="name"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={formData.name}
+          onChange={(e) => setFormData({...formData, name: e.target.value})}
           required
-          placeholder="Nome do seu pet"
-          disabled={isSubmitting}
         />
       </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="breed">Raça</Label>
+          <Input
+            id="breed"
+            value={formData.breed}
+            onChange={(e) => setFormData({...formData, breed: e.target.value})}
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="age">Idade</Label>
+          <Input
+            id="age"
+            value={formData.age}
+            onChange={(e) => setFormData({...formData, age: e.target.value})}
+            placeholder="Ex: 2 anos"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="size">Porte</Label>
+          <Select value={formData.size} onValueChange={(value) => setFormData({...formData, size: value})}>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecione o porte" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="small">Pequeno</SelectItem>
+              <SelectItem value="medium">Médio</SelectItem>
+              <SelectItem value="large">Grande</SelectItem>
+              <SelectItem value="extra_large">Extra Grande</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="weight">Peso (kg)</Label>
+          <Input
+            id="weight"
+            type="number"
+            step="0.1"
+            value={formData.weight}
+            onChange={(e) => setFormData({...formData, weight: e.target.value})}
+          />
+        </div>
+      </div>
+
       <div>
-        <Label htmlFor="breed">Raça</Label>
-        <Input
-          id="breed"
-          type="text"
-          value={breed}
-          onChange={(e) => setBreed(e.target.value)}
-          placeholder="Ex: Golden Retriever"
-          disabled={isSubmitting}
-        />
+        <Label htmlFor="gender">Sexo</Label>
+        <Select value={formData.gender} onValueChange={(value) => setFormData({...formData, gender: value})}>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione o sexo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="male">Macho</SelectItem>
+            <SelectItem value="female">Fêmea</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
+
       <div>
-        <Label htmlFor="age">Idade</Label>
-        <Input
-          id="age"
-          type="text"
-          value={age}
-          onChange={(e) => setAge(e.target.value)}
-          placeholder="Ex: 3 anos"
-          disabled={isSubmitting}
+        <Label htmlFor="notes">Observações</Label>
+        <Textarea
+          id="notes"
+          value={formData.notes}
+          onChange={(e) => setFormData({...formData, notes: e.target.value})}
+          placeholder="Temperamento, alergias, cuidados especiais..."
         />
       </div>
-      <div className="flex gap-2 pt-4">
-        <Button
-          type="submit"
-          disabled={isSubmitting || !name.trim()}
-        >
-          {isSubmitting ? 'Salvando...' : editing ? 'Atualizar' : 'Adicionar'}
-        </Button>
-      </div>
+
+      <Button type="submit" disabled={isLoading} className="w-full">
+        {isLoading ? 'Salvando...' : (editingPet ? 'Atualizar Pet' : 'Cadastrar Pet')}
+      </Button>
     </form>
   );
-}
+};
+
+export default PetForm;
