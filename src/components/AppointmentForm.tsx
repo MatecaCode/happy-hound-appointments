@@ -36,7 +36,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     handleNextAvailableSelect,
     handleSubmit,
     fetchServices,
-    serviceRequiresGroomer,
+    serviceRequiresStaff, // Fixed: was serviceRequiresGroomer
     serviceRequirementsLoaded,
   } = useAppointmentForm(serviceType);
 
@@ -49,8 +49,8 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
   const getStepTitle = (step: number) => {
     if (step === 1) return "1. Informações Básicas";
     if (step === 2) return "2. Escolha da Data";
-    if (step === 3 && serviceRequiresGroomer) return "3. Seleção do Profissional";
-    if (step === 3 && !serviceRequiresGroomer) return "3. Confirme o Horário";
+    if (step === 3 && serviceRequiresStaff) return "3. Seleção do Profissional";
+    if (step === 3 && !serviceRequiresStaff) return "3. Confirme o Horário";
     if (step === 4) return "4. Confirme o Horário";
     return "";
   };
@@ -61,10 +61,10 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     if (currentStep === 2) {
       // Only allow progression if we know the service requirements
       if (!serviceRequirementsLoaded) return 2;
-      // From step 2: go to step 3 if groomer required, otherwise skip to step 4 (final)
-      return serviceRequiresGroomer ? 3 : 4;
+      // From step 2: go to step 3 if staff required, otherwise skip to step 4 (final)
+      return serviceRequiresStaff ? 3 : 4;
     }
-    if (currentStep === 3 && serviceRequiresGroomer) return 4;
+    if (currentStep === 3 && serviceRequiresStaff) return 4;
     return currentStep;
   };
 
@@ -72,15 +72,15 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     if (currentStep === 2) return 1;
     if (currentStep === 3) return 2;
     if (currentStep === 4) {
-      // From step 4: go back to step 3 if groomer was required, otherwise step 2
-      return serviceRequiresGroomer ? 3 : 2;
+      // From step 4: go back to step 3 if staff was required, otherwise step 2
+      return serviceRequiresStaff ? 3 : 2;
     }
     return currentStep;
   };
 
   // A step is final if it's the time confirmation step
   const isFinalStep = (step: number) => {
-    return (step === 3 && !serviceRequiresGroomer) || (step === 4);
+    return (step === 3 && !serviceRequiresStaff) || (step === 4);
   };
 
   // Helper function to handle next button with proper validation
@@ -97,7 +97,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     setFormStep(nextStep);
   };
 
-  console.log('🔍 DEBUG: AppointmentForm render - Service requires groomer:', serviceRequiresGroomer);
+  console.log('🔍 DEBUG: AppointmentForm render - Service requires staff:', serviceRequiresStaff);
   console.log('🔍 DEBUG: Service requirements loaded:', serviceRequirementsLoaded);
   console.log('🔍 DEBUG: Current form step:', formStep);
   console.log('🔍 DEBUG: Is final step:', isFinalStep(formStep));
@@ -124,7 +124,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           timeSlots={timeSlots}
           selectedTimeSlotId={selectedTimeSlotId}
           setSelectedTimeSlotId={setSelectedTimeSlotId}
-          nextAvailable={nextAvailable}
+          nextAvailable={nextAvailable ? {
+            date: nextAvailable.date,
+            time: nextAvailable.time,
+            provider_name: nextAvailable.staff_name || 'Profissional'
+          } : null}
           handleNextAvailableSelect={handleNextAvailableSelect}
           isLoading={isLoading || !serviceRequirementsLoaded}
           activeTab={activeTab}
@@ -139,8 +143,8 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
         />
       )}
       
-      {/* Groomer selection - only show if service requires groomer AND we're on step 3 */}
-      {formStep === 3 && serviceRequiresGroomer && (
+      {/* Groomer selection - only show if service requires staff AND we're on step 3 */}
+      {formStep === 3 && serviceRequiresStaff && (
         <GroomerSelectionForm
           groomers={groomers}
           selectedGroomerId={selectedGroomerId}
@@ -152,7 +156,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
         />
       )}
       
-      {/* Final step - time slot selection and confirmation (step 3 for no-groomer, step 4 for groomer) */}
+      {/* Final step - time slot selection and confirmation (step 3 for no-staff, step 4 for staff) */}
       {isFinalStep(formStep) && (
         <DateTimeForm
           date={date}
@@ -160,7 +164,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           timeSlots={timeSlots}
           selectedTimeSlotId={selectedTimeSlotId}
           setSelectedTimeSlotId={setSelectedTimeSlotId}
-          nextAvailable={nextAvailable}
+          nextAvailable={nextAvailable ? {
+            date: nextAvailable.date,
+            time: nextAvailable.time,
+            provider_name: nextAvailable.staff_name || 'Profissional'
+          } : null}
           handleNextAvailableSelect={handleNextAvailableSelect}
           isLoading={isLoading}
           activeTab={activeTab}

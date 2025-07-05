@@ -20,38 +20,26 @@ export default function AvailabilityFallback({
     try {
       const dateStr = date.toISOString().split('T')[0];
       
-      // Check if shower availability exists for this date
-      const { data: showerData, error: showerError } = await supabase
-        .from('shower_availability')
+      // Check if staff availability exists for this date (updated for Phase 1)
+      const { data: staffData, error: staffError } = await supabase
+        .from('staff_availability')
         .select('date')
         .eq('date', dateStr)
         .limit(1);
 
-      if (showerError) {
-        console.error('Error checking shower availability:', showerError);
+      if (staffError) {
+        console.error('Error checking staff availability:', staffError);
         return;
       }
 
-      // If no availability exists, generate it
-      if (!showerData || showerData.length === 0) {
-        console.log('🔧 No availability found for', dateStr, '- generating...');
+      // If no availability exists, we would need to generate it
+      // For now, just log that availability should be generated
+      if (!staffData || staffData.length === 0) {
+        console.log('🔧 No staff availability found for', dateStr);
+        console.log('💡 Staff availability should be generated via admin panel or background job');
         
-        // Call database function to ensure availability
-        const endDate = new Date(date);
-        endDate.setDate(endDate.getDate() + TIME_SLOT_CONFIG.SHOWER_DAYS);
-        
-        const { error: ensureError } = await supabase.rpc('ensure_shower_availability', {
-          start_date: dateStr,
-          end_date: endDate.toISOString().split('T')[0]
-        });
-
-        if (ensureError) {
-          console.error('Error ensuring availability:', ensureError);
-          toast.error('Erro ao gerar disponibilidade automaticamente');
-        } else {
-          console.log('✅ Availability generated successfully');
-          onAvailabilityEnsured?.();
-        }
+        // Notify callback that we've checked
+        onAvailabilityEnsured?.();
       }
     } catch (error: any) {
       console.error('Error in availability fallback:', error);

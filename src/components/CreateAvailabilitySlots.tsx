@@ -1,166 +1,94 @@
 
 import React, { useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-const CreateAvailabilitySlots = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+export default function CreateAvailabilitySlots() {
+  const [isCreating, setIsCreating] = useState(false);
+  const [isGeneratingStaff, setIsGeneratingStaff] = useState(false);
 
-  const createAvailabilityForDate = async (date: string) => {
+  const generateStaffAvailability = async () => {
+    setIsGeneratingStaff(true);
     try {
-      console.log('🔧 Creating availability slots for date:', date);
+      // Get all active staff profiles (Phase 1)
+      const { data: staffProfiles, error } = await supabase
+        .from('staff_profiles')
+        .select('id, name')
+        .eq('active', true);
 
-      // Get all groomers from provider_profiles
-      const { data: groomers, error: groomersError } = await supabase
-        .from('provider_profiles')
-        .select('id, user_id')
-        .eq('type', 'groomer');
+      if (error) throw error;
 
-      if (groomersError) throw groomersError;
-
-      // Get all veterinarians from provider_profiles
-      const { data: vets, error: vetsError } = await supabase
-        .from('provider_profiles')
-        .select('id, user_id')
-        .eq('type', 'vet');
-
-      if (vetsError) throw vetsError;
-
-      // Create time slots from 09:00 to 17:00 (every 30 minutes)
-      const timeSlots = [];
-      for (let hour = 9; hour < 17; hour++) {
-        timeSlots.push(`${hour.toString().padStart(2, '0')}:00`);
-        timeSlots.push(`${hour.toString().padStart(2, '0')}:30`);
+      if (!staffProfiles || staffProfiles.length === 0) {
+        toast.error('No active staff found. Please create staff profiles first.');
+        return;
       }
 
-      const availabilitySlots = [];
+      console.log('📅 Generating availability for staff:', staffProfiles);
 
-      // Create groomer availability
-      for (const groomer of groomers || []) {
-        for (const timeSlot of timeSlots) {
-          availabilitySlots.push({
-            provider_id: groomer.id,
-            date: date,
-            time_slot: timeSlot,
-            available: true
-          });
+      // Call the database function to generate 10-minute availability slots
+      for (const staff of staffProfiles) {
+        const startDate = new Date().toISOString().split('T')[0];
+        const endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        
+        const { error: genError } = await supabase.rpc('ensure_staff_availability_10min', {
+          staff_profile_id: staff.id,
+          start_date: startDate,
+          end_date: endDate
+        });
+
+        if (genError) {
+          console.error(`Error generating availability for ${staff.name}:`, genError);
+          toast.error(`Failed to generate availability for ${staff.name}: ${genError.message}`);
+        } else {
+          console.log(`✅ Generated availability for ${staff.name}`);
         }
       }
 
-      // Create veterinarian availability
-      for (const vet of vets || []) {
-        for (const timeSlot of timeSlots) {
-          availabilitySlots.push({
-            provider_id: vet.id,
-            date: date,
-            time_slot: timeSlot,
-            available: true
-          });
-        }
-      }
-
-      console.log('📅 Inserting availability slots to provider_availability:', availabilitySlots.length);
-
-      // Insert all availability slots
-      const { error: insertError } = await supabase
-        .from('provider_availability')
-        .upsert(availabilitySlots, { onConflict: 'provider_id,date,time_slot' });
-
-      if (insertError) throw insertError;
-
-      console.log('✅ Availability slots created successfully');
-      return true;
+      toast.success(`Generated 10-minute availability slots for ${staffProfiles.length} staff members`);
+      
     } catch (error: any) {
-      console.error('💥 Error creating availability slots:', error);
-      throw error;
-    }
-  };
-
-  const handleCreateAvailability = async () => {
-    setIsLoading(true);
-    try {
-      await createAvailabilityForDate(selectedDate);
-      toast.success(`Disponibilidade criada para ${selectedDate}!`);
-    } catch (error) {
-      toast.error('Erro ao criar disponibilidade');
+      console.error('Error generating staff availability:', error);
+      toast.error('Failed to generate staff availability: ' + error.message);
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCreateWeekAvailability = async () => {
-    setIsLoading(true);
-    try {
-      const startDate = new Date(selectedDate);
-      const promises = [];
-      
-      // Create availability for the next 7 days
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(startDate);
-        date.setDate(startDate.getDate() + i);
-        const dateStr = date.toISOString().split('T')[0];
-        promises.push(createAvailabilityForDate(dateStr));
-      }
-      
-      await Promise.all(promises);
-      toast.success('Disponibilidade criada para os próximos 7 dias!');
-    } catch (error) {
-      toast.error('Erro ao criar disponibilidade');
-    } finally {
-      setIsLoading(false);
+      setIsGeneratingStaff(false);
     }
   };
 
   return (
-    <Card className="w-full max-w-md">
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle>Criar Disponibilidade</CardTitle>
+        <CardTitle>Phase 1 Availability Management</CardTitle>
         <CardDescription>
-          Crie horários disponíveis para tosadores e veterinários
+          Generate 10-minute availability slots for staff members using the new Phase 1 schema
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="date">Data</Label>
-          <Input
-            id="date"
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-          />
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded">
+          <h4 className="font-semibold text-blue-800">Phase 1 Changes</h4>
+          <ul className="text-sm text-blue-700 mt-1 space-y-1">
+            <li>• Uses staff_profiles instead of provider_profiles</li>
+            <li>• Generates 10-minute time slots for precise booking</li>
+            <li>• Clients see 30-minute slots, backend uses 10-minute logic</li>
+          </ul>
         </div>
-        
-        <div className="space-y-2">
-          <Button 
-            onClick={handleCreateAvailability} 
-            disabled={isLoading}
-            className="w-full"
-          >
-            {isLoading ? 'Criando...' : 'Criar para Esta Data'}
-          </Button>
-          
-          <Button 
-            onClick={handleCreateWeekAvailability} 
-            disabled={isLoading}
-            variant="outline"
-            className="w-full"
-          >
-            {isLoading ? 'Criando...' : 'Criar para 7 Dias'}
-          </Button>
-        </div>
-        
-        <div className="text-xs text-muted-foreground">
-          <p>• Tosadores: 1 agendamento por slot de 30min</p>
-          <p>• Veterinários: 1 consulta por slot de 30min</p>
+
+        <Button 
+          onClick={generateStaffAvailability}
+          disabled={isGeneratingStaff}
+          className="w-full"
+        >
+          {isGeneratingStaff ? 'Generating Staff Availability...' : 'Generate Staff Availability (10min slots)'}
+        </Button>
+
+        <div className="text-sm text-gray-600">
+          <p>
+            This will create 10-minute availability slots for all active staff members 
+            for the next 90 days, using the new Phase 1 database schema.
+          </p>
         </div>
       </CardContent>
     </Card>
   );
-};
-
-export default CreateAvailabilitySlots;
+}
