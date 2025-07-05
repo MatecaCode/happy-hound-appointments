@@ -35,7 +35,7 @@ const StatusCenter: React.FC = () => {
     setError(null);
     
     try {
-      // Get appointments with related data
+      // Get appointments with related data using the new schema
       const { data: appointmentData, error: appointmentError } = await supabase
         .from('appointments')
         .select(`
@@ -44,8 +44,7 @@ const StatusCenter: React.FC = () => {
           time,
           status,
           notes,
-          user_id,
-          provider_id,
+          client_id,
           pets:pet_id (name),
           services:service_id (name)
         `)
@@ -65,40 +64,25 @@ const StatusCenter: React.FC = () => {
       // Get user data for each appointment
       const appointmentsWithUserData = await Promise.all(
         appointmentData.map(async (apt) => {
-          // Get user data from clients table
+          // Get user data from clients table using client_id
           const { data: userData } = await supabase
             .from('clients')
-            .select('name')
-            .eq('user_id', apt.user_id)
+            .select('name, user_id')
+            .eq('id', apt.client_id)
             .single();
 
-          // Get provider data if provider_id exists
+          // Get staff information if there's an appointment_staff relationship
           let providerName = null;
-          if (apt.provider_id) {
-            const { data: providerProfile } = await supabase
-              .from('provider_profiles')
-              .select('user_id')
-              .eq('user_id', apt.provider_id)
-              .single();
-            
-            if (providerProfile?.user_id) {
-              const { data: providerData } = await supabase
-                .from('groomers')
-                .select('name')
-                .eq('user_id', providerProfile.user_id)
-                .single();
-              
-              if (!providerData) {
-                const { data: vetData } = await supabase
-                  .from('veterinarians')
-                  .select('name')
-                  .eq('user_id', providerProfile.user_id)
-                  .single();
-                providerName = vetData?.name;
-              } else {
-                providerName = providerData.name;
-              }
-            }
+          const { data: staffData } = await supabase
+            .from('appointment_staff')
+            .select(`
+              staff_profiles (name)
+            `)
+            .eq('appointment_id', apt.id)
+            .single();
+          
+          if (staffData?.staff_profiles) {
+            providerName = staffData.staff_profiles.name;
           }
           
           return {

@@ -1,59 +1,53 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
 
 const Profile = () => {
-  const { user, signOut } = useAuth();
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [userRole, setUserRole] = useState<string>('client');
-  const [profile, setProfile] = useState<any>(null);
+  const { user, loading } = useAuth();
+  const [userRole, setUserRole] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
-      fetchProfile();
+      fetchUserRole();
     }
   }, [user]);
 
-  const fetchProfile = async () => {
+  const fetchUserRole = async () => {
     if (!user) return;
+
     try {
-      // Only look in provider_profiles for providers, or fallback for clients
-      const { data: providerProfile } = await supabase
-        .from('provider_profiles')
-        .select('*')
+      // Get user role from user_roles table
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
         .eq('user_id', user.id)
-        .maybeSingle();
-      if (providerProfile) {
-        setProfile(providerProfile);
-        setUserRole(providerProfile.type);
-        setName('');  // No name in schema
-        setPhone(''); // No phone in schema
+        .single();
+
+      if (roleError) {
+        console.error('Error fetching user role:', roleError);
         return;
       }
-      // No profile, must be client
-      setProfile(null);
-      setUserRole('client');
-      setName('');
-      setPhone('');
-    } catch (error: any) {
-      console.error('Error fetching profile:', error);
-      toast.error('Erro ao carregar perfil');
+
+      setUserRole(roleData?.role || null);
+    } catch (error) {
+      console.error('Error in fetchUserRole:', error);
     }
   };
 
-  const updateProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Just no-op; can't update provider_profiles anyway for name/phone
-    toast.info('Atualização de perfil indisponível nesta versão.');
-  };
+  if (loading) {
+    return (
+      <Layout>
+        <div className="max-w-md mx-auto py-16 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Carregando perfil...</p>
+        </div>
+      </Layout>
+    );
+  }
 
   if (!user) {
     return (
@@ -67,89 +61,62 @@ const Profile = () => {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto px-6 py-8">
-        <h1 className="text-3xl font-bold mb-8">Meu Perfil</h1>
-        
-        <Card>
-          <CardHeader>
-            <CardTitle>Informações Pessoais</CardTitle>
-            <CardDescription>
-              Informações pessoais não disponíveis para edição nesta versão.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={updateProfile} className="space-y-4">
+      <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Meu Perfil</h1>
+          <p className="text-muted-foreground">Gerencie suas informações pessoais</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Informações Básicas</CardTitle>
+              <CardDescription>Seus dados de conta</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={user.email || ''}
-                  disabled
-                  className="bg-muted"
-                />
-                <p className="text-sm text-muted-foreground mt-1">
-                  O email não pode ser alterado
+                <label className="text-sm font-medium text-muted-foreground">Email</label>
+                <p className="text-sm">{user.email}</p>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Tipo de Conta</label>
+                <div className="mt-1">
+                  {userRole ? (
+                    <Badge variant="secondary">
+                      {userRole === 'client' ? 'Cliente' : 
+                       userRole === 'groomer' ? 'Tosador' : 
+                       userRole === 'vet' ? 'Veterinário' : 
+                       userRole === 'admin' ? 'Administrador' : 
+                       userRole}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Carregando...</Badge>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-muted-foreground">Data de Cadastro</label>
+                <p className="text-sm">
+                  {new Date(user.created_at).toLocaleDateString('pt-BR')}
                 </p>
               </div>
-              
-              <div>
-                <Label htmlFor="name">Nome</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  value={name}
-                  disabled
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="phone">Telefone</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={phone}
-                  disabled
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
+            </CardContent>
+          </Card>
 
-              <div>
-                <Label>Tipo de Conta</Label>
-                <Input
-                  value={
-                    userRole === 'client' ? 'Cliente' :
-                    userRole === 'groomer' ? 'Tosador' :
-                    userRole === 'vet' ? 'Veterinário' : userRole
-                  }
-                  disabled
-                  className="bg-muted"
-                />
-              </div>
-              
-              <Button type="submit" disabled>
-                Salvando...
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Configurações da Conta</CardTitle>
-            <CardDescription>
-              Gerenciar configurações da sua conta
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button 
-              variant="destructive" 
-              onClick={signOut}
-            >
-              Sair da Conta
-            </Button>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações da Conta</CardTitle>
+              <CardDescription>Opções de personalização</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Configurações adicionais serão adicionadas em breve.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </Layout>
   );

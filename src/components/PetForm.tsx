@@ -9,9 +9,20 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 
+interface Pet {
+  id: string;
+  name: string;
+  breed?: string;
+  age?: string;
+  size?: string;
+  weight?: number;
+  gender?: string;
+  notes?: string;
+}
+
 interface PetFormProps {
   onSuccess?: () => void;
-  editingPet?: any;
+  editingPet?: Pet;
 }
 
 const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
@@ -53,7 +64,7 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
         breed: formData.breed || null,
         age: formData.age || null,
         size: formData.size || null,
-        weight: formData.weight ? parseFloat(formData.weight) : null,
+        weight: formData.weight ? parseFloat(formData.weight.toString()) : null,
         gender: formData.gender || null,
         notes: formData.notes || null,
         client_id: clientData.id // Use client_id instead of user_id

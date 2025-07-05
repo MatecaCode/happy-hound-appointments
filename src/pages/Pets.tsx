@@ -15,6 +15,10 @@ interface Pet {
   name: string;
   breed?: string;
   age?: string;
+  size?: string;
+  weight?: number;
+  gender?: string;
+  notes?: string;
 }
 
 const Pets = () => {
@@ -49,24 +53,32 @@ const Pets = () => {
     try {
       console.log('📡 Making pets fetch query...');
       
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Fetch timeout')), 10000);
-      });
+      // Get client_id first
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
 
-      const fetchPromise = supabase
+      if (clientError || !clientData) {
+        console.log('No client record found for user:', user.id);
+        setPets([]);
+        return;
+      }
+
+      // Now get pets using client_id
+      const { data, error } = await supabase
         .from('pets')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('client_id', clientData.id)
+        .eq('active', true)
         .order('created_at', { ascending: false });
-
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       console.log('🐶 Fetch pets result:', { 
         data, 
         error, 
         userCount: data?.length || 0,
-        userId: user.id
+        clientId: clientData.id
       });
 
       if (error) {
@@ -100,8 +112,7 @@ const Pets = () => {
       const { error } = await supabase
         .from('pets')
         .delete()
-        .eq('id', petId)
-        .eq('user_id', user?.id);
+        .eq('id', petId);
 
       if (error) {
         console.error('❌ Error deleting pet:', error);
@@ -197,9 +208,7 @@ const Pets = () => {
                 </DialogDescription>
               </DialogHeader>
               <PetForm
-                userId={user?.id || ''}
-                initialPet={dialogPet ?? undefined}
-                editing={!!dialogPet}
+                editingPet={dialogPet ?? undefined}
                 onSuccess={handlePetFormSuccess}
               />
               <div className="flex justify-end pt-2">
