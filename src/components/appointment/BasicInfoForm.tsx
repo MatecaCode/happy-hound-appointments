@@ -88,11 +88,6 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
                 <SelectItem key={service.id} value={service.id}>
                   <div className="flex flex-col items-start">
                     <span>{service.name}</span>
-                    {service.description && (
-                      <span className="text-xs text-muted-foreground">
-                        {service.description}
-                      </span>
-                    )}
                     {service.base_price && (
                       <span className="text-xs font-medium text-green-600">
                         A partir de R$ {service.base_price}
@@ -113,11 +108,6 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
         {selectedService && (
           <div className="p-4 bg-muted rounded-lg">
             <h4 className="font-medium mb-2">{selectedService.name}</h4>
-            {selectedService.description && (
-              <p className="text-sm text-muted-foreground mb-2">
-                {selectedService.description}
-              </p>
-            )}
             <div className="text-sm space-y-1">
               {selectedService.default_duration && (
                 <p>Duração: {selectedService.default_duration} minutos</p>

@@ -36,7 +36,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     handleNextAvailableSelect,
     handleSubmit,
     fetchServices,
-    serviceRequiresStaff, // Fixed: was serviceRequiresGroomer
+    serviceRequiresStaff,
     serviceRequirementsLoaded,
   } = useAppointmentForm(serviceType);
 

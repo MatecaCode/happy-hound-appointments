@@ -177,59 +177,61 @@ export const useAppointmentData = () => {
     setTimeSlots([]);
     
     try {
+      // Manual time slot generation since RPC doesn't exist
       const dateStr = date.toISOString().split('T')[0];
+      const serviceDuration = selectedService.default_duration || 30;
       
-      // Use existing RPC function with correct parameters
-      const rpcParams = {
-        _service_id: selectedService.id,
-        _date: dateStr,
-        _provider_id: selectedStaffProfileId || null
-      };
-
-      console.log('📤 [FETCH_TIME_SLOTS] 🔥 CALLING get_available_slots_for_service RPC with params:', {
-        ...rpcParams,
-        service_name: selectedService.name,
-        service_duration_minutes: selectedService.default_duration,
-        timestamp: new Date().toISOString()
-      });
-
-      const { data: availableSlots, error } = await supabase.rpc('get_available_slots_for_service', rpcParams);
-
-      if (error) {
-        console.error('❌ [FETCH_TIME_SLOTS] RPC error:', error);
-        throw error;
+      // Generate 30-minute slots from 9:00 to 16:30
+      const availableSlots: TimeSlot[] = [];
+      
+      for (let hour = 9; hour < 17; hour++) {
+        for (let minute = 0; minute < 60; minute += 30) {
+          const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
+          const endHour = hour + Math.floor((minute + serviceDuration) / 60);
+          const endMinute = (minute + serviceDuration) % 60;
+          
+          // Skip if appointment would end after 5 PM
+          if (endHour > 17 || (endHour === 17 && endMinute > 0)) {
+            continue;
+          }
+          
+          let isAvailable = true;
+          
+          // Check staff availability if staff is required
+          if (selectedStaffProfileId && selectedService.requires_grooming || selectedService.requires_vet) {
+            const { data: staffAvailability } = await supabase
+              .from('staff_availability')
+              .select('available')
+              .eq('staff_profile_id', selectedStaffProfileId)
+              .eq('date', dateStr)
+              .eq('time_slot', timeStr)
+              .single();
+              
+            if (!staffAvailability?.available) {
+              isAvailable = false;
+            }
+          }
+          
+          if (isAvailable) {
+            availableSlots.push({
+              id: timeStr,
+              time: timeStr.substring(0, 5), // Format HH:MM
+              available: true
+            });
+          }
+        }
       }
-
-      console.log('📨 [FETCH_TIME_SLOTS] 🔥 RPC RESPONSE from get_available_slots_for_service:', {
-        slots_count: Array.isArray(availableSlots) ? availableSlots.length : 0,
-        slots: availableSlots,
-        request_params: rpcParams,
-        timestamp: new Date().toISOString()
-      });
-
-      if (!availableSlots || !Array.isArray(availableSlots)) {
-        console.error('❌ [FETCH_TIME_SLOTS] Invalid slots response:', availableSlots);
-        setTimeSlots([]);
-        return;
-      }
-
-      // Transform to TimeSlot format
-      const timeSlotData: TimeSlot[] = availableSlots.map(slot => ({
-        id: slot.time_slot,
-        time: slot.time_slot.substring(0, 5), // Format HH:MM
-        available: true
-      }));
 
       console.log('✅ [FETCH_TIME_SLOTS] Final time slots for UI:', {
-        count: timeSlotData.length,
-        slots: timeSlotData.map(s => ({ id: s.id, time: s.time, available: s.available })),
+        count: availableSlots.length,
+        slots: availableSlots.map(s => ({ id: s.id, time: s.time, available: s.available })),
         timestamp: new Date().toISOString()
       });
       
-      setTimeSlots(timeSlotData);
+      setTimeSlots(availableSlots);
 
       // Fetch next available appointment if no slots today
-      if (timeSlotData.length === 0) {
+      if (availableSlots.length === 0) {
         await fetchNextAvailable(selectedService.id, selectedStaffProfileId);
       } else {
         setNextAvailable(null);
@@ -256,13 +258,16 @@ export const useAppointmentData = () => {
         
         const dateStr = checkDate.toISOString().split('T')[0];
         
-        const { data: availableSlots } = await supabase.rpc('get_available_slots_for_service', {
-          _service_id: serviceId,
-          _date: dateStr,
-          _provider_id: staffProfileId
-        });
+        // Check if there are any available slots for this date and staff
+        const { data: availableSlots } = await supabase
+          .from('staff_availability')
+          .select('time_slot')
+          .eq('staff_profile_id', staffProfileId)
+          .eq('date', dateStr)
+          .eq('available', true)
+          .limit(1);
 
-        if (availableSlots && Array.isArray(availableSlots) && availableSlots.length > 0) {
+        if (availableSlots && availableSlots.length > 0) {
           setNextAvailable({
             date: dateStr,
             time: availableSlots[0].time_slot,

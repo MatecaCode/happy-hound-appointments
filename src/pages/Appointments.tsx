@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ interface AppointmentWithDetails {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   service_status?: 'not_started' | 'in_progress' | 'completed';
   notes?: string;
-  provider_name?: string;
+  staff_name?: string;
 }
 
 const Appointments = () => {
@@ -37,6 +38,20 @@ const Appointments = () => {
       try {
         console.log('Fetching appointments for user:', user.id);
         
+        // First get client_id from user
+        const { data: clientData, error: clientError } = await supabase
+          .from('clients')
+          .select('id')
+          .eq('user_id', user.id)
+          .single();
+
+        if (clientError || !clientData) {
+          console.log('No client record found for user:', user.id);
+          setAppointments([]);
+          return;
+        }
+
+        // Get appointments with related data
         const { data, error } = await supabase
           .from('appointments')
           .select(`
@@ -46,12 +61,14 @@ const Appointments = () => {
             status,
             service_status,
             notes,
-            user_id,
-            provider_id,
+            client_id,
             pets:pet_id (name),
-            services:service_id (name)
+            services:service_id (name),
+            appointment_staff (
+              staff_profiles (name)
+            )
           `)
-          .eq('user_id', user.id)
+          .eq('client_id', clientData.id)
           .order('date', { ascending: true });
         
         if (error) {
@@ -62,36 +79,22 @@ const Appointments = () => {
         console.log('Raw appointments data:', data);
         
         if (data) {
-          // Get provider details for each appointment that has a provider
-          const formattedData = await Promise.all(
-            data.map(async (apt) => {
-              let providerName = null;
-              if (apt.provider_id) {
-                const { data: providerData } = await supabase
-                  .from('provider_profiles')
-                  .select('user_id')
-                  .eq('id', apt.provider_id)
-                  .single();
-                
-                if (providerData?.user_id) {
-                  const { data: providerUserData } = await supabase.auth.admin.getUserById(providerData.user_id);
-                  providerName = providerUserData.user?.user_metadata?.name || null;
-                }
-              }
+          const formattedData = data.map((apt) => {
+            // Get staff name from appointment_staff relationship
+            const staffName = apt.appointment_staff?.[0]?.staff_profiles?.name || null;
 
-              return {
-                id: apt.id,
-                pet_name: apt.pets?.name || 'Pet',
-                service_name: apt.services?.name || 'Serviço',
-                date: new Date(apt.date),
-                time: apt.time,
-                status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
-                service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
-                notes: apt.notes || undefined,
-                provider_name: providerName
-              };
-            })
-          );
+            return {
+              id: apt.id,
+              pet_name: apt.pets?.name || 'Pet',
+              service_name: apt.services?.name || 'Serviço',
+              date: new Date(apt.date),
+              time: apt.time,
+              status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
+              service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
+              notes: apt.notes || undefined,
+              staff_name: staffName
+            };
+          });
           
           console.log('Formatted appointments:', formattedData);
           setAppointments(formattedData);
@@ -218,10 +221,10 @@ const Appointments = () => {
           <span className="font-medium w-20">Horário:</span>
           <span>{appointment.time}</span>
         </div>
-        {appointment.provider_name && (
+        {appointment.staff_name && (
           <div className="flex items-center text-sm">
             <span className="font-medium w-20">Profissional:</span>
-            <span>{appointment.provider_name}</span>
+            <span>{appointment.staff_name}</span>
           </div>
         )}
         {appointment.notes && (

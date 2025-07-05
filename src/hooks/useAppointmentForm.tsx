@@ -34,6 +34,9 @@ export interface Service {
   base_price: number;
   default_duration: number;
   service_type: string;
+  requires_grooming: boolean;
+  requires_vet: boolean;
+  requires_bath: boolean;
 }
 
 export interface TimeSlot {
@@ -328,7 +331,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       });
       
       // Pass staff_profile_id to fetchTimeSlots for Phase 1
-      const selectedStaff = staff.find(s => s === formState.selectedGroomerId);
+      const selectedStaff = staff.find(s => s.id === formState.selectedGroomerId);
       const staffProfileId = selectedStaff?.id || null;
       
       fetchTimeSlots(formState.date, staffProfileId, formState.setIsLoading, selectedServiceObj);
