@@ -36,25 +36,32 @@ const GroomerCalendar = () => {
     
     setIsLoading(true);
     try {
-      // First get the provider profile for this user
-      const { data: providerProfile, error: profileError } = await supabase
-        .from('provider_profiles')
+      // First get the staff profile for this user
+      const { data: staffProfile, error: profileError } = await supabase
+        .from('staff_profiles')
         .select('id')
         .eq('user_id', user.id)
-        .eq('type', 'groomer')
         .single();
 
-      if (profileError || !providerProfile) {
-        console.error('Provider profile not found:', profileError);
+      if (profileError || !staffProfile) {
+        console.error('Staff profile not found:', profileError);
         setAppointments([]);
         return;
       }
 
       const dateStr = selectedDate.toISOString().split('T')[0];
+      
+      // Get appointments through appointment_staff relationship
       const { data, error } = await supabase
         .from('appointments')
-        .select('*')
-        .eq('provider_id', providerProfile.id)
+        .select(`
+          *,
+          pets(name),
+          services(name),
+          clients(name),
+          appointment_staff!inner(staff_profile_id)
+        `)
+        .eq('appointment_staff.staff_profile_id', staffProfile.id)
         .eq('date', dateStr)
         .order('time');
 
@@ -63,10 +70,10 @@ const GroomerCalendar = () => {
       // Map for AppointmentCard
       const displayData: Appointment[] = (data ?? []).map((apt) => ({
         id: apt.id,
-        pet_name: 'Pet',
-        service: 'Serviço',
+        pet_name: apt.pets?.name || 'Pet',
+        service: apt.services?.name || 'Serviço',
         time: apt.time,
-        owner_name: 'Cliente',
+        owner_name: apt.clients?.name || 'Cliente',
         status: apt.status,
         notes: apt.notes,
       }));
@@ -157,7 +164,7 @@ const GroomerCalendar = () => {
                           appointment.status === 'cancelled' ? 'destructive' :
                           'secondary'
                         }>
-                          {appointment.status === 'upcoming' ? 'Agendado' :
+                          {appointment.status === 'pending' ? 'Agendado' :
                            appointment.status === 'completed' ? 'Concluído' :
                            'Cancelado'}
                         </Badge>
@@ -168,7 +175,7 @@ const GroomerCalendar = () => {
                         <p className="text-sm mb-2"><strong>Observações:</strong> {appointment.notes}</p>
                       )}
                       
-                      {appointment.status === 'upcoming' && (
+                      {appointment.status === 'pending' && (
                         <div className="flex gap-2 mt-3">
                           <Button
                             size="sm"
@@ -196,4 +203,5 @@ const GroomerCalendar = () => {
     </Layout>
   );
 };
+
 export default GroomerCalendar;

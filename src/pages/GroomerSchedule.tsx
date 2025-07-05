@@ -21,7 +21,7 @@ const GroomerSchedule = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [providerProfileId, setProviderProfileId] = useState<string | null>(null);
+  const [staffProfileId, setStaffProfileId] = useState<string | null>(null);
 
   // Generate default time slots (8am to 5pm)
   const generateDefaultSlots = (): AvailabilitySlot[] => {
@@ -45,50 +45,49 @@ const GroomerSchedule = () => {
 
   useEffect(() => {
     if (user) {
-      getProviderProfile();
+      getStaffProfile();
     }
   }, [user]);
 
   useEffect(() => {
-    if (selectedDate && providerProfileId) {
+    if (selectedDate && staffProfileId) {
       fetchAvailability();
     }
-  }, [selectedDate, providerProfileId]);
+  }, [selectedDate, staffProfileId]);
 
-  const getProviderProfile = async () => {
+  const getStaffProfile = async () => {
     if (!user) return;
 
     try {
-      const { data: providerProfile, error } = await supabase
-        .from('provider_profiles')
+      const { data: staffProfile, error } = await supabase
+        .from('staff_profiles')
         .select('id')
         .eq('user_id', user.id)
-        .eq('type', 'groomer')
         .single();
 
       if (error) {
-        console.error('Error fetching provider profile:', error);
+        console.error('Error fetching staff profile:', error);
         return;
       }
 
-      setProviderProfileId(providerProfile?.id || null);
+      setStaffProfileId(staffProfile?.id || null);
     } catch (error) {
-      console.error('Error getting provider profile:', error);
+      console.error('Error getting staff profile:', error);
     }
   };
 
   const fetchAvailability = async () => {
-    if (!selectedDate || !providerProfileId) return;
+    if (!selectedDate || !staffProfileId) return;
     
     setIsLoading(true);
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
       
-      // Query provider_availability table
+      // Query staff_availability table
       const { data, error } = await supabase
-        .from('provider_availability')
+        .from('staff_availability')
         .select('*')
-        .eq('provider_id', providerProfileId)
+        .eq('staff_profile_id', staffProfileId)
         .eq('date', dateStr);
 
       if (error && error.code !== 'PGRST116') {
@@ -117,7 +116,7 @@ const GroomerSchedule = () => {
   };
 
   const toggleAvailability = async (timeSlot: string) => {
-    if (!selectedDate || !providerProfileId) return;
+    if (!selectedDate || !staffProfileId) return;
     
     const dateStr = selectedDate.toISOString().split('T')[0];
     const currentSlot = availabilitySlots.find(slot => slot.time === timeSlot);
@@ -126,16 +125,16 @@ const GroomerSchedule = () => {
     const newAvailability = !currentSlot.available;
 
     try {
-      // Use direct query to insert into the provider_availability table
+      // Use direct query to insert into the staff_availability table
       const { error } = await supabase
-        .from('provider_availability')
+        .from('staff_availability')
         .upsert({
-          provider_id: providerProfileId,
+          staff_profile_id: staffProfileId,
           date: dateStr,
           time_slot: timeSlot,
           available: newAvailability
         }, {
-          onConflict: 'provider_id,date,time_slot'
+          onConflict: 'staff_profile_id,date,time_slot'
         });
 
       if (error) throw error;
