@@ -3,28 +3,25 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface BookingDebugData {
   serviceData: any;
-  serviceResources: any[];
-  providerData: any;
-  providerAvailability: any[];
-  showerAvailability: any[];
+  staffProfiles: any[];
+  staffAvailability: any[];
   existingAppointments: any[];
   slotValidation: {
     slot: string;
-    providerAvailable: boolean;
-    showerAvailable: boolean;
+    staffAvailable: boolean;
     conflicts: any[];
   }[];
 }
 
 export async function debugBookingState(
   serviceId: string,
-  providerId: string | null,
+  staffProfileId: string | null,
   date: string,
   timeSlot: string
 ): Promise<BookingDebugData> {
   console.log('🔍 [BOOKING_DEBUGGER] Starting comprehensive debug analysis:', {
     serviceId,
-    providerId,
+    staffProfileId,
     date,
     timeSlot
   });
@@ -36,74 +33,61 @@ export async function debugBookingState(
     .eq('id', serviceId)
     .single();
 
-  // Get service resources
-  const { data: serviceResources } = await supabase
-    .from('service_resources')
-    .select('*')
-    .eq('service_id', serviceId);
-
-  // Get provider data if provided
-  let providerData = null;
-  if (providerId) {
+  // Get relevant staff profiles
+  let staffProfiles: any[] = [];
+  if (staffProfileId) {
     const { data } = await supabase
-      .from('provider_profiles')
+      .from('staff_profiles')
       .select('*')
-      .eq('id', providerId)
-      .single();
-    providerData = data;
+      .eq('id', staffProfileId);
+    staffProfiles = data || [];
   }
 
-  // Get provider availability
-  const { data: providerAvailability } = await supabase
-    .from('provider_availability')
+  // Get staff availability
+  const { data: staffAvailability } = await supabase
+    .from('staff_availability')
     .select('*')
-    .eq('provider_id', providerId)
+    .eq('staff_profile_id', staffProfileId)
     .eq('date', date)
     .order('time_slot');
 
-  // Get shower availability
-  const { data: showerAvailability } = await supabase
-    .from('shower_availability')
-    .select('*')
-    .eq('date', date)
-    .order('time_slot');
-
-  // Get existing appointments for this provider/date
+  // Get existing appointments for this staff/date
   const { data: existingAppointments } = await supabase
-    .from('appointments')
+    .from('appointment_staff')
     .select(`
-      *,
-      appointment_providers!inner(*),
-      services(*)
+      appointment_id,
+      appointments!inner(
+        id,
+        date,
+        time,
+        status,
+        services(name, default_duration)
+      )
     `)
-    .eq('date', date)
-    .eq('appointment_providers.provider_id', providerId)
-    .not('status', 'in', '(cancelled,rejected)');
+    .eq('staff_profile_id', staffProfileId)
+    .eq('appointments.date', date)
+    .not('appointments.status', 'in', '(cancelled,rejected)');
 
   // Validate each slot in the service duration
   const slotValidation = [];
-  const duration = serviceData?.duration_minutes || 30;
+  const duration = serviceData?.default_duration || 30;
   const startTime = new Date(`2000-01-01T${timeSlot}:00`);
   
   for (let i = 0; i < duration; i += 30) {
     const checkTime = new Date(startTime.getTime() + (i * 60 * 1000));
-    const checkTimeStr = checkTime.toTimeString().substring(0, 5) + ':00';
+    const checkTimeStr = checkTime.toTimeString().substring(0, 8);
     
-    // Check provider availability
-    const providerAvailable = providerId ? 
-      providerAvailability?.some(pa => 
-        pa.time_slot === checkTimeStr && pa.available
+    // Check staff availability
+    const staffAvailable = staffProfileId ? 
+      staffAvailability?.some(sa => 
+        sa.time_slot === checkTimeStr && sa.available
       ) : true;
 
-    // Check shower availability
-    const showerAvailable = showerAvailability?.some(sa => 
-      sa.time_slot === checkTimeStr && sa.available_spots > 0
-    );
-
     // Check conflicts
-    const conflicts = existingAppointments?.filter(apt => {
+    const conflicts = existingAppointments?.filter((item: any) => {
+      const apt = item.appointments;
       const aptStart = new Date(`2000-01-01T${apt.time}`);
-      const aptEnd = new Date(aptStart.getTime() + ((apt.services?.duration_minutes || 30) * 60 * 1000));
+      const aptEnd = new Date(aptStart.getTime() + ((apt.services?.default_duration || 30) * 60 * 1000));
       const checkEnd = new Date(checkTime.getTime() + (30 * 60 * 1000));
       
       return (checkTime < aptEnd && checkEnd > aptStart);
@@ -111,18 +95,15 @@ export async function debugBookingState(
 
     slotValidation.push({
       slot: checkTimeStr,
-      providerAvailable,
-      showerAvailable,
+      staffAvailable,
       conflicts
     });
   }
 
   const debugData: BookingDebugData = {
     serviceData,
-    serviceResources: serviceResources || [],
-    providerData,
-    providerAvailability: providerAvailability || [],
-    showerAvailability: showerAvailability || [],
+    staffProfiles,
+    staffAvailability: staffAvailability || [],
     existingAppointments: existingAppointments || [],
     slotValidation
   };
@@ -133,41 +114,51 @@ export async function debugBookingState(
 
 export async function compareSlotFetchVsBooking(
   serviceId: string,
-  providerId: string | null,
+  staffProfileId: string | null,
   date: string,
   timeSlot: string
 ) {
   console.log('🔄 [SLOT_COMPARISON] Comparing slot fetch vs booking logic');
 
-  // 1. Fetch available slots using RPC
-  const { data: availableSlots, error: slotsError } = await supabase.rpc('get_available_slots_for_service', {
-    _service_id: serviceId,
-    _date: date,
-    _provider_id: providerId
-  });
+  // 1. Fetch available slots using a simple query since the RPC doesn't exist
+  let availableSlots: any[] = [];
+  try {
+    // Get staff availability for the date
+    if (staffProfileId) {
+      const { data } = await supabase
+        .from('staff_availability')
+        .select('time_slot')
+        .eq('staff_profile_id', staffProfileId)
+        .eq('date', date)
+        .eq('available', true)
+        .order('time_slot');
+      
+      availableSlots = data || [];
+    }
+  } catch (error) {
+    console.error('Error fetching available slots:', error);
+  }
 
-  console.log('📋 [SLOT_COMPARISON] Available slots from RPC:', {
+  console.log('📋 [SLOT_COMPARISON] Available slots from query:', {
     slots: availableSlots,
-    error: slotsError,
     requestedSlot: timeSlot + ':00',
     isSlotAvailable: availableSlots?.some(slot => slot.time_slot === timeSlot + ':00')
   });
 
   // 2. Get comprehensive debug data
-  const debugData = await debugBookingState(serviceId, providerId, date, timeSlot);
+  const debugData = await debugBookingState(serviceId, staffProfileId, date, timeSlot);
 
   // 3. Analyze discrepancies
   const analysis = {
     slotShownAsAvailable: availableSlots?.some(slot => slot.time_slot === timeSlot + ':00'),
     allSlotsValid: debugData.slotValidation.every(sv => 
-      sv.providerAvailable && sv.showerAvailable && sv.conflicts.length === 0
+      sv.staffAvailable && sv.conflicts.length === 0
     ),
     failureReasons: debugData.slotValidation
-      .filter(sv => !sv.providerAvailable || !sv.showerAvailable || sv.conflicts.length > 0)
+      .filter(sv => !sv.staffAvailable || sv.conflicts.length > 0)
       .map(sv => ({
         slot: sv.slot,
-        providerIssue: !sv.providerAvailable,
-        showerIssue: !sv.showerAvailable,
+        staffIssue: !sv.staffAvailable,
         conflictIssue: sv.conflicts.length > 0,
         conflicts: sv.conflicts
       }))

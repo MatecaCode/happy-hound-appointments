@@ -90,12 +90,12 @@ export async function createAppointment(
       segments_formatted: formattedTimeSlot.split(':').length
     });
 
-    // ✅ UPDATED: Direct booking call with new Phase 1 RPC
+    // ✅ UPDATED: Direct booking call with Phase 1 RPC - Use correct parameter name
     const bookingParams = {
       _user_id: userId,
       _pet_id: petId,
       _service_id: serviceId,
-      _staff_profile_ids: staffProfileId ? [staffProfileId] : [],
+      _provider_ids: staffProfileId ? [staffProfileId] : [], // Use _provider_ids as expected by RPC
       _booking_date: isoDate,
       _time_slot: formattedTimeSlot,
       _notes: notes || null
@@ -301,7 +301,7 @@ export async function serviceRequiresBath(serviceId: string): Promise<boolean> {
   }
 }
 
-// 🆕 NEW: Get available staff for service (Phase 1)
+// 🆕 NEW: Get available staff for service (Phase 1) - Remove this function since it doesn't exist in DB
 export async function getAvailableStaffForService(
   serviceId: string,
   date: Date,
@@ -310,11 +310,36 @@ export async function getAvailableStaffForService(
   try {
     const dateStr = date.toISOString().split('T')[0];
     
-    const { data, error } = await supabase.rpc('get_available_staff_for_service', {
-      _service_id: serviceId,
-      _date: dateStr,
-      _location_id: locationId || null
-    });
+    // Since the RPC doesn't exist, let's query staff directly
+    const { data: service } = await supabase
+      .from('services')
+      .select('requires_grooming, requires_vet, requires_bath')
+      .eq('id', serviceId)
+      .single();
+
+    if (!service) return [];
+
+    let query = supabase
+      .from('staff_profiles')
+      .select('*')
+      .eq('active', true);
+
+    // Filter by capabilities based on service requirements
+    if (service.requires_grooming) {
+      query = query.eq('can_groom', true);
+    }
+    if (service.requires_vet) {
+      query = query.eq('can_vet', true);
+    }
+    if (service.requires_bath) {
+      query = query.eq('can_bathe', true);
+    }
+
+    if (locationId) {
+      query = query.eq('location_id', locationId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
     return data || [];

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Calendar } from '@/components/ui/calendar';
@@ -35,41 +36,56 @@ const VetCalendar = () => {
     
     setIsLoading(true);
     try {
-      // First get the provider profile for this user
-      const { data: providerProfile, error: profileError } = await supabase
-        .from('provider_profiles')
+      // Get the staff profile for this user
+      const { data: staffProfile, error: profileError } = await supabase
+        .from('staff_profiles')
         .select('id')
         .eq('user_id', user.id)
-        .eq('type', 'vet')
+        .eq('can_vet', true)
         .single();
 
-      if (profileError || !providerProfile) {
-        console.error('Provider profile not found:', profileError);
+      if (profileError || !staffProfile) {
+        console.error('Staff profile not found:', profileError);
         setAppointments([]);
         return;
       }
 
       const dateStr = selectedDate.toISOString().split('T')[0];
-      const { data, error } = await supabase
-        .from('appointments')
-        .select('*')
-        .eq('provider_id', providerProfile.id)
-        .eq('date', dateStr)
-        .order('time');
+      
+      // Get appointments assigned to this staff member
+      const { data: appointmentStaff, error: staffError } = await supabase
+        .from('appointment_staff')
+        .select(`
+          appointment_id,
+          appointments!inner(
+            id,
+            date,
+            time,
+            status,
+            notes,
+            pets(name),
+            services(name),
+            clients(name)
+          )
+        `)
+        .eq('staff_profile_id', staffProfile.id)
+        .eq('appointments.date', dateStr)
+        .order('appointments.time');
 
-      if (error) throw error;
-      // Map to Appointment with placeholders
-      setAppointments(
-        (data || []).map((apt) => ({
-          id: apt.id,
-          pet_name: 'Pet',
-          service: 'Serviço',
-          owner_name: 'Cliente',
-          time: apt.time,
-          status: apt.status,
-          notes: apt.notes ?? undefined,
-        }))
-      );
+      if (staffError) throw staffError;
+
+      // Transform the data
+      const transformedAppointments = (appointmentStaff || []).map((item: any) => ({
+        id: item.appointments.id,
+        pet_name: item.appointments.pets?.name || 'Pet',
+        service: item.appointments.services?.name || 'Serviço',
+        owner_name: item.appointments.clients?.name || 'Cliente',
+        time: item.appointments.time,
+        status: item.appointments.status,
+        notes: item.appointments.notes,
+      }));
+
+      setAppointments(transformedAppointments);
     } catch (error: any) {
       console.error('Error fetching appointments:', error);
       toast.error('Erro ao carregar consultas');
@@ -155,7 +171,7 @@ const VetCalendar = () => {
                           appointment.status === 'cancelled' ? 'destructive' :
                           'secondary'
                         }>
-                          {appointment.status === 'upcoming' ? 'Agendado' :
+                          {appointment.status === 'pending' ? 'Agendado' :
                            appointment.status === 'completed' ? 'Concluído' :
                            'Cancelado'}
                         </Badge>
@@ -166,7 +182,7 @@ const VetCalendar = () => {
                         <p className="text-sm mb-2"><strong>Observações:</strong> {appointment.notes}</p>
                       )}
                       
-                      {appointment.status === 'upcoming' && (
+                      {appointment.status === 'pending' && (
                         <div className="flex gap-2 mt-3">
                           <Button
                             size="sm"
