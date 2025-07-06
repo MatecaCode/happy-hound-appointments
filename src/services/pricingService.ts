@@ -80,16 +80,13 @@ export class PricingService {
 
   private static async getExactMatchPricing(serviceId: string, breedId: string, size: string): Promise<any> {
     try {
-      // Use a simple type cast to avoid deep type inference issues
-      const result: any = await supabase
+      const { data, error } = await (supabase
         .from('service_pricing')
         .select('price, duration_override')
         .eq('service_id', serviceId)
         .eq('breed_id', breedId)
-        .eq('size', size)
+        .eq('size', size) as any)
         .maybeSingle();
-
-      const { data, error } = result;
 
       if (error) {
         console.log('🔍 [PRICING] No exact match found:', error.message);
@@ -105,16 +102,13 @@ export class PricingService {
 
   private static async getServiceSizeFallback(serviceId: string, size: string): Promise<any> {
     try {
-      // Use a simple type cast to avoid deep type inference issues
-      const result: any = await supabase
+      const { data, error } = await (supabase
         .from('service_pricing')
         .select('price, duration_override')
         .eq('service_id', serviceId)
         .eq('size', size)
-        .limit(1)
+        .limit(1) as any)
         .maybeSingle();
-
-      const { data, error } = result;
 
       if (error) {
         console.log('🔍 [PRICING] No service+size fallback found:', error.message);
@@ -130,14 +124,11 @@ export class PricingService {
 
   private static async getServiceDefault(serviceId: string): Promise<any> {
     try {
-      // Use a simple type cast to avoid deep type inference issues
-      const result: any = await supabase
+      const { data, error } = await (supabase
         .from('services')
         .select('base_price, default_duration')
-        .eq('id', serviceId)
+        .eq('id', serviceId) as any)
         .maybeSingle();
-
-      const { data, error } = result;
 
       if (error) {
         console.log('🔍 [PRICING] No service default found:', error.message);

@@ -94,10 +94,10 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
             Nenhum profissional disponível
           </h3>
           <p className="text-yellow-600 mb-4">
-            Não há profissionais disponíveis para este serviço na data selecionada.
+            Não há profissionais disponíveis para este serviço.
           </p>
           <p className="text-sm text-yellow-500">
-            Tente selecionar uma data diferente.
+            Por favor, tente outro serviço ou contate-nos diretamente.
           </p>
         </div>
       </div>
@@ -134,7 +134,7 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
                     <div className="relative">
                       <Avatar className="h-16 w-16 border-2 border-gray-100">
                         <AvatarImage 
-                          src={member.profile_image} 
+                          src={member.profile_image || undefined} 
                           alt={member.name}
                         />
                         <AvatarFallback className="bg-primary/10 text-primary font-medium">

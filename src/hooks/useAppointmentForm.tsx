@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useAppointmentData } from './useAppointmentData';
@@ -35,6 +36,8 @@ export interface Provider {
   role: string;
   rating: number;
   about: string;
+  profile_image?: string;
+  specialty?: string;
 }
 
 export interface TimeSlot {
@@ -104,16 +107,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [user, fetchUserPets]);
 
-  // Fetch providers when service changes
+  // Fetch time slots when date/staff changes - but only if we're on the date/time step
   useEffect(() => {
-    if (selectedService && serviceRequiresStaff) {
-      fetchAvailableProviders(serviceType, new Date(), selectedService);
-    }
-  }, [selectedService, serviceType, serviceRequiresStaff, fetchAvailableProviders]);
-
-  // Fetch time slots when date/staff changes
-  useEffect(() => {
-    if (date && selectedService && formStep === 3) {
+    if (date && selectedService && (formStep === 3 || (formStep === 2 && !serviceRequiresStaff))) {
       const staffId = serviceRequiresStaff ? selectedGroomerId : null;
       fetchTimeSlots(date, staffId, setIsLoading, selectedService);
     }

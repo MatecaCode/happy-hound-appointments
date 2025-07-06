@@ -41,14 +41,13 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     pricing,
   } = useAppointmentForm(serviceType);
 
-  // Use the new staff filtering hook
+  // Use the staff filtering hook - no date filtering initially
   const {
     availableStaff,
     isLoading: staffLoading,
     error: staffError
   } = useStaffFiltering({
     service: selectedService,
-    date: date,
     serviceDuration: pricing?.duration || selectedService?.default_duration || 60
   });
 
@@ -57,7 +56,6 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     fetchServices(serviceType);
   }, [serviceType, fetchServices]);
 
-  // Updated step flow: Pet -> Service -> Staff (if required) -> Date/Time
   const getStepTitle = (step: number) => {
     if (step === 1) return "1. Informações Básicas";
     if (step === 2 && serviceRequiresStaff) return "2. Seleção do Profissional";
