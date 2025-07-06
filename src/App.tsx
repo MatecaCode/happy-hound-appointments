@@ -7,7 +7,7 @@ import Services from "./pages/Services";
 import Book from "./pages/Book";
 import Appointments from "./pages/Appointments";
 import Confirmation from "./pages/Confirmation";
-import BookingSuccess from "./pages/BookingSuccess";
+import BookingSuccess from '@/components/BookingSuccess';
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -40,30 +40,30 @@ function App() {
           <AuthProvider>
             <Routes>
               <Route path="/" element={<Index />} />
-              <Route path="/services" element={<Services />} />
               <Route path="/about" element={<About />} />
+              <Route path="/services" element={<Services />} />
               <Route path="/book" element={<Book />} />
-              <Route path="/appointments" element={<Appointments />} />
-              <Route path="/confirmation" element={<Confirmation />} />
               <Route path="/booking-success" element={<BookingSuccess />} />
+              <Route path="/appointments" element={<Appointments />} />
+              <Route path="/pets" element={<Pets />} />
+              <Route path="/shop" element={<Shop />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/profile" element={<Profile />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/pets" element={<Pets />} />
-              <Route path="/groomer-calendar" element={<GroomerDashboard />} />
-              <Route path="/groomer-schedule" element={<GroomerDashboard />} />
+              <Route path="/confirmation" element={<Confirmation />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/groomer-dashboard" element={<GroomerDashboard />} />
+              <Route path="/groomer-calendar" element={<GroomerCalendar />} />
+              <Route path="/groomer-schedule" element={<GroomerSchedule />} />
               <Route path="/groomer-availability" element={<GroomerAvailability />} />
               <Route path="/vet-calendar" element={<VetCalendar />} />
-              <Route path="/shop" element={<Shop />} />
-              <Route path="/cart" element={<Cart />} />
               <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/booking" element={<AdminBookingPage />} />
               <Route path="/admin/availability" element={<AdminAvailabilityManager />} />
-              <Route path="/admin/book-for-client" element={<AdminBookingPage />} />
-              <Route path="/status-center" element={<StatusCenter />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/status" element={<StatusCenter />} />
               <Route path="/test-data" element={<TestDataPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

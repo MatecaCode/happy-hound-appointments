@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -99,8 +100,28 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     setSelectedTimeSlotId(null);
   };
 
+  // Full screen loading overlay for booking submission
+  if (isLoading && canSubmit) {
+    return (
+      <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="text-center animate-fade-in">
+          <div className="relative mb-6">
+            <div className="w-20 h-20 border-4 border-primary/20 rounded-full animate-pulse"></div>
+            <div className="absolute inset-0 w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <h2 className="text-xl font-semibold text-primary mb-2">
+            Processando seu agendamento...
+          </h2>
+          <p className="text-muted-foreground">
+            Aguarde enquanto confirmamos sua solicitação
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">{stepTitle}</h2>
         {onBack && (
@@ -109,6 +130,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             variant="outline" 
             onClick={onBack}
             disabled={isLoading}
+            className="hover-scale"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
             Voltar
@@ -118,17 +140,17 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'calendar' | 'next-available')}>
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="calendar" disabled={isLoading}>
+          <TabsTrigger value="calendar" disabled={isLoading} className="transition-all duration-200">
             <CalendarIcon className="w-4 h-4 mr-2" />
             Escolher Data
           </TabsTrigger>
-          <TabsTrigger value="next-available" disabled={isLoading}>
+          <TabsTrigger value="next-available" disabled={isLoading} className="transition-all duration-200">
             <Clock className="w-4 h-4 mr-2" />
             Próximo Disponível
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="calendar" className="space-y-4">
+        <TabsContent value="calendar" className="space-y-4 animate-slide-in-right">
           <div>
             <Label>Selecione uma data</Label>
             <Calendar
@@ -140,17 +162,17 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                 // Use the staff availability hook to determine if date should be disabled
                 return isDateDisabled(date);
               }}
-              className="rounded-md border"
+              className="rounded-md border transition-all duration-200 hover:shadow-md"
             />
             {availabilityLoading && (
-              <p className="text-sm text-muted-foreground mt-2">
+              <p className="text-sm text-muted-foreground mt-2 animate-pulse">
                 Carregando disponibilidade...
               </p>
             )}
           </div>
 
           {showTimeSlots && date && (
-            <div>
+            <div className="animate-fade-in">
               <Label>Horários disponíveis</Label>
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
@@ -164,7 +186,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                       key={slot.id}
                       type="button"
                       variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
-                      className="h-auto py-2"
+                      className="h-auto py-2 transition-all duration-200 hover:scale-105"
                       onClick={() => setSelectedTimeSlotId(slot.id)}
                       disabled={!slot.available || isLoading}
                     >
@@ -181,9 +203,9 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
           )}
         </TabsContent>
 
-        <TabsContent value="next-available" className="space-y-4">
+        <TabsContent value="next-available" className="space-y-4 animate-slide-in-right">
           {nextAvailable ? (
-            <div className="p-4 border rounded-lg">
+            <div className="p-4 border rounded-lg hover:shadow-md transition-all duration-200">
               <h3 className="font-semibold mb-2">Próximo horário disponível</h3>
               <p className="text-sm text-muted-foreground mb-2">
                 {format(new Date(nextAvailable.date), "EEEE, d 'de' MMMM", { locale: ptBR })} às {nextAvailable.time}
@@ -197,6 +219,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                 type="button" 
                 onClick={handleNextAvailableSelect}
                 disabled={isLoading}
+                className="hover-scale"
               >
                 Selecionar este horário
               </Button>
@@ -209,26 +232,26 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
         </TabsContent>
       </Tabs>
 
-      <div>
+      <div className="animate-fade-in">
         <Label htmlFor="notes">Observações (opcional)</Label>
         <Textarea
           id="notes"
           placeholder="Alguma informação importante sobre seu pet ou preferências..."
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="mt-2"
+          className="mt-2 transition-all duration-200 focus:shadow-md"
           rows={3}
           disabled={isLoading}
         />
       </div>
 
       {showSubmitButton && (
-        <div className="flex gap-4">
+        <div className="flex gap-4 animate-fade-in">
           <Button
             type="submit"
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className="flex-1"
+            className="flex-1 transition-all duration-200 hover:scale-105"
           >
             {isLoading ? (
               <>

@@ -114,9 +114,21 @@ const PendingApprovalsSection = () => {
       const appointment = pendingAppointments.find(a => a.id === appointmentId);
       
       if (newStatus === 'confirmed') {
-        toast.success(`Agendamento de ${appointment?.client?.name} foi aprovado!`);
+        toast.success(`Agendamento de ${appointment?.client?.name} foi aprovado!`, {
+          style: {
+            background: '#10B981',
+            color: 'white',
+            border: 'none'
+          }
+        });
       } else {
-        toast.success(`Agendamento de ${appointment?.client?.name} foi rejeitado!`);
+        toast.success(`Agendamento de ${appointment?.client?.name} foi rejeitado!`, {
+          style: {
+            background: '#EF4444',
+            color: 'white',
+            border: 'none'
+          }
+        });
         
         // If rejected, we should free up the staff availability slots
         if (appointment && appointment.staff && appointment.staff.length > 0) {
@@ -207,7 +219,7 @@ const PendingApprovalsSection = () => {
         ) : (
           <div className="space-y-4">
             {pendingAppointments.map((appointment) => (
-              <div key={appointment.id} className="border rounded-lg p-4 space-y-3">
+              <div key={appointment.id} className="border rounded-lg p-4 space-y-3 hover:shadow-md transition-all duration-200 animate-fade-in">
                 <div className="flex justify-between items-start">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -256,7 +268,9 @@ const PendingApprovalsSection = () => {
                     </div>
                   </div>
                   
-                  <Badge variant="secondary">Pendente</Badge>
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
+                    Pendente
+                  </Badge>
                 </div>
                 
                 <div className="flex gap-2 justify-end">
@@ -264,7 +278,7 @@ const PendingApprovalsSection = () => {
                     size="sm"
                     variant="outline"
                     onClick={() => handleApproval(appointment.id, 'rejected')}
-                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    className="text-red-600 border-red-200 hover:bg-red-50 hover-scale"
                   >
                     <XCircle className="h-4 w-4 mr-1" />
                     Rejeitar
@@ -272,7 +286,7 @@ const PendingApprovalsSection = () => {
                   <Button
                     size="sm"
                     onClick={() => handleApproval(appointment.id, 'confirmed')}
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-green-600 hover:bg-green-700 hover-scale"
                   >
                     <CheckCircle className="h-4 w-4 mr-1" />
                     Aprovar

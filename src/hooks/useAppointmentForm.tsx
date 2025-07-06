@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { usePricing } from './usePricing';
 import { debugAppointmentStatus, debugServiceStatus } from '@/utils/debugAppointmentStatus';
+import { useNavigate } from 'react-router-dom';
 
 export interface Pet {
   id: string;
@@ -53,6 +54,7 @@ export interface NextAvailable {
 }
 
 export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [selectedGroomerId, setSelectedGroomerId] = useState<string | null>(null);
@@ -170,58 +172,34 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
       console.log('✅ [BOOKING_SUBMIT] Client found:', clientData.id);
 
-      // Prepare appointment data - try different status values based on what we find
+      // Prepare appointment data - ALWAYS use 'pending' status initially
       const dateStr = date.toISOString().split('T')[0];
       const serviceDuration = pricing?.duration || selectedService.default_duration || 60;
       
-      // Try multiple status combinations to find what works
-      const statusOptions = [
-        { status: 'pending', service_status: 'not_started' },
-        { status: 'confirmed', service_status: 'not_started' },
-        { status: 'scheduled', service_status: 'not_started' },
-        { status: 'booked', service_status: 'not_started' },
-        { status: 'pending', service_status: 'scheduled' },
-        { status: 'pending', service_status: 'pending' }
-      ];
+      const appointmentData = {
+        client_id: clientData.id,
+        pet_id: selectedPet.id,
+        service_id: selectedService.id,
+        date: dateStr,
+        time: selectedTimeSlotId,
+        notes: notes || null,
+        status: 'pending', // ALWAYS start with pending
+        service_status: 'not_started', // ALWAYS start with not_started
+        duration: serviceDuration,
+        total_price: pricing?.price || selectedService.base_price || 0
+      };
 
-      let appointment = null;
-      let lastError = null;
+      console.log('📝 [BOOKING_SUBMIT] Creating appointment with data:', appointmentData);
 
-      for (const statusCombo of statusOptions) {
-        const appointmentData = {
-          client_id: clientData.id,
-          pet_id: selectedPet.id,
-          service_id: selectedService.id,
-          date: dateStr,
-          time: selectedTimeSlotId,
-          notes: notes || null,
-          status: statusCombo.status,
-          service_status: statusCombo.service_status,
-          duration: serviceDuration,
-          total_price: pricing?.price || selectedService.base_price || 0
-        };
+      const { data: appointment, error: appointmentError } = await supabase
+        .from('appointments')
+        .insert(appointmentData)
+        .select()
+        .single();
 
-        console.log(`📝 [BOOKING_SUBMIT] Trying status combo:`, statusCombo);
-
-        const { data: appointmentResult, error: appointmentError } = await supabase
-          .from('appointments')
-          .insert(appointmentData)
-          .select()
-          .single();
-
-        if (!appointmentError && appointmentResult) {
-          appointment = appointmentResult;
-          console.log('✅ [BOOKING_SUBMIT] Success with status combo:', statusCombo);
-          break;
-        } else {
-          lastError = appointmentError;
-          console.log(`❌ [BOOKING_SUBMIT] Failed with status combo:`, statusCombo, appointmentError?.message);
-        }
-      }
-
-      if (!appointment) {
-        console.error('❌ [BOOKING_SUBMIT] All status combinations failed. Last error:', lastError);
-        throw new Error(`Erro ao criar agendamento: ${lastError?.message || 'Status inválido'}`);
+      if (appointmentError || !appointment) {
+        console.error('❌ [BOOKING_SUBMIT] Appointment creation failed:', appointmentError);
+        throw new Error(`Erro ao criar agendamento: ${appointmentError?.message || 'Erro desconhecido'}`);
       }
 
       console.log('✅ [BOOKING_SUBMIT] Appointment created:', appointment.id);
@@ -289,8 +267,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       }
 
       // Success! Show confirmation message
-      toast.success('Seu agendamento está pendente de aprovação pela clínica. Você receberá uma notificação quando for aprovado.', {
-        duration: 8000,
+      toast.success('Agendamento criado com sucesso! Aguardando aprovação da clínica.', {
+        duration: 4000,
         style: {
           background: '#10B981',
           color: 'white',
@@ -309,6 +287,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       setNotes('');
       setFormStep(1);
       
+      // Redirect to booking success page with appointment ID
+      navigate(`/booking-success?id=${appointment.id}`);
+      
     } catch (error: any) {
       console.error('❌ [BOOKING_SUBMIT] Fatal error:', error);
       
@@ -324,7 +305,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, selectedPet, selectedService, date, selectedTimeSlotId, selectedGroomerId, notes, serviceRequiresStaff, pricing]);
+  }, [user, selectedPet, selectedService, date, selectedTimeSlotId, selectedGroomerId, notes, serviceRequiresStaff, pricing, navigate]);
 
   return {
     date,
