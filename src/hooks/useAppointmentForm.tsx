@@ -1,9 +1,9 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useAppointmentData } from './useAppointmentData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { usePricing } from './usePricing';
 
 export interface Pet {
   id: string;
@@ -74,6 +74,15 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     fetchUserPets,
     fetchTimeSlots,
   } = useAppointmentData();
+
+  // Get pricing for current pet/service combination
+  const pricingParams = selectedPet && selectedService ? {
+    serviceId: selectedService.id,
+    breedId: selectedPet.breed_id,
+    size: selectedPet.size
+  } : null;
+
+  const { pricing } = usePricing(pricingParams);
 
   // Check service requirements when service is selected
   useEffect(() => {
@@ -149,7 +158,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         date: date.toISOString().split('T')[0],
         time: selectedTimeSlotId,
         notes: notes || null,
-        status: 'pending'
+        status: 'pending',
+        // Include calculated pricing info
+        duration: pricing?.duration || selectedService.default_duration || 60,
+        total_price: pricing?.price || selectedService.base_price || 0
       };
 
       const { data, error } = await supabase
@@ -193,7 +205,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     } finally {
       setIsLoading(false);
     }
-  }, [user, selectedPet, selectedService, date, selectedTimeSlotId, selectedGroomerId, notes, serviceRequiresStaff]);
+  }, [user, selectedPet, selectedService, date, selectedTimeSlotId, selectedGroomerId, notes, serviceRequiresStaff, pricing]);
 
   return {
     date,
@@ -223,5 +235,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     fetchServices,
     serviceRequiresStaff,
     serviceRequirementsLoaded,
+    pricing,
   };
 };

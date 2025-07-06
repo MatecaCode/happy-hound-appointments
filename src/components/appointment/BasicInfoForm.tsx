@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pet, Service } from '@/hooks/useAppointmentForm';
+import { usePricing } from '@/hooks/usePricing';
 
 interface BasicInfoFormProps {
   userPets: Pet[];
@@ -27,6 +28,15 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   onNext,
   serviceType
 }) => {
+  // Calculate pricing when both pet and service are selected
+  const pricingParams = selectedPet && selectedService ? {
+    serviceId: selectedService.id,
+    breedId: selectedPet.breed_id,
+    size: selectedPet.size
+  } : null;
+
+  const { pricing, isLoading: pricingLoading } = usePricing(pricingParams);
+
   const handleNext = () => {
     if (selectedPet && selectedService) {
       onNext();
@@ -34,6 +44,17 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   };
 
   const isNextEnabled = selectedPet && selectedService;
+
+  const formatSizeLabel = (size?: string) => {
+    if (!size) return size;
+    const sizeMap = {
+      'small': 'Pequeno',
+      'medium': 'Médio', 
+      'large': 'Grande',
+      'extra_large': 'Extra Grande'
+    };
+    return sizeMap[size as keyof typeof sizeMap] || size;
+  };
 
   return (
     <Card>
@@ -63,10 +84,7 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
                     <span>{pet.name}</span>
                     {pet.breed && (
                       <span className="text-xs text-muted-foreground">
-                        {pet.breed} - {pet.size === 'small' ? 'Pequeno' : 
-                                     pet.size === 'medium' ? 'Médio' : 
-                                     pet.size === 'large' ? 'Grande' : 
-                                     pet.size === 'extra_large' ? 'Extra Grande' : pet.size}
+                        {pet.breed} - {formatSizeLabel(pet.size)}
                       </span>
                     )}
                   </div>
@@ -115,7 +133,42 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
           )}
         </div>
 
-        {selectedService && (
+        {/* Dynamic Pricing Display */}
+        {selectedService && selectedPet && (
+          <div className="p-4 bg-muted rounded-lg">
+            <h4 className="font-medium mb-2">{selectedService.name}</h4>
+            <div className="text-sm space-y-1">
+              <p>Pet: {selectedPet.name} ({formatSizeLabel(selectedPet.size)})</p>
+              
+              {pricingLoading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                  <span>Calculando preço...</span>
+                </div>
+              ) : pricing ? (
+                <div className="space-y-1">
+                  <p className="font-medium text-green-600">
+                    Preço: R$ {pricing.price.toFixed(2)}
+                  </p>
+                  <p>Duração estimada: {pricing.duration} minutos</p>
+                  {pricing.priceSource !== 'exact_match' && (
+                    <p className="text-xs text-muted-foreground">
+                      {pricing.priceSource === 'service_size_fallback' && 'Preço baseado no porte do pet'}
+                      {pricing.priceSource === 'service_default' && 'Preço padrão do serviço'}
+                      {pricing.priceSource === 'system_default' && 'Preço padrão do sistema'}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Erro ao calcular preço
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {selectedService && !selectedPet && (
           <div className="p-4 bg-muted rounded-lg">
             <h4 className="font-medium mb-2">{selectedService.name}</h4>
             <div className="text-sm space-y-1">
@@ -127,6 +180,9 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
                   Preço base: R$ {selectedService.base_price}
                 </p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Selecione um pet para ver o preço personalizado
+              </p>
             </div>
           </div>
         )}
