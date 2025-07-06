@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
@@ -6,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Dog, Clock, CheckCircle, XCircle, Play } from 'lucide-react';
+import { Dog, Clock, CheckCircle, XCircle, Play, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -22,6 +21,9 @@ interface AppointmentWithDetails {
   service_status?: 'not_started' | 'in_progress' | 'completed';
   notes?: string;
   staff_name?: string;
+  staff_names?: string[];
+  duration?: number;
+  total_price?: number;
 }
 
 const Appointments = () => {
@@ -36,7 +38,7 @@ const Appointments = () => {
       
       setIsLoading(true);
       try {
-        console.log('Fetching appointments for user:', user.id);
+        console.log('🔍 [APPOINTMENTS] Fetching appointments for user:', user.id);
         
         // First get client_id from user
         const { data: clientData, error: clientError } = await supabase
@@ -46,12 +48,12 @@ const Appointments = () => {
           .single();
 
         if (clientError || !clientData) {
-          console.log('No client record found for user:', user.id);
+          console.log('❌ [APPOINTMENTS] No client record found for user:', user.id);
           setAppointments([]);
           return;
         }
 
-        // Get appointments with related data
+        // Get appointments with related data including staff from appointment_staff
         const { data, error } = await supabase
           .from('appointments')
           .select(`
@@ -61,6 +63,8 @@ const Appointments = () => {
             status,
             service_status,
             notes,
+            duration,
+            total_price,
             client_id,
             pets:pet_id (name),
             services:service_id (name),
@@ -72,16 +76,16 @@ const Appointments = () => {
           .order('date', { ascending: true });
         
         if (error) {
-          console.error('Supabase error:', error);
+          console.error('❌ [APPOINTMENTS] Supabase error:', error);
           throw error;
         }
         
-        console.log('Raw appointments data:', data);
+        console.log('📊 [APPOINTMENTS] Raw appointments data:', data);
         
         if (data) {
           const formattedData = data.map((apt) => {
-            // Get staff name from appointment_staff relationship
-            const staffName = apt.appointment_staff?.[0]?.staff_profiles?.name || null;
+            // Get all staff names from appointment_staff relationship
+            const staffNames = apt.appointment_staff?.map((as: any) => as.staff_profiles?.name).filter(Boolean) || [];
 
             return {
               id: apt.id,
@@ -92,15 +96,18 @@ const Appointments = () => {
               status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
               service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
               notes: apt.notes || undefined,
-              staff_name: staffName
+              staff_names: staffNames,
+              staff_name: staffNames.length > 0 ? staffNames.join(', ') : undefined,
+              duration: apt.duration || 60,
+              total_price: apt.total_price || 0
             };
           });
           
-          console.log('Formatted appointments:', formattedData);
+          console.log('✅ [APPOINTMENTS] Formatted appointments:', formattedData);
           setAppointments(formattedData);
         }
       } catch (error: any) {
-        console.error('Error fetching appointments:', error.message);
+        console.error('❌ [APPOINTMENTS] Error fetching appointments:', error.message);
         toast.error('Erro ao carregar os agendamentos');
       } finally {
         setIsLoading(false);
@@ -133,7 +140,7 @@ const Appointments = () => {
         toast.success(`Agendamento para ${appointment.pet_name} foi cancelado.`);
       }
     } catch (error: any) {
-      console.error('Error cancelling appointment:', error.message);
+      console.error('❌ [APPOINTMENTS] Error cancelling appointment:', error.message);
       toast.error('Erro ao cancelar agendamento');
     }
   };
@@ -143,7 +150,7 @@ const Appointments = () => {
       case 'pending':
         return (
           <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
-            <Clock className="w-3 h-3 mr-1" />
+            <AlertCircle className="w-3 h-3 mr-1" />
             Aguardando Aprovação
           </Badge>
         );
@@ -219,12 +226,18 @@ const Appointments = () => {
         </div>
         <div className="flex items-center text-sm">
           <span className="font-medium w-20">Horário:</span>
-          <span>{appointment.time}</span>
+          <span>{appointment.time} ({appointment.duration}min)</span>
         </div>
-        {appointment.staff_name && (
+        {appointment.staff_names && appointment.staff_names.length > 0 && (
           <div className="flex items-center text-sm">
-            <span className="font-medium w-20">Profissional:</span>
-            <span>{appointment.staff_name}</span>
+            <span className="font-medium w-20">Profissionais:</span>
+            <span>{appointment.staff_names.join(', ')}</span>
+          </div>
+        )}
+        {appointment.total_price && appointment.total_price > 0 && (
+          <div className="flex items-center text-sm">
+            <span className="font-medium w-20">Valor:</span>
+            <span className="text-green-600 font-medium">R$ {appointment.total_price.toFixed(2)}</span>
           </div>
         )}
         {appointment.notes && (
@@ -238,8 +251,8 @@ const Appointments = () => {
       {appointment.status === 'pending' && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
           <p className="text-sm text-amber-800">
-            <Clock className="w-4 h-4 inline mr-1" />
-            Aguardando aprovação da nossa equipe. Você receberá uma confirmação em breve.
+            <AlertCircle className="w-4 h-4 inline mr-1" />
+            Seu agendamento está pendente de aprovação pela clínica. Você receberá uma confirmação em breve.
           </p>
         </div>
       )}
@@ -271,7 +284,7 @@ const Appointments = () => {
         <div className="max-w-7xl mx-auto px-6 text-center">
           <h1 className="mb-4">Meus <span className="text-primary">Agendamentos</span></h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Visualize e gerencie todos os seus agendamentos de tosa.
+            Visualize e gerencie todos os seus agendamentos de serviços.
           </p>
         </div>
       </section>
@@ -291,6 +304,7 @@ const Appointments = () => {
             <TabsContent value="upcoming">
               {isLoading ? (
                 <div className="text-center py-10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                   <p>Carregando agendamentos...</p>
                 </div>
               ) : upcomingAppointments.length > 0 ? (
@@ -307,10 +321,10 @@ const Appointments = () => {
                   <Dog className="w-12 h-12 mx-auto mb-4 text-primary opacity-70" />
                   <h3 className="text-xl font-bold mb-2">Nenhum Agendamento Próximo</h3>
                   <p className="text-muted-foreground mb-6">
-                    Você não tem nenhum agendamento de tosa próximo.
+                    Você não tem nenhum agendamento próximo.
                   </p>
                   <Button asChild>
-                    <Link to="/book">Agendar uma Tosa</Link>
+                    <Link to="/book">Agendar um Serviço</Link>
                   </Button>
                 </div>
               )}
@@ -319,6 +333,7 @@ const Appointments = () => {
             <TabsContent value="past">
               {isLoading ? (
                 <div className="text-center py-10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
                   <p>Carregando agendamentos...</p>
                 </div>
               ) : pastAppointments.length > 0 ? (

@@ -131,8 +131,21 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       return;
     }
 
+    console.log('🚀 [APPOINTMENT_SUBMIT] Starting booking process:', {
+      user: user.id,
+      pet: selectedPet.name,
+      service: selectedService.name,
+      date: date.toISOString().split('T')[0],
+      time: selectedTimeSlotId,
+      staffIds: selectedStaffIds
+    });
+
     try {
       setIsLoading(true);
+
+      // Start a transaction-like approach
+      const dateStr = date.toISOString().split('T')[0];
+      const serviceDuration = pricing?.duration || selectedService.default_duration || 60;
 
       // Get client_id from user_id
       const { data: clientData, error: clientError } = await supabase
@@ -142,42 +155,44 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         .single();
 
       if (clientError || !clientData) {
-        toast.error('Erro ao encontrar dados do cliente');
-        return;
+        throw new Error('Erro ao encontrar dados do cliente');
       }
 
-      // Prepare appointment data
+      console.log('✅ [APPOINTMENT_SUBMIT] Client found:', clientData.id);
+
+      // Create the appointment
       const appointmentData = {
         client_id: clientData.id,
         pet_id: selectedPet.id,
         service_id: selectedService.id,
-        date: date.toISOString().split('T')[0],
+        date: dateStr,
         time: selectedTimeSlotId,
         notes: notes || null,
         status: 'pending',
-        duration: pricing?.duration || selectedService.default_duration || 60,
+        service_status: 'not_started',
+        duration: serviceDuration,
         total_price: pricing?.price || selectedService.base_price || 0
       };
 
-      console.log('🚀 [APPOINTMENT_SUBMIT] Creating appointment with data:', appointmentData);
+      console.log('📝 [APPOINTMENT_SUBMIT] Creating appointment with data:', appointmentData);
 
-      // Create the appointment
-      const { data: appointment, error } = await supabase
+      const { data: appointment, error: appointmentError } = await supabase
         .from('appointments')
         .insert(appointmentData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (appointmentError) throw appointmentError;
+      if (!appointment) throw new Error('Falha ao criar agendamento');
 
-      console.log('✅ [APPOINTMENT_SUBMIT] Appointment created:', appointment);
+      console.log('✅ [APPOINTMENT_SUBMIT] Appointment created:', appointment.id);
 
-      // If service requires staff, link the staff members using appointment_staff
-      if (serviceRequiresStaff && selectedStaffIds && selectedStaffIds.length > 0 && appointment) {
-        console.log('🔗 [APPOINTMENT_SUBMIT] Linking staff members:', selectedStaffIds);
+      // Link staff members if they exist
+      if (selectedStaffIds && selectedStaffIds.length > 0) {
+        console.log('🔗 [APPOINTMENT_SUBMIT] Linking', selectedStaffIds.length, 'staff members');
         
         for (const staffId of selectedStaffIds) {
-          const { error: staffError } = await supabase
+          const { error: staffLinkError } = await supabase
             .from('appointment_staff')
             .insert({
               appointment_id: appointment.id,
@@ -185,16 +200,59 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
               role: 'primary'
             });
 
-          if (staffError) {
-            console.error('❌ [APPOINTMENT_SUBMIT] Error linking staff:', staffError);
-            // Don't fail the whole appointment for this
+          if (staffLinkError) {
+            console.error('❌ [APPOINTMENT_SUBMIT] Error linking staff:', staffId, staffLinkError);
+            // Continue with other staff, don't fail the whole appointment
           } else {
-            console.log('✅ [APPOINTMENT_SUBMIT] Staff successfully linked:', staffId);
+            console.log('✅ [APPOINTMENT_SUBMIT] Staff linked:', staffId);
+          }
+        }
+
+        // Update staff availability - mark time slots as unavailable
+        console.log('🔒 [APPOINTMENT_SUBMIT] Updating staff availability for', serviceDuration, 'minutes');
+
+        for (const staffId of selectedStaffIds) {
+          // Calculate all time slots needed for this service duration
+          const slotsToUpdate = [];
+          for (let offset = 0; offset < serviceDuration; offset += 30) {
+            const slotTime = new Date(`1970-01-01T${selectedTimeSlotId}`);
+            slotTime.setMinutes(slotTime.getMinutes() + offset);
+            const timeStr = slotTime.toTimeString().split(' ')[0]; // Format: HH:MM:SS
+            slotsToUpdate.push(timeStr);
+          }
+
+          console.log('🔒 [APPOINTMENT_SUBMIT] Marking unavailable for staff', staffId, ':', slotsToUpdate);
+
+          // Update each time slot
+          for (const timeSlot of slotsToUpdate) {
+            const { error: availabilityError } = await supabase
+              .from('staff_availability')
+              .update({ available: false })
+              .eq('staff_profile_id', staffId)
+              .eq('date', dateStr)
+              .eq('time_slot', timeSlot);
+
+            if (availabilityError) {
+              console.error('⚠️ [APPOINTMENT_SUBMIT] Failed to update availability for', staffId, timeSlot, availabilityError);
+              // Continue - don't fail the booking for availability update issues
+            } else {
+              console.log('✅ [APPOINTMENT_SUBMIT] Marked unavailable:', staffId, timeSlot);
+            }
           }
         }
       }
 
-      toast.success('Agendamento criado com sucesso!');
+      // Success feedback
+      toast.success('Seu agendamento está pendente de aprovação pela clínica. Você receberá uma notificação quando for aprovado.', {
+        duration: 5000,
+        style: {
+          background: '#10B981',
+          color: 'white',
+          border: 'none'
+        }
+      });
+
+      console.log('🎉 [APPOINTMENT_SUBMIT] Booking completed successfully');
       
       // Reset form
       setSelectedPet(null);
@@ -207,7 +265,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       
     } catch (error: any) {
       console.error('❌ [APPOINTMENT_SUBMIT] Error creating appointment:', error);
-      toast.error('Erro ao criar agendamento: ' + error.message);
+      toast.error('Erro ao criar agendamento: ' + (error.message || 'Erro desconhecido'), {
+        duration: 5000
+      });
     } finally {
       setIsLoading(false);
     }

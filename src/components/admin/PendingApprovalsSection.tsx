@@ -18,6 +18,8 @@ interface PendingAppointment {
   client_id: string;
   pet_id: string;
   service_id: string;
+  duration?: number;
+  total_price?: number;
   created_at: string;
   // Related data
   client?: { name: string; };
@@ -32,7 +34,9 @@ const PendingApprovalsSection = () => {
 
   const fetchPendingAppointments = async () => {
     try {
-      // Updated query for Phase 1 schema
+      console.log('🔍 [PENDING_APPROVALS] Fetching pending appointments...');
+
+      // Get appointments with related data using the new appointment_staff structure
       const { data: appointments, error } = await supabase
         .from('appointments')
         .select(`
@@ -44,6 +48,8 @@ const PendingApprovalsSection = () => {
           client_id,
           pet_id,
           service_id,
+          duration,
+          total_price,
           created_at,
           clients!inner(name),
           pets!inner(name),
@@ -58,6 +64,8 @@ const PendingApprovalsSection = () => {
 
       if (error) throw error;
 
+      console.log('📊 [PENDING_APPROVALS] Raw data:', appointments);
+
       // Transform the data to match our interface
       const transformedAppointments: PendingAppointment[] = appointments?.map(apt => ({
         id: apt.id,
@@ -68,6 +76,8 @@ const PendingApprovalsSection = () => {
         client_id: apt.client_id,
         pet_id: apt.pet_id,
         service_id: apt.service_id,
+        duration: apt.duration || 60,
+        total_price: apt.total_price || 0,
         created_at: apt.created_at,
         client: { name: (apt.clients as any)?.name || 'Cliente' },
         pet: { name: (apt.pets as any)?.name || 'Pet' },
@@ -77,9 +87,10 @@ const PendingApprovalsSection = () => {
         })) || []
       })) || [];
 
+      console.log('✅ [PENDING_APPROVALS] Processed appointments:', transformedAppointments);
       setPendingAppointments(transformedAppointments);
     } catch (error: any) {
-      console.error('Error fetching pending appointments:', error);
+      console.error('❌ [PENDING_APPROVALS] Error fetching pending appointments:', error);
       toast.error('Erro ao carregar agendamentos pendentes');
     } finally {
       setIsLoading(false);
@@ -88,6 +99,8 @@ const PendingApprovalsSection = () => {
 
   const handleApproval = async (appointmentId: string, newStatus: 'confirmed' | 'rejected') => {
     try {
+      console.log('🔄 [PENDING_APPROVALS] Updating appointment:', appointmentId, 'to status:', newStatus);
+
       const { error } = await supabase
         .from('appointments')
         .update({ 
@@ -98,16 +111,54 @@ const PendingApprovalsSection = () => {
 
       if (error) throw error;
 
-      toast.success(
-        newStatus === 'confirmed' 
-          ? 'Agendamento aprovado!' 
-          : 'Agendamento rejeitado!'
-      );
+      const appointment = pendingAppointments.find(a => a.id === appointmentId);
+      
+      if (newStatus === 'confirmed') {
+        toast.success(`Agendamento de ${appointment?.client?.name} foi aprovado!`);
+      } else {
+        toast.success(`Agendamento de ${appointment?.client?.name} foi rejeitado!`);
+        
+        // If rejected, we should free up the staff availability slots
+        if (appointment && appointment.staff && appointment.staff.length > 0) {
+          console.log('🔓 [PENDING_APPROVALS] Freeing up staff availability for rejected appointment');
+          
+          // Get staff IDs linked to this appointment
+          const { data: staffLinks } = await supabase
+            .from('appointment_staff')
+            .select('staff_profile_id')
+            .eq('appointment_id', appointmentId);
+
+          if (staffLinks) {
+            const serviceDuration = appointment.duration || 60;
+            
+            for (const staffLink of staffLinks) {
+              // Calculate all time slots that were blocked
+              const slotsToFree = [];
+              for (let offset = 0; offset < serviceDuration; offset += 30) {
+                const slotTime = new Date(`1970-01-01T${appointment.time}`);
+                slotTime.setMinutes(slotTime.getMinutes() + offset);
+                const timeStr = slotTime.toTimeString().split(' ')[0];
+                slotsToFree.push(timeStr);
+              }
+
+              // Free up each time slot
+              for (const timeSlot of slotsToFree) {
+                await supabase
+                  .from('staff_availability')
+                  .update({ available: true })
+                  .eq('staff_profile_id', staffLink.staff_profile_id)
+                  .eq('date', appointment.date)
+                  .eq('time_slot', timeSlot);
+              }
+            }
+          }
+        }
+      }
 
       // Refresh the list
       fetchPendingAppointments();
     } catch (error: any) {
-      console.error('Error updating appointment:', error);
+      console.error('❌ [PENDING_APPROVALS] Error updating appointment:', error);
       toast.error('Erro ao atualizar agendamento');
     }
   };
@@ -128,7 +179,7 @@ const PendingApprovalsSection = () => {
         <CardContent>
           <div className="animate-pulse space-y-4">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-20 bg-gray-200 rounded"></div>
+              <div key={i} className="h-24 bg-gray-200 rounded"></div>
             ))}
           </div>
         </CardContent>
@@ -175,17 +226,22 @@ const PendingApprovalsSection = () => {
                       </div>
                       <div className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />
-                        {appointment.time}
+                        {appointment.time} ({appointment.duration}min)
                       </div>
                     </div>
                     
                     <div className="text-sm">
                       <strong>Serviço:</strong> {appointment.service?.name}
+                      {appointment.total_price > 0 && (
+                        <span className="ml-2 text-green-600 font-medium">
+                          R$ {appointment.total_price.toFixed(2)}
+                        </span>
+                      )}
                     </div>
                     
                     {appointment.staff && appointment.staff.length > 0 && (
                       <div className="text-sm">
-                        <strong>Staff:</strong> {appointment.staff.map(s => s.name).join(', ')}
+                        <strong>Profissionais:</strong> {appointment.staff.map(s => s.name).join(', ')}
                       </div>
                     )}
                     
@@ -194,6 +250,10 @@ const PendingApprovalsSection = () => {
                         <strong>Observações:</strong> {appointment.notes}
                       </div>
                     )}
+
+                    <div className="text-xs text-gray-500">
+                      Solicitado em: {format(new Date(appointment.created_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                    </div>
                   </div>
                   
                   <Badge variant="secondary">Pendente</Badge>
