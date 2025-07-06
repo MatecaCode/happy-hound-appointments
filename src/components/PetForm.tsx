@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { toast } from 'sonner';
 
 interface Pet {
@@ -115,6 +115,12 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
     }
   };
 
+  // Convert breeds to options for the combobox
+  const breedOptions = breeds.map(breed => ({
+    value: breed.id,
+    label: breed.name
+  }));
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
@@ -130,22 +136,15 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="breed">Raça</Label>
-          <Select 
-            value={formData.breed_id} 
+          <Combobox
+            options={breedOptions}
+            value={formData.breed_id}
             onValueChange={(value) => setFormData({...formData, breed_id: value})}
+            placeholder={breedsLoading ? "Carregando..." : "Selecione ou digite uma raça"}
+            searchPlaceholder="Digite para buscar raça..."
+            emptyText="Nenhuma raça encontrada."
             disabled={breedsLoading}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={breedsLoading ? "Carregando..." : "Selecione uma raça"} />
-            </SelectTrigger>
-            <SelectContent>
-              {breeds.map((breed) => (
-                <SelectItem key={breed.id} value={breed.id}>
-                  {breed.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         </div>
 
         <div>
