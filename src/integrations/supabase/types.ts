@@ -305,6 +305,33 @@ export type Database = {
           },
         ]
       }
+      breeds: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          size_category: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          size_category?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          size_category?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           created_at: string | null
@@ -625,6 +652,7 @@ export type Database = {
           age: string | null
           birth_date: string | null
           breed: string | null
+          breed_id: string | null
           client_id: string
           created_at: string | null
           gender: string | null
@@ -641,6 +669,7 @@ export type Database = {
           age?: string | null
           birth_date?: string | null
           breed?: string | null
+          breed_id?: string | null
           client_id: string
           created_at?: string | null
           gender?: string | null
@@ -657,6 +686,7 @@ export type Database = {
           age?: string | null
           birth_date?: string | null
           breed?: string | null
+          breed_id?: string | null
           client_id?: string
           created_at?: string | null
           gender?: string | null
@@ -669,6 +699,13 @@ export type Database = {
           weight?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "pets_breed_id_fkey"
+            columns: ["breed_id"]
+            isOneToOne: false
+            referencedRelation: "breeds"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pets_client_id_fkey"
             columns: ["client_id"]

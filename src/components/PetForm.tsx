@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { useBreeds } from '@/hooks/useBreeds';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +14,7 @@ interface Pet {
   id: string;
   name: string;
   breed?: string;
+  breed_id?: string;
   age?: string;
   size?: string;
   weight?: number;
@@ -27,10 +29,11 @@ interface PetFormProps {
 
 const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
   const { user } = useAuth();
+  const { breeds, isLoading: breedsLoading } = useBreeds();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: editingPet?.name || '',
-    breed: editingPet?.breed || '',
+    breed_id: editingPet?.breed_id || '',
     age: editingPet?.age || '',
     size: editingPet?.size || '',
     weight: editingPet?.weight || '',
@@ -61,13 +64,13 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
 
       const petData = {
         name: formData.name,
-        breed: formData.breed || null,
+        breed_id: formData.breed_id || null,
         age: formData.age || null,
         size: formData.size || null,
         weight: formData.weight ? parseFloat(formData.weight.toString()) : null,
         gender: formData.gender || null,
         notes: formData.notes || null,
-        client_id: clientData.id // Use client_id instead of user_id
+        client_id: clientData.id
       };
 
       let error;
@@ -94,7 +97,7 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
       if (!editingPet) {
         setFormData({
           name: '',
-          breed: '',
+          breed_id: '',
           age: '',
           size: '',
           weight: '',
@@ -127,11 +130,29 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="breed">Raça</Label>
-          <Input
-            id="breed"
-            value={formData.breed}
-            onChange={(e) => setFormData({...formData, breed: e.target.value})}
-          />
+          <Select 
+            value={formData.breed_id} 
+            onValueChange={(value) => setFormData({...formData, breed_id: value})}
+            disabled={breedsLoading}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={breedsLoading ? "Carregando..." : "Selecione uma raça"} />
+            </SelectTrigger>
+            <SelectContent>
+              {breeds.map((breed) => (
+                <SelectItem key={breed.id} value={breed.id}>
+                  {breed.name}
+                  {breed.size_category && (
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({breed.size_category === 'small' ? 'Pequeno' : 
+                        breed.size_category === 'medium' ? 'Médio' : 
+                        breed.size_category === 'large' ? 'Grande' : 'Extra Grande'})
+                    </span>
+                  )}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div>

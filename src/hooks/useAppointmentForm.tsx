@@ -9,6 +9,7 @@ export interface Pet {
   id: string;
   name: string;
   breed?: string;
+  breed_id?: string;
   age?: string;
   size?: string;
   weight?: number;
@@ -94,20 +95,21 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [user, fetchUserPets]);
 
-  // Fetch providers when date/service changes
+  // Fetch providers when service changes (this now happens in step 2)
   useEffect(() => {
-    if (date && selectedService && serviceRequiresStaff) {
-      fetchAvailableProviders(serviceType, date, selectedService);
+    if (selectedService && serviceRequiresStaff) {
+      // Don't need a specific date yet, just fetch available providers for this service
+      fetchAvailableProviders(serviceType, new Date(), selectedService);
     }
-  }, [date, selectedService, serviceType, serviceRequiresStaff, fetchAvailableProviders]);
+  }, [selectedService, serviceType, serviceRequiresStaff, fetchAvailableProviders]);
 
-  // Fetch time slots when date/groomer changes
+  // Fetch time slots when date/groomer changes (this now happens in step 3)
   useEffect(() => {
-    if (date && selectedService) {
+    if (date && selectedService && formStep === 3) {
       const staffId = serviceRequiresStaff ? selectedGroomerId : null;
       fetchTimeSlots(date, staffId, setIsLoading, selectedService);
     }
-  }, [date, selectedGroomerId, selectedService, serviceRequiresStaff, fetchTimeSlots]);
+  }, [date, selectedGroomerId, selectedService, serviceRequiresStaff, fetchTimeSlots, formStep]);
 
   const handleNextAvailableSelect = useCallback(() => {
     if (nextAvailable) {

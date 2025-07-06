@@ -3,7 +3,7 @@ import React from 'react';
 import { useAppointmentForm } from '@/hooks/useAppointmentForm';
 import BasicInfoForm from './appointment/BasicInfoForm';
 import DateTimeForm from './appointment/DateTimeForm';
-import GroomerSelectionForm from './appointment/GroomerSelectionForm';
+import StaffSelectionForm from './appointment/StaffSelectionForm';
 
 interface AppointmentFormProps {
   serviceType: 'grooming' | 'veterinary';
@@ -45,65 +45,45 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     fetchServices(serviceType);
   }, [serviceType, fetchServices]);
 
-  // Dynamic step calculation based on service requirements
+  // Updated step flow: Pet -> Service -> Staff -> Date/Time
   const getStepTitle = (step: number) => {
     if (step === 1) return "1. Informações Básicas";
-    if (step === 2) return "2. Escolha da Data";
-    if (step === 3 && serviceRequiresStaff) return "3. Seleção do Profissional";
-    if (step === 3 && !serviceRequiresStaff) return "3. Confirme o Horário";
-    if (step === 4) return "4. Confirme o Horário";
+    if (step === 2) return "2. Seleção do Profissional";
+    if (step === 3) return "3. Escolha da Data e Horário";
     return "";
   };
 
-  // Fixed step progression logic - only allow progression if service requirements are loaded
-  const getNextStep = (currentStep: number) => {
-    if (currentStep === 1) return 2;
-    if (currentStep === 2) {
-      // Only allow progression if we know the service requirements
-      if (!serviceRequirementsLoaded) return 2;
-      // From step 2: go to step 3 if staff required, otherwise skip to step 4 (final)
-      return serviceRequiresStaff ? 3 : 4;
-    }
-    if (currentStep === 3 && serviceRequiresStaff) return 4;
-    return currentStep;
-  };
-
-  const getPreviousStep = (currentStep: number) => {
-    if (currentStep === 2) return 1;
-    if (currentStep === 3) return 2;
-    if (currentStep === 4) {
-      // From step 4: go back to step 3 if staff was required, otherwise step 2
-      return serviceRequiresStaff ? 3 : 2;
-    }
-    return currentStep;
-  };
-
-  // A step is final if it's the time confirmation step
-  const isFinalStep = (step: number) => {
-    return (step === 3 && !serviceRequiresStaff) || (step === 4);
-  };
-
-  // Helper function to handle next button with proper validation
   const handleNextStep = (currentStep: number) => {
-    const nextStep = getNextStep(currentStep);
-    
-    // Prevent progression from step 2 if service requirements aren't loaded yet
-    if (currentStep === 2 && !serviceRequirementsLoaded) {
-      console.log('🔍 DEBUG: Service requirements not loaded yet, waiting...');
-      return;
+    if (currentStep === 1) {
+      // From basic info, always go to staff selection if service requires staff
+      if (serviceRequiresStaff) {
+        setFormStep(2);
+      } else {
+        // If no staff required, go directly to date/time
+        setFormStep(3);
+      }
+    } else if (currentStep === 2) {
+      // From staff selection, go to date/time
+      setFormStep(3);
     }
-    
-    console.log('🔍 DEBUG: Moving from step', currentStep, 'to step', nextStep);
-    setFormStep(nextStep);
+  };
+
+  const handleBackStep = (currentStep: number) => {
+    if (currentStep === 2) {
+      setFormStep(1);
+    } else if (currentStep === 3) {
+      // Go back to staff selection if service requires staff, otherwise to basic info
+      setFormStep(serviceRequiresStaff ? 2 : 1);
+    }
   };
 
   console.log('🔍 DEBUG: AppointmentForm render - Service requires staff:', serviceRequiresStaff);
   console.log('🔍 DEBUG: Service requirements loaded:', serviceRequirementsLoaded);
   console.log('🔍 DEBUG: Current form step:', formStep);
-  console.log('🔍 DEBUG: Is final step:', isFinalStep(formStep));
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {/* Step 1: Basic Info (Pet + Service) */}
       {formStep === 1 && (
         <BasicInfoForm
           userPets={userPets}
@@ -117,47 +97,21 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
         />
       )}
       
-      {formStep === 2 && (
-        <DateTimeForm
-          date={date}
-          setDate={setDate}
-          timeSlots={timeSlots}
-          selectedTimeSlotId={selectedTimeSlotId}
-          setSelectedTimeSlotId={setSelectedTimeSlotId}
-          nextAvailable={nextAvailable ? {
-            date: nextAvailable.date,
-            time: nextAvailable.time,
-            provider_name: nextAvailable.staff_name || 'Profissional'
-          } : null}
-          handleNextAvailableSelect={handleNextAvailableSelect}
-          isLoading={isLoading || !serviceRequirementsLoaded}
-          activeTab={activeTab}
-          setActiveTab={(tab: 'calendar' | 'next-available') => setActiveTab(tab)}
-          notes={notes}
-          setNotes={setNotes}
-          onBack={() => setFormStep(getPreviousStep(2))}
+      {/* Step 2: Staff Selection (only if service requires staff) */}
+      {formStep === 2 && serviceRequiresStaff && (
+        <StaffSelectionForm
+          staff={groomers}
+          selectedStaffId={selectedGroomerId}
+          setSelectedStaffId={setSelectedGroomerId}
           onNext={() => handleNextStep(2)}
-          showTimeSlots={false}
-          showSubmitButton={false}
-          stepTitle={getStepTitle(2)}
-        />
-      )}
-      
-      {/* Groomer selection - only show if service requires staff AND we're on step 3 */}
-      {formStep === 3 && serviceRequiresStaff && (
-        <GroomerSelectionForm
-          groomers={groomers}
-          selectedGroomerId={selectedGroomerId}
-          setSelectedGroomerId={setSelectedGroomerId}
-          date={date}
-          onNext={() => handleNextStep(3)}
-          onBack={() => setFormStep(getPreviousStep(3))}
+          onBack={() => handleBackStep(2)}
           serviceType={serviceType}
+          isLoading={isLoading}
         />
       )}
       
-      {/* Final step - time slot selection and confirmation (step 3 for no-staff, step 4 for staff) */}
-      {isFinalStep(formStep) && (
+      {/* Step 3: Date/Time Selection */}
+      {formStep === 3 && (
         <DateTimeForm
           date={date}
           setDate={setDate}
@@ -175,11 +129,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setActiveTab={(tab: 'calendar' | 'next-available') => setActiveTab(tab)}
           notes={notes}
           setNotes={setNotes}
-          onBack={() => setFormStep(getPreviousStep(formStep))}
+          onBack={() => handleBackStep(3)}
           onSubmit={handleSubmit}
           showTimeSlots={true}
           showSubmitButton={true}
-          stepTitle={getStepTitle(formStep)}
+          stepTitle={getStepTitle(3)}
         />
       )}
     </form>
