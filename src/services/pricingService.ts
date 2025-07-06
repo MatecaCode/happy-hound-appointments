@@ -78,52 +78,76 @@ export class PricingService {
     }
   }
 
-  private static async getExactMatchPricing(serviceId: string, breedId: string, size: string) {
-    const { data, error }: { data: any, error: any } = await supabase
-      .from('service_pricing')
-      .select('price, duration_override')
-      .eq('service_id', serviceId)
-      .eq('breed_id', breedId)
-      .eq('size', size)
-      .maybeSingle();
+  private static async getExactMatchPricing(serviceId: string, breedId: string, size: string): Promise<any> {
+    try {
+      const query = supabase
+        .from('service_pricing')
+        .select('price, duration_override')
+        .eq('service_id', serviceId)
+        .eq('breed_id', breedId)
+        .eq('size', size)
+        .maybeSingle();
 
-    if (error) {
-      console.log('🔍 [PRICING] No exact match found:', error.message);
+      const result = await query;
+      const { data, error } = result as { data: any; error: any };
+
+      if (error) {
+        console.log('🔍 [PRICING] No exact match found:', error.message);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.log('🔍 [PRICING] Error in getExactMatchPricing:', error);
       return null;
     }
-
-    return data;
   }
 
-  private static async getServiceSizeFallback(serviceId: string, size: string) {
-    const { data, error }: { data: any, error: any } = await supabase
-      .from('service_pricing')
-      .select('price, duration_override')
-      .eq('service_id', serviceId)
-      .eq('size', size)
-      .limit(1)
-      .maybeSingle();
+  private static async getServiceSizeFallback(serviceId: string, size: string): Promise<any> {
+    try {
+      const query = supabase
+        .from('service_pricing')
+        .select('price, duration_override')
+        .eq('service_id', serviceId)
+        .eq('size', size)
+        .limit(1)
+        .maybeSingle();
 
-    if (error) {
-      console.log('🔍 [PRICING] No service+size fallback found:', error.message);
+      const result = await query;
+      const { data, error } = result as { data: any; error: any };
+
+      if (error) {
+        console.log('🔍 [PRICING] No service+size fallback found:', error.message);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.log('🔍 [PRICING] Error in getServiceSizeFallback:', error);
       return null;
     }
-
-    return data;
   }
 
-  private static async getServiceDefault(serviceId: string) {
-    const { data, error }: { data: any, error: any } = await supabase
-      .from('services')
-      .select('base_price, default_duration')
-      .eq('id', serviceId)
-      .maybeSingle();
+  private static async getServiceDefault(serviceId: string): Promise<any> {
+    try {
+      const query = supabase
+        .from('services')
+        .select('base_price, default_duration')
+        .eq('id', serviceId)
+        .maybeSingle();
 
-    if (error) {
-      console.log('🔍 [PRICING] No service default found:', error.message);
+      const result = await query;
+      const { data, error } = result as { data: any; error: any };
+
+      if (error) {
+        console.log('🔍 [PRICING] No service default found:', error.message);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.log('🔍 [PRICING] Error in getServiceDefault:', error);
       return null;
     }
-
-    return data;
   }
 }
