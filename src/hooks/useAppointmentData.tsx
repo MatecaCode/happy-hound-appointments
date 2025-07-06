@@ -84,10 +84,24 @@ export const useAppointmentData = () => {
 
   const fetchUserPets = useCallback(async (userId: string) => {
     try {
+      // First get the client_id from the user_id
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (clientError || !clientData) {
+        console.error('Error fetching client data:', clientError);
+        toast.error('Erro ao buscar dados do cliente');
+        return;
+      }
+
+      // Then fetch pets using the client_id
       const { data, error } = await supabase
         .from('pets')
         .select('*')
-        .eq('client_id', userId);
+        .eq('client_id', clientData.id);
 
       if (error) {
         console.error('Error fetching user pets:', error);
