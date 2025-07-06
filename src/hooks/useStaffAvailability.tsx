@@ -65,7 +65,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         checkDate.setDate(today.getDate() + i);
         const dateStr = checkDate.toISOString().split('T')[0];
         
-        // Skip Sundays (day 0)
+        // Skip Sundays (day 0) - they should be unavailable
         if (checkDate.getDay() === 0) {
           unavailableDatesSet.add(dateStr);
           continue;
@@ -137,6 +137,9 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       }
 
       console.log(`✅ [BATCH_AVAILABILITY] Found ${unavailableDatesSet.size} unavailable dates out of 90 checked`);
+      console.log(`🗓️ [BATCH_AVAILABILITY] Sample unavailable dates:`, Array.from(unavailableDatesSet).slice(0, 10));
+      console.log(`🗓️ [BATCH_AVAILABILITY] Available dates for staff:`, Array.from(availabilityByDate.keys()).slice(0, 10));
+      
       return unavailableDatesSet;
 
     } catch (error) {
@@ -175,15 +178,25 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       return true;
     }
     
+    // Create date string using local timezone to match database format
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    console.log(`🗓️ [DATE_CHECK] Checking date: ${dateStr}, isUnavailable: ${unavailableDates.has(dateStr)}`);
+    
     // Disable dates with no staff availability
-    const dateStr = date.toISOString().split('T')[0];
     return unavailableDates.has(dateStr);
   }, [unavailableDates]);
 
   const checkDateAvailability = useCallback(async (date: Date): Promise<boolean> => {
     if (selectedStaffIds.length === 0) return true;
 
-    const dateStr = date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
     
     // Use the pre-computed unavailable dates for faster lookup
     return !unavailableDates.has(dateStr);
