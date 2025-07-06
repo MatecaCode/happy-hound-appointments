@@ -5,111 +5,158 @@ import { Service, Provider } from './useAppointmentForm';
 
 interface StaffFilteringParams {
   service: Service | null;
-  date?: Date | undefined; // Make date optional since staff selection comes first
-  serviceDuration?: number;
 }
 
-export const useStaffFiltering = ({ service, date, serviceDuration }: StaffFilteringParams) => {
-  const [availableStaff, setAvailableStaff] = useState<Provider[]>([]);
+export interface StaffByRole {
+  bathers: Provider[];
+  groomers: Provider[];
+  vets: Provider[];
+}
+
+export interface ServiceRequirements {
+  requiresBath: boolean;
+  requiresGrooming: boolean;
+  requiresVet: boolean;
+}
+
+export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
+  const [staffByRole, setStaffByRole] = useState<StaffByRole>({
+    bathers: [],
+    groomers: [],
+    vets: []
+  });
+  const [serviceRequirements, setServiceRequirements] = useState<ServiceRequirements>({
+    requiresBath: false,
+    requiresGrooming: false,
+    requiresVet: false
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchAvailableStaff = useCallback(async () => {
+  const fetchStaffByRole = useCallback(async () => {
     if (!service) {
-      setAvailableStaff([]);
+      setStaffByRole({ bathers: [], groomers: [], vets: [] });
+      setServiceRequirements({ requiresBath: false, requiresGrooming: false, requiresVet: false });
       return;
     }
 
-    console.log('🔍 [STAFF_FILTERING] Starting staff filtering for service:', {
-      service: service.name,
-      requirements: {
-        grooming: service.requires_grooming,
-        vet: service.requires_vet,
-        bath: service.requires_bath
-      }
-    });
+    console.log('🔍 [STAFF_FILTERING] Starting role-based staff filtering for service:', service.name);
 
     setIsLoading(true);
     setError(null);
 
     try {
-      // Step 1: Get qualified staff based on service requirements (no date filtering yet)
-      let staffQuery = supabase
+      // Set service requirements
+      const requirements = {
+        requiresBath: service.requires_bath || false,
+        requiresGrooming: service.requires_grooming || false,
+        requiresVet: service.requires_vet || false
+      };
+      setServiceRequirements(requirements);
+
+      console.log('📊 [STAFF_FILTERING] Service requirements:', requirements);
+
+      // Fetch all active staff
+      const { data: allStaff, error: staffError } = await supabase
         .from('staff_profiles')
         .select('id, name, can_groom, can_vet, can_bathe, bio, photo_url, hourly_rate')
         .eq('active', true);
 
-      // Apply capability filters based on service requirements
-      if (service.requires_grooming) {
-        staffQuery = staffQuery.eq('can_groom', true);
-      }
-      if (service.requires_vet) {
-        staffQuery = staffQuery.eq('can_vet', true);
-      }
-      if (service.requires_bath) {
-        staffQuery = staffQuery.eq('can_bathe', true);
-      }
-
-      const { data: qualifiedStaff, error: staffError } = await staffQuery;
-
       if (staffError) {
-        console.error('❌ [STAFF_FILTERING] Error fetching qualified staff:', staffError);
+        console.error('❌ [STAFF_FILTERING] Error fetching staff:', staffError);
         throw staffError;
       }
 
-      console.log('📊 [STAFF_FILTERING] Qualified staff found:', qualifiedStaff?.length || 0);
-
-      if (!qualifiedStaff || qualifiedStaff.length === 0) {
-        console.log('❌ [STAFF_FILTERING] No qualified staff found');
-        setAvailableStaff([]);
-        setError('No staff members meet the requirements for this service');
+      if (!allStaff || allStaff.length === 0) {
+        console.log('❌ [STAFF_FILTERING] No active staff found');
+        setError('No active staff members found');
         return;
       }
 
-      // Convert to Provider format
-      const staffMembers: Provider[] = qualifiedStaff.map(staff => {
-        // Determine role based on capabilities
-        let role = 'staff';
-        if (staff.can_vet) role = 'vet';
-        else if (staff.can_groom) role = 'groomer';
-        else if (staff.can_bathe) role = 'bather';
+      // Separate staff by role capabilities
+      const bathers: Provider[] = [];
+      const groomers: Provider[] = [];
+      const vets: Provider[] = [];
 
-        return {
+      allStaff.forEach(staff => {
+        const staffProvider: Provider = {
           id: staff.id,
           name: staff.name,
-          role: role,
-          rating: 4.5, // Default rating - can be enhanced later
+          role: 'staff', // Will be updated based on primary capability
+          rating: 4.5, // Default rating
           about: staff.bio || '',
           profile_image: staff.photo_url || undefined,
-          specialty: role === 'vet' ? 'Veterinary Care' : 
-                   role === 'groomer' ? 'Pet Grooming' : 'Pet Care'
+          specialty: ''
         };
+
+        // Add to bathers if can bathe and service requires bath
+        if (staff.can_bathe && requirements.requiresBath) {
+          bathers.push({
+            ...staffProvider,
+            role: 'bather',
+            specialty: 'Banho e Higiene'
+          });
+        }
+
+        // Add to groomers if can groom and service requires grooming
+        if (staff.can_groom && requirements.requiresGrooming) {
+          groomers.push({
+            ...staffProvider,
+            role: 'groomer',
+            specialty: 'Tosa e Estética'
+          });
+        }
+
+        // Add to vets if can vet and service requires vet
+        if (staff.can_vet && requirements.requiresVet) {
+          vets.push({
+            ...staffProvider,
+            role: 'vet',
+            specialty: 'Cuidados Veterinários'
+          });
+        }
       });
 
-      console.log('🎉 [STAFF_FILTERING] Available staff (all qualified):', {
-        count: staffMembers.length,
-        staff: staffMembers.map(s => ({ id: s.id, name: s.name, role: s.role }))
+      console.log('🎉 [STAFF_FILTERING] Staff by role:', {
+        bathers: bathers.length,
+        groomers: groomers.length,
+        vets: vets.length
       });
 
-      setAvailableStaff(staffMembers);
+      setStaffByRole({ bathers, groomers, vets });
+
+      // Check if we have staff for all required roles
+      if (requirements.requiresBath && bathers.length === 0) {
+        setError('Nenhum banhista disponível para este serviço');
+        return;
+      }
+      if (requirements.requiresGrooming && groomers.length === 0) {
+        setError('Nenhum tosador disponível para este serviço');
+        return;
+      }
+      if (requirements.requiresVet && vets.length === 0) {
+        setError('Nenhum veterinário disponível para este serviço');
+        return;
+      }
 
     } catch (error) {
       console.error('❌ [STAFF_FILTERING] Critical error:', error);
-      setError('Failed to load available staff. Please try again.');
-      setAvailableStaff([]);
+      setError('Falha ao carregar profissionais disponíveis. Tente novamente.');
+      setStaffByRole({ bathers: [], groomers: [], vets: [] });
     } finally {
       setIsLoading(false);
     }
-  }, [service]); // Remove date dependency since staff selection comes first
+  }, [service]);
 
   useEffect(() => {
-    fetchAvailableStaff();
-  }, [fetchAvailableStaff]);
+    fetchStaffByRole();
+  }, [fetchStaffByRole]);
 
   return {
-    availableStaff,
+    staffByRole,
+    serviceRequirements,
     isLoading,
     error,
-    refetch: fetchAvailableStaff
+    refetch: fetchStaffByRole
   };
 };

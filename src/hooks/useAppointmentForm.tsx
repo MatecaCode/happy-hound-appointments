@@ -123,7 +123,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [nextAvailable]);
 
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: React.FormEvent, selectedStaffIds?: string[]) => {
     e.preventDefault();
     
     if (!user || !selectedPet || !selectedService || !date || !selectedTimeSlotId) {
@@ -172,24 +172,25 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
       console.log('✅ [APPOINTMENT_SUBMIT] Appointment created:', appointment);
 
-      // If service requires staff, link the staff member using appointment_staff
-      if (serviceRequiresStaff && selectedGroomerId && appointment) {
-        console.log('🔗 [APPOINTMENT_SUBMIT] Linking staff member:', selectedGroomerId);
+      // If service requires staff, link the staff members using appointment_staff
+      if (serviceRequiresStaff && selectedStaffIds && selectedStaffIds.length > 0 && appointment) {
+        console.log('🔗 [APPOINTMENT_SUBMIT] Linking staff members:', selectedStaffIds);
         
-        const { error: staffError } = await supabase
-          .from('appointment_staff')
-          .insert({
-            appointment_id: appointment.id,
-            staff_profile_id: selectedGroomerId,
-            role: 'primary'
-          });
+        for (const staffId of selectedStaffIds) {
+          const { error: staffError } = await supabase
+            .from('appointment_staff')
+            .insert({
+              appointment_id: appointment.id,
+              staff_profile_id: staffId,
+              role: 'primary'
+            });
 
-        if (staffError) {
-          console.error('❌ [APPOINTMENT_SUBMIT] Error linking staff:', staffError);
-          // Don't fail the whole appointment for this
-          toast.error('Agendamento criado, mas houve erro ao vincular profissional');
-        } else {
-          console.log('✅ [APPOINTMENT_SUBMIT] Staff successfully linked');
+          if (staffError) {
+            console.error('❌ [APPOINTMENT_SUBMIT] Error linking staff:', staffError);
+            // Don't fail the whole appointment for this
+          } else {
+            console.log('✅ [APPOINTMENT_SUBMIT] Staff successfully linked:', staffId);
+          }
         }
       }
 

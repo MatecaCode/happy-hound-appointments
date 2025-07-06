@@ -80,12 +80,12 @@ export class PricingService {
 
   private static async getExactMatchPricing(serviceId: string, breedId: string, size: string): Promise<any> {
     try {
-      const { data, error } = await (supabase
+      const { data, error } = await supabase
         .from('service_pricing')
         .select('price, duration_override')
         .eq('service_id', serviceId)
         .eq('breed_id', breedId)
-        .eq('size', size) as any)
+        .eq('size', size)
         .maybeSingle();
 
       if (error) {
@@ -102,12 +102,12 @@ export class PricingService {
 
   private static async getServiceSizeFallback(serviceId: string, size: string): Promise<any> {
     try {
-      const { data, error } = await (supabase
+      const { data, error } = await supabase
         .from('service_pricing')
         .select('price, duration_override')
         .eq('service_id', serviceId)
         .eq('size', size)
-        .limit(1) as any)
+        .limit(1)
         .maybeSingle();
 
       if (error) {
@@ -124,10 +124,10 @@ export class PricingService {
 
   private static async getServiceDefault(serviceId: string): Promise<any> {
     try {
-      const { data, error } = await (supabase
+      const { data, error } = await supabase
         .from('services')
         .select('base_price, default_duration')
-        .eq('id', serviceId) as any)
+        .eq('id', serviceId)
         .maybeSingle();
 
       if (error) {

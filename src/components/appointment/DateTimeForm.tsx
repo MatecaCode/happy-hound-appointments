@@ -29,6 +29,8 @@ interface DateTimeFormProps {
   showTimeSlots: boolean;
   showSubmitButton: boolean;
   stepTitle: string;
+  selectedStaff?: string[];
+  serviceDuration?: number;
 }
 
 const DateTimeForm: React.FC<DateTimeFormProps> = ({
@@ -49,7 +51,9 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   onSubmit,
   showTimeSlots,
   showSubmitButton,
-  stepTitle
+  stepTitle,
+  selectedStaff = [],
+  serviceDuration = 60
 }) => {
   const isNextEnabled = !showTimeSlots || (date && selectedTimeSlotId);
   const isSubmitEnabled = showSubmitButton && date && selectedTimeSlotId;
@@ -61,6 +65,26 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     } else if (onNext && isNextEnabled) {
       onNext();
     }
+  };
+
+  // Function to check if a date should be disabled
+  const isDateDisabled = (checkDate: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Disable past dates and Sundays
+    if (checkDate < today || checkDate.getDay() === 0) {
+      return true;
+    }
+
+    // If no staff selected yet, don't disable future dates
+    if (!selectedStaff || selectedStaff.length === 0) {
+      return false;
+    }
+
+    // TODO: Add logic to check if any time slots are available for the selected staff on this date
+    // For now, we'll let the time slot loading handle this
+    return false;
   };
 
   return (
@@ -87,11 +111,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                   selected={date}
                   onSelect={setDate}
                   locale={ptBR}
-                  disabled={(date) => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    return date < today || date.getDay() === 0; // Disable past dates and Sundays
-                  }}
+                  disabled={isDateDisabled}
                   className="rounded-md border"
                 />
               </div>
@@ -121,9 +141,14 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Nenhum horário disponível para esta data.
-                    </p>
+                    <div className="text-center py-4">
+                      <p className="text-sm text-muted-foreground">
+                        Nenhum horário disponível para esta data com os profissionais selecionados.
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Tente selecionar outra data ou volte para escolher outros profissionais.
+                      </p>
+                    </div>
                   )}
                 </div>
               )}

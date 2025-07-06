@@ -2,13 +2,20 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Provider } from '@/hooks/useAppointmentForm';
-import StaffCardSelector from './StaffCardSelector';
+import { StaffByRole, ServiceRequirements } from '@/hooks/useStaffFiltering';
+import RoleBasedStaffSelector from './RoleBasedStaffSelector';
+
+interface SelectedStaff {
+  batherId?: string;
+  groomerId?: string;
+  vetId?: string;
+}
 
 interface StaffSelectionFormProps {
-  staff: Provider[];
-  selectedStaffId: string | null;
-  setSelectedStaffId: (staffId: string | null) => void;
+  staffByRole: StaffByRole;
+  serviceRequirements: ServiceRequirements;
+  selectedStaff: SelectedStaff;
+  onStaffSelect: (role: 'bather' | 'groomer' | 'vet', staffId: string) => void;
   onNext: () => void;
   onBack: () => void;
   serviceType: 'grooming' | 'veterinary';
@@ -17,47 +24,58 @@ interface StaffSelectionFormProps {
 }
 
 const StaffSelectionForm: React.FC<StaffSelectionFormProps> = ({
-  staff,
-  selectedStaffId,
-  setSelectedStaffId,
+  staffByRole,
+  serviceRequirements,
+  selectedStaff,
+  onStaffSelect,
   onNext,
   onBack,
   serviceType,
   isLoading = false,
   error = null
 }) => {
-  const handleStaffSelect = (staffId: string) => {
-    // Toggle selection - if already selected, deselect; otherwise select
-    if (selectedStaffId === staffId) {
-      setSelectedStaffId(null);
-    } else {
-      setSelectedStaffId(staffId);
+  // Check if all required roles have been selected
+  const isSelectionComplete = () => {
+    const requiredSelections = [];
+    
+    if (serviceRequirements.requiresBath) {
+      requiredSelections.push(!!selectedStaff.batherId);
     }
+    if (serviceRequirements.requiresGrooming) {
+      requiredSelections.push(!!selectedStaff.groomerId);
+    }
+    if (serviceRequirements.requiresVet) {
+      requiredSelections.push(!!selectedStaff.vetId);
+    }
+    
+    return requiredSelections.length > 0 && requiredSelections.every(Boolean);
   };
 
-  const handleNext = () => {
-    if (selectedStaffId) {
-      onNext();
-    }
+  const getRequiredRolesText = () => {
+    const roles = [];
+    if (serviceRequirements.requiresBath) roles.push('banhista');
+    if (serviceRequirements.requiresGrooming) roles.push('tosador');
+    if (serviceRequirements.requiresVet) roles.push('veterinário');
+    
+    if (roles.length === 1) return `um ${roles[0]}`;
+    if (roles.length === 2) return `um ${roles[0]} e um ${roles[1]}`;
+    return `um ${roles.slice(0, -1).join(', ')} e um ${roles[roles.length - 1]}`;
   };
-
-  const isNextEnabled = selectedStaffId && !isLoading;
-  const selectedStaffIds = selectedStaffId ? [selectedStaffId] : [];
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>2. Seleção do Profissional</CardTitle>
+        <CardTitle>2. Seleção de Profissionais</CardTitle>
         <CardDescription>
-          Escolha o {serviceType === 'grooming' ? 'tosador' : 'veterinário'} de sua preferência
+          Este serviço requer {getRequiredRolesText()}. Selecione os profissionais para cada função.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <StaffCardSelector
-          staff={staff}
-          selectedStaffIds={selectedStaffIds}
-          onStaffSelect={handleStaffSelect}
-          allowMultiple={false}
+        <RoleBasedStaffSelector
+          staffByRole={staffByRole}
+          serviceRequirements={serviceRequirements}
+          selectedStaff={selectedStaff}
+          onStaffSelect={onStaffSelect}
           isLoading={isLoading}
           error={error}
         />
@@ -71,8 +89,8 @@ const StaffSelectionForm: React.FC<StaffSelectionFormProps> = ({
             Voltar
           </Button>
           <Button 
-            onClick={handleNext}
-            disabled={!isNextEnabled}
+            onClick={onNext}
+            disabled={!isSelectionComplete() || isLoading}
             className="flex-1"
           >
             Continuar

@@ -6,16 +6,22 @@ import BasicInfoForm from './appointment/BasicInfoForm';
 import DateTimeForm from './appointment/DateTimeForm';
 import StaffSelectionForm from './appointment/StaffSelectionForm';
 
+interface SelectedStaff {
+  batherId?: string;
+  groomerId?: string;
+  vetId?: string;
+}
+
 interface AppointmentFormProps {
   serviceType: 'grooming' | 'veterinary';
 }
 
 const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'grooming' }) => {
+  const [selectedStaff, setSelectedStaff] = React.useState<SelectedStaff>({});
+
   const {
     date,
     setDate,
-    selectedGroomerId,
-    setSelectedGroomerId,
     selectedTimeSlotId, 
     setSelectedTimeSlotId,
     selectedPet,
@@ -41,14 +47,14 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     pricing,
   } = useAppointmentForm(serviceType);
 
-  // Use the staff filtering hook - no date filtering initially
+  // Use the staff filtering hook
   const {
-    availableStaff,
+    staffByRole,
+    serviceRequirements,
     isLoading: staffLoading,
     error: staffError
   } = useStaffFiltering({
-    service: selectedService,
-    serviceDuration: pricing?.duration || selectedService?.default_duration || 60
+    service: selectedService
   });
 
   // Fetch appropriate services when service type changes
@@ -56,9 +62,41 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     fetchServices(serviceType);
   }, [serviceType, fetchServices]);
 
+  // Reset selected staff when service changes
+  React.useEffect(() => {
+    if (selectedService) {
+      setSelectedStaff({});
+    }
+  }, [selectedService]);
+
+  const handleStaffSelect = (role: 'bather' | 'groomer' | 'vet', staffId: string) => {
+    setSelectedStaff(prev => {
+      const newSelection = { ...prev };
+      
+      // Toggle selection - if already selected, deselect; otherwise select
+      const currentSelection = role === 'bather' ? prev.batherId : 
+                              role === 'groomer' ? prev.groomerId : 
+                              prev.vetId;
+      
+      if (currentSelection === staffId) {
+        // Deselect
+        if (role === 'bather') delete newSelection.batherId;
+        else if (role === 'groomer') delete newSelection.groomerId;
+        else delete newSelection.vetId;
+      } else {
+        // Select
+        if (role === 'bather') newSelection.batherId = staffId;
+        else if (role === 'groomer') newSelection.groomerId = staffId;
+        else newSelection.vetId = staffId;
+      }
+      
+      return newSelection;
+    });
+  };
+
   const getStepTitle = (step: number) => {
     if (step === 1) return "1. Informações Básicas";
-    if (step === 2 && serviceRequiresStaff) return "2. Seleção do Profissional";
+    if (step === 2 && serviceRequiresStaff) return "2. Seleção de Profissionais";
     if (step === 2 && !serviceRequiresStaff) return "2. Escolha da Data e Horário";
     if (step === 3) return "3. Escolha da Data e Horário";
     return "";
@@ -90,13 +128,32 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     }
   };
 
+  // Convert selected staff to the format expected by the form submission
+  const getSelectedStaffForSubmission = () => {
+    const staffIds = [];
+    if (selectedStaff.batherId) staffIds.push(selectedStaff.batherId);
+    if (selectedStaff.groomerId) staffIds.push(selectedStaff.groomerId);
+    if (selectedStaff.vetId) staffIds.push(selectedStaff.vetId);
+    return staffIds;
+  };
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Set the selected staff for the main form handler
+    const staffIds = getSelectedStaffForSubmission();
+    
+    // Call the original submit handler with the staff selection
+    await handleSubmit(e, staffIds);
+  };
+
   console.log('🔍 DEBUG: AppointmentForm render - Service requires staff:', serviceRequiresStaff);
   console.log('🔍 DEBUG: Service requirements loaded:', serviceRequirementsLoaded);
   console.log('🔍 DEBUG: Current form step:', formStep);
-  console.log('🔍 DEBUG: Available staff count:', availableStaff.length);
+  console.log('🔍 DEBUG: Selected staff:', selectedStaff);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form onSubmit={handleFormSubmit} className="space-y-8">
       {/* Step 1: Basic Info (Pet + Service) */}
       {formStep === 1 && (
         <BasicInfoForm
@@ -114,9 +171,10 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
       {/* Step 2: Staff Selection (only if service requires staff) */}
       {formStep === 2 && serviceRequiresStaff && (
         <StaffSelectionForm
-          staff={availableStaff}
-          selectedStaffId={selectedGroomerId}
-          setSelectedStaffId={setSelectedGroomerId}
+          staffByRole={staffByRole}
+          serviceRequirements={serviceRequirements}
+          selectedStaff={selectedStaff}
+          onStaffSelect={handleStaffSelect}
           onNext={() => handleNextStep(2)}
           onBack={() => handleBackStep(2)}
           serviceType={serviceType}
@@ -145,10 +203,12 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           notes={notes}
           setNotes={setNotes}
           onBack={() => handleBackStep(serviceRequiresStaff ? 3 : 2)}
-          onSubmit={handleSubmit}
+          onSubmit={handleFormSubmit}
           showTimeSlots={true}
           showSubmitButton={true}
           stepTitle={getStepTitle(serviceRequiresStaff ? 3 : 2)}
+          selectedStaff={getSelectedStaffForSubmission()}
+          serviceDuration={pricing?.duration || selectedService?.default_duration || 60}
         />
       )}
     </form>
