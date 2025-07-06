@@ -1,238 +1,142 @@
-
 import React, { useState, useEffect } from 'react';
-import Layout from '@/components/Layout';
 import { Calendar } from '@/components/ui/calendar';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { useAuth } from '@/hooks/useAuth';
+import { Badge } from '@/components/ui/badge';
+import { CalendarDays, Clock, User } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import Layout from '@/components/Layout';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { generateBackendTimeSlots } from '@/utils/timeSlotHelpers';
+import { generateClientTimeSlots, getRequiredBackendSlots } from '@/utils/timeSlotHelpers';
 
-interface AvailabilitySlot {
-  id: string;
-  time: string;
-  available: boolean;
-}
+// Define a type for availability status
+type AvailabilityStatus = 'available' | 'unavailable' | 'pending';
 
 const GroomerSchedule = () => {
-  const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [staffProfileId, setStaffProfileId] = useState<string | null>(null);
-
-  // Generate 10-minute granular slots for staff management
-  const generateStaffSlots = (): AvailabilitySlot[] => {
-    const backendSlots = generateBackendTimeSlots();
-    return backendSlots.map(slot => ({
-      id: slot,
-      time: slot.substring(0, 5), // Format as HH:MM
-      available: true
-    }));
-  };
+  const [schedule, setSchedule] = useState<{ [key: string]: AvailabilityStatus }>({});
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      getStaffProfile();
-    }
-  }, [user]);
+    fetchSchedule();
+  }, [selectedDate]);
 
-  useEffect(() => {
-    if (selectedDate && staffProfileId) {
-      fetchAvailability();
-    }
-  }, [selectedDate, staffProfileId]);
+  const fetchSchedule = async () => {
+    if (!selectedDate) return;
 
-  const getStaffProfile = async () => {
-    if (!user) return;
+    setLoading(true);
+    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
     try {
-      const { data: staffProfile, error } = await supabase
-        .from('staff_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
+      // Fetch the groomer's availability for the selected date
+      const { data, error } = await supabase
+        .from('staff_availability')
+        .select('time_slot, available')
+        .eq('staff_profile_id', 'f44f0947-96a8-48e4-b399-0c634c990c93') // Replace with actual groomer ID
+        .eq('date', formattedDate);
 
       if (error) {
-        console.error('Error fetching staff profile:', error);
+        console.error('Error fetching schedule:', error);
         return;
       }
 
-      setStaffProfileId(staffProfile?.id || null);
-    } catch (error) {
-      console.error('Error getting staff profile:', error);
-    }
-  };
+      // Initialize the schedule with all possible time slots
+      const initialSchedule: { [key: string]: AvailabilityStatus } = {};
+      generateClientTimeSlots().forEach(slot => {
+        initialSchedule[slot] = 'available'; // Default to available
+      });
 
-  const fetchAvailability = async () => {
-    if (!selectedDate || !staffProfileId) return;
-    
-    setIsLoading(true);
-    try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      
-      console.log('📅 [GROOMER_SCHEDULE] Fetching 10-min granular availability for:', { dateStr, staffProfileId });
-      
-      // Query staff_availability table for 10-minute slots
-      const { data, error } = await supabase
-        .from('staff_availability')
-        .select('*')
-        .eq('staff_profile_id', staffProfileId)
-        .eq('date', dateStr);
+      // Update the schedule based on the fetched data
+      data.forEach(item => {
+        initialSchedule[item.time_slot] = item.available ? 'available' : 'unavailable';
+      });
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching availability:', error);
-      }
-
-      if (data && data.length > 0) {
-        const slots = generateStaffSlots().map(slot => {
-          const dbSlot = data.find(d => d.time_slot === `${slot.time}:00`);
-          return {
-            ...slot,
-            available: dbSlot ? dbSlot.available : true
-          };
-        });
-        setAvailabilitySlots(slots);
-        console.log(`📊 [GROOMER_SCHEDULE] Loaded ${slots.length} 10-min slots, ${slots.filter(s => s.available).length} available`);
-      } else {
-        const defaultSlots = generateStaffSlots();
-        setAvailabilitySlots(defaultSlots);
-        console.log(`📋 [GROOMER_SCHEDULE] Using default ${defaultSlots.length} 10-min slots`);
-      }
-    } catch (error: any) {
-      console.error('Error fetching availability:', error);
-      toast.error('Erro ao carregar disponibilidade');
-      setAvailabilitySlots(generateStaffSlots());
+      setSchedule(initialSchedule);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const toggleAvailability = async (timeSlot: string) => {
-    if (!selectedDate || !staffProfileId) return;
-    
-    const dateStr = selectedDate.toISOString().split('T')[0];
-    const currentSlot = availabilitySlots.find(slot => slot.time === timeSlot);
-    if (!currentSlot) return;
+  const updateAvailability = async (timeSlot: string, newStatus: AvailabilityStatus) => {
+    if (!selectedDate) return;
 
-    const newAvailability = !currentSlot.available;
-    const fullTimeSlot = `${timeSlot}:00`;
-
-    console.log('🔄 [GROOMER_SCHEDULE] Toggling 10-min slot:', { timeSlot: fullTimeSlot, newAvailability });
+    const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
     try {
-      // Use direct query to insert into the staff_availability table with 10-minute granularity
+      // Update the availability in the database
       const { error } = await supabase
         .from('staff_availability')
-        .upsert({
-          staff_profile_id: staffProfileId,
-          date: dateStr,
-          time_slot: fullTimeSlot,
-          available: newAvailability
-        }, {
-          onConflict: 'staff_profile_id,date,time_slot'
-        });
+        .update({ available: newStatus === 'available' })
+        .eq('staff_profile_id', 'f44f0947-96a8-48e4-b399-0c634c990c93') // Replace with actual groomer ID
+        .eq('date', formattedDate)
+        .eq('time_slot', timeSlot);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating availability:', error);
+        return;
+      }
 
-      // Update local state
-      setAvailabilitySlots(prev => 
-        prev.map(slot => 
-          slot.time === timeSlot 
-            ? { ...slot, available: newAvailability }
-            : slot
-        )
-      );
-
-      toast.success(`10-min slot ${timeSlot} ${newAvailability ? 'disponibilizado' : 'bloqueado'}`);
-    } catch (error: any) {
-      console.error('Error updating availability:', error);
-      toast.error('Erro ao atualizar disponibilidade');
+      // Update the local state
+      setSchedule(prevSchedule => ({
+        ...prevSchedule,
+        [timeSlot]: newStatus,
+      }));
+    } catch (error) {
+      console.error('Unexpected error updating availability:', error);
     }
   };
-
-  const isWeekend = selectedDate?.getDay() === 0; // Sunday
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <h1 className="text-3xl font-bold mb-8">Minha Agenda (10min granular)</h1>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <section className="bg-secondary/50 py-12">
+        <div className="container max-w-4xl mx-auto">
           <Card>
-            <CardHeader>
-              <CardTitle>Selecionar Data</CardTitle>
-              <CardDescription>
-                Escolha uma data para configurar sua disponibilidade em slots de 10 minutos
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-2xl font-medium">Groomer Schedule</CardTitle>
+              <Badge variant="secondary">
+                <CalendarDays className="mr-2 h-4 w-4" />
+                {format(selectedDate || new Date(), 'PPP', { locale: ptBR })}
+              </Badge>
             </CardHeader>
-            <CardContent>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="rounded-md border"
-                disabled={(date) => date < new Date() || date.getDay() === 0}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                Disponibilidade 10min para {selectedDate?.toLocaleDateString('pt-BR')}
-              </CardTitle>
-              <CardDescription>
-                {isWeekend ? 'Fechado aos domingos' : 'Configure seus horários em slots de 10 minutos'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <p>Carregando slots de 10 minutos...</p>
-              ) : isWeekend ? (
-                <p className="text-muted-foreground">Não atendemos aos domingos.</p>
-              ) : (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto">
-                    {availabilitySlots.map((slot) => (
-                      <div key={slot.id} className="flex items-center justify-between p-2 border rounded text-xs">
-                        <Label htmlFor={slot.id} className="font-medium">
-                          {slot.time}
-                        </Label>
-                        <Switch
-                          id={slot.id}
-                          checked={slot.available}
-                          onCheckedChange={() => toggleAvailability(slot.time)}
-                        />
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="pt-4 border-t">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => {
-                        const allAvailable = availabilitySlots.every(slot => slot.available);
-                        availabilitySlots.forEach(slot => {
-                          if (slot.available === allAvailable) {
-                            toggleAvailability(slot.time);
-                          }
-                        });
-                      }}
-                      className="w-full"
-                    >
-                      {availabilitySlots.every(slot => slot.available) ? 'Desabilitar Todos' : 'Habilitar Todos'}
-                    </Button>
-                  </div>
-                </div>
-              )}
+            <CardContent className="grid gap-4">
+              <div className="grid gap-2">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  locale={ptBR}
+                  className="rounded-md border"
+                />
+              </div>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {generateClientTimeSlots().map(slot => (
+                  <Button
+                    key={slot}
+                    variant="outline"
+                    className="flex items-center justify-center"
+                    onClick={() => {
+                      const currentStatus = schedule[slot] || 'available';
+                      const newStatus: AvailabilityStatus =
+                        currentStatus === 'available' ? 'unavailable' : 'available';
+                      updateAvailability(slot, newStatus);
+                    }}
+                    disabled={loading}
+                  >
+                    <Clock className="mr-2 h-4 w-4" />
+                    {slot}
+                    {schedule[slot] === 'unavailable' && (
+                      <Badge variant="destructive" className="ml-2">
+                        Unavailable
+                      </Badge>
+                    )}
+                  </Button>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </div>
-      </div>
+      </section>
     </Layout>
   );
 };
