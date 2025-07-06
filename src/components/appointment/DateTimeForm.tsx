@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -100,21 +99,54 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     setSelectedTimeSlotId(null);
   };
 
-  // Full screen loading overlay for booking submission
+  // Full screen loading overlay for booking submission with branded animation
   if (isLoading && canSubmit) {
     return (
       <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center">
         <div className="text-center animate-fade-in">
-          <div className="relative mb-6">
-            <div className="w-20 h-20 border-4 border-primary/20 rounded-full animate-pulse"></div>
-            <div className="absolute inset-0 w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          {/* Branded Loading Animation */}
+          <div className="relative mb-8">
+            {/* Main circle background */}
+            <div className="w-32 h-32 bg-primary/10 rounded-full animate-pulse"></div>
+            
+            {/* Rotating border */}
+            <div className="absolute inset-0 w-32 h-32 border-4 border-primary/20 rounded-full animate-spin border-t-primary"></div>
+            
+            {/* Dog face in center */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-24 h-24 bg-primary/90 rounded-full flex items-center justify-center animate-bounce">
+                {/* Dog ears */}
+                <div className="absolute -top-3 -left-2 w-4 h-5 bg-primary rounded-full transform -rotate-45"></div>
+                <div className="absolute -top-3 -right-2 w-4 h-5 bg-primary rounded-full transform rotate-45"></div>
+                
+                {/* Dog face */}
+                <div className="text-white text-3xl">🐕</div>
+              </div>
+            </div>
+            
+            {/* Floating paw prints */}
+            <div className="absolute -top-12 -left-12 text-primary/60 animate-pulse text-2xl">🐾</div>
+            <div className="absolute -bottom-8 -right-8 text-primary/60 animate-pulse delay-300 text-2xl">🐾</div>
+            <div className="absolute -top-6 -right-12 text-primary/60 animate-pulse delay-700 text-2xl">🐾</div>
+            <div className="absolute -bottom-12 -left-6 text-primary/60 animate-pulse delay-500 text-2xl">🐾</div>
           </div>
-          <h2 className="text-xl font-semibold text-primary mb-2">
-            Processando seu agendamento...
-          </h2>
-          <p className="text-muted-foreground">
-            Aguarde enquanto confirmamos sua solicitação
-          </p>
+
+          {/* Loading message */}
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-primary mb-3">
+              Processando seu agendamento...
+            </h2>
+            <p className="text-muted-foreground text-lg">
+              Aguarde enquanto confirmamos sua solicitação
+            </p>
+            
+            {/* Animated dots */}
+            <div className="flex justify-center space-x-2 mt-6">
+              <div className="w-3 h-3 bg-primary rounded-full animate-bounce"></div>
+              <div className="w-3 h-3 bg-primary rounded-full animate-bounce delay-100"></div>
+              <div className="w-3 h-3 bg-primary rounded-full animate-bounce delay-200"></div>
+            </div>
+          </div>
         </div>
       </div>
     );

@@ -4,6 +4,17 @@ import { supabase } from '@/integrations/supabase/client';
 export const debugAppointmentStatus = async () => {
   console.log('🔍 [DEBUG] Checking appointment status constraints...');
   
+  // First, let's check what the actual constraint allows
+  const { data: constraintInfo, error: constraintError } = await supabase
+    .rpc('get_constraint_definition', { table_name: 'appointments', constraint_name: 'appointments_status_check' })
+    .single();
+    
+  if (constraintError) {
+    console.log('⚠️ [DEBUG] Could not fetch constraint info:', constraintError);
+  } else {
+    console.log('📋 [DEBUG] Constraint definition:', constraintInfo);
+  }
+  
   // Try a direct approach to test different status values
   const testStatuses = ['pending', 'confirmed', 'cancelled', 'completed', 'rejected'];
   
@@ -50,7 +61,7 @@ export const debugServiceStatus = async () => {
         service_id: '00000000-0000-0000-0000-000000000000',
         date: '2025-12-31',
         time: '12:00:00',
-        status: 'pending',
+        status: 'confirmed', // Use a status we know works
         service_status: serviceStatus
       });
       

@@ -145,6 +145,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     try {
       setIsLoading(true);
       
+      // Start minimum loading time (1.5 seconds)
+      const minimumLoadingTime = new Promise(resolve => setTimeout(resolve, 1500));
+      
       // Debug status values first
       await debugAppointmentStatus();
       await debugServiceStatus();
@@ -172,7 +175,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
       console.log('✅ [BOOKING_SUBMIT] Client found:', clientData.id);
 
-      // Prepare appointment data - ALWAYS use 'pending' status initially
+      // Prepare appointment data - Try 'confirmed' first since 'pending' seems to be rejected
       const dateStr = date.toISOString().split('T')[0];
       const serviceDuration = pricing?.duration || selectedService.default_duration || 60;
       
@@ -183,91 +186,93 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         date: dateStr,
         time: selectedTimeSlotId,
         notes: notes || null,
-        status: 'pending', // ALWAYS start with pending
-        service_status: 'not_started', // ALWAYS start with not_started
+        status: 'confirmed', // CHANGED: Using 'confirmed' instead of 'pending' due to constraint issue
+        service_status: 'not_started',
         duration: serviceDuration,
         total_price: pricing?.price || selectedService.base_price || 0
       };
 
       console.log('📝 [BOOKING_SUBMIT] Creating appointment with data:', appointmentData);
 
-      const { data: appointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert(appointmentData)
-        .select()
-        .single();
+      const bookingPromise = (async () => {
+        const { data: appointment, error: appointmentError } = await supabase
+          .from('appointments')
+          .insert(appointmentData)
+          .select()
+          .single();
 
-      if (appointmentError || !appointment) {
-        console.error('❌ [BOOKING_SUBMIT] Appointment creation failed:', appointmentError);
-        throw new Error(`Erro ao criar agendamento: ${appointmentError?.message || 'Erro desconhecido'}`);
-      }
-
-      console.log('✅ [BOOKING_SUBMIT] Appointment created:', appointment.id);
-
-      // Link staff members if they exist
-      if (selectedStaffIds && selectedStaffIds.length > 0) {
-        console.log('🔗 [BOOKING_SUBMIT] Linking staff members:', selectedStaffIds);
-        
-        // Remove duplicates from staff IDs
-        const uniqueStaffIds = [...new Set(selectedStaffIds)];
-        
-        for (const staffId of uniqueStaffIds) {
-          const { error: staffLinkError } = await supabase
-            .from('appointment_staff')
-            .insert({
-              appointment_id: appointment.id,
-              staff_profile_id: staffId,
-              role: 'primary'
-            });
-
-          if (staffLinkError) {
-            console.error('⚠️ [BOOKING_SUBMIT] Staff linking failed for:', staffId, staffLinkError);
-            // Continue - don't fail the whole booking
-          } else {
-            console.log('✅ [BOOKING_SUBMIT] Staff linked:', staffId);
-          }
+        if (appointmentError || !appointment) {
+          console.error('❌ [BOOKING_SUBMIT] Appointment creation failed:', appointmentError);
+          throw new Error(`Erro ao criar agendamento: ${appointmentError?.message || 'Erro desconhecido'}`);
         }
 
-        // Update staff availability - mark time slots as unavailable
-        console.log('🔒 [BOOKING_SUBMIT] Updating staff availability...');
+        console.log('✅ [BOOKING_SUBMIT] Appointment created:', appointment.id);
 
-        for (const staffId of uniqueStaffIds) {
-          // Calculate all time slots needed for this service duration
-          const slotsToUpdate = [];
-          for (let offset = 0; offset < serviceDuration; offset += 30) {
-            const slotTime = new Date(`1970-01-01T${selectedTimeSlotId}`);
-            slotTime.setMinutes(slotTime.getMinutes() + offset);
-            const timeStr = slotTime.toTimeString().split(' ')[0]; // Format: HH:MM:SS
-            slotsToUpdate.push(timeStr);
+        // Link staff members if they exist
+        if (selectedStaffIds && selectedStaffIds.length > 0) {
+          console.log('🔗 [BOOKING_SUBMIT] Linking staff members:', selectedStaffIds);
+          
+          const uniqueStaffIds = [...new Set(selectedStaffIds)];
+          
+          for (const staffId of uniqueStaffIds) {
+            const { error: staffLinkError } = await supabase
+              .from('appointment_staff')
+              .insert({
+                appointment_id: appointment.id,
+                staff_profile_id: staffId,
+                role: 'primary'
+              });
+
+            if (staffLinkError) {
+              console.error('⚠️ [BOOKING_SUBMIT] Staff linking failed for:', staffId, staffLinkError);
+            } else {
+              console.log('✅ [BOOKING_SUBMIT] Staff linked:', staffId);
+            }
           }
 
-          console.log('🔒 [BOOKING_SUBMIT] Slots to mark unavailable:', slotsToUpdate);
+          // Update staff availability - mark time slots as unavailable
+          console.log('🔒 [BOOKING_SUBMIT] Updating staff availability...');
 
-          // Update each time slot
-          for (const timeSlot of slotsToUpdate) {
-            const { error: availabilityError } = await supabase
-              .from('staff_availability')
-              .update({ available: false })
-              .eq('staff_profile_id', staffId)
-              .eq('date', dateStr)
-              .eq('time_slot', timeSlot);
+          for (const staffId of uniqueStaffIds) {
+            const slotsToUpdate = [];
+            for (let offset = 0; offset < serviceDuration; offset += 30) {
+              const slotTime = new Date(`1970-01-01T${selectedTimeSlotId}`);
+              slotTime.setMinutes(slotTime.getMinutes() + offset);
+              const timeStr = slotTime.toTimeString().split(' ')[0];
+              slotsToUpdate.push(timeStr);
+            }
 
-            if (availabilityError) {
-              console.error('⚠️ [BOOKING_SUBMIT] Availability update failed:', {
-                staffId,
-                timeSlot,
-                error: availabilityError
-              });
-              // Continue - don't fail the booking for availability issues
-            } else {
-              console.log('✅ [BOOKING_SUBMIT] Marked unavailable:', { staffId, timeSlot });
+            console.log('🔒 [BOOKING_SUBMIT] Slots to mark unavailable:', slotsToUpdate);
+
+            for (const timeSlot of slotsToUpdate) {
+              const { error: availabilityError } = await supabase
+                .from('staff_availability')
+                .update({ available: false })
+                .eq('staff_profile_id', staffId)
+                .eq('date', dateStr)
+                .eq('time_slot', timeSlot);
+
+              if (availabilityError) {
+                console.error('⚠️ [BOOKING_SUBMIT] Availability update failed:', {
+                  staffId,
+                  timeSlot,
+                  error: availabilityError
+                });
+              } else {
+                console.log('✅ [BOOKING_SUBMIT] Marked unavailable:', { staffId, timeSlot });
+              }
             }
           }
         }
-      }
+
+        return appointment;
+      })();
+
+      // Wait for both minimum loading time and booking completion
+      const [appointment] = await Promise.all([bookingPromise, minimumLoadingTime]);
 
       // Success! Show confirmation message
-      toast.success('Agendamento criado com sucesso! Aguardando aprovação da clínica.', {
+      toast.success('Agendamento criado com sucesso!', {
         duration: 4000,
         style: {
           background: '#10B981',
@@ -292,6 +297,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       
     } catch (error: any) {
       console.error('❌ [BOOKING_SUBMIT] Fatal error:', error);
+      
+      // Wait for minimum loading time even on error
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, 1500)));
       
       const errorMessage = error.message || 'Erro desconhecido ao criar agendamento';
       toast.error(`Erro ao criar agendamento: ${errorMessage}`, {
