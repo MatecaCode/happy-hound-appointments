@@ -166,7 +166,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
       console.log('✅ [BOOKING_SUBMIT] Client found:', clientData.id);
 
-      // Prepare appointment data
+      // Prepare appointment data with correct status
       const dateStr = date.toISOString().split('T')[0];
       const serviceDuration = pricing?.duration || selectedService.default_duration || 60;
       
@@ -177,8 +177,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         date: dateStr,
         time: selectedTimeSlotId,
         notes: notes || null,
-        status: 'pending',
-        service_status: 'not_started',
+        status: 'pending' as const, // Ensure this matches database constraint
+        service_status: 'not_started' as const, // Ensure this matches database constraint
         duration: serviceDuration,
         total_price: pricing?.price || selectedService.base_price || 0
       };
@@ -194,6 +194,12 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
       if (appointmentError) {
         console.error('❌ [BOOKING_SUBMIT] Appointment creation failed:', appointmentError);
+        
+        // Check if it's a status constraint error
+        if (appointmentError.code === '23514' && appointmentError.message.includes('status_check')) {
+          throw new Error('Status de agendamento inválido. Por favor, tente novamente.');
+        }
+        
         throw appointmentError;
       }
 
@@ -207,7 +213,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       if (selectedStaffIds && selectedStaffIds.length > 0) {
         console.log('🔗 [BOOKING_SUBMIT] Linking staff members:', selectedStaffIds);
         
-        for (const staffId of selectedStaffIds) {
+        // Remove duplicates from staff IDs
+        const uniqueStaffIds = [...new Set(selectedStaffIds)];
+        
+        for (const staffId of uniqueStaffIds) {
           const { error: staffLinkError } = await supabase
             .from('appointment_staff')
             .insert({
@@ -227,7 +236,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         // Update staff availability - mark time slots as unavailable
         console.log('🔒 [BOOKING_SUBMIT] Updating staff availability...');
 
-        for (const staffId of selectedStaffIds) {
+        for (const staffId of uniqueStaffIds) {
           // Calculate all time slots needed for this service duration
           const slotsToUpdate = [];
           for (let offset = 0; offset < serviceDuration; offset += 30) {

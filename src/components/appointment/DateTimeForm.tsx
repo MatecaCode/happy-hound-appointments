@@ -68,9 +68,21 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('📝 [DateTimeForm] Submitting form...', {
+      canSubmit,
+      date: !!date,
+      selectedTimeSlotId: !!selectedTimeSlotId,
+      isLoading
+    });
+    
     if (canSubmit && onSubmit) {
-      console.log('📝 [DateTimeForm] Submitting form...');
+      console.log('📝 [DateTimeForm] Calling onSubmit...');
       onSubmit(e);
+    } else {
+      console.log('📝 [DateTimeForm] Cannot submit:', {
+        canSubmit,
+        hasOnSubmit: !!onSubmit
+      });
     }
   };
 
