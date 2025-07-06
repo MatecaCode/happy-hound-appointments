@@ -1,7 +1,7 @@
-
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Pet, Service, TimeSlot, NextAvailable } from './useAppointmentForm';
+import { useStaffFiltering } from './useStaffFiltering';
 
 // Define Provider interface for Phase 1 - using staff_profiles
 interface Provider {
@@ -10,6 +10,8 @@ interface Provider {
   role: string;
   rating: number;
   about: string;
+  profile_image?: string;
+  specialty?: string;
 }
 
 export const useAppointmentData = () => {
@@ -70,99 +72,10 @@ export const useAppointmentData = () => {
     date: Date,
     selectedService: Service | undefined
   ) => {
-    if (!selectedService) return;
-
-    try {
-      const dateStr = date.toISOString().split('T')[0];
-      
-      console.log('🔍 [FETCH_PROVIDERS] Starting with params:', {
-        service_type: serviceType,
-        service_id: selectedService.id,
-        date: dateStr,
-        service_name: selectedService.name,
-        requires_grooming: selectedService.requires_grooming,
-        requires_vet: selectedService.requires_vet,
-        requires_bath: selectedService.requires_bath
-      });
-
-      // Check if service requires staff
-      const requiresStaff = selectedService.requires_grooming || selectedService.requires_vet || selectedService.requires_bath;
-      
-      if (!requiresStaff) {
-        console.log('🔍 [FETCH_PROVIDERS] Service does not require staff, skipping fetch');
-        setGroomers([]);
-        return;
-      }
-
-      // Build query for staff_profiles based on service requirements
-      let staffQuery = supabase
-        .from('staff_profiles')
-        .select('id, name, can_groom, can_vet, can_bathe, bio')
-        .eq('active', true);
-
-      // Filter staff based on service requirements
-      if (selectedService.requires_grooming) {
-        staffQuery = staffQuery.eq('can_groom', true);
-      }
-      if (selectedService.requires_vet) {
-        staffQuery = staffQuery.eq('can_vet', true);
-      }
-      if (selectedService.requires_bath) {
-        staffQuery = staffQuery.eq('can_bathe', true);
-      }
-
-      const { data: qualifiedStaff, error: staffError } = await staffQuery;
-
-      if (staffError) {
-        console.error('❌ [FETCH_PROVIDERS] Error fetching qualified staff:', staffError);
-        throw staffError;
-      }
-
-      console.log('📊 [FETCH_PROVIDERS] Qualified staff found:', qualifiedStaff?.length || 0);
-
-      if (!qualifiedStaff || qualifiedStaff.length === 0) {
-        console.log('❌ [FETCH_PROVIDERS] No qualified staff found');
-        setGroomers([]);
-        return;
-      }
-
-      // Now check availability for each qualified staff member
-      const availableProviders: Provider[] = [];
-
-      for (const staff of qualifiedStaff) {
-        // Check if staff has availability on the selected date
-        const { data: availability } = await supabase
-          .from('staff_availability')
-          .select('time_slot, available')
-          .eq('staff_profile_id', staff.id)
-          .eq('date', dateStr)
-          .eq('available', true);
-
-        if (availability && availability.length > 0) {
-          availableProviders.push({
-            id: staff.id,
-            name: staff.name,
-            role: staff.can_vet ? 'vet' : (staff.can_groom ? 'groomer' : 'bather'),
-            rating: 4.5, // Default rating for now
-            about: staff.bio || ''
-          });
-        }
-      }
-
-      console.log('🎉 [FETCH_PROVIDERS] Final available providers:', {
-        count: availableProviders.length,
-        providers: availableProviders.map(p => ({
-          id: p.id,
-          name: p.name,
-          role: p.role
-        }))
-      });
-
-      setGroomers(availableProviders);
-    } catch (error) {
-      console.error('❌ [FETCH_PROVIDERS] Critical error:', error);
-      setGroomers([]);
-    }
+    // This function is now handled by useStaffFiltering hook
+    // We'll keep it for compatibility but it won't be used
+    console.log('🔍 [FETCH_PROVIDERS] Legacy function called - now handled by useStaffFiltering');
+    setGroomers([]);
   }, []);
 
   const fetchTimeSlots = useCallback(async (

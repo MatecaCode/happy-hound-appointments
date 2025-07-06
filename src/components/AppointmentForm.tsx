@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { useAppointmentForm } from '@/hooks/useAppointmentForm';
+import { useStaffFiltering } from '@/hooks/useStaffFiltering';
 import BasicInfoForm from './appointment/BasicInfoForm';
 import DateTimeForm from './appointment/DateTimeForm';
 import StaffSelectionForm from './appointment/StaffSelectionForm';
@@ -32,39 +33,53 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     setFormStep,
     userPets,
     services,
-    groomers,
     handleNextAvailableSelect,
     handleSubmit,
     fetchServices,
     serviceRequiresStaff,
     serviceRequirementsLoaded,
+    pricing,
   } = useAppointmentForm(serviceType);
+
+  // Use the new staff filtering hook
+  const {
+    availableStaff,
+    isLoading: staffLoading,
+    error: staffError
+  } = useStaffFiltering({
+    service: selectedService,
+    date: date,
+    serviceDuration: pricing?.duration || selectedService?.default_duration || 60
+  });
 
   // Fetch appropriate services when service type changes
   React.useEffect(() => {
     fetchServices(serviceType);
   }, [serviceType, fetchServices]);
 
-  // Updated step flow: Pet -> Service -> Staff -> Date/Time
+  // Updated step flow: Pet -> Service -> Staff (if required) -> Date/Time
   const getStepTitle = (step: number) => {
     if (step === 1) return "1. Informações Básicas";
-    if (step === 2) return "2. Seleção do Profissional";
+    if (step === 2 && serviceRequiresStaff) return "2. Seleção do Profissional";
+    if (step === 2 && !serviceRequiresStaff) return "2. Escolha da Data e Horário";
     if (step === 3) return "3. Escolha da Data e Horário";
     return "";
   };
 
   const handleNextStep = (currentStep: number) => {
     if (currentStep === 1) {
-      // From basic info, always go to staff selection if service requires staff
+      // From basic info, go to staff selection if service requires staff, otherwise go to date/time
       if (serviceRequiresStaff) {
         setFormStep(2);
       } else {
-        // If no staff required, go directly to date/time
-        setFormStep(3);
+        setFormStep(2); // This will be date/time step when no staff required
       }
     } else if (currentStep === 2) {
-      // From staff selection, go to date/time
-      setFormStep(3);
+      // From staff selection (when required), go to date/time
+      if (serviceRequiresStaff) {
+        setFormStep(3);
+      }
+      // If no staff required, this step is already date/time, so no next step needed
     }
   };
 
@@ -80,6 +95,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
   console.log('🔍 DEBUG: AppointmentForm render - Service requires staff:', serviceRequiresStaff);
   console.log('🔍 DEBUG: Service requirements loaded:', serviceRequirementsLoaded);
   console.log('🔍 DEBUG: Current form step:', formStep);
+  console.log('🔍 DEBUG: Available staff count:', availableStaff.length);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
@@ -100,18 +116,19 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
       {/* Step 2: Staff Selection (only if service requires staff) */}
       {formStep === 2 && serviceRequiresStaff && (
         <StaffSelectionForm
-          staff={groomers}
+          staff={availableStaff}
           selectedStaffId={selectedGroomerId}
           setSelectedStaffId={setSelectedGroomerId}
           onNext={() => handleNextStep(2)}
           onBack={() => handleBackStep(2)}
           serviceType={serviceType}
-          isLoading={isLoading}
+          isLoading={staffLoading}
+          error={staffError}
         />
       )}
       
-      {/* Step 3: Date/Time Selection */}
-      {formStep === 3 && (
+      {/* Step 2/3: Date/Time Selection */}
+      {((formStep === 2 && !serviceRequiresStaff) || (formStep === 3 && serviceRequiresStaff)) && (
         <DateTimeForm
           date={date}
           setDate={setDate}
@@ -129,11 +146,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setActiveTab={(tab: 'calendar' | 'next-available') => setActiveTab(tab)}
           notes={notes}
           setNotes={setNotes}
-          onBack={() => handleBackStep(3)}
+          onBack={() => handleBackStep(serviceRequiresStaff ? 3 : 2)}
           onSubmit={handleSubmit}
           showTimeSlots={true}
           showSubmitButton={true}
-          stepTitle={getStepTitle(3)}
+          stepTitle={getStepTitle(serviceRequiresStaff ? 3 : 2)}
         />
       )}
     </form>
