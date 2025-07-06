@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -74,20 +73,15 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     serviceDuration: serviceDuration
   });
 
-  // 🚨 NEW: Debug what DateTimeForm is receiving
+  // Simple debugging
   React.useEffect(() => {
-    console.log('🎯 [UI_DEBUG] ==========================================');
-    console.log('🎯 [UI_DEBUG] DateTimeForm received timeSlots prop:', timeSlots.length, 'slots');
-    console.log('🎯 [UI_DEBUG] timeSlots content received by UI:');
-    timeSlots.forEach((slot, index) => {
-      console.log(`  UI Slot ${index}: id="${slot.id}", time="${slot.time}", available=${slot.available}`);
+    console.log('🎯 [UI_DEBUG] DateTimeForm received:', {
+      totalSlots: timeSlots.length,
+      availableSlots: timeSlots.filter(s => s.available).length,
+      selectedDate: date,
+      selectedTime: selectedTimeSlotId,
+      isLoading
     });
-    console.log('🎯 [UI_DEBUG] Available slots for UI:', timeSlots.filter(s => s.available).length);
-    console.log('🎯 [UI_DEBUG] Unavailable slots for UI:', timeSlots.filter(s => !s.available).length);
-    console.log('🎯 [UI_DEBUG] Selected date:', date);
-    console.log('🎯 [UI_DEBUG] Selected time slot ID:', selectedTimeSlotId);
-    console.log('🎯 [UI_DEBUG] Is loading:', isLoading);
-    console.log('🎯 [UI_DEBUG] ==========================================');
   }, [timeSlots, date, selectedTimeSlotId, isLoading]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -164,10 +158,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               selected={date}
               onSelect={handleDateSelect}
               locale={ptBR}
-              disabled={(date) => {
-                // Use the staff availability hook to determine if date should be disabled
-                return isDateDisabled(date);
-              }}
+              disabled={(date) => isDateDisabled(date)}
               className="rounded-md border transition-all duration-200 hover:shadow-md"
             />
             {availabilityLoading && (
@@ -187,32 +178,28 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                 </div>
               ) : timeSlots.length > 0 ? (
                 <div>
-                  {/* 🚨 NEW: Show UI debugging info */}
+                  {/* Simple UI debugging info */}
                   <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
                     <div>Total slots: {timeSlots.length}</div>
                     <div>Available slots: {timeSlots.filter(s => s.available).length}</div>
-                    <div>Unavailable slots: {timeSlots.filter(s => !s.available).length}</div>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-2 mt-2">
-                    {timeSlots.map((slot) => {
-                      console.log('🎯 [UI_RENDER] Rendering slot button:', slot);
-                      return (
-                        <Button
-                          key={slot.id}
-                          type="button"
-                          variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
-                          className="h-auto py-2 transition-all duration-200 hover:scale-105"
-                          onClick={() => {
-                            console.log('🎯 [UI_CLICK] Slot clicked:', slot);
-                            setSelectedTimeSlotId(slot.id);
-                          }}
-                          disabled={!slot.available || isLoading}
-                        >
-                          {slot.time}
-                        </Button>
-                      );
-                    })}
+                    {timeSlots.map((slot) => (
+                      <Button
+                        key={slot.id}
+                        type="button"
+                        variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
+                        className="h-auto py-2 transition-all duration-200 hover:scale-105"
+                        onClick={() => {
+                          console.log('🎯 [UI_CLICK] Slot clicked:', slot);
+                          setSelectedTimeSlotId(slot.id);
+                        }}
+                        disabled={!slot.available || isLoading}
+                      >
+                        {slot.time}
+                      </Button>
+                    ))}
                   </div>
                 </div>
               ) : (
@@ -220,11 +207,10 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                   <p className="text-muted-foreground mt-2">
                     Nenhum horário disponível para esta data.
                   </p>
-                  {/* 🚨 NEW: Debug info when no slots */}
                   <div className="mt-2 p-2 bg-red-100 rounded text-xs">
-                    <div>Debug: timeSlots.length = {timeSlots.length}</div>
-                    <div>Debug: isLoading = {isLoading.toString()}</div>
-                    <div>Debug: date = {date?.toISOString()}</div>
+                    <div>Debug: Total slots = {timeSlots.length}</div>
+                    <div>Debug: Loading = {isLoading.toString()}</div>
+                    <div>Debug: Date = {date?.toISOString()}</div>
                   </div>
                 </div>
               )}

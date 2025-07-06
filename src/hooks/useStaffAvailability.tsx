@@ -1,10 +1,9 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { fromZonedTime, toZonedTime, format as formatTz } from 'date-fns-tz';
 import { 
   generateClientTimeSlots, 
-  getRequiredBackendSlots, 
   isClientSlotAvailable,
   TIME_SLOT_CONFIG
 } from '@/utils/timeSlotHelpers';
@@ -21,34 +20,20 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   const checkBatchAvailability = useCallback(async (): Promise<Set<string>> => {
     if (selectedStaffIds.length === 0) return new Set();
 
-    console.log(`🔄 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Checking availability for ${selectedStaffIds.length} staff members with 10min granular logic in ${TIME_SLOT_CONFIG.TIMEZONE}`);
+    console.log(`🔄 [BATCH_AVAILABILITY] Checking availability for ${selectedStaffIds.length} staff members`);
     
     try {
-      // Check next 90 days in batches
+      // Check next 90 days
       const today = new Date();
       const endDate = new Date(today);
       endDate.setDate(today.getDate() + 90);
       
-      // Convert dates to proper timezone
-      const todayUTC = format(today, 'yyyy-MM-dd');
-      const todaySP = formatTz(toZonedTime(today, TIME_SLOT_CONFIG.TIMEZONE), 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
-      const endDateUTC = format(endDate, 'yyyy-MM-dd');
-      const endDateSP = formatTz(toZonedTime(endDate, TIME_SLOT_CONFIG.TIMEZONE), 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
-      
-      console.log(`🕐 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Date range analysis:`);
-      console.log(`  Today UTC: ${todayUTC}, SP: ${todaySP}`);
-      console.log(`  End UTC: ${endDateUTC}, SP: ${endDateSP}`);
-      console.log(`  Using for query: ${todaySP} to ${endDateSP}`);
+      const startDateStr = format(today, 'yyyy-MM-dd');
+      const endDateStr = format(endDate, 'yyyy-MM-dd');
 
-      const startDateStr = todaySP;
-      const endDateStr = endDateSP;
+      console.log(`🔍 [BATCH_AVAILABILITY] Fetching availability from ${startDateStr} to ${endDateStr}`);
 
-      console.log(`🔍 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] SQL Query:`)
-      console.log(`  SELECT staff_profile_id, date, time_slot, available FROM staff_availability`);
-      console.log(`  WHERE staff_profile_id IN (${selectedStaffIds.map(id => `'${id}'`).join(', ')})`);
-      console.log(`  AND date >= '${startDateStr}' AND date <= '${endDateStr}' AND available = true`);
-
-      // Fetch all 10-minute granular availability data for the date range and selected staff
+      // Fetch all 10-minute availability data for the date range and selected staff
       const { data: availabilityData, error } = await supabase
         .from('staff_availability')
         .select('staff_profile_id, date, time_slot, available')
@@ -58,27 +43,11 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         .eq('available', true);
 
       if (error) {
-        console.error('❌ [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Error fetching availability:', error);
+        console.error('❌ [BATCH_AVAILABILITY] Error fetching availability:', error);
         return new Set();
       }
 
-      console.log(`📊 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Fetched ${availabilityData?.length || 0} 10-min availability records in ${TIME_SLOT_CONFIG.TIMEZONE}`);
-
-      // Log sample of availability data with timezone info
-      if (availabilityData && availabilityData.length > 0) {
-        console.log(`📋 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Sample availability records (first 5):`);
-        availabilityData.slice(0, 5).forEach((record, index) => {
-          try {
-            const dateTime = new Date(`${record.date}T${record.time_slot}`);
-            const utcTime = format(dateTime, 'yyyy-MM-dd HH:mm:ss');
-            const spTime = formatTz(dateTime, 'yyyy-MM-dd HH:mm:ss', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
-            
-            console.log(`  ${index + 1}: ${record.date} ${record.time_slot} (UTC: ${utcTime}, SP: ${spTime}) - Staff: ${record.staff_profile_id}`);
-          } catch (error) {
-            console.log(`  ${index + 1}: ${record.date} ${record.time_slot} (TIMEZONE_ERROR: ${error}) - Staff: ${record.staff_profile_id}`);
-          }
-        });
-      }
+      console.log(`📊 [BATCH_AVAILABILITY] Fetched ${availabilityData?.length || 0} available 10-min records`);
 
       // Group availability by date and staff
       const availabilityByDate = new Map<string, Map<string, Array<{ time_slot: string; available: boolean }>>>();
@@ -101,32 +70,26 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
 
       const unavailableDatesSet = new Set<string>();
 
-      // Check each date in the 90-day range with timezone awareness
+      // Check each date in the 90-day range
       for (let i = 0; i < 90; i++) {
         const checkDate = new Date(today);
         checkDate.setDate(today.getDate() + i);
         
-        // Use São Paulo timezone for date formatting
-        const spDate = toZonedTime(checkDate, TIME_SLOT_CONFIG.TIMEZONE);
-        const dateStr = formatTz(spDate, 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+        const dateStr = format(checkDate, 'yyyy-MM-dd');
         
-        console.log(`🔍 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Checking date ${dateStr} (day ${i}) in ${TIME_SLOT_CONFIG.TIMEZONE}`);
-        
-        // Skip Sundays (day 0) - they should be unavailable
+        // Skip Sundays (day 0)
         if (checkDate.getDay() === 0) {
           unavailableDatesSet.add(dateStr);
-          console.log(`  ⏭️ Skipping Sunday: ${dateStr}`);
           continue;
         }
 
         const dateAvailability = availabilityByDate.get(dateStr);
         if (!dateAvailability) {
           unavailableDatesSet.add(dateStr);
-          console.log(`  ❌ No availability data for: ${dateStr}`);
           continue;
         }
 
-        // Check if any 30-minute client slot is available using 10-minute granular logic
+        // Check if any 30-minute client slot is available
         let hasAvailableClientSlot = false;
         const clientSlots = generateClientTimeSlots();
 
@@ -145,24 +108,21 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
 
           if (allStaffAvailable) {
             hasAvailableClientSlot = true;
-            console.log(`  ✅ Found available slot ${clientSlot} for ${dateStr} in ${TIME_SLOT_CONFIG.TIMEZONE}`);
             break;
           }
         }
 
         if (!hasAvailableClientSlot) {
           unavailableDatesSet.add(dateStr);
-          console.log(`  ❌ No available slots for: ${dateStr} in ${TIME_SLOT_CONFIG.TIMEZONE}`);
         }
       }
 
-      console.log(`✅ [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Found ${unavailableDatesSet.size} unavailable dates out of 90 checked using 10min granular logic in ${TIME_SLOT_CONFIG.TIMEZONE}`);
-      console.log(`📋 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Unavailable dates:`, Array.from(unavailableDatesSet));
+      console.log(`✅ [BATCH_AVAILABILITY] Found ${unavailableDatesSet.size} unavailable dates out of 90 checked`);
       
       return unavailableDatesSet;
 
     } catch (error) {
-      console.error('❌ [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Error in batch availability check:', error);
+      console.error('❌ [BATCH_AVAILABILITY] Error in batch availability check:', error);
       return new Set();
     }
   }, [selectedStaffIds, serviceDuration]);
@@ -197,27 +157,15 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       return true;
     }
     
-    // Convert date to São Paulo timezone for comparison
-    const spDate = toZonedTime(date, TIME_SLOT_CONFIG.TIMEZONE);
-    const dateStr = formatTz(spDate, 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
-    
-    const isUnavailable = unavailableDates.has(dateStr);
-    
-    console.log(`🔍 [DATE_DISABLED] [TIMEZONE_DEBUG] Checking date: ${dateStr} in ${TIME_SLOT_CONFIG.TIMEZONE} - Disabled: ${isUnavailable}`);
-    
-    return isUnavailable;
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return unavailableDates.has(dateStr);
   }, [unavailableDates]);
 
   const checkDateAvailability = useCallback(async (date: Date): Promise<boolean> => {
     if (selectedStaffIds.length === 0) return true;
 
-    const spDate = toZonedTime(date, TIME_SLOT_CONFIG.TIMEZONE);
-    const dateStr = formatTz(spDate, 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
-    
-    const result = !unavailableDates.has(dateStr);
-    console.log(`🔍 [CHECK_DATE_AVAILABILITY] [TIMEZONE_DEBUG] Date ${dateStr} in ${TIME_SLOT_CONFIG.TIMEZONE} - Available: ${result}`);
-    
-    return result;
+    const dateStr = format(date, 'yyyy-MM-dd');
+    return !unavailableDates.has(dateStr);
   }, [selectedStaffIds, unavailableDates]);
 
   return {
