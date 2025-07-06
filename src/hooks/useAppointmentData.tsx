@@ -138,7 +138,19 @@ export const useAppointmentData = () => {
         return;
       }
 
-      setGroomers(data || []);
+      // Transform staff_profiles data to match Provider interface
+      const transformedData = data?.map(staff => ({
+        id: staff.id,
+        name: staff.name,
+        bio: staff.bio,
+        can_bathe: staff.can_bathe,
+        can_groom: staff.can_groom,
+        can_vet: staff.can_vet,
+        photo_url: staff.photo_url,
+        hourly_rate: staff.hourly_rate,
+      })) || [];
+
+      setGroomers(transformedData);
     } catch (error) {
       console.error('Unexpected error fetching available providers:', error);
       toast.error('Erro inesperado ao buscar profissionais');
