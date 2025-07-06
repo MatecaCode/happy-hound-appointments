@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -28,11 +29,12 @@ export interface Service {
 export interface Provider {
   id: string;
   name: string;
-  role: string;
-  rating: number;
-  about: string;
-  profile_image?: string;
-  specialty?: string;
+  bio?: string;
+  can_bathe?: boolean;
+  can_groom?: boolean;
+  can_vet?: boolean;
+  photo_url?: string;
+  hourly_rate?: number;
 }
 
 export interface Pet {
@@ -102,28 +104,29 @@ export const useAppointmentData = () => {
 
   const fetchAvailableProviders = useCallback(async (serviceType: string) => {
     try {
-      let roleFilter = '';
-      if (serviceType === 'grooming') {
-        roleFilter = 'Groomer';
-      } else if (serviceType === 'veterinary') {
-        roleFilter = 'Veterinarian';
-      }
-
-      const { data, error } = await supabase
+      let query = supabase
         .from('staff_profiles')
         .select('*')
-        .eq('role', roleFilter)
         .eq('active', true);
 
+      // Filter based on service type capabilities
+      if (serviceType === 'grooming') {
+        query = query.eq('can_groom', true);
+      } else if (serviceType === 'veterinary') {
+        query = query.eq('can_vet', true);
+      }
+
+      const { data, error } = await query;
+
       if (error) {
-        console.error('Error fetching available groomers:', error);
+        console.error('Error fetching available providers:', error);
         toast.error('Erro ao buscar profissionais disponíveis');
         return;
       }
 
       setGroomers(data || []);
     } catch (error) {
-      console.error('Unexpected error fetching available groomers:', error);
+      console.error('Unexpected error fetching available providers:', error);
       toast.error('Erro inesperado ao buscar profissionais');
     }
   }, []);
@@ -204,64 +207,9 @@ export const useAppointmentData = () => {
     userPets,
     services,
     groomers,
-    fetchAvailableProviders: useCallback(async () => {
-      try {
-        const { data, error } = await supabase
-          .from('staff_profiles')
-          .select('*')
-          .eq('role', 'Groomer')
-          .eq('active', true);
-  
-        if (error) {
-          console.error('Error fetching available groomers:', error);
-          toast.error('Erro ao buscar profissionais disponíveis');
-          return;
-        }
-  
-        setGroomers(data || []);
-      } catch (error) {
-        console.error('Unexpected error fetching available groomers:', error);
-        toast.error('Erro inesperado ao buscar profissionais');
-      }
-    }, []),
-    fetchServices: useCallback(async () => {
-      try {
-        const { data, error } = await supabase
-          .from('services')
-          .select('*')
-          .eq('active', true);
-  
-        if (error) {
-          console.error('Error fetching services:', error);
-          toast.error('Erro ao buscar serviços');
-          return;
-        }
-  
-        setServices(data || []);
-      } catch (error) {
-        console.error('Unexpected error fetching services:', error);
-        toast.error('Erro inesperado ao buscar serviços');
-      }
-    }, []),
-    fetchUserPets: useCallback(async (userId: string) => {
-      try {
-        const { data, error } = await supabase
-          .from('pets')
-          .select('*')
-          .eq('client_id', userId);
-  
-        if (error) {
-          console.error('Error fetching user pets:', error);
-          toast.error('Erro ao buscar pets do usuário');
-          return;
-        }
-  
-        setUserPets(data || []);
-      } catch (error) {
-        console.error('Unexpected error fetching user pets:', error);
-        toast.error('Erro inesperado ao buscar pets do usuário');
-      }
-    }, []),
+    fetchAvailableProviders,
+    fetchServices,
+    fetchUserPets,
     fetchTimeSlots,
   };
 };
