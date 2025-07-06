@@ -80,7 +80,8 @@ export class PricingService {
 
   private static async getExactMatchPricing(serviceId: string, breedId: string, size: string): Promise<any> {
     try {
-      const query = supabase
+      // Use any to bypass deep type inference
+      const query: any = supabase
         .from('service_pricing')
         .select('price, duration_override')
         .eq('service_id', serviceId)
@@ -89,7 +90,8 @@ export class PricingService {
         .maybeSingle();
 
       const result = await query;
-      const { data, error } = result as { data: any; error: any };
+      const data = result.data;
+      const error = result.error;
 
       if (error) {
         console.log('🔍 [PRICING] No exact match found:', error.message);
@@ -105,7 +107,8 @@ export class PricingService {
 
   private static async getServiceSizeFallback(serviceId: string, size: string): Promise<any> {
     try {
-      const query = supabase
+      // Use any to bypass deep type inference
+      const query: any = supabase
         .from('service_pricing')
         .select('price, duration_override')
         .eq('service_id', serviceId)
@@ -114,7 +117,8 @@ export class PricingService {
         .maybeSingle();
 
       const result = await query;
-      const { data, error } = result as { data: any; error: any };
+      const data = result.data;
+      const error = result.error;
 
       if (error) {
         console.log('🔍 [PRICING] No service+size fallback found:', error.message);
@@ -130,14 +134,16 @@ export class PricingService {
 
   private static async getServiceDefault(serviceId: string): Promise<any> {
     try {
-      const query = supabase
+      // Use any to bypass deep type inference
+      const query: any = supabase
         .from('services')
         .select('base_price, default_duration')
         .eq('id', serviceId)
         .maybeSingle();
 
       const result = await query;
-      const { data, error } = result as { data: any; error: any };
+      const data = result.data;
+      const error = result.error;
 
       if (error) {
         console.log('🔍 [PRICING] No service default found:', error.message);
