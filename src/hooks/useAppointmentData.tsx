@@ -1,10 +1,31 @@
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Pet, Service, TimeSlot, NextAvailable } from './useAppointmentForm';
-import { useStaffFiltering } from './useStaffFiltering';
+import { toast } from 'sonner';
+import { 
+  generateClientTimeSlots, 
+  isClientSlotAvailable,
+  formatTimeSlot 
+} from '@/utils/timeSlotHelpers';
 
-// Define Provider interface for Phase 1 - using staff_profiles
-interface Provider {
+export interface TimeSlot {
+  id: string;
+  time: string;
+  available: boolean;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  service_type: string;
+  base_price?: number;
+  default_duration?: number;
+  requires_grooming?: boolean;
+  requires_vet?: boolean;
+  requires_bath?: boolean;
+  active?: boolean;
+}
+
+export interface Provider {
   id: string;
   name: string;
   role: string;
@@ -14,6 +35,24 @@ interface Provider {
   specialty?: string;
 }
 
+export interface Pet {
+  id: string;
+  name: string;
+  breed?: string;
+  breed_id?: string;
+  age?: string;
+  size?: string;
+  weight?: number;
+  gender?: string;
+  notes?: string;
+}
+
+export interface NextAvailable {
+  date: string;
+  time: string;
+  staff_name?: string;
+}
+
 export const useAppointmentData = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [nextAvailable, setNextAvailable] = useState<NextAvailable | null>(null);
@@ -21,192 +60,141 @@ export const useAppointmentData = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
 
-  const fetchUserPets = useCallback(async (userId: string) => {
-    try {
-      // Get client_id from user_id first
-      const { data: clientData, error: clientError } = await supabase
-        .from('clients')
-        .select('id')
-        .eq('user_id', userId)
-        .single();
-
-      if (clientError || !clientData) {
-        console.log('No client record found for user:', userId);
-        setUserPets([]);
-        return;
-      }
-
-      // Now get pets using client_id
-      const { data, error } = await supabase
-        .from('pets')
-        .select('*')
-        .eq('client_id', clientData.id)
-        .eq('active', true);
-
-      if (error) throw error;
-      setUserPets(data || []);
-    } catch (error) {
-      console.error('Error fetching pets:', error);
-      setUserPets([]);
-    }
-  }, []);
-
-  const fetchServices = useCallback(async (serviceType: 'grooming' | 'veterinary') => {
+  const fetchServices = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('services')
         .select('*')
-        .eq('service_type', serviceType)
         .eq('active', true);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching services:', error);
+        toast.error('Erro ao buscar serviços');
+        return;
+      }
+
       setServices(data || []);
     } catch (error) {
-      console.error('Error fetching services:', error);
-      setServices([]);
+      console.error('Unexpected error fetching services:', error);
+      toast.error('Erro inesperado ao buscar serviços');
     }
   }, []);
 
-  const fetchAvailableProviders = useCallback(async (
-    serviceType: 'grooming' | 'veterinary',
-    date: Date,
-    selectedService: Service | undefined
-  ) => {
-    // This function is now handled by useStaffFiltering hook
-    // We'll keep it for compatibility but it won't be used
-    console.log('🔍 [FETCH_PROVIDERS] Legacy function called - now handled by useStaffFiltering');
-    setGroomers([]);
+  const fetchUserPets = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('pets')
+        .select('*')
+        .eq('client_id', userId);
+
+      if (error) {
+        console.error('Error fetching user pets:', error);
+        toast.error('Erro ao buscar pets do usuário');
+        return;
+      }
+
+      setUserPets(data || []);
+    } catch (error) {
+      console.error('Unexpected error fetching user pets:', error);
+      toast.error('Erro inesperado ao buscar pets do usuário');
+    }
+  }, []);
+
+  const fetchAvailableProviders = useCallback(async (serviceType: string) => {
+    try {
+      let roleFilter = '';
+      if (serviceType === 'grooming') {
+        roleFilter = 'Groomer';
+      } else if (serviceType === 'veterinary') {
+        roleFilter = 'Veterinarian';
+      }
+
+      const { data, error } = await supabase
+        .from('staff_profiles')
+        .select('*')
+        .eq('role', roleFilter)
+        .eq('active', true);
+
+      if (error) {
+        console.error('Error fetching available groomers:', error);
+        toast.error('Erro ao buscar profissionais disponíveis');
+        return;
+      }
+
+      setGroomers(data || []);
+    } catch (error) {
+      console.error('Unexpected error fetching available groomers:', error);
+      toast.error('Erro inesperado ao buscar profissionais');
+    }
   }, []);
 
   const fetchTimeSlots = useCallback(async (
     date: Date,
-    selectedStaffProfileId: string | null,
+    staffId: string | null,
     setIsLoading: (loading: boolean) => void,
-    selectedService: Service | undefined
+    selectedService: Service | null
   ) => {
-    if (!selectedService) return;
+    if (!selectedService || !staffId) {
+      console.log('⚠️ [FETCH_TIME_SLOTS] Missing required parameters');
+      setTimeSlots([]);
+      return;
+    }
 
-    console.log('⏰ [FETCH_TIME_SLOTS] Starting with params:', {
+    console.log('🕐 [FETCH_TIME_SLOTS] Starting with 10min granular logic:', {
       date: date.toISOString().split('T')[0],
-      selectedStaffProfileId,
-      service_id: selectedService.id,
-      service_duration: selectedService.default_duration
+      staffId,
+      serviceDuration: selectedService.default_duration || 60
     });
 
     setIsLoading(true);
-    setTimeSlots([]);
-    
+
     try {
       const dateStr = date.toISOString().split('T')[0];
       const serviceDuration = selectedService.default_duration || 60;
-      
-      // Generate time slots from 9:00 to 17:00 in 30-minute intervals
-      const availableSlots: TimeSlot[] = [];
-      
-      for (let hour = 9; hour < 17; hour++) {
-        for (let minute = 0; minute < 60; minute += 30) {
-          const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
-          const startTime = new Date(`1970-01-01T${timeStr}`);
-          const endTime = new Date(startTime.getTime() + serviceDuration * 60000);
-          
-          // Skip if appointment would end after 5 PM
-          if (endTime.getHours() > 17 || (endTime.getHours() === 17 && endTime.getMinutes() > 0)) {
-            continue;
-          }
-          
-          let isAvailable = true;
-          
-          // Check staff availability for entire service duration if staff is required
-          if (selectedStaffProfileId && (selectedService.requires_grooming || selectedService.requires_vet || selectedService.requires_bath)) {
-            // Check availability for every 30-minute slot needed for the service duration
-            for (let offset = 0; offset < serviceDuration; offset += 30) {
-              const checkTime = new Date(startTime.getTime() + offset * 60000);
-              const checkTimeStr = `${checkTime.getHours().toString().padStart(2, '0')}:${checkTime.getMinutes().toString().padStart(2, '0')}:00`;
-              
-              const { data: staffAvailability } = await supabase
-                .from('staff_availability')
-                .select('available')
-                .eq('staff_profile_id', selectedStaffProfileId)
-                .eq('date', dateStr)
-                .eq('time_slot', checkTimeStr)
-                .eq('available', true)
-                .maybeSingle();
-                
-              if (!staffAvailability) {
-                isAvailable = false;
-                break;
-              }
-            }
-          }
-          
-          if (isAvailable) {
-            availableSlots.push({
-              id: timeStr,
-              time: timeStr.substring(0, 5), // Format HH:MM
-              available: true
-            });
-          }
-        }
+
+      // Fetch all 10-minute granular availability for the staff on this date
+      const { data: availabilityData, error } = await supabase
+        .from('staff_availability')
+        .select('time_slot, available')
+        .eq('staff_profile_id', staffId)
+        .eq('date', dateStr);
+
+      if (error) {
+        console.error('❌ [FETCH_TIME_SLOTS] Error fetching staff availability:', error);
+        toast.error('Erro ao buscar horários disponíveis');
+        setTimeSlots([]);
+        return;
       }
 
-      console.log('✅ [FETCH_TIME_SLOTS] Final time slots:', {
-        count: availableSlots.length,
-        slots: availableSlots.map(s => ({ id: s.id, time: s.time }))
-      });
-      
+      console.log(`📊 [FETCH_TIME_SLOTS] Fetched ${availabilityData?.length || 0} 10-min availability records`);
+
+      // Generate 30-minute client slots and check availability using 10-minute granular logic
+      const clientSlots = generateClientTimeSlots();
+      const availableSlots: TimeSlot[] = [];
+
+      for (const clientSlot of clientSlots) {
+        const isAvailable = isClientSlotAvailable(
+          clientSlot, 
+          serviceDuration, 
+          availabilityData || []
+        );
+
+        availableSlots.push({
+          id: clientSlot,
+          time: formatTimeSlot(clientSlot),
+          available: isAvailable
+        });
+      }
+
+      console.log(`✅ [FETCH_TIME_SLOTS] Generated ${availableSlots.length} client slots, ${availableSlots.filter(s => s.available).length} available`);
       setTimeSlots(availableSlots);
 
-      // Fetch next available appointment if no slots today
-      if (availableSlots.length === 0 && selectedStaffProfileId) {
-        await fetchNextAvailable(selectedService.id, selectedStaffProfileId);
-      } else {
-        setNextAvailable(null);
-      }
-
     } catch (error) {
-      console.error('❌ [FETCH_TIME_SLOTS] Error:', error);
+      console.error('❌ [FETCH_TIME_SLOTS] Unexpected error:', error);
+      toast.error('Erro inesperado ao buscar horários');
       setTimeSlots([]);
     } finally {
       setIsLoading(false);
-    }
-  }, []);
-
-  const fetchNextAvailable = useCallback(async (serviceId: string, staffProfileId: string) => {
-    try {
-      // Simple implementation - check next 7 days
-      const today = new Date();
-      for (let i = 1; i <= 7; i++) {
-        const checkDate = new Date(today);
-        checkDate.setDate(today.getDate() + i);
-        
-        // Skip Sundays
-        if (checkDate.getDay() === 0) continue;
-        
-        const dateStr = checkDate.toISOString().split('T')[0];
-        
-        // Check if there are any available slots for this date and staff
-        const { data: availableSlots } = await supabase
-          .from('staff_availability')
-          .select('time_slot')
-          .eq('staff_profile_id', staffProfileId)
-          .eq('date', dateStr)
-          .eq('available', true)
-          .limit(1);
-
-        if (availableSlots && availableSlots.length > 0) {
-          setNextAvailable({
-            date: dateStr,
-            time: availableSlots[0].time_slot,
-            staff_name: 'Próximo disponível'
-          });
-          return;
-        }
-      }
-      
-      setNextAvailable(null);
-    } catch (error) {
-      console.error('Error fetching next available:', error);
-      setNextAvailable(null);
     }
   }, []);
 
@@ -216,9 +204,64 @@ export const useAppointmentData = () => {
     userPets,
     services,
     groomers,
-    fetchAvailableProviders,
-    fetchServices,
-    fetchUserPets,
+    fetchAvailableProviders: useCallback(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('staff_profiles')
+          .select('*')
+          .eq('role', 'Groomer')
+          .eq('active', true);
+  
+        if (error) {
+          console.error('Error fetching available groomers:', error);
+          toast.error('Erro ao buscar profissionais disponíveis');
+          return;
+        }
+  
+        setGroomers(data || []);
+      } catch (error) {
+        console.error('Unexpected error fetching available groomers:', error);
+        toast.error('Erro inesperado ao buscar profissionais');
+      }
+    }, []),
+    fetchServices: useCallback(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('services')
+          .select('*')
+          .eq('active', true);
+  
+        if (error) {
+          console.error('Error fetching services:', error);
+          toast.error('Erro ao buscar serviços');
+          return;
+        }
+  
+        setServices(data || []);
+      } catch (error) {
+        console.error('Unexpected error fetching services:', error);
+        toast.error('Erro inesperado ao buscar serviços');
+      }
+    }, []),
+    fetchUserPets: useCallback(async (userId: string) => {
+      try {
+        const { data, error } = await supabase
+          .from('pets')
+          .select('*')
+          .eq('client_id', userId);
+  
+        if (error) {
+          console.error('Error fetching user pets:', error);
+          toast.error('Erro ao buscar pets do usuário');
+          return;
+        }
+  
+        setUserPets(data || []);
+      } catch (error) {
+        console.error('Unexpected error fetching user pets:', error);
+        toast.error('Erro inesperado ao buscar pets do usuário');
+      }
+    }, []),
     fetchTimeSlots,
   };
 };

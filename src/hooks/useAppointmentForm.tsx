@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useAppointmentData } from './useAppointmentData';
@@ -7,6 +6,7 @@ import { toast } from 'sonner';
 import { usePricing } from './usePricing';
 import { debugAppointmentStatus, debugServiceStatus } from '@/utils/debugAppointmentStatus';
 import { useNavigate } from 'react-router-dom';
+import { getRequiredBackendSlots } from '@/utils/timeSlotHelpers';
 
 export interface Pet {
   id: string;
@@ -129,16 +129,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   const handleSubmit = useCallback(async (e: React.FormEvent, selectedStaffIds?: string[]) => {
     e.preventDefault();
     
-    console.log('🚀 [BOOKING_SUBMIT] Starting submission process...');
+    console.log('🚀 [BOOKING_SUBMIT] Starting submission with 10min granular slot booking...');
     
     if (!user || !selectedPet || !selectedService || !date || !selectedTimeSlotId) {
-      console.error('❌ [BOOKING_SUBMIT] Missing required fields:', {
-        user: !!user,
-        pet: !!selectedPet,
-        service: !!selectedService,
-        date: !!date,
-        timeSlot: !!selectedTimeSlotId
-      });
+      console.error('❌ [BOOKING_SUBMIT] Missing required fields');
       toast.error('Por favor, preencha todos os campos obrigatórios');
       return;
     }
@@ -159,7 +153,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         service: selectedService.name,
         date: date.toISOString().split('T')[0],
         time: selectedTimeSlotId,
-        staffIds: selectedStaffIds || []
+        staffIds: selectedStaffIds || [],
+        serviceDuration: pricing?.duration || selectedService.default_duration || 60
       });
 
       // Get client_id from user_id
@@ -174,9 +169,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         throw new Error('Erro ao encontrar dados do cliente');
       }
 
-      console.log('✅ [BOOKING_SUBMIT] Client found:', clientData.id);
-
-      // Prepare appointment data - ALWAYS create as 'pending' for admin approval
       const dateStr = date.toISOString().split('T')[0];
       const serviceDuration = pricing?.duration || selectedService.default_duration || 60;
       
@@ -187,7 +179,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         date: dateStr,
         time: selectedTimeSlotId,
         notes: notes || null,
-        status: 'pending', // ALWAYS START AS PENDING FOR ADMIN APPROVAL
+        status: 'pending', // Always start as pending for admin approval
         service_status: 'not_started',
         duration: serviceDuration,
         total_price: pricing?.price || selectedService.base_price || 0
@@ -231,21 +223,16 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
             }
           }
 
-          // Update staff availability - mark time slots as unavailable
-          console.log('🔒 [BOOKING_SUBMIT] Updating staff availability...');
+          // Update staff availability using 10-minute granular logic
+          console.log('🔒 [BOOKING_SUBMIT] Updating staff availability with 10min granular logic...');
 
           for (const staffId of uniqueStaffIds) {
-            const slotsToUpdate = [];
-            for (let offset = 0; offset < serviceDuration; offset += 30) {
-              const slotTime = new Date(`1970-01-01T${selectedTimeSlotId}`);
-              slotTime.setMinutes(slotTime.getMinutes() + offset);
-              const timeStr = slotTime.toTimeString().split(' ')[0];
-              slotsToUpdate.push(timeStr);
-            }
+            // Get all 10-minute slots that need to be marked unavailable
+            const requiredSlots = getRequiredBackendSlots(selectedTimeSlotId, serviceDuration);
+            
+            console.log(`🔒 [BOOKING_SUBMIT] Marking ${requiredSlots.length} 10-min slots unavailable for staff ${staffId}:`, requiredSlots);
 
-            console.log('🔒 [BOOKING_SUBMIT] Slots to mark unavailable:', slotsToUpdate);
-
-            for (const timeSlot of slotsToUpdate) {
+            for (const timeSlot of requiredSlots) {
               const { error: availabilityError } = await supabase
                 .from('staff_availability')
                 .update({ available: false })
@@ -260,7 +247,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
                   error: availabilityError
                 });
               } else {
-                console.log('✅ [BOOKING_SUBMIT] Marked unavailable:', { staffId, timeSlot });
+                console.log(`✅ [BOOKING_SUBMIT] Marked 10-min slot ${timeSlot} unavailable`);
               }
             }
           }
@@ -282,7 +269,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         }
       });
 
-      console.log('🎉 [BOOKING_SUBMIT] Booking completed successfully!');
+      console.log('🎉 [BOOKING_SUBMIT] Booking completed successfully with 10min granular slot booking!');
       
       // Reset form
       setSelectedPet(null);
@@ -341,7 +328,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     groomers,
     handleNextAvailableSelect,
     handleSubmit,
-    fetchServices,
+    fetchServices: fetchServices,
     serviceRequiresStaff,
     serviceRequirementsLoaded,
     pricing,

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { generateBackendTimeSlots } from '@/utils/timeSlotHelpers';
 
 interface AvailabilitySlot {
   id: string;
@@ -23,24 +24,14 @@ const GroomerSchedule = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [staffProfileId, setStaffProfileId] = useState<string | null>(null);
 
-  // Generate default time slots (8am to 5pm)
-  const generateDefaultSlots = (): AvailabilitySlot[] => {
-    const slots: AvailabilitySlot[] = [];
-    for (let hour = 8; hour < 17; hour++) {
-      slots.push({
-        id: `${hour}:00`,
-        time: `${hour}:00`,
-        available: true
-      });
-      if (hour < 16) {
-        slots.push({
-          id: `${hour}:30`,
-          time: `${hour}:30`,
-          available: true
-        });
-      }
-    }
-    return slots;
+  // Generate 10-minute granular slots for staff management
+  const generateStaffSlots = (): AvailabilitySlot[] => {
+    const backendSlots = generateBackendTimeSlots();
+    return backendSlots.map(slot => ({
+      id: slot,
+      time: slot.substring(0, 5), // Format as HH:MM
+      available: true
+    }));
   };
 
   useEffect(() => {
@@ -83,7 +74,9 @@ const GroomerSchedule = () => {
     try {
       const dateStr = selectedDate.toISOString().split('T')[0];
       
-      // Query staff_availability table
+      console.log('📅 [GROOMER_SCHEDULE] Fetching 10-min granular availability for:', { dateStr, staffProfileId });
+      
+      // Query staff_availability table for 10-minute slots
       const { data, error } = await supabase
         .from('staff_availability')
         .select('*')
@@ -95,21 +88,24 @@ const GroomerSchedule = () => {
       }
 
       if (data && data.length > 0) {
-        const slots = generateDefaultSlots().map(slot => {
-          const dbSlot = data.find(d => d.time_slot === slot.time);
+        const slots = generateStaffSlots().map(slot => {
+          const dbSlot = data.find(d => d.time_slot === `${slot.time}:00`);
           return {
             ...slot,
             available: dbSlot ? dbSlot.available : true
           };
         });
         setAvailabilitySlots(slots);
+        console.log(`📊 [GROOMER_SCHEDULE] Loaded ${slots.length} 10-min slots, ${slots.filter(s => s.available).length} available`);
       } else {
-        setAvailabilitySlots(generateDefaultSlots());
+        const defaultSlots = generateStaffSlots();
+        setAvailabilitySlots(defaultSlots);
+        console.log(`📋 [GROOMER_SCHEDULE] Using default ${defaultSlots.length} 10-min slots`);
       }
     } catch (error: any) {
       console.error('Error fetching availability:', error);
       toast.error('Erro ao carregar disponibilidade');
-      setAvailabilitySlots(generateDefaultSlots());
+      setAvailabilitySlots(generateStaffSlots());
     } finally {
       setIsLoading(false);
     }
@@ -123,15 +119,18 @@ const GroomerSchedule = () => {
     if (!currentSlot) return;
 
     const newAvailability = !currentSlot.available;
+    const fullTimeSlot = `${timeSlot}:00`;
+
+    console.log('🔄 [GROOMER_SCHEDULE] Toggling 10-min slot:', { timeSlot: fullTimeSlot, newAvailability });
 
     try {
-      // Use direct query to insert into the staff_availability table
+      // Use direct query to insert into the staff_availability table with 10-minute granularity
       const { error } = await supabase
         .from('staff_availability')
         .upsert({
           staff_profile_id: staffProfileId,
           date: dateStr,
-          time_slot: timeSlot,
+          time_slot: fullTimeSlot,
           available: newAvailability
         }, {
           onConflict: 'staff_profile_id,date,time_slot'
@@ -148,7 +147,7 @@ const GroomerSchedule = () => {
         )
       );
 
-      toast.success('Disponibilidade atualizada');
+      toast.success(`10-min slot ${timeSlot} ${newAvailability ? 'disponibilizado' : 'bloqueado'}`);
     } catch (error: any) {
       console.error('Error updating availability:', error);
       toast.error('Erro ao atualizar disponibilidade');
@@ -160,14 +159,14 @@ const GroomerSchedule = () => {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <h1 className="text-3xl font-bold mb-8">Minha Agenda</h1>
+        <h1 className="text-3xl font-bold mb-8">Minha Agenda (10min granular)</h1>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Card>
             <CardHeader>
               <CardTitle>Selecionar Data</CardTitle>
               <CardDescription>
-                Escolha uma data para configurar sua disponibilidade
+                Escolha uma data para configurar sua disponibilidade em slots de 10 minutos
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -184,22 +183,22 @@ const GroomerSchedule = () => {
           <Card>
             <CardHeader>
               <CardTitle>
-                Disponibilidade para {selectedDate?.toLocaleDateString('pt-BR')}
+                Disponibilidade 10min para {selectedDate?.toLocaleDateString('pt-BR')}
               </CardTitle>
               <CardDescription>
-                {isWeekend ? 'Fechado aos domingos' : 'Configure seus horários disponíveis'}
+                {isWeekend ? 'Fechado aos domingos' : 'Configure seus horários em slots de 10 minutos'}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <p>Carregando...</p>
+                <p>Carregando slots de 10 minutos...</p>
               ) : isWeekend ? (
                 <p className="text-muted-foreground">Não atendemos aos domingos.</p>
               ) : (
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-2 max-h-96 overflow-y-auto">
                     {availabilitySlots.map((slot) => (
-                      <div key={slot.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div key={slot.id} className="flex items-center justify-between p-2 border rounded text-xs">
                         <Label htmlFor={slot.id} className="font-medium">
                           {slot.time}
                         </Label>
@@ -225,7 +224,7 @@ const GroomerSchedule = () => {
                       }}
                       className="w-full"
                     >
-                      {availabilitySlots.every(slot => slot.available) ? 'Desabilitar Tudo' : 'Habilitar Tudo'}
+                      {availabilitySlots.every(slot => slot.available) ? 'Desabilitar Todos' : 'Habilitar Todos'}
                     </Button>
                   </div>
                 </div>
