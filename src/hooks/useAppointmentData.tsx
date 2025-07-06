@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -248,12 +249,15 @@ export const useAppointmentData = () => {
           availabilityData || []
         );
 
-        availableSlots.push({
+        const slotObject = {
           id: clientSlot,
           time: formatTimeSlot(clientSlot),
           available: isAvailable
-        });
+        };
 
+        availableSlots.push(slotObject);
+
+        console.log(`📊 [FETCH_TIME_SLOTS] Created slot object:`, slotObject);
         console.log(`Result for ${clientSlot}: ${isAvailable ? 'AVAILABLE' : 'NOT AVAILABLE'}`);
       }
 
@@ -265,13 +269,28 @@ export const useAppointmentData = () => {
       const availableSlotTimes = availableSlots.filter(s => s.available).map(s => s.time);
       console.log(`   Available slot times:`, availableSlotTimes);
 
+      // 🚨 NEW PIPELINE DEBUGGING 🚨
+      console.log('🔄 [PIPELINE_DEBUG] ==========================================');
+      console.log('🔄 [PIPELINE_DEBUG] COMPLETE availableSlots array before setTimeSlots:');
+      console.log(JSON.stringify(availableSlots, null, 2));
+      
+      console.log('🔄 [PIPELINE_DEBUG] Available slots structure analysis:');
+      availableSlots.forEach((slot, index) => {
+        console.log(`  Slot ${index}: id="${slot.id}", time="${slot.time}", available=${slot.available}`);
+      });
+
+      console.log('🔄 [PIPELINE_DEBUG] Calling setTimeSlots with:', availableSlots.length, 'slots');
+
       if (availableSlotTimes.length === 0) {
         console.log('❌ [FETCH_TIME_SLOTS] NO AVAILABLE SLOTS FOUND!');
         console.log('❌ [FETCH_TIME_SLOTS] This is the root cause of the "Nenhum horário disponível" message.');
         console.log('❌ [FETCH_TIME_SLOTS] Review the detailed logs above to identify the issue.');
+      } else {
+        console.log('✅ [FETCH_TIME_SLOTS] SUCCESS! Found', availableSlotTimes.length, 'available slots');
       }
 
       setTimeSlots(availableSlots);
+      console.log('🔄 [PIPELINE_DEBUG] setTimeSlots called successfully');
       console.log('🕐 [FETCH_TIME_SLOTS] ==========================================');
 
     } catch (error) {
@@ -282,6 +301,18 @@ export const useAppointmentData = () => {
       setIsLoading(false);
     }
   }, []);
+
+  // 🚨 NEW: Debug the timeSlots state whenever it changes
+  useEffect(() => {
+    console.log('🔄 [STATE_DEBUG] ==========================================');
+    console.log('🔄 [STATE_DEBUG] timeSlots state changed to:', timeSlots.length, 'slots');
+    console.log('🔄 [STATE_DEBUG] timeSlots content:');
+    timeSlots.forEach((slot, index) => {
+      console.log(`  State Slot ${index}: id="${slot.id}", time="${slot.time}", available=${slot.available}`);
+    });
+    console.log('🔄 [STATE_DEBUG] Available slots in state:', timeSlots.filter(s => s.available).length);
+    console.log('🔄 [STATE_DEBUG] ==========================================');
+  }, [timeSlots]);
 
   return {
     timeSlots,

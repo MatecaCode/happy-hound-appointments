@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -72,6 +73,22 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     selectedStaffIds: selectedStaff,
     serviceDuration: serviceDuration
   });
+
+  // 🚨 NEW: Debug what DateTimeForm is receiving
+  React.useEffect(() => {
+    console.log('🎯 [UI_DEBUG] ==========================================');
+    console.log('🎯 [UI_DEBUG] DateTimeForm received timeSlots prop:', timeSlots.length, 'slots');
+    console.log('🎯 [UI_DEBUG] timeSlots content received by UI:');
+    timeSlots.forEach((slot, index) => {
+      console.log(`  UI Slot ${index}: id="${slot.id}", time="${slot.time}", available=${slot.available}`);
+    });
+    console.log('🎯 [UI_DEBUG] Available slots for UI:', timeSlots.filter(s => s.available).length);
+    console.log('🎯 [UI_DEBUG] Unavailable slots for UI:', timeSlots.filter(s => !s.available).length);
+    console.log('🎯 [UI_DEBUG] Selected date:', date);
+    console.log('🎯 [UI_DEBUG] Selected time slot ID:', selectedTimeSlotId);
+    console.log('🎯 [UI_DEBUG] Is loading:', isLoading);
+    console.log('🎯 [UI_DEBUG] ==========================================');
+  }, [timeSlots, date, selectedTimeSlotId, isLoading]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -169,24 +186,47 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                   <span>Carregando horários...</span>
                 </div>
               ) : timeSlots.length > 0 ? (
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {timeSlots.map((slot) => (
-                    <Button
-                      key={slot.id}
-                      type="button"
-                      variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
-                      className="h-auto py-2 transition-all duration-200 hover:scale-105"
-                      onClick={() => setSelectedTimeSlotId(slot.id)}
-                      disabled={!slot.available || isLoading}
-                    >
-                      {slot.time}
-                    </Button>
-                  ))}
+                <div>
+                  {/* 🚨 NEW: Show UI debugging info */}
+                  <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
+                    <div>Total slots: {timeSlots.length}</div>
+                    <div>Available slots: {timeSlots.filter(s => s.available).length}</div>
+                    <div>Unavailable slots: {timeSlots.filter(s => !s.available).length}</div>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2 mt-2">
+                    {timeSlots.map((slot) => {
+                      console.log('🎯 [UI_RENDER] Rendering slot button:', slot);
+                      return (
+                        <Button
+                          key={slot.id}
+                          type="button"
+                          variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
+                          className="h-auto py-2 transition-all duration-200 hover:scale-105"
+                          onClick={() => {
+                            console.log('🎯 [UI_CLICK] Slot clicked:', slot);
+                            setSelectedTimeSlotId(slot.id);
+                          }}
+                          disabled={!slot.available || isLoading}
+                        >
+                          {slot.time}
+                        </Button>
+                      );
+                    })}
+                  </div>
                 </div>
               ) : (
-                <p className="text-muted-foreground mt-2">
-                  Nenhum horário disponível para esta data.
-                </p>
+                <div>
+                  <p className="text-muted-foreground mt-2">
+                    Nenhum horário disponível para esta data.
+                  </p>
+                  {/* 🚨 NEW: Debug info when no slots */}
+                  <div className="mt-2 p-2 bg-red-100 rounded text-xs">
+                    <div>Debug: timeSlots.length = {timeSlots.length}</div>
+                    <div>Debug: isLoading = {isLoading.toString()}</div>
+                    <div>Debug: date = {date?.toISOString()}</div>
+                  </div>
+                </div>
               )}
             </div>
           )}
