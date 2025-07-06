@@ -63,11 +63,17 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       for (let i = 0; i < 90; i++) {
         const checkDate = new Date(today);
         checkDate.setDate(today.getDate() + i);
-        const dateStr = checkDate.toISOString().split('T')[0];
+        
+        // Create consistent date string format
+        const year = checkDate.getFullYear();
+        const month = (checkDate.getMonth() + 1).toString().padStart(2, '0');
+        const day = checkDate.getDate().toString().padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         
         // Skip Sundays (day 0) - they should be unavailable
         if (checkDate.getDay() === 0) {
           unavailableDatesSet.add(dateStr);
+          console.log(`🚫 [BATCH_AVAILABILITY] Skipping Sunday: ${dateStr}`);
           continue;
         }
 
@@ -75,7 +81,17 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         if (!dateAvailability) {
           // No availability data for this date
           unavailableDatesSet.add(dateStr);
+          console.log(`❌ [BATCH_AVAILABILITY] No availability data for: ${dateStr} (${checkDate.toLocaleDateString('pt-BR', { weekday: 'long' })})`);
           continue;
+        }
+
+        // Debug logging for Mondays
+        if (checkDate.getDay() === 1) { // Monday
+          console.log(`🔍 [BATCH_AVAILABILITY] Monday check for ${dateStr}:`, {
+            dayOfWeek: checkDate.getDay(),
+            dateAvailability: Array.from(dateAvailability.keys()),
+            selectedStaffIds
+          });
         }
 
         // Check if all selected staff have availability for at least one complete time slot
@@ -100,6 +116,9 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
               const staffTimeSlots = dateAvailability.get(staffId);
               if (!staffTimeSlots) {
                 allStaffAvailable = false;
+                if (checkDate.getDay() === 1) { // Monday debug
+                  console.log(`🔍 [BATCH_AVAILABILITY] Monday: Staff ${staffId} has no time slots for ${dateStr}`);
+                }
                 break;
               }
 
@@ -124,6 +143,9 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
 
             if (allStaffAvailable) {
               hasAvailableSlot = true;
+              if (checkDate.getDay() === 1) { // Monday debug
+                console.log(`✅ [BATCH_AVAILABILITY] Monday ${dateStr} has available slot at ${timeStr}`);
+              }
               break;
             }
           }
@@ -133,6 +155,9 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
 
         if (!hasAvailableSlot) {
           unavailableDatesSet.add(dateStr);
+          if (checkDate.getDay() === 1) { // Monday debug
+            console.log(`❌ [BATCH_AVAILABILITY] Monday ${dateStr} marked as unavailable - no complete slots found`);
+          }
         }
       }
 
@@ -184,10 +209,15 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     const day = date.getDate().toString().padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     
-    console.log(`🗓️ [DATE_CHECK] Checking date: ${dateStr}, isUnavailable: ${unavailableDates.has(dateStr)}`);
+    const isUnavailable = unavailableDates.has(dateStr);
+    
+    // Extra logging for Mondays
+    if (date.getDay() === 1) {
+      console.log(`🗓️ [DATE_CHECK] Monday check: ${dateStr}, isUnavailable: ${isUnavailable}, dayOfWeek: ${date.getDay()}`);
+    }
     
     // Disable dates with no staff availability
-    return unavailableDates.has(dateStr);
+    return isUnavailable;
   }, [unavailableDates]);
 
   const checkDateAvailability = useCallback(async (date: Date): Promise<boolean> => {
