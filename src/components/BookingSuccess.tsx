@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Calendar, Clock, User, PawPrint, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Calendar, Clock, User, PawPrint, ArrowLeft, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Layout from './Layout';
@@ -113,6 +113,44 @@ const BookingSuccess: React.FC = () => {
     );
   }
 
+  const getStatusInfo = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return {
+          badge: (
+            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
+              <AlertCircle className="w-3 h-3 mr-1" />
+              Aguardando Aprovação
+            </Badge>
+          ),
+          title: 'Agendamento Enviado com Sucesso!',
+          subtitle: 'Seu agendamento está aguardando aprovação da clínica',
+          color: 'text-amber-600'
+        };
+      case 'confirmed':
+        return {
+          badge: (
+            <Badge variant="default" className="bg-blue-100 text-blue-800 border-blue-200">
+              <CheckCircle className="w-3 h-3 mr-1" />
+              Confirmado
+            </Badge>
+          ),
+          title: 'Agendamento Confirmado!',
+          subtitle: 'Seu agendamento foi aprovado pela clínica',
+          color: 'text-green-600'
+        };
+      default:
+        return {
+          badge: null,
+          title: 'Agendamento Criado!',
+          subtitle: 'Detalhes do seu agendamento',
+          color: 'text-green-600'
+        };
+    }
+  };
+
+  const statusInfo = getStatusInfo(booking.status);
+
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50 py-8">
@@ -122,11 +160,11 @@ const BookingSuccess: React.FC = () => {
             <div className="animate-scale-in mb-4">
               <CheckCircle className="w-16 h-16 text-green-500 mx-auto" />
             </div>
-            <h1 className="text-2xl font-bold text-green-600 mb-2">
-              Agendamento Criado com Sucesso!
+            <h1 className={`text-2xl font-bold ${statusInfo.color} mb-2`}>
+              {statusInfo.title}
             </h1>
             <p className="text-muted-foreground">
-              Seu agendamento está aguardando aprovação da clínica
+              {statusInfo.subtitle}
             </p>
           </div>
 
@@ -138,12 +176,7 @@ const BookingSuccess: React.FC = () => {
                   <PawPrint className="w-5 h-5 text-primary" />
                   {booking.pet_name}
                 </CardTitle>
-                <Badge 
-                  variant="secondary" 
-                  className="bg-amber-100 text-amber-800 border-amber-200"
-                >
-                  Aguardando Aprovação
-                </Badge>
+                {statusInfo.badge}
               </div>
             </CardHeader>
             
@@ -208,16 +241,18 @@ const BookingSuccess: React.FC = () => {
               )}
 
               {/* Status Info */}
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <h3 className="font-semibold text-amber-800 mb-2">
-                  O que acontece agora?
-                </h3>
-                <p className="text-amber-700 text-sm">
-                  Seu agendamento foi enviado para aprovação. A clínica irá revisar 
-                  e confirmar sua solicitação em breve. Você receberá uma notificação 
-                  quando o status for atualizado.
-                </p>
-              </div>
+              {booking.status === 'pending' && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <h3 className="font-semibold text-amber-800 mb-2">
+                    O que acontece agora?
+                  </h3>
+                  <p className="text-amber-700 text-sm">
+                    Seu agendamento foi enviado para aprovação. A clínica irá revisar 
+                    e confirmar sua solicitação em breve. Você receberá uma notificação 
+                    quando o status for atualizado.
+                  </p>
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex gap-3 pt-4">

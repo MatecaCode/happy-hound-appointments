@@ -1,3 +1,4 @@
+
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useAppointmentData } from './useAppointmentData';
@@ -175,7 +176,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
       console.log('✅ [BOOKING_SUBMIT] Client found:', clientData.id);
 
-      // Prepare appointment data - Try 'confirmed' first since 'pending' seems to be rejected
+      // Prepare appointment data - ALWAYS create as 'pending' for admin approval
       const dateStr = date.toISOString().split('T')[0];
       const serviceDuration = pricing?.duration || selectedService.default_duration || 60;
       
@@ -186,7 +187,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         date: dateStr,
         time: selectedTimeSlotId,
         notes: notes || null,
-        status: 'confirmed', // CHANGED: Using 'confirmed' instead of 'pending' due to constraint issue
+        status: 'pending', // ALWAYS START AS PENDING FOR ADMIN APPROVAL
         service_status: 'not_started',
         duration: serviceDuration,
         total_price: pricing?.price || selectedService.base_price || 0
@@ -272,10 +273,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       const [appointment] = await Promise.all([bookingPromise, minimumLoadingTime]);
 
       // Success! Show confirmation message
-      toast.success('Agendamento criado com sucesso!', {
+      toast.success('Agendamento criado com sucesso! Aguardando aprovação da clínica.', {
         duration: 4000,
         style: {
-          background: '#10B981',
+          background: '#F59E0B',
           color: 'white',
           border: 'none'
         }

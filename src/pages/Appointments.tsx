@@ -1,11 +1,13 @@
+
 import React, { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Dog, Clock, CheckCircle, XCircle, Play, AlertCircle } from 'lucide-react';
+import { Dog, Clock, CheckCircle, XCircle, Play, AlertCircle, Calendar, User, Trash2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -30,6 +32,7 @@ const Appointments = () => {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   
   // Load user's appointments from the database with detailed information
   useEffect(() => {
@@ -117,31 +120,75 @@ const Appointments = () => {
     fetchAppointments();
   }, [user]);
   
-  const cancelAppointment = async (id: string) => {
+  const cancelAppointment = async (appointmentId: string) => {
+    setCancellingId(appointmentId);
     try {
-      const { error } = await supabase
+      const appointment = appointments.find(a => a.id === appointmentId);
+      if (!appointment) return;
+
+      // Update appointment status to cancelled
+      const { error: updateError } = await supabase
         .from('appointments')
         .update({ status: 'cancelled' })
-        .eq('id', id);
+        .eq('id', appointmentId);
       
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      // Restore staff availability if there are linked staff members
+      if (appointment.staff_names && appointment.staff_names.length > 0) {
+        // Get staff IDs linked to this appointment
+        const { data: staffLinks } = await supabase
+          .from('appointment_staff')
+          .select('staff_profile_id')
+          .eq('appointment_id', appointmentId);
+
+        if (staffLinks) {
+          const serviceDuration = appointment.duration || 60;
+          
+          for (const staffLink of staffLinks) {
+            // Calculate all time slots that were blocked
+            const slotsToFree = [];
+            for (let offset = 0; offset < serviceDuration; offset += 30) {
+              const slotTime = new Date(`1970-01-01T${appointment.time}`);
+              slotTime.setMinutes(slotTime.getMinutes() + offset);
+              const timeStr = slotTime.toTimeString().split(' ')[0];
+              slotsToFree.push(timeStr);
+            }
+
+            // Free up each time slot
+            for (const timeSlot of slotsToFree) {
+              await supabase
+                .from('staff_availability')
+                .update({ available: true })
+                .eq('staff_profile_id', staffLink.staff_profile_id)
+                .eq('date', appointment.date.toISOString().split('T')[0])
+                .eq('time_slot', timeSlot);
+            }
+          }
+        }
+      }
       
       // Update local state
-      setAppointments(
-        appointments.map(appointment => 
-          appointment.id === id
-            ? { ...appointment, status: 'cancelled' as const }
-            : appointment
+      setAppointments(prevAppointments =>
+        prevAppointments.map(apt => 
+          apt.id === appointmentId
+            ? { ...apt, status: 'cancelled' as const }
+            : apt
         )
       );
       
-      const appointment = appointments.find(a => a.id === id);
-      if (appointment) {
-        toast.success(`Agendamento para ${appointment.pet_name} foi cancelado.`);
-      }
+      toast.success(`Agendamento para ${appointment.pet_name} foi cancelado.`, {
+        style: {
+          background: '#EF4444',
+          color: 'white',
+          border: 'none'
+        }
+      });
     } catch (error: any) {
       console.error('❌ [APPOINTMENTS] Error cancelling appointment:', error.message);
       toast.error('Erro ao cancelar agendamento');
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -207,68 +254,126 @@ const Appointments = () => {
   };
 
   const AppointmentDetailCard = ({ appointment }: { appointment: AppointmentWithDetails }) => (
-    <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-shadow">
-      <div className="flex justify-between items-start mb-4">
-        <div className="flex items-center gap-3">
-          <Dog className="h-8 w-8 text-primary" />
-          <div>
-            <h3 className="font-semibold text-lg">{appointment.pet_name}</h3>
-            <p className="text-sm text-muted-foreground">{appointment.service_name}</p>
+    <Dialog>
+      <DialogTrigger asChild>
+        <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200 hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-[1.02]">
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex items-center gap-3">
+              <Dog className="h-8 w-8 text-primary" />
+              <div>
+                <h3 className="font-semibold text-lg">{appointment.pet_name}</h3>
+                <p className="text-sm text-muted-foreground">{appointment.service_name}</p>
+              </div>
+            </div>
+            {getStatusBadge(appointment.status, appointment.service_status)}
           </div>
+          
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center text-sm">
+              <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+              <span>{format(appointment.date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+            </div>
+            <div className="flex items-center text-sm">
+              <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
+              <span>{appointment.time} ({appointment.duration}min)</span>
+            </div>
+            {appointment.staff_names && appointment.staff_names.length > 0 && (
+              <div className="flex items-center text-sm">
+                <User className="h-4 w-4 mr-2 text-muted-foreground" />
+                <span>{appointment.staff_names.join(', ')}</span>
+              </div>
+            )}
+          </div>
+
+          {appointment.status === 'pending' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-amber-800">
+                <AlertCircle className="w-4 h-4 inline mr-1" />
+                Seu agendamento está pendente de aprovação pela clínica.
+              </p>
+            </div>
+          )}
         </div>
-        {getStatusBadge(appointment.status, appointment.service_status)}
-      </div>
+      </DialogTrigger>
       
-      <div className="space-y-2 mb-4">
-        <div className="flex items-center text-sm">
-          <span className="font-medium w-20">Data:</span>
-          <span>{format(appointment.date, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
-        </div>
-        <div className="flex items-center text-sm">
-          <span className="font-medium w-20">Horário:</span>
-          <span>{appointment.time} ({appointment.duration}min)</span>
-        </div>
-        {appointment.staff_names && appointment.staff_names.length > 0 && (
-          <div className="flex items-center text-sm">
-            <span className="font-medium w-20">Profissionais:</span>
-            <span>{appointment.staff_names.join(', ')}</span>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Dog className="h-5 w-5 text-primary" />
+            {appointment.pet_name}
+          </DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <span className="text-sm font-medium">Status:</span>
+            {getStatusBadge(appointment.status, appointment.service_status)}
           </div>
-        )}
-        {appointment.total_price && appointment.total_price > 0 && (
-          <div className="flex items-center text-sm">
-            <span className="font-medium w-20">Valor:</span>
-            <span className="text-green-600 font-medium">R$ {appointment.total_price.toFixed(2)}</span>
+          
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Serviço:</span>
+              <span className="text-sm">{appointment.service_name}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Data:</span>
+              <span className="text-sm">{format(appointment.date, "dd/MM/yyyy", { locale: ptBR })}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Horário:</span>
+              <span className="text-sm">{appointment.time}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm font-medium">Duração:</span>
+              <span className="text-sm">{appointment.duration} minutos</span>
+            </div>
+            {appointment.staff_names && appointment.staff_names.length > 0 && (
+              <div className="flex justify-between">
+                <span className="text-sm font-medium">Profissionais:</span>
+                <span className="text-sm">{appointment.staff_names.join(', ')}</span>
+              </div>
+            )}
+            {appointment.total_price && appointment.total_price > 0 && (
+              <div className="flex justify-between">
+                <span className="text-sm font-medium">Valor:</span>
+                <span className="text-sm text-green-600 font-medium">R$ {appointment.total_price.toFixed(2)}</span>
+              </div>
+            )}
+            {appointment.notes && (
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium">Observações:</span>
+                <span className="text-sm text-muted-foreground">{appointment.notes}</span>
+              </div>
+            )}
           </div>
-        )}
-        {appointment.notes && (
-          <div className="flex items-start text-sm">
-            <span className="font-medium w-20">Notas:</span>
-            <span className="flex-1">{appointment.notes}</span>
-          </div>
-        )}
-      </div>
 
-      {appointment.status === 'pending' && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-          <p className="text-sm text-amber-800">
-            <AlertCircle className="w-4 h-4 inline mr-1" />
-            Seu agendamento está pendente de aprovação pela clínica. Você receberá uma confirmação em breve.
-          </p>
+          {appointment.status === 'pending' && (
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={(e) => {
+                e.stopPropagation();
+                cancelAppointment(appointment.id);
+              }}
+              disabled={cancellingId === appointment.id}
+              className="w-full"
+            >
+              {cancellingId === appointment.id ? (
+                <>
+                  <Clock className="w-4 h-4 mr-2 animate-spin" />
+                  Cancelando...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Cancelar Agendamento
+                </>
+              )}
+            </Button>
+          )}
         </div>
-      )}
-
-      {/* Only show cancel button for pending appointments */}
-      {appointment.status === 'pending' && (
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => cancelAppointment(appointment.id)}
-          className="w-full sm:w-auto"
-        >
-          Cancelar Agendamento
-        </Button>
-      )}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
   
   const upcomingAppointments = appointments.filter(apt => 
