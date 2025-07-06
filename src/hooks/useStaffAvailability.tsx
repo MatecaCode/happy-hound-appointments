@@ -1,10 +1,12 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import { zonedTimeToUtc, utcToZonedTime, format as formatTz } from 'date-fns-tz';
 import { 
   generateClientTimeSlots, 
   getRequiredBackendSlots, 
-  isClientSlotAvailable 
+  isClientSlotAvailable,
+  TIME_SLOT_CONFIG
 } from '@/utils/timeSlotHelpers';
 
 interface UseStaffAvailabilityParams {
@@ -19,7 +21,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   const checkBatchAvailability = useCallback(async (): Promise<Set<string>> => {
     if (selectedStaffIds.length === 0) return new Set();
 
-    console.log(`🔄 [BATCH_AVAILABILITY] Checking availability for ${selectedStaffIds.length} staff members with 10min granular logic`);
+    console.log(`🔄 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Checking availability for ${selectedStaffIds.length} staff members with 10min granular logic in ${TIME_SLOT_CONFIG.TIMEZONE}`);
     
     try {
       // Check next 90 days in batches
@@ -27,8 +29,24 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       const endDate = new Date(today);
       endDate.setDate(today.getDate() + 90);
       
-      const startDateStr = today.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
+      // Convert dates to proper timezone
+      const todayUTC = format(today, 'yyyy-MM-dd');
+      const todaySP = formatTz(utcToZonedTime(today, TIME_SLOT_CONFIG.TIMEZONE), 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+      const endDateUTC = format(endDate, 'yyyy-MM-dd');
+      const endDateSP = formatTz(utcToZonedTime(endDate, TIME_SLOT_CONFIG.TIMEZONE), 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+      
+      console.log(`🕐 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Date range analysis:`);
+      console.log(`  Today UTC: ${todayUTC}, SP: ${todaySP}`);
+      console.log(`  End UTC: ${endDateUTC}, SP: ${endDateSP}`);
+      console.log(`  Using for query: ${todaySP} to ${endDateSP}`);
+
+      const startDateStr = todaySP;
+      const endDateStr = endDateSP;
+
+      console.log(`🔍 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] SQL Query:`)
+      console.log(`  SELECT staff_profile_id, date, time_slot, available FROM staff_availability`);
+      console.log(`  WHERE staff_profile_id IN (${selectedStaffIds.map(id => `'${id}'`).join(', ')})`);
+      console.log(`  AND date >= '${startDateStr}' AND date <= '${endDateStr}' AND available = true`);
 
       // Fetch all 10-minute granular availability data for the date range and selected staff
       const { data: availabilityData, error } = await supabase
@@ -40,11 +58,27 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         .eq('available', true);
 
       if (error) {
-        console.error('❌ [BATCH_AVAILABILITY] Error fetching availability:', error);
+        console.error('❌ [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Error fetching availability:', error);
         return new Set();
       }
 
-      console.log(`📊 [BATCH_AVAILABILITY] Fetched ${availabilityData?.length || 0} 10-min availability records`);
+      console.log(`📊 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Fetched ${availabilityData?.length || 0} 10-min availability records in ${TIME_SLOT_CONFIG.TIMEZONE}`);
+
+      // Log sample of availability data with timezone info
+      if (availabilityData && availabilityData.length > 0) {
+        console.log(`📋 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Sample availability records (first 5):`);
+        availabilityData.slice(0, 5).forEach((record, index) => {
+          try {
+            const dateTime = new Date(`${record.date}T${record.time_slot}`);
+            const utcTime = format(dateTime, 'yyyy-MM-dd HH:mm:ss');
+            const spTime = formatTz(dateTime, 'yyyy-MM-dd HH:mm:ss', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+            
+            console.log(`  ${index + 1}: ${record.date} ${record.time_slot} (UTC: ${utcTime}, SP: ${spTime}) - Staff: ${record.staff_profile_id}`);
+          } catch (error) {
+            console.log(`  ${index + 1}: ${record.date} ${record.time_slot} (TIMEZONE_ERROR: ${error}) - Staff: ${record.staff_profile_id}`);
+          }
+        });
+      }
 
       // Group availability by date and staff
       const availabilityByDate = new Map<string, Map<string, Array<{ time_slot: string; available: boolean }>>>();
@@ -67,25 +101,28 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
 
       const unavailableDatesSet = new Set<string>();
 
-      // Check each date in the 90-day range
+      // Check each date in the 90-day range with timezone awareness
       for (let i = 0; i < 90; i++) {
         const checkDate = new Date(today);
         checkDate.setDate(today.getDate() + i);
         
-        const year = checkDate.getFullYear();
-        const month = (checkDate.getMonth() + 1).toString().padStart(2, '0');
-        const day = checkDate.getDate().toString().padStart(2, '0');
-        const dateStr = `${year}-${month}-${day}`;
+        // Use São Paulo timezone for date formatting
+        const spDate = utcToZonedTime(checkDate, TIME_SLOT_CONFIG.TIMEZONE);
+        const dateStr = formatTz(spDate, 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+        
+        console.log(`🔍 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Checking date ${dateStr} (day ${i}) in ${TIME_SLOT_CONFIG.TIMEZONE}`);
         
         // Skip Sundays (day 0) - they should be unavailable
         if (checkDate.getDay() === 0) {
           unavailableDatesSet.add(dateStr);
+          console.log(`  ⏭️ Skipping Sunday: ${dateStr}`);
           continue;
         }
 
         const dateAvailability = availabilityByDate.get(dateStr);
         if (!dateAvailability) {
           unavailableDatesSet.add(dateStr);
+          console.log(`  ❌ No availability data for: ${dateStr}`);
           continue;
         }
 
@@ -108,21 +145,24 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
 
           if (allStaffAvailable) {
             hasAvailableClientSlot = true;
+            console.log(`  ✅ Found available slot ${clientSlot} for ${dateStr} in ${TIME_SLOT_CONFIG.TIMEZONE}`);
             break;
           }
         }
 
         if (!hasAvailableClientSlot) {
           unavailableDatesSet.add(dateStr);
+          console.log(`  ❌ No available slots for: ${dateStr} in ${TIME_SLOT_CONFIG.TIMEZONE}`);
         }
       }
 
-      console.log(`✅ [BATCH_AVAILABILITY] Found ${unavailableDatesSet.size} unavailable dates out of 90 checked using 10min granular logic`);
+      console.log(`✅ [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Found ${unavailableDatesSet.size} unavailable dates out of 90 checked using 10min granular logic in ${TIME_SLOT_CONFIG.TIMEZONE}`);
+      console.log(`📋 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Unavailable dates:`, Array.from(unavailableDatesSet));
       
       return unavailableDatesSet;
 
     } catch (error) {
-      console.error('❌ [BATCH_AVAILABILITY] Error in batch availability check:', error);
+      console.error('❌ [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Error in batch availability check:', error);
       return new Set();
     }
   }, [selectedStaffIds, serviceDuration]);
@@ -157,12 +197,13 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       return true;
     }
     
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
+    // Convert date to São Paulo timezone for comparison
+    const spDate = utcToZonedTime(date, TIME_SLOT_CONFIG.TIMEZONE);
+    const dateStr = formatTz(spDate, 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
     
     const isUnavailable = unavailableDates.has(dateStr);
+    
+    console.log(`🔍 [DATE_DISABLED] [TIMEZONE_DEBUG] Checking date: ${dateStr} in ${TIME_SLOT_CONFIG.TIMEZONE} - Disabled: ${isUnavailable}`);
     
     return isUnavailable;
   }, [unavailableDates]);
@@ -170,12 +211,13 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   const checkDateAvailability = useCallback(async (date: Date): Promise<boolean> => {
     if (selectedStaffIds.length === 0) return true;
 
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
+    const spDate = utcToZonedTime(date, TIME_SLOT_CONFIG.TIMEZONE);
+    const dateStr = formatTz(spDate, 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
     
-    return !unavailableDates.has(dateStr);
+    const result = !unavailableDates.has(dateStr);
+    console.log(`🔍 [CHECK_DATE_AVAILABILITY] [TIMEZONE_DEBUG] Date ${dateStr} in ${TIME_SLOT_CONFIG.TIMEZONE} - Available: ${result}`);
+    
+    return result;
   }, [selectedStaffIds, unavailableDates]);
 
   return {

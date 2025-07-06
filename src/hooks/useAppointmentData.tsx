@@ -1,12 +1,14 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { format, parseISO } from 'date-fns';
+import { zonedTimeToUtc, utcToZonedTime, format as formatTz } from 'date-fns-tz';
 import { 
   generateClientTimeSlots, 
   isClientSlotAvailable,
   formatTimeSlot,
-  createAvailabilitySummaryTable
+  createAvailabilitySummaryTable,
+  TIME_SLOT_CONFIG
 } from '@/utils/timeSlotHelpers';
 
 export interface TimeSlot {
@@ -165,15 +167,27 @@ export const useAppointmentData = () => {
     selectedService: Service | null
   ) => {
     if (!selectedService || !staffId) {
-      console.log('⚠️ [FETCH_TIME_SLOTS] Missing required parameters');
+      console.log('⚠️ [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Missing required parameters');
       setTimeSlots([]);
       return;
     }
 
-    console.log('🕐 [FETCH_TIME_SLOTS] ==========================================');
-    console.log('🕐 [FETCH_TIME_SLOTS] Starting with enhanced debugging...');
-    console.log('🕐 [FETCH_TIME_SLOTS] Parameters:', {
-      date: date.toISOString().split('T')[0],
+    console.log('🕐 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] ==========================================');
+    console.log('🕐 [FETCH_TIME_SLOTS] Starting with timezone-aware debugging...');
+    
+    // Log the input date in multiple formats
+    const inputDateUTC = format(date, 'yyyy-MM-dd HH:mm:ss');
+    const inputDateSP = formatTz(date, 'yyyy-MM-dd HH:mm:ss', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+    const dateForQuery = format(date, 'yyyy-MM-dd');
+    
+    console.log('🕐 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Date analysis:');
+    console.log(`  Input date object: ${date.toISOString()}`);
+    console.log(`  UTC format: ${inputDateUTC}`);
+    console.log(`  São Paulo format: ${inputDateSP}`);
+    console.log(`  Query format: ${dateForQuery}`);
+    
+    console.log('🕐 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Parameters:', {
+      date: dateForQuery,
       staffId,
       serviceDuration: selectedService.default_duration || 60,
       serviceType: selectedService.service_type,
@@ -183,65 +197,78 @@ export const useAppointmentData = () => {
     setIsLoading(true);
 
     try {
-      const dateStr = date.toISOString().split('T')[0];
       const serviceDuration = selectedService.default_duration || 60;
 
-      console.log('🔍 [FETCH_TIME_SLOTS] Fetching staff availability...');
+      console.log('🔍 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Fetching staff availability...');
+      console.log('🔍 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] SQL Query will be:');
+      console.log(`  SELECT time_slot, available FROM staff_availability`);
+      console.log(`  WHERE staff_profile_id = '${staffId}' AND date = '${dateForQuery}'`);
       
       // Fetch all 10-minute granular availability for the staff on this date
       const { data: availabilityData, error } = await supabase
         .from('staff_availability')
         .select('time_slot, available')
         .eq('staff_profile_id', staffId)
-        .eq('date', dateStr);
+        .eq('date', dateForQuery);
 
       if (error) {
-        console.error('❌ [FETCH_TIME_SLOTS] Error fetching staff availability:', error);
+        console.error('❌ [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Error fetching staff availability:', error);
         toast.error('Erro ao buscar horários disponíveis');
         setTimeSlots([]);
         return;
       }
 
-      console.log(`📊 [FETCH_TIME_SLOTS] Raw availability data received:`, {
+      console.log(`📊 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Raw availability data received:`, {
         recordCount: availabilityData?.length || 0,
-        dateRequested: dateStr,
-        staffId: staffId
+        dateRequested: dateForQuery,
+        staffId: staffId,
+        timezone: TIME_SLOT_CONFIG.TIMEZONE
       });
 
-      // Log the raw data
+      // Log timezone info for each availability record
       if (availabilityData && availabilityData.length > 0) {
-        console.log('📋 [FETCH_TIME_SLOTS] Raw availability records:');
+        console.log('📋 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Raw availability records with timezone analysis:');
         availabilityData.forEach((record, index) => {
-          console.log(`  ${index + 1}: ${record.time_slot} = ${record.available}`);
+          try {
+            const timeSlot = record.time_slot;
+            const dateTime = new Date(`2024-01-01T${timeSlot}`);
+            const utcTime = format(dateTime, 'HH:mm:ss');
+            const spTime = formatTz(dateTime, 'HH:mm:ss', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+            
+            console.log(`  ${index + 1}: ${timeSlot} = ${record.available} (UTC: ${utcTime}, SP: ${spTime})`);
+          } catch (error) {
+            console.log(`  ${index + 1}: ${record.time_slot} = ${record.available} (TIMEZONE_ERROR: ${error})`);
+          }
         });
       } else {
-        console.log('⚠️ [FETCH_TIME_SLOTS] NO AVAILABILITY DATA FOUND!');
-        console.log('⚠️ [FETCH_TIME_SLOTS] This could be why no slots are showing up.');
-        console.log('⚠️ [FETCH_TIME_SLOTS] Possible causes:');
+        console.log('⚠️ [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] NO AVAILABILITY DATA FOUND!');
+        console.log('⚠️ [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] This could be why no slots are showing up.');
+        console.log('⚠️ [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Possible causes:');
         console.log('   - Staff availability not generated for this date');
         console.log('   - Incorrect staff_profile_id');
         console.log('   - Date format mismatch');
+        console.log('   - Timezone conversion issue');
         console.log('   - Database query issue');
       }
 
-      // Create availability summary table
+      // Create availability summary table with timezone awareness
       createAvailabilitySummaryTable(
         availabilityData || [], 
-        dateStr, 
+        dateForQuery, 
         staffId, 
         serviceDuration
       );
 
       // Generate 30-minute client slots and check availability using 10-minute granular logic
-      console.log('🔄 [FETCH_TIME_SLOTS] Generating client-facing 30-minute slots...');
+      console.log('🔄 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Generating client-facing 30-minute slots...');
       const clientSlots = generateClientTimeSlots();
-      console.log(`📝 [FETCH_TIME_SLOTS] Generated ${clientSlots.length} client slots:`, clientSlots);
+      console.log(`📝 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Generated ${clientSlots.length} client slots in ${TIME_SLOT_CONFIG.TIMEZONE}:`, clientSlots);
 
       const availableSlots: TimeSlot[] = [];
 
-      console.log('🔍 [FETCH_TIME_SLOTS] Checking each client slot...');
+      console.log('🔍 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Checking each client slot with timezone awareness...');
       for (const clientSlot of clientSlots) {
-        console.log(`\n--- Checking client slot: ${clientSlot} ---`);
+        console.log(`\n--- [TIMEZONE_DEBUG] Checking client slot: ${clientSlot} in ${TIME_SLOT_CONFIG.TIMEZONE} ---`);
         
         const isAvailable = isClientSlotAvailable(
           clientSlot, 
@@ -257,44 +284,59 @@ export const useAppointmentData = () => {
 
         availableSlots.push(slotObject);
 
-        console.log(`📊 [FETCH_TIME_SLOTS] Created slot object:`, slotObject);
-        console.log(`Result for ${clientSlot}: ${isAvailable ? 'AVAILABLE' : 'NOT AVAILABLE'}`);
+        console.log(`📊 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Created slot object:`, slotObject);
+        console.log(`Result for ${clientSlot}: ${isAvailable ? 'AVAILABLE' : 'NOT AVAILABLE'} in ${TIME_SLOT_CONFIG.TIMEZONE}`);
       }
 
-      console.log('📊 [FETCH_TIME_SLOTS] Final Results Summary:');
+      console.log('📊 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Final Results Summary:');
+      console.log(`   Timezone: ${TIME_SLOT_CONFIG.TIMEZONE}`);
+      console.log(`   Date queried: ${dateForQuery}`);
       console.log(`   Total client slots generated: ${availableSlots.length}`);
       console.log(`   Available slots: ${availableSlots.filter(s => s.available).length}`);
       console.log(`   Unavailable slots: ${availableSlots.filter(s => !s.available).length}`);
       
       const availableSlotTimes = availableSlots.filter(s => s.available).map(s => s.time);
-      console.log(`   Available slot times:`, availableSlotTimes);
+      console.log(`   Available slot times in ${TIME_SLOT_CONFIG.TIMEZONE}:`, availableSlotTimes);
 
-      // 🚨 NEW PIPELINE DEBUGGING 🚨
-      console.log('🔄 [PIPELINE_DEBUG] ==========================================');
+      // 🚨 PIPELINE DEBUGGING WITH TIMEZONE INFO 🚨
+      console.log('🔄 [PIPELINE_DEBUG] [TIMEZONE_DEBUG] ==========================================');
       console.log('🔄 [PIPELINE_DEBUG] COMPLETE availableSlots array before setTimeSlots:');
+      console.log(`🔄 [PIPELINE_DEBUG] Timezone: ${TIME_SLOT_CONFIG.TIMEZONE}`);
       console.log(JSON.stringify(availableSlots, null, 2));
       
-      console.log('🔄 [PIPELINE_DEBUG] Available slots structure analysis:');
+      console.log('🔄 [PIPELINE_DEBUG] [TIMEZONE_DEBUG] Available slots structure analysis:');
       availableSlots.forEach((slot, index) => {
-        console.log(`  Slot ${index}: id="${slot.id}", time="${slot.time}", available=${slot.available}`);
+        try {
+          const dateTime = new Date(`2024-01-01T${slot.id}`);
+          const utcTime = format(dateTime, 'HH:mm:ss');
+          const spTime = formatTz(dateTime, 'HH:mm:ss', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+          
+          console.log(`  Slot ${index}: id="${slot.id}", time="${slot.time}", available=${slot.available} (UTC: ${utcTime}, SP: ${spTime})`);
+        } catch (error) {
+          console.log(`  Slot ${index}: id="${slot.id}", time="${slot.time}", available=${slot.available} (TIMEZONE_ERROR: ${error})`);
+        }
       });
 
-      console.log('🔄 [PIPELINE_DEBUG] Calling setTimeSlots with:', availableSlots.length, 'slots');
+      console.log(`🔄 [PIPELINE_DEBUG] [TIMEZONE_DEBUG] Calling setTimeSlots with: ${availableSlots.length} slots for date ${dateForQuery} in ${TIME_SLOT_CONFIG.TIMEZONE}`);
 
       if (availableSlotTimes.length === 0) {
-        console.log('❌ [FETCH_TIME_SLOTS] NO AVAILABLE SLOTS FOUND!');
+        console.log('❌ [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] NO AVAILABLE SLOTS FOUND!');
         console.log('❌ [FETCH_TIME_SLOTS] This is the root cause of the "Nenhum horário disponível" message.');
-        console.log('❌ [FETCH_TIME_SLOTS] Review the detailed logs above to identify the issue.');
+        console.log('❌ [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Possible timezone-related causes:');
+        console.log('   - Date/time conversion between UTC and São Paulo timezone');
+        console.log('   - Database storing times in different timezone than expected');
+        console.log('   - Client-side date parsing defaulting to different timezone');
+        console.log('❌ [FETCH_TIME_SLOTS] Review the detailed timezone logs above to identify the issue.');
       } else {
-        console.log('✅ [FETCH_TIME_SLOTS] SUCCESS! Found', availableSlotTimes.length, 'available slots');
+        console.log(`✅ [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] SUCCESS! Found ${availableSlotTimes.length} available slots in ${TIME_SLOT_CONFIG.TIMEZONE}`);
       }
 
       setTimeSlots(availableSlots);
-      console.log('🔄 [PIPELINE_DEBUG] setTimeSlots called successfully');
-      console.log('🕐 [FETCH_TIME_SLOTS] ==========================================');
+      console.log(`🔄 [PIPELINE_DEBUG] [TIMEZONE_DEBUG] setTimeSlots called successfully for ${dateForQuery} in ${TIME_SLOT_CONFIG.TIMEZONE}`);
+      console.log('🕐 [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] ==========================================');
 
     } catch (error) {
-      console.error('❌ [FETCH_TIME_SLOTS] Unexpected error:', error);
+      console.error('❌ [FETCH_TIME_SLOTS] [TIMEZONE_DEBUG] Unexpected error:', error);
       toast.error('Erro inesperado ao buscar horários');
       setTimeSlots([]);
     } finally {
@@ -302,16 +344,24 @@ export const useAppointmentData = () => {
     }
   }, []);
 
-  // 🚨 NEW: Debug the timeSlots state whenever it changes
+  // 🚨 Debug the timeSlots state whenever it changes with timezone info
   useEffect(() => {
-    console.log('🔄 [STATE_DEBUG] ==========================================');
-    console.log('🔄 [STATE_DEBUG] timeSlots state changed to:', timeSlots.length, 'slots');
-    console.log('🔄 [STATE_DEBUG] timeSlots content:');
+    console.log('🔄 [STATE_DEBUG] [TIMEZONE_DEBUG] ==========================================');
+    console.log(`🔄 [STATE_DEBUG] timeSlots state changed to: ${timeSlots.length} slots in ${TIME_SLOT_CONFIG.TIMEZONE}`);
+    console.log('🔄 [STATE_DEBUG] [TIMEZONE_DEBUG] timeSlots content:');
     timeSlots.forEach((slot, index) => {
-      console.log(`  State Slot ${index}: id="${slot.id}", time="${slot.time}", available=${slot.available}`);
+      try {
+        const dateTime = new Date(`2024-01-01T${slot.id}`);
+        const utcTime = format(dateTime, 'HH:mm:ss');
+        const spTime = formatTz(dateTime, 'HH:mm:ss', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+        
+        console.log(`  State Slot ${index}: id="${slot.id}", time="${slot.time}", available=${slot.available} (UTC: ${utcTime}, SP: ${spTime})`);
+      } catch (error) {
+        console.log(`  State Slot ${index}: id="${slot.id}", time="${slot.time}", available=${slot.available} (TIMEZONE_ERROR: ${error})`);
+      }
     });
-    console.log('🔄 [STATE_DEBUG] Available slots in state:', timeSlots.filter(s => s.available).length);
-    console.log('🔄 [STATE_DEBUG] ==========================================');
+    console.log(`🔄 [STATE_DEBUG] [TIMEZONE_DEBUG] Available slots in state: ${timeSlots.filter(s => s.available).length} in ${TIME_SLOT_CONFIG.TIMEZONE}`);
+    console.log('🔄 [STATE_DEBUG] [TIMEZONE_DEBUG] ==========================================');
   }, [timeSlots]);
 
   return {
