@@ -88,7 +88,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   useEffect(() => {
     if (selectedService) {
       console.log('🔍 DEBUG: Checking service requirements for:', selectedService.name);
-      const requiresStaff = selectedService.requires_grooming || selectedService.requires_vet;
+      const requiresStaff = selectedService.requires_grooming || selectedService.requires_vet || selectedService.requires_bath;
       console.log('🔍 DEBUG: Service requires staff:', requiresStaff);
       setServiceRequiresStaff(requiresStaff);
       setServiceRequirementsLoaded(true);
@@ -104,15 +104,14 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [user, fetchUserPets]);
 
-  // Fetch providers when service changes (this now happens in step 2)
+  // Fetch providers when service changes
   useEffect(() => {
     if (selectedService && serviceRequiresStaff) {
-      // Don't need a specific date yet, just fetch available providers for this service
       fetchAvailableProviders(serviceType, new Date(), selectedService);
     }
   }, [selectedService, serviceType, serviceRequiresStaff, fetchAvailableProviders]);
 
-  // Fetch time slots when date/groomer changes (this now happens in step 3)
+  // Fetch time slots when date/staff changes
   useEffect(() => {
     if (date && selectedService && formStep === 3) {
       const staffId = serviceRequiresStaff ? selectedGroomerId : null;
@@ -151,6 +150,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         return;
       }
 
+      // Prepare appointment data
       const appointmentData = {
         client_id: clientData.id,
         pet_id: selectedPet.id,
@@ -159,12 +159,14 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         time: selectedTimeSlotId,
         notes: notes || null,
         status: 'pending',
-        // Include calculated pricing info
         duration: pricing?.duration || selectedService.default_duration || 60,
         total_price: pricing?.price || selectedService.base_price || 0
       };
 
-      const { data, error } = await supabase
+      console.log('🚀 [APPOINTMENT_SUBMIT] Creating appointment with data:', appointmentData);
+
+      // Create the appointment
+      const { data: appointment, error } = await supabase
         .from('appointments')
         .insert(appointmentData)
         .select()
@@ -172,19 +174,26 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
       if (error) throw error;
 
-      // If service requires staff, link the staff member
-      if (serviceRequiresStaff && selectedGroomerId && data) {
+      console.log('✅ [APPOINTMENT_SUBMIT] Appointment created:', appointment);
+
+      // If service requires staff, link the staff member using appointment_staff
+      if (serviceRequiresStaff && selectedGroomerId && appointment) {
+        console.log('🔗 [APPOINTMENT_SUBMIT] Linking staff member:', selectedGroomerId);
+        
         const { error: staffError } = await supabase
           .from('appointment_staff')
           .insert({
-            appointment_id: data.id,
+            appointment_id: appointment.id,
             staff_profile_id: selectedGroomerId,
             role: 'primary'
           });
 
         if (staffError) {
-          console.error('Error linking staff:', staffError);
+          console.error('❌ [APPOINTMENT_SUBMIT] Error linking staff:', staffError);
           // Don't fail the whole appointment for this
+          toast.error('Agendamento criado, mas houve erro ao vincular profissional');
+        } else {
+          console.log('✅ [APPOINTMENT_SUBMIT] Staff successfully linked');
         }
       }
 
@@ -200,7 +209,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       setFormStep(1);
       
     } catch (error: any) {
-      console.error('Error creating appointment:', error);
+      console.error('❌ [APPOINTMENT_SUBMIT] Error creating appointment:', error);
       toast.error('Erro ao criar agendamento: ' + error.message);
     } finally {
       setIsLoading(false);

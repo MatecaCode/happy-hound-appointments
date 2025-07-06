@@ -2,32 +2,44 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-// ✅ CLEAN BOOKING: Updated for Phase 1 schema with client_id and staff_profiles
+// ✅ PHASE 1 CLEAN BOOKING: Updated to use only staff_profiles and appointment_staff
 export async function createAppointment(
   userId: string,
   petId: string,
   serviceId: string,
-  staffProfileId: string | null, // Now uses staff_profile_id directly
+  staffProfileId: string | null,
   date: Date,
   timeSlot: string,
   notes?: string,
   isAdminOverride: boolean = false
 ): Promise<{ success: boolean; appointmentId?: string; bookingData?: any; error?: any }> {
   try {
-    console.log('🚀 [CREATE_APPOINTMENT] Starting booking with Phase 1 schema:', {
+    console.log('🚀 [CREATE_APPOINTMENT] Starting Phase 1 booking:', {
       userId,
       petId,
       serviceId,
-      staffProfileId, // This is now staff_profile_id
+      staffProfileId,
       date: date.toISOString(),
       timeSlot,
       notes,
-      isAdminOverride,
-      timestamp: new Date().toISOString()
+      isAdminOverride
     });
 
     const isoDate = date.toISOString().split('T')[0];
     
+    // Get client_id from user_id
+    const { data: clientData, error: clientError } = await supabase
+      .from('clients')
+      .select('id')
+      .eq('user_id', userId)
+      .single();
+
+    if (clientError || !clientData) {
+      console.error('❌ [CREATE_APPOINTMENT] No client found for user:', userId);
+      toast.error('Erro: dados do cliente não encontrados');
+      return { success: false, error: 'Client not found' };
+    }
+
     // Get user, pet, service data for notifications
     const { data: userData } = await supabase.auth.getUser();
     const { data: petData } = await supabase
@@ -74,103 +86,86 @@ export async function createAppointment(
       }
     }
 
-    // 🔧 FIXED: Ensure time slot is in correct HH:MM:SS format
+    // Format time slot correctly
     let formattedTimeSlot = timeSlot;
-    
     if (timeSlot.split(':').length === 2) {
       formattedTimeSlot = timeSlot + ':00';
-    } else if (timeSlot.split(':').length === 3) {
-      formattedTimeSlot = timeSlot;
     }
 
     console.log('🕐 [CREATE_APPOINTMENT] Time slot formatting:', {
       original_time_slot: timeSlot,
-      formatted_time_slot: formattedTimeSlot,
-      segments_original: timeSlot.split(':').length,
-      segments_formatted: formattedTimeSlot.split(':').length
+      formatted_time_slot: formattedTimeSlot
     });
 
-    // ✅ UPDATED: Direct booking call with Phase 1 RPC - Use correct parameter name
-    const bookingParams = {
-      _user_id: userId,
-      _pet_id: petId,
-      _service_id: serviceId,
-      _provider_ids: staffProfileId ? [staffProfileId] : [], // Use _provider_ids as expected by RPC
-      _booking_date: isoDate,
-      _time_slot: formattedTimeSlot,
-      _notes: notes || null
+    // Create appointment using direct insert (Phase 1 approach)
+    const appointmentData = {
+      client_id: clientData.id,
+      pet_id: petId,
+      service_id: serviceId,
+      date: isoDate,
+      time: formattedTimeSlot,
+      notes: notes || null,
+      status: 'pending',
+      service_status: 'not_started',
+      duration: serviceData?.default_duration || 60,
+      total_price: 0, // Will be calculated by pricing service
+      is_admin_override: isAdminOverride
     };
 
-    console.log('📤 [CREATE_APPOINTMENT] 🔥 CALLING create_booking_atomic RPC:', bookingParams);
+    console.log('📤 [CREATE_APPOINTMENT] Creating appointment with data:', appointmentData);
     
-    const { data: appointmentId, error } = await supabase.rpc('create_booking_atomic', bookingParams);
-
-    console.log('📨 [CREATE_APPOINTMENT] 🔥 RPC create_booking_atomic RESPONSE:', {
-      appointmentId,
-      error,
-      success: !error && !!appointmentId,
-      timestamp: new Date().toISOString()
-    });
+    const { data: appointment, error } = await supabase
+      .from('appointments')
+      .insert(appointmentData)
+      .select()
+      .single();
 
     if (error) {
-      console.error('❌ [CREATE_APPOINTMENT] RPC ERROR:', {
-        message: error.message,
-        details: error.details,
-        hint: error.hint,
-        code: error.code,
-        full_error: error
-      });
-      
-      // Enhanced error message handling
-      let userErrorMessage = 'Erro no agendamento';
-      
-      if (error.message.includes('not available') || error.message.includes('Staff') && error.message.includes('not available')) {
-        userErrorMessage = 'Profissional não disponível para o horário selecionado.';
-      } else if (error.message.includes('not qualified')) {
-        userErrorMessage = 'Profissional não qualificado para este serviço.';
-      } else if (error.message.includes('permission denied') || error.message.includes('row-level security')) {
-        userErrorMessage = 'Erro de permissão. Verifique se você está logado.';
-      } else if (error.message.includes('violates')) {
-        userErrorMessage = 'Erro de validação de dados.';
-      } else if (error.message.includes('invalid input syntax for type time')) {
-        userErrorMessage = 'Formato de horário inválido. Por favor, tente novamente.';
-      } else {
-        userErrorMessage = `Erro: ${error.message}`;
-      }
-      
-      toast.error(userErrorMessage);
-      
-      return { 
-        success: false, 
-        error: {
-          ...error,
-          userMessage: userErrorMessage
-        }
-      };
+      console.error('❌ [CREATE_APPOINTMENT] Database error:', error);
+      toast.error('Erro ao criar agendamento: ' + error.message);
+      return { success: false, error };
     }
 
-    if (!appointmentId) {
-      console.error('❌ [CREATE_APPOINTMENT] NO APPOINTMENT ID: RPC succeeded but returned no ID');
+    if (!appointment) {
+      console.error('❌ [CREATE_APPOINTMENT] No appointment returned');
       toast.error('Erro interno: ID do agendamento não foi retornado');
-      return { 
-        success: false, 
-        error: 'No appointment ID returned from RPC'
-      };
+      return { success: false, error: 'No appointment ID returned' };
     }
 
-    // 🆕 ADMIN OVERRIDE TRACKING: Track if this was an admin override
+    console.log('✅ [CREATE_APPOINTMENT] Appointment created:', appointment);
+
+    // Link staff if provided
+    if (staffProfileId && appointment) {
+      console.log('🔗 [CREATE_APPOINTMENT] Linking staff member via appointment_staff');
+      
+      const { error: staffError } = await supabase
+        .from('appointment_staff')
+        .insert({
+          appointment_id: appointment.id,
+          staff_profile_id: staffProfileId,
+          role: 'primary'
+        });
+
+      if (staffError) {
+        console.error('❌ [CREATE_APPOINTMENT] Failed to link staff:', staffError);
+        // Don't fail the whole appointment for this
+      } else {
+        console.log('✅ [CREATE_APPOINTMENT] Staff successfully linked');
+      }
+    }
+
+    // Track admin action if admin override
     if (isAdminOverride && userData?.user) {
       try {
-        console.log('📝 [CREATE_APPOINTMENT] Recording admin override action');
         await trackAdminAction(
           userData.user.id,
           'create_appointment',
           'appointment',
-          appointmentId,
+          appointment.id,
           'Admin override booking',
-          null, // no old values for creation
+          null,
           {
-            appointment_id: appointmentId,
+            appointment_id: appointment.id,
             created_by_admin: true,
             override_reason: 'Manual admin booking'
           },
@@ -178,13 +173,12 @@ export async function createAppointment(
         );
       } catch (adminError) {
         console.error('⚠️ [CREATE_APPOINTMENT] Failed to track admin action:', adminError);
-        // Don't fail the booking if admin tracking fails
       }
     }
 
     // Prepare booking data for success page
     const bookingData = {
-      appointmentId,
+      appointmentId: appointment.id,
       petName: petData?.name || 'Pet',
       serviceName: serviceData?.name || 'Serviço',
       date: isoDate,
@@ -196,38 +190,32 @@ export async function createAppointment(
     };
 
     console.log('🎉 [CREATE_APPOINTMENT] BOOKING SUCCESS:', {
-      appointmentId,
-      bookingData,
-      timestamp: new Date().toISOString()
+      appointmentId: appointment.id,
+      bookingData
     });
-    toast.success('Agendamento enviado com sucesso!');
+    
+    toast.success('Agendamento criado com sucesso!');
     
     return { 
       success: true, 
-      appointmentId, 
+      appointmentId: appointment.id, 
       bookingData 
     };
 
   } catch (error: any) {
-    console.error('💥 [CREATE_APPOINTMENT] CRITICAL ERROR:', {
-      error_message: error?.message,
-      error_stack: error?.stack,
-      full_error: error,
-      timestamp: new Date().toISOString()
-    });
+    console.error('💥 [CREATE_APPOINTMENT] CRITICAL ERROR:', error);
     toast.error('Erro crítico no sistema de agendamento');
     return { 
       success: false, 
       error: {
         message: error?.message || 'Unknown error',
-        stack: error?.stack,
         fullError: error
       }
     };
   }
 }
 
-// 🆕 NEW: Admin action tracking function
+// Admin action tracking function
 export async function trackAdminAction(
   adminUserId: string,
   actionType: string,
@@ -269,7 +257,7 @@ export async function trackAdminAction(
   }
 }
 
-// Helper function to get service resource requirements (updated for Phase 1)
+// Helper function to get service resource requirements (Phase 1)
 export async function getServiceResources(serviceId: string) {
   try {
     const { data, error } = await supabase
@@ -286,7 +274,7 @@ export async function getServiceResources(serviceId: string) {
   }
 }
 
-// Helper function to check if service requires bath (updated for Phase 1)
+// Helper function to check if service requires bath (Phase 1)
 export async function serviceRequiresBath(serviceId: string): Promise<boolean> {
   try {
     const { data, error } = await supabase
@@ -301,7 +289,7 @@ export async function serviceRequiresBath(serviceId: string): Promise<boolean> {
   }
 }
 
-// 🆕 NEW: Get available staff for service (Phase 1) - Remove this function since it doesn't exist in DB
+// Get available staff for service (Phase 1)
 export async function getAvailableStaffForService(
   serviceId: string,
   date: Date,
@@ -310,7 +298,7 @@ export async function getAvailableStaffForService(
   try {
     const dateStr = date.toISOString().split('T')[0];
     
-    // Since the RPC doesn't exist, let's query staff directly
+    // Get service requirements
     const { data: service } = await supabase
       .from('services')
       .select('requires_grooming, requires_vet, requires_bath')
@@ -319,6 +307,7 @@ export async function getAvailableStaffForService(
 
     if (!service) return [];
 
+    // Build query for staff_profiles
     let query = supabase
       .from('staff_profiles')
       .select('*')
@@ -349,17 +338,16 @@ export async function getAvailableStaffForService(
   }
 }
 
-// Debug function to audit current system state (updated for Phase 1)
+// Debug function to audit current system state (Phase 1)
 export async function auditBookingSystemState() {
   console.log('🔍 PHASE 1 SYSTEM STATE AUDIT:');
   
   try {
     // Check services and their requirements
     const { data: services } = await supabase.from('services').select('*');
-    
     console.log('📋 SERVICES:', services);
     
-    // Check staff profiles and availability
+    // Check staff profiles and capabilities
     const { data: staffProfiles } = await supabase.from('staff_profiles').select('*');
     console.log('👥 STAFF PROFILES:', staffProfiles);
     
@@ -372,6 +360,14 @@ export async function auditBookingSystemState() {
       .order('time_slot');
     
     console.log('🗓️ STAFF AVAILABILITY TODAY:', staffAvail);
+    
+    // Check appointment_staff linkages
+    const { data: appointmentStaff } = await supabase
+      .from('appointment_staff')
+      .select('*')
+      .limit(10);
+    
+    console.log('🔗 APPOINTMENT_STAFF LINKAGES (last 10):', appointmentStaff);
     
   } catch (error) {
     console.error('❌ AUDIT ERROR:', error);

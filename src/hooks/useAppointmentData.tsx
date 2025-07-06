@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Pet, Service, TimeSlot, NextAvailable } from './useAppointmentForm';
 
-// Define Provider interface locally since it's not exported from useAppointmentForm
+// Define Provider interface for Phase 1 - using staff_profiles
 interface Provider {
   id: string;
   name: string;
@@ -79,17 +79,14 @@ export const useAppointmentData = () => {
         service_type: serviceType,
         service_id: selectedService.id,
         date: dateStr,
-        service_name: selectedService.name
+        service_name: selectedService.name,
+        requires_grooming: selectedService.requires_grooming,
+        requires_vet: selectedService.requires_vet,
+        requires_bath: selectedService.requires_bath
       });
 
-      // Check if service requires staff (Phase 1)
-      const requiresStaff = selectedService.requires_grooming || selectedService.requires_vet;
-      
-      console.log('🔍 [FETCH_PROVIDERS] Service requirements:', {
-        requires_staff: requiresStaff,
-        requires_grooming: selectedService.requires_grooming,
-        requires_vet: selectedService.requires_vet
-      });
+      // Check if service requires staff
+      const requiresStaff = selectedService.requires_grooming || selectedService.requires_vet || selectedService.requires_bath;
       
       if (!requiresStaff) {
         console.log('🔍 [FETCH_PROVIDERS] Service does not require staff, skipping fetch');
@@ -97,48 +94,60 @@ export const useAppointmentData = () => {
         return;
       }
 
-      // Get available staff manually since RPC doesn't exist
-      const { data: availableStaff, error: staffError } = await supabase
+      // Build query for staff_profiles based on service requirements
+      let staffQuery = supabase
         .from('staff_profiles')
-        .select(`
-          id,
-          name,
-          can_groom,
-          can_vet,
-          can_bathe,
-          staff_availability!inner(available)
-        `)
-        .eq('active', true)
-        .eq('staff_availability.date', dateStr)
-        .eq('staff_availability.available', true);
+        .select('id, name, can_groom, can_vet, can_bathe, bio')
+        .eq('active', true);
+
+      // Filter staff based on service requirements
+      if (selectedService.requires_grooming) {
+        staffQuery = staffQuery.eq('can_groom', true);
+      }
+      if (selectedService.requires_vet) {
+        staffQuery = staffQuery.eq('can_vet', true);
+      }
+      if (selectedService.requires_bath) {
+        staffQuery = staffQuery.eq('can_bathe', true);
+      }
+
+      const { data: qualifiedStaff, error: staffError } = await staffQuery;
 
       if (staffError) {
-        console.error('❌ [FETCH_PROVIDERS] Error fetching available staff:', staffError);
+        console.error('❌ [FETCH_PROVIDERS] Error fetching qualified staff:', staffError);
         throw staffError;
       }
 
-      console.log('📊 [FETCH_PROVIDERS] Raw available staff data:', availableStaff);
+      console.log('📊 [FETCH_PROVIDERS] Qualified staff found:', qualifiedStaff?.length || 0);
 
-      if (!availableStaff || availableStaff.length === 0) {
-        console.log('❌ [FETCH_PROVIDERS] No available staff found');
+      if (!qualifiedStaff || qualifiedStaff.length === 0) {
+        console.log('❌ [FETCH_PROVIDERS] No qualified staff found');
         setGroomers([]);
         return;
       }
 
-      // Filter staff based on service requirements and transform to Provider format
-      const availableProviders: Provider[] = availableStaff
-        .filter(staff => {
-          if (selectedService.requires_grooming && !staff.can_groom) return false;
-          if (selectedService.requires_vet && !staff.can_vet) return false;
-          return true;
-        })
-        .map(staff => ({
-          id: staff.id,
-          name: staff.name,
-          role: staff.can_vet ? 'vet' : (staff.can_groom ? 'groomer' : 'bather'),
-          rating: 0, // Default rating
-          about: '' // Default empty about
-        }));
+      // Now check availability for each qualified staff member
+      const availableProviders: Provider[] = [];
+
+      for (const staff of qualifiedStaff) {
+        // Check if staff has availability on the selected date
+        const { data: availability } = await supabase
+          .from('staff_availability')
+          .select('time_slot, available')
+          .eq('staff_profile_id', staff.id)
+          .eq('date', dateStr)
+          .eq('available', true);
+
+        if (availability && availability.length > 0) {
+          availableProviders.push({
+            id: staff.id,
+            name: staff.name,
+            role: staff.can_vet ? 'vet' : (staff.can_groom ? 'groomer' : 'bather'),
+            rating: 4.5, // Default rating for now
+            about: staff.bio || ''
+          });
+        }
+      }
 
       console.log('🎉 [FETCH_PROVIDERS] Final available providers:', {
         count: availableProviders.length,
@@ -158,7 +167,7 @@ export const useAppointmentData = () => {
 
   const fetchTimeSlots = useCallback(async (
     date: Date,
-    selectedStaffProfileId: string,
+    selectedStaffProfileId: string | null,
     setIsLoading: (loading: boolean) => void,
     selectedService: Service | undefined
   ) => {
@@ -172,43 +181,48 @@ export const useAppointmentData = () => {
     });
 
     setIsLoading(true);
-    
-    // Reset slots immediately to prevent stale data
     setTimeSlots([]);
     
     try {
-      // Manual time slot generation since RPC doesn't exist
       const dateStr = date.toISOString().split('T')[0];
-      const serviceDuration = selectedService.default_duration || 30;
+      const serviceDuration = selectedService.default_duration || 60;
       
-      // Generate 30-minute slots from 9:00 to 16:30
+      // Generate time slots from 9:00 to 17:00 in 30-minute intervals
       const availableSlots: TimeSlot[] = [];
       
       for (let hour = 9; hour < 17; hour++) {
         for (let minute = 0; minute < 60; minute += 30) {
           const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
-          const endHour = hour + Math.floor((minute + serviceDuration) / 60);
-          const endMinute = (minute + serviceDuration) % 60;
+          const startTime = new Date(`1970-01-01T${timeStr}`);
+          const endTime = new Date(startTime.getTime() + serviceDuration * 60000);
           
           // Skip if appointment would end after 5 PM
-          if (endHour > 17 || (endHour === 17 && endMinute > 0)) {
+          if (endTime.getHours() > 17 || (endTime.getHours() === 17 && endTime.getMinutes() > 0)) {
             continue;
           }
           
           let isAvailable = true;
           
-          // Check staff availability if staff is required
-          if (selectedStaffProfileId && selectedService.requires_grooming || selectedService.requires_vet) {
-            const { data: staffAvailability } = await supabase
-              .from('staff_availability')
-              .select('available')
-              .eq('staff_profile_id', selectedStaffProfileId)
-              .eq('date', dateStr)
-              .eq('time_slot', timeStr)
-              .single();
+          // Check staff availability for entire service duration if staff is required
+          if (selectedStaffProfileId && (selectedService.requires_grooming || selectedService.requires_vet || selectedService.requires_bath)) {
+            // Check availability for every 30-minute slot needed for the service duration
+            for (let offset = 0; offset < serviceDuration; offset += 30) {
+              const checkTime = new Date(startTime.getTime() + offset * 60000);
+              const checkTimeStr = `${checkTime.getHours().toString().padStart(2, '0')}:${checkTime.getMinutes().toString().padStart(2, '0')}:00`;
               
-            if (!staffAvailability?.available) {
-              isAvailable = false;
+              const { data: staffAvailability } = await supabase
+                .from('staff_availability')
+                .select('available')
+                .eq('staff_profile_id', selectedStaffProfileId)
+                .eq('date', dateStr)
+                .eq('time_slot', checkTimeStr)
+                .eq('available', true)
+                .maybeSingle();
+                
+              if (!staffAvailability) {
+                isAvailable = false;
+                break;
+              }
             }
           }
           
@@ -222,16 +236,15 @@ export const useAppointmentData = () => {
         }
       }
 
-      console.log('✅ [FETCH_TIME_SLOTS] Final time slots for UI:', {
+      console.log('✅ [FETCH_TIME_SLOTS] Final time slots:', {
         count: availableSlots.length,
-        slots: availableSlots.map(s => ({ id: s.id, time: s.time, available: s.available })),
-        timestamp: new Date().toISOString()
+        slots: availableSlots.map(s => ({ id: s.id, time: s.time }))
       });
       
       setTimeSlots(availableSlots);
 
       // Fetch next available appointment if no slots today
-      if (availableSlots.length === 0) {
+      if (availableSlots.length === 0 && selectedStaffProfileId) {
         await fetchNextAvailable(selectedService.id, selectedStaffProfileId);
       } else {
         setNextAvailable(null);
@@ -245,7 +258,7 @@ export const useAppointmentData = () => {
     }
   }, []);
 
-  const fetchNextAvailable = useCallback(async (serviceId: string, staffProfileId: string | null) => {
+  const fetchNextAvailable = useCallback(async (serviceId: string, staffProfileId: string) => {
     try {
       // Simple implementation - check next 7 days
       const today = new Date();
