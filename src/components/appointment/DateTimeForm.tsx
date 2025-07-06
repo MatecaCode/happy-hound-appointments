@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -8,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Clock, ArrowLeft, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useStaffAvailability } from '@/hooks/useStaffAvailability';
 
 interface TimeSlot {
   id: string;
@@ -66,6 +66,12 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 }) => {
   const canSubmit = date && selectedTimeSlotId && !isLoading;
 
+  // Use staff availability hook to get proper date filtering
+  const { isDateDisabled, isLoading: availabilityLoading } = useStaffAvailability({
+    selectedStaffIds: selectedStaff,
+    serviceDuration: serviceDuration
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log('📝 [DateTimeForm] Submitting form...', {
@@ -84,6 +90,13 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
         hasOnSubmit: !!onSubmit
       });
     }
+  };
+
+  const handleDateSelect = (selectedDate: Date | undefined) => {
+    console.log('📅 [DateTimeForm] Date selected:', selectedDate);
+    setDate(selectedDate);
+    // Clear selected time slot when date changes
+    setSelectedTimeSlotId(null);
   };
 
   return (
@@ -121,15 +134,19 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             <Calendar
               mode="single"
               selected={date}
-              onSelect={setDate}
+              onSelect={handleDateSelect}
               locale={ptBR}
               disabled={(date) => {
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                return date < today || date.getDay() === 0; // Disable past dates and Sundays
+                // Use the staff availability hook to determine if date should be disabled
+                return isDateDisabled(date);
               }}
               className="rounded-md border"
             />
+            {availabilityLoading && (
+              <p className="text-sm text-muted-foreground mt-2">
+                Carregando disponibilidade...
+              </p>
+            )}
           </div>
 
           {showTimeSlots && date && (

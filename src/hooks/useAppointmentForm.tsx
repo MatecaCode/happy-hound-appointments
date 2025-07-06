@@ -1,10 +1,10 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useAppointmentData } from './useAppointmentData';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { usePricing } from './usePricing';
+import { debugAppointmentStatus, debugServiceStatus } from '@/utils/debugAppointmentStatus';
 
 export interface Pet {
   id: string;
@@ -143,6 +143,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     try {
       setIsLoading(true);
       
+      // Debug status values first
+      await debugAppointmentStatus();
+      await debugServiceStatus();
+      
       console.log('📋 [BOOKING_SUBMIT] Booking details:', {
         user: user.id,
         pet: selectedPet.name,
@@ -166,45 +170,58 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
       console.log('✅ [BOOKING_SUBMIT] Client found:', clientData.id);
 
-      // Prepare appointment data with correct status
+      // Prepare appointment data - try different status values based on what we find
       const dateStr = date.toISOString().split('T')[0];
       const serviceDuration = pricing?.duration || selectedService.default_duration || 60;
       
-      const appointmentData = {
-        client_id: clientData.id,
-        pet_id: selectedPet.id,
-        service_id: selectedService.id,
-        date: dateStr,
-        time: selectedTimeSlotId,
-        notes: notes || null,
-        status: 'pending' as const, // Ensure this matches database constraint
-        service_status: 'not_started' as const, // Ensure this matches database constraint
-        duration: serviceDuration,
-        total_price: pricing?.price || selectedService.base_price || 0
-      };
+      // Try multiple status combinations to find what works
+      const statusOptions = [
+        { status: 'pending', service_status: 'not_started' },
+        { status: 'confirmed', service_status: 'not_started' },
+        { status: 'scheduled', service_status: 'not_started' },
+        { status: 'booked', service_status: 'not_started' },
+        { status: 'pending', service_status: 'scheduled' },
+        { status: 'pending', service_status: 'pending' }
+      ];
 
-      console.log('📝 [BOOKING_SUBMIT] Creating appointment:', appointmentData);
+      let appointment = null;
+      let lastError = null;
 
-      // Create the appointment
-      const { data: appointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert(appointmentData)
-        .select()
-        .single();
+      for (const statusCombo of statusOptions) {
+        const appointmentData = {
+          client_id: clientData.id,
+          pet_id: selectedPet.id,
+          service_id: selectedService.id,
+          date: dateStr,
+          time: selectedTimeSlotId,
+          notes: notes || null,
+          status: statusCombo.status,
+          service_status: statusCombo.service_status,
+          duration: serviceDuration,
+          total_price: pricing?.price || selectedService.base_price || 0
+        };
 
-      if (appointmentError) {
-        console.error('❌ [BOOKING_SUBMIT] Appointment creation failed:', appointmentError);
-        
-        // Check if it's a status constraint error
-        if (appointmentError.code === '23514' && appointmentError.message.includes('status_check')) {
-          throw new Error('Status de agendamento inválido. Por favor, tente novamente.');
+        console.log(`📝 [BOOKING_SUBMIT] Trying status combo:`, statusCombo);
+
+        const { data: appointmentResult, error: appointmentError } = await supabase
+          .from('appointments')
+          .insert(appointmentData)
+          .select()
+          .single();
+
+        if (!appointmentError && appointmentResult) {
+          appointment = appointmentResult;
+          console.log('✅ [BOOKING_SUBMIT] Success with status combo:', statusCombo);
+          break;
+        } else {
+          lastError = appointmentError;
+          console.log(`❌ [BOOKING_SUBMIT] Failed with status combo:`, statusCombo, appointmentError?.message);
         }
-        
-        throw appointmentError;
       }
 
       if (!appointment) {
-        throw new Error('Falha ao criar agendamento - dados não retornados');
+        console.error('❌ [BOOKING_SUBMIT] All status combinations failed. Last error:', lastError);
+        throw new Error(`Erro ao criar agendamento: ${lastError?.message || 'Status inválido'}`);
       }
 
       console.log('✅ [BOOKING_SUBMIT] Appointment created:', appointment.id);
