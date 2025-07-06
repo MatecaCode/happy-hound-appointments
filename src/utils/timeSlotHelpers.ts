@@ -1,6 +1,7 @@
+
 // Utility functions for handling 10-minute granular time slots with timezone awareness
 
-import { zonedTimeToUtc, utcToZonedTime, format as formatTz } from 'date-fns-tz';
+import { fromZonedTime, toZonedTime, format as formatTz } from 'date-fns-tz';
 import { format } from 'date-fns';
 
 export const TIME_SLOT_CONFIG = {

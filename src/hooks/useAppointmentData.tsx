@@ -1,8 +1,9 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
-import { zonedTimeToUtc, utcToZonedTime, format as formatTz } from 'date-fns-tz';
+import { fromZonedTime, toZonedTime, format as formatTz } from 'date-fns-tz';
 import { 
   generateClientTimeSlots, 
   isClientSlotAvailable,

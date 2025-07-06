@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
-import { zonedTimeToUtc, utcToZonedTime, format as formatTz } from 'date-fns-tz';
+import { fromZonedTime, toZonedTime, format as formatTz } from 'date-fns-tz';
 import { 
   generateClientTimeSlots, 
   getRequiredBackendSlots, 
@@ -31,9 +31,9 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       
       // Convert dates to proper timezone
       const todayUTC = format(today, 'yyyy-MM-dd');
-      const todaySP = formatTz(utcToZonedTime(today, TIME_SLOT_CONFIG.TIMEZONE), 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+      const todaySP = formatTz(toZonedTime(today, TIME_SLOT_CONFIG.TIMEZONE), 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
       const endDateUTC = format(endDate, 'yyyy-MM-dd');
-      const endDateSP = formatTz(utcToZonedTime(endDate, TIME_SLOT_CONFIG.TIMEZONE), 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
+      const endDateSP = formatTz(toZonedTime(endDate, TIME_SLOT_CONFIG.TIMEZONE), 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
       
       console.log(`🕐 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Date range analysis:`);
       console.log(`  Today UTC: ${todayUTC}, SP: ${todaySP}`);
@@ -107,7 +107,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         checkDate.setDate(today.getDate() + i);
         
         // Use São Paulo timezone for date formatting
-        const spDate = utcToZonedTime(checkDate, TIME_SLOT_CONFIG.TIMEZONE);
+        const spDate = toZonedTime(checkDate, TIME_SLOT_CONFIG.TIMEZONE);
         const dateStr = formatTz(spDate, 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
         
         console.log(`🔍 [BATCH_AVAILABILITY] [TIMEZONE_DEBUG] Checking date ${dateStr} (day ${i}) in ${TIME_SLOT_CONFIG.TIMEZONE}`);
@@ -198,7 +198,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     }
     
     // Convert date to São Paulo timezone for comparison
-    const spDate = utcToZonedTime(date, TIME_SLOT_CONFIG.TIMEZONE);
+    const spDate = toZonedTime(date, TIME_SLOT_CONFIG.TIMEZONE);
     const dateStr = formatTz(spDate, 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
     
     const isUnavailable = unavailableDates.has(dateStr);
@@ -211,7 +211,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   const checkDateAvailability = useCallback(async (date: Date): Promise<boolean> => {
     if (selectedStaffIds.length === 0) return true;
 
-    const spDate = utcToZonedTime(date, TIME_SLOT_CONFIG.TIMEZONE);
+    const spDate = toZonedTime(date, TIME_SLOT_CONFIG.TIMEZONE);
     const dateStr = formatTz(spDate, 'yyyy-MM-dd', { timeZone: TIME_SLOT_CONFIG.TIMEZONE });
     
     const result = !unavailableDates.has(dateStr);
