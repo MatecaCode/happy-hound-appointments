@@ -80,14 +80,15 @@ export class PricingService {
 
   private static async getExactMatchPricing(serviceId: string, breedId: string, size: string): Promise<any> {
     try {
-      // Explicitly type as any to avoid deep type inference
-      const { data, error } = await supabase
+      // Cast the entire query builder to any to avoid deep type inference
+      const query = supabase
         .from('service_pricing')
         .select('price, duration_override')
         .eq('service_id', serviceId)
         .eq('breed_id', breedId)
-        .eq('size', size)
-        .maybeSingle() as any;
+        .eq('size', size) as any;
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.log('🔍 [PRICING] No exact match found:', error.message);
@@ -103,14 +104,15 @@ export class PricingService {
 
   private static async getServiceSizeFallback(serviceId: string, size: string): Promise<any> {
     try {
-      // Explicitly type as any to avoid deep type inference
-      const { data, error } = await supabase
+      // Cast the entire query builder to any to avoid deep type inference
+      const query = supabase
         .from('service_pricing')
         .select('price, duration_override')
         .eq('service_id', serviceId)
         .eq('size', size)
-        .limit(1)
-        .maybeSingle() as any;
+        .limit(1) as any;
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.log('🔍 [PRICING] No service+size fallback found:', error.message);
@@ -126,12 +128,13 @@ export class PricingService {
 
   private static async getServiceDefault(serviceId: string): Promise<any> {
     try {
-      // Explicitly type as any to avoid deep type inference
-      const { data, error } = await supabase
+      // Cast the entire query builder to any to avoid deep type inference
+      const query = supabase
         .from('services')
         .select('base_price, default_duration')
-        .eq('id', serviceId)
-        .maybeSingle() as any;
+        .eq('id', serviceId) as any;
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) {
         console.log('🔍 [PRICING] No service default found:', error.message);
