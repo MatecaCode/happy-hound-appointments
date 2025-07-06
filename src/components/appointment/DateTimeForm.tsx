@@ -56,7 +56,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   selectedStaff = [],
   serviceDuration = 60
 }) => {
-  const { isDateDisabled, isLoading: availabilityLoading } = useStaffAvailability({
+  const { isDateDisabled, isLoading: availabilityLoading, checkDateAvailability } = useStaffAvailability({
     selectedStaffIds: selectedStaff,
     serviceDuration
   });
@@ -72,6 +72,17 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
       onNext();
     }
   };
+
+  // Check if selected date has availability
+  const [dateHasAvailability, setDateHasAvailability] = React.useState<boolean | null>(null);
+
+  React.useEffect(() => {
+    if (date && selectedStaff.length > 0) {
+      checkDateAvailability(date).then(setDateHasAvailability);
+    } else {
+      setDateHasAvailability(null);
+    }
+  }, [date, selectedStaff, checkDateAvailability]);
 
   return (
     <Card>
@@ -115,6 +126,20 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                       {[...Array(6)].map((_, i) => (
                         <div key={i} className="h-10 bg-gray-200 rounded animate-pulse" />
                       ))}
+                    </div>
+                  ) : dateHasAvailability === false ? (
+                    <div className="text-center py-4">
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+                        <h3 className="text-lg font-medium text-yellow-800 mb-2">
+                          Nenhum horário disponível
+                        </h3>
+                        <p className="text-yellow-600 mb-2">
+                          Os profissionais selecionados não têm disponibilidade nesta data.
+                        </p>
+                        <p className="text-sm text-yellow-500">
+                          Tente selecionar outra data ou volte para escolher outros profissionais.
+                        </p>
+                      </div>
                     </div>
                   ) : timeSlots.length > 0 ? (
                     <div className="grid grid-cols-3 gap-2">
