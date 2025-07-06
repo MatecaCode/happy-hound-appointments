@@ -17,7 +17,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     const dateStr = date.toISOString().split('T')[0];
     
     try {
-      // Get all possible time slots for the day (every 30 minutes from 9:00 to 16:30)
+      // Generate all possible time slots for the day (every 30 minutes from 9:00 to 16:30)
       const timeSlots = [];
       for (let hour = 9; hour < 17; hour++) {
         for (let minute = 0; minute < 60; minute += 30) {
