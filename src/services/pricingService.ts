@@ -30,7 +30,7 @@ export class PricingService {
           console.log('✅ [PRICING] Exact match found:', exactMatch);
           return {
             price: exactMatch.price,
-            duration: exactMatch.duration,
+            duration: exactMatch.duration_override || this.SYSTEM_DEFAULT_DURATION,
             priceSource: 'exact_match'
           };
         }
@@ -43,7 +43,7 @@ export class PricingService {
           console.log('✅ [PRICING] Service+size fallback found:', sizeFallback);
           return {
             price: sizeFallback.price,
-            duration: sizeFallback.duration,
+            duration: sizeFallback.duration_override || this.SYSTEM_DEFAULT_DURATION,
             priceSource: 'service_size_fallback'
           };
         }
@@ -81,7 +81,7 @@ export class PricingService {
   private static async getExactMatchPricing(serviceId: string, breedId: string, size: string) {
     const { data, error } = await supabase
       .from('service_pricing')
-      .select('price, duration')
+      .select('price, duration_override')
       .eq('service_id', serviceId)
       .eq('breed_id', breedId)
       .eq('size', size)
@@ -98,7 +98,7 @@ export class PricingService {
   private static async getServiceSizeFallback(serviceId: string, size: string) {
     const { data, error } = await supabase
       .from('service_pricing')
-      .select('price, duration')
+      .select('price, duration_override')
       .eq('service_id', serviceId)
       .eq('size', size)
       .limit(1)
