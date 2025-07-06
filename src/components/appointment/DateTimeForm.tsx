@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Calendar } from '@/components/ui/calendar';
 import { TimeSlot } from '@/hooks/useAppointmentForm';
 import NextAvailableAppointment from '@/components/NextAvailableAppointment';
+import { useStaffAvailability } from '@/hooks/useStaffAvailability';
 import { ptBR } from 'date-fns/locale';
 
 interface DateTimeFormProps {
@@ -55,6 +56,11 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   selectedStaff = [],
   serviceDuration = 60
 }) => {
+  const { isDateDisabled, isLoading: availabilityLoading } = useStaffAvailability({
+    selectedStaffIds: selectedStaff,
+    serviceDuration
+  });
+
   const isNextEnabled = !showTimeSlots || (date && selectedTimeSlotId);
   const isSubmitEnabled = showSubmitButton && date && selectedTimeSlotId;
 
@@ -65,26 +71,6 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     } else if (onNext && isNextEnabled) {
       onNext();
     }
-  };
-
-  // Function to check if a date should be disabled
-  const isDateDisabled = (checkDate: Date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Disable past dates and Sundays
-    if (checkDate < today || checkDate.getDay() === 0) {
-      return true;
-    }
-
-    // If no staff selected yet, don't disable future dates
-    if (!selectedStaff || selectedStaff.length === 0) {
-      return false;
-    }
-
-    // TODO: Add logic to check if any time slots are available for the selected staff on this date
-    // For now, we'll let the time slot loading handle this
-    return false;
   };
 
   return (
@@ -106,6 +92,11 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             <TabsContent value="calendar" className="space-y-4">
               <div className="space-y-2">
                 <Label>Selecione uma data</Label>
+                {availabilityLoading && (
+                  <p className="text-sm text-muted-foreground">
+                    Verificando disponibilidade dos profissionais selecionados...
+                  </p>
+                )}
                 <Calendar
                   mode="single"
                   selected={date}
@@ -181,11 +172,11 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             )}
             
             {showSubmitButton ? (
-              <Button type="submit" disabled={!isSubmitEnabled} className="flex-1">
+              <Button type="submit" disabled={!isSubmitEnabled || availabilityLoading} className="flex-1">
                 Confirmar Agendamento
               </Button>
             ) : (
-              <Button type="submit" disabled={!isNextEnabled} className="flex-1">
+              <Button type="submit" disabled={!isNextEnabled || availabilityLoading} className="flex-1">
                 Continuar
               </Button>
             )}
