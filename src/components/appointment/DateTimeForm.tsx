@@ -67,22 +67,24 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 }) => {
   const canSubmit = date && selectedTimeSlotId && !isLoading;
 
-  // Use staff availability hook to get proper date filtering
+  // Use staff availability hook to get proper date filtering with multi-staff support
   const { isDateDisabled, isLoading: availabilityLoading } = useStaffAvailability({
     selectedStaffIds: selectedStaff,
     serviceDuration: serviceDuration
   });
 
-  // Simple debugging
+  // Enhanced debugging for multi-staff support
   React.useEffect(() => {
-    console.log('🎯 [UI_DEBUG] DateTimeForm received:', {
+    console.log('🎯 [UI_DEBUG] DateTimeForm received (multi-staff):', {
       totalSlots: timeSlots.length,
       availableSlots: timeSlots.filter(s => s.available).length,
       selectedDate: date,
       selectedTime: selectedTimeSlotId,
+      selectedStaff,
+      staffCount: selectedStaff.length,
       isLoading
     });
-  }, [timeSlots, date, selectedTimeSlotId, isLoading]);
+  }, [timeSlots, date, selectedTimeSlotId, isLoading, selectedStaff]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,7 +165,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             />
             {availabilityLoading && (
               <p className="text-sm text-muted-foreground mt-2 animate-pulse">
-                Carregando disponibilidade...
+                Carregando disponibilidade para {selectedStaff.length} profissionais...
               </p>
             )}
           </div>
@@ -178,10 +180,12 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                 </div>
               ) : timeSlots.length > 0 ? (
                 <div>
-                  {/* Simple UI debugging info */}
+                  {/* Enhanced UI debugging info for multi-staff */}
                   <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
                     <div>Total slots: {timeSlots.length}</div>
                     <div>Available slots: {timeSlots.filter(s => s.available).length}</div>
+                    <div>Selected staff: {selectedStaff.length} professional(s)</div>
+                    <div>Staff IDs: {selectedStaff.join(', ')}</div>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-2 mt-2">
@@ -192,7 +196,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                         variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
                         className="h-auto py-2 transition-all duration-200 hover:scale-105"
                         onClick={() => {
-                          console.log('🎯 [UI_CLICK] Slot clicked:', slot);
+                          console.log('🎯 [UI_CLICK] Slot clicked (multi-staff):', slot, 'for staff:', selectedStaff);
                           setSelectedTimeSlotId(slot.id);
                         }}
                         disabled={!slot.available || isLoading}
@@ -205,12 +209,14 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               ) : (
                 <div>
                   <p className="text-muted-foreground mt-2">
-                    Nenhum horário disponível para esta data.
+                    Nenhum horário disponível para esta data com os profissionais selecionados.
                   </p>
                   <div className="mt-2 p-2 bg-red-100 rounded text-xs">
                     <div>Debug: Total slots = {timeSlots.length}</div>
                     <div>Debug: Loading = {isLoading.toString()}</div>
                     <div>Debug: Date = {date?.toISOString()}</div>
+                    <div>Debug: Staff count = {selectedStaff.length}</div>
+                    <div>Debug: Staff IDs = {selectedStaff.join(', ')}</div>
                   </div>
                 </div>
               )}

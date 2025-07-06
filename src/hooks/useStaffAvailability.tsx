@@ -20,7 +20,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   const checkBatchAvailability = useCallback(async (): Promise<Set<string>> => {
     if (selectedStaffIds.length === 0) return new Set();
 
-    console.log(`🔄 [BATCH_AVAILABILITY] Checking availability for ${selectedStaffIds.length} staff members`);
+    console.log(`🔄 [BATCH_AVAILABILITY] Checking availability for ${selectedStaffIds.length} staff members:`, selectedStaffIds);
     
     try {
       // Check next 90 days
@@ -47,7 +47,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         return new Set();
       }
 
-      console.log(`📊 [BATCH_AVAILABILITY] Fetched ${availabilityData?.length || 0} available 10-min records`);
+      console.log(`📊 [BATCH_AVAILABILITY] Fetched ${availabilityData?.length || 0} available 10-min records for ${selectedStaffIds.length} staff`);
 
       // Group availability by date and staff
       const availabilityByDate = new Map<string, Map<string, Array<{ time_slot: string; available: boolean }>>>();
@@ -89,7 +89,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
           continue;
         }
 
-        // Check if any 30-minute client slot is available
+        // Check if any 30-minute client slot is available for ALL selected staff
         let hasAvailableClientSlot = false;
         const clientSlots = generateClientTimeSlots();
 
@@ -117,7 +117,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         }
       }
 
-      console.log(`✅ [BATCH_AVAILABILITY] Found ${unavailableDatesSet.size} unavailable dates out of 90 checked`);
+      console.log(`✅ [BATCH_AVAILABILITY] Found ${unavailableDatesSet.size} unavailable dates out of 90 checked for ${selectedStaffIds.length} staff`);
       
       return unavailableDatesSet;
 
