@@ -79,7 +79,7 @@ export class PricingService {
   }
 
   private static async getExactMatchPricing(serviceId: string, breedId: string, size: string) {
-    const { data, error } = await supabase
+    const { data, error }: { data: any, error: any } = await supabase
       .from('service_pricing')
       .select('price, duration_override')
       .eq('service_id', serviceId)
@@ -96,7 +96,7 @@ export class PricingService {
   }
 
   private static async getServiceSizeFallback(serviceId: string, size: string) {
-    const { data, error } = await supabase
+    const { data, error }: { data: any, error: any } = await supabase
       .from('service_pricing')
       .select('price, duration_override')
       .eq('service_id', serviceId)
@@ -113,7 +113,7 @@ export class PricingService {
   }
 
   private static async getServiceDefault(serviceId: string) {
-    const { data, error } = await supabase
+    const { data, error }: { data: any, error: any } = await supabase
       .from('services')
       .select('base_price, default_duration')
       .eq('id', serviceId)
