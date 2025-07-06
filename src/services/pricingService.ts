@@ -85,7 +85,7 @@ export class PricingService {
       .eq('service_id', serviceId)
       .eq('breed_id', breedId)
       .eq('size', size)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.log('🔍 [PRICING] No exact match found:', error.message);
@@ -102,7 +102,7 @@ export class PricingService {
       .eq('service_id', serviceId)
       .eq('size', size)
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.log('🔍 [PRICING] No service+size fallback found:', error.message);
@@ -117,7 +117,7 @@ export class PricingService {
       .from('services')
       .select('base_price, default_duration')
       .eq('id', serviceId)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.log('🔍 [PRICING] No service default found:', error.message);
