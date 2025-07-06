@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,6 +9,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 
 interface Pet {
@@ -16,6 +22,7 @@ interface Pet {
   breed?: string;
   breed_id?: string;
   age?: string;
+  birth_date?: string;
   size?: string;
   weight?: number;
   gender?: string;
@@ -31,10 +38,12 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
   const { user } = useAuth();
   const { breeds, isLoading: breedsLoading } = useBreeds();
   const [isLoading, setIsLoading] = useState(false);
+  const [birthDate, setBirthDate] = useState<Date | undefined>(
+    editingPet?.birth_date ? new Date(editingPet.birth_date) : undefined
+  );
   const [formData, setFormData] = useState({
     name: editingPet?.name || '',
     breed_id: editingPet?.breed_id || '',
-    age: editingPet?.age || '',
     size: editingPet?.size || '',
     weight: editingPet?.weight || '',
     gender: editingPet?.gender || '',
@@ -65,7 +74,7 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
       const petData = {
         name: formData.name,
         breed_id: formData.breed_id || null,
-        age: formData.age || null,
+        birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null,
         size: formData.size || null,
         weight: formData.weight ? parseFloat(formData.weight.toString()) : null,
         gender: formData.gender || null,
@@ -98,12 +107,12 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
         setFormData({
           name: '',
           breed_id: '',
-          age: '',
           size: '',
           weight: '',
           gender: '',
           notes: ''
         });
+        setBirthDate(undefined);
       }
       
       onSuccess?.();
@@ -148,13 +157,29 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
         </div>
 
         <div>
-          <Label htmlFor="age">Idade</Label>
-          <Input
-            id="age"
-            value={formData.age}
-            onChange={(e) => setFormData({...formData, age: e.target.value})}
-            placeholder="Ex: 2 anos"
-          />
+          <Label>Data de Nascimento</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className={`w-full justify-start text-left font-normal ${!birthDate && "text-muted-foreground"}`}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {birthDate ? format(birthDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecione a data"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={birthDate}
+                onSelect={setBirthDate}
+                initialFocus
+                fromYear={2000}
+                toYear={new Date().getFullYear()}
+                captionLayout="dropdown-buttons"
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
