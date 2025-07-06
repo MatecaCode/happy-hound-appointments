@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -14,6 +15,8 @@ import Register from "./pages/Register";
 import Profile from "./pages/Profile";
 import Pets from "./pages/Pets";
 import GroomerDashboard from "./pages/GroomerDashboard";
+import GroomerCalendar from "./pages/GroomerCalendar";
+import GroomerSchedule from "./pages/GroomerSchedule";
 import VetCalendar from "./pages/VetCalendar";
 import Shop from "./pages/Shop";
 import Cart from "./pages/Cart";
