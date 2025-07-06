@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 export interface Breed {
   id: string;
   name: string;
-  size_category?: string;
 }
 
 export const useBreeds = () => {
@@ -20,7 +19,7 @@ export const useBreeds = () => {
     try {
       const { data, error } = await supabase
         .from('breeds')
-        .select('id, name, size_category')
+        .select('id, name')
         .eq('active', true)
         .order('name');
 

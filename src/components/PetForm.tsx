@@ -142,13 +142,6 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
               {breeds.map((breed) => (
                 <SelectItem key={breed.id} value={breed.id}>
                   {breed.name}
-                  {breed.size_category && (
-                    <span className="text-xs text-muted-foreground ml-2">
-                      ({breed.size_category === 'small' ? 'Pequeno' : 
-                        breed.size_category === 'medium' ? 'Médio' : 
-                        breed.size_category === 'large' ? 'Grande' : 'Extra Grande'})
-                    </span>
-                  )}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -168,8 +161,11 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <Label htmlFor="size">Porte</Label>
-          <Select value={formData.size} onValueChange={(value) => setFormData({...formData, size: value})}>
+          <Label htmlFor="size">Porte *</Label>
+          <Select 
+            value={formData.size} 
+            onValueChange={(value) => setFormData({...formData, size: value})}
+          >
             <SelectTrigger>
               <SelectValue placeholder="Selecione o porte" />
             </SelectTrigger>

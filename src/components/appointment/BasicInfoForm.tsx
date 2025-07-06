@@ -59,7 +59,17 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
             <SelectContent>
               {userPets.map((pet) => (
                 <SelectItem key={pet.id} value={pet.id}>
-                  {pet.name} {pet.breed && `(${pet.breed})`}
+                  <div className="flex flex-col items-start">
+                    <span>{pet.name}</span>
+                    {pet.breed && (
+                      <span className="text-xs text-muted-foreground">
+                        {pet.breed} - {pet.size === 'small' ? 'Pequeno' : 
+                                     pet.size === 'medium' ? 'Médio' : 
+                                     pet.size === 'large' ? 'Grande' : 
+                                     pet.size === 'extra_large' ? 'Extra Grande' : pet.size}
+                      </span>
+                    )}
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
