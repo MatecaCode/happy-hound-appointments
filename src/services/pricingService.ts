@@ -80,18 +80,14 @@ export class PricingService {
 
   private static async getExactMatchPricing(serviceId: string, breedId: string, size: string): Promise<any> {
     try {
-      // Use any to bypass deep type inference
-      const query: any = supabase
+      // Explicitly type as any to avoid deep type inference
+      const { data, error } = await supabase
         .from('service_pricing')
         .select('price, duration_override')
         .eq('service_id', serviceId)
         .eq('breed_id', breedId)
         .eq('size', size)
-        .maybeSingle();
-
-      const result = await query;
-      const data = result.data;
-      const error = result.error;
+        .maybeSingle() as any;
 
       if (error) {
         console.log('🔍 [PRICING] No exact match found:', error.message);
@@ -107,18 +103,14 @@ export class PricingService {
 
   private static async getServiceSizeFallback(serviceId: string, size: string): Promise<any> {
     try {
-      // Use any to bypass deep type inference
-      const query: any = supabase
+      // Explicitly type as any to avoid deep type inference
+      const { data, error } = await supabase
         .from('service_pricing')
         .select('price, duration_override')
         .eq('service_id', serviceId)
         .eq('size', size)
         .limit(1)
-        .maybeSingle();
-
-      const result = await query;
-      const data = result.data;
-      const error = result.error;
+        .maybeSingle() as any;
 
       if (error) {
         console.log('🔍 [PRICING] No service+size fallback found:', error.message);
@@ -134,16 +126,12 @@ export class PricingService {
 
   private static async getServiceDefault(serviceId: string): Promise<any> {
     try {
-      // Use any to bypass deep type inference
-      const query: any = supabase
+      // Explicitly type as any to avoid deep type inference
+      const { data, error } = await supabase
         .from('services')
         .select('base_price, default_duration')
         .eq('id', serviceId)
-        .maybeSingle();
-
-      const result = await query;
-      const data = result.data;
-      const error = result.error;
+        .maybeSingle() as any;
 
       if (error) {
         console.log('🔍 [PRICING] No service default found:', error.message);
