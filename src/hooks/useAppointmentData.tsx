@@ -1,11 +1,11 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   generateClientTimeSlots, 
   isClientSlotAvailable,
-  formatTimeSlot 
+  formatTimeSlot,
+  createAvailabilitySummaryTable
 } from '@/utils/timeSlotHelpers';
 
 export interface TimeSlot {
@@ -169,10 +169,14 @@ export const useAppointmentData = () => {
       return;
     }
 
-    console.log('🕐 [FETCH_TIME_SLOTS] Starting with 10min granular logic:', {
+    console.log('🕐 [FETCH_TIME_SLOTS] ==========================================');
+    console.log('🕐 [FETCH_TIME_SLOTS] Starting with enhanced debugging...');
+    console.log('🕐 [FETCH_TIME_SLOTS] Parameters:', {
       date: date.toISOString().split('T')[0],
       staffId,
-      serviceDuration: selectedService.default_duration || 60
+      serviceDuration: selectedService.default_duration || 60,
+      serviceType: selectedService.service_type,
+      serviceName: selectedService.name
     });
 
     setIsLoading(true);
@@ -181,6 +185,8 @@ export const useAppointmentData = () => {
       const dateStr = date.toISOString().split('T')[0];
       const serviceDuration = selectedService.default_duration || 60;
 
+      console.log('🔍 [FETCH_TIME_SLOTS] Fetching staff availability...');
+      
       // Fetch all 10-minute granular availability for the staff on this date
       const { data: availabilityData, error } = await supabase
         .from('staff_availability')
@@ -195,13 +201,47 @@ export const useAppointmentData = () => {
         return;
       }
 
-      console.log(`📊 [FETCH_TIME_SLOTS] Fetched ${availabilityData?.length || 0} 10-min availability records`);
+      console.log(`📊 [FETCH_TIME_SLOTS] Raw availability data received:`, {
+        recordCount: availabilityData?.length || 0,
+        dateRequested: dateStr,
+        staffId: staffId
+      });
+
+      // Log the raw data
+      if (availabilityData && availabilityData.length > 0) {
+        console.log('📋 [FETCH_TIME_SLOTS] Raw availability records:');
+        availabilityData.forEach((record, index) => {
+          console.log(`  ${index + 1}: ${record.time_slot} = ${record.available}`);
+        });
+      } else {
+        console.log('⚠️ [FETCH_TIME_SLOTS] NO AVAILABILITY DATA FOUND!');
+        console.log('⚠️ [FETCH_TIME_SLOTS] This could be why no slots are showing up.');
+        console.log('⚠️ [FETCH_TIME_SLOTS] Possible causes:');
+        console.log('   - Staff availability not generated for this date');
+        console.log('   - Incorrect staff_profile_id');
+        console.log('   - Date format mismatch');
+        console.log('   - Database query issue');
+      }
+
+      // Create availability summary table
+      createAvailabilitySummaryTable(
+        availabilityData || [], 
+        dateStr, 
+        staffId, 
+        serviceDuration
+      );
 
       // Generate 30-minute client slots and check availability using 10-minute granular logic
+      console.log('🔄 [FETCH_TIME_SLOTS] Generating client-facing 30-minute slots...');
       const clientSlots = generateClientTimeSlots();
+      console.log(`📝 [FETCH_TIME_SLOTS] Generated ${clientSlots.length} client slots:`, clientSlots);
+
       const availableSlots: TimeSlot[] = [];
 
+      console.log('🔍 [FETCH_TIME_SLOTS] Checking each client slot...');
       for (const clientSlot of clientSlots) {
+        console.log(`\n--- Checking client slot: ${clientSlot} ---`);
+        
         const isAvailable = isClientSlotAvailable(
           clientSlot, 
           serviceDuration, 
@@ -213,10 +253,26 @@ export const useAppointmentData = () => {
           time: formatTimeSlot(clientSlot),
           available: isAvailable
         });
+
+        console.log(`Result for ${clientSlot}: ${isAvailable ? 'AVAILABLE' : 'NOT AVAILABLE'}`);
       }
 
-      console.log(`✅ [FETCH_TIME_SLOTS] Generated ${availableSlots.length} client slots, ${availableSlots.filter(s => s.available).length} available`);
+      console.log('📊 [FETCH_TIME_SLOTS] Final Results Summary:');
+      console.log(`   Total client slots generated: ${availableSlots.length}`);
+      console.log(`   Available slots: ${availableSlots.filter(s => s.available).length}`);
+      console.log(`   Unavailable slots: ${availableSlots.filter(s => !s.available).length}`);
+      
+      const availableSlotTimes = availableSlots.filter(s => s.available).map(s => s.time);
+      console.log(`   Available slot times:`, availableSlotTimes);
+
+      if (availableSlotTimes.length === 0) {
+        console.log('❌ [FETCH_TIME_SLOTS] NO AVAILABLE SLOTS FOUND!');
+        console.log('❌ [FETCH_TIME_SLOTS] This is the root cause of the "Nenhum horário disponível" message.');
+        console.log('❌ [FETCH_TIME_SLOTS] Review the detailed logs above to identify the issue.');
+      }
+
       setTimeSlots(availableSlots);
+      console.log('🕐 [FETCH_TIME_SLOTS] ==========================================');
 
     } catch (error) {
       console.error('❌ [FETCH_TIME_SLOTS] Unexpected error:', error);
