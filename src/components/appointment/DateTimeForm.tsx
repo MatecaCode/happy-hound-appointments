@@ -96,7 +96,8 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
       fullArray: timeSlots,
       availableSlotsOnly: timeSlots?.filter(s => s.available) || [],
       sampleSlot: timeSlots?.[0],
-      allSlotStructure: timeSlots?.map(s => ({ id: s.id, time: s.time, available: s.available })) || []
+      allSlotStructure: timeSlots?.map(s => ({ id: s.id, time: s.time, available: s.available })) || [],
+      timestamp: new Date().toISOString()
     });
     
     console.log('🚨 [UI_DATETIME_FORM] Complete timeSlots prop structure:', timeSlots);
@@ -105,6 +106,14 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
       console.log('✅ [UI_DATETIME_FORM] timeSlots prop is NOT empty!');
       const availableSlots = timeSlots.filter(s => s.available);
       console.log('✅ [UI_DATETIME_FORM] Available slots in prop:', availableSlots);
+      
+      // Check for test slot
+      const testSlot = timeSlots.find(s => s.id === 'test-09:00:00');
+      if (testSlot) {
+        console.log('🧪 [UI_DATETIME_FORM] TEST SLOT FOUND IN PROPS:', testSlot);
+      } else {
+        console.log('🧪 [UI_DATETIME_FORM] TEST SLOT NOT FOUND IN PROPS');
+      }
       
       if (availableSlots.length === 0) {
         console.log('⚠️ [UI_DATETIME_FORM] WARNING: timeSlots prop has data but NO available slots!');
@@ -119,9 +128,10 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
       selectedTime: selectedTimeSlotId,
       originalSelectedStaff: selectedStaff,
       uniqueSelectedStaff,
-      isLoading
+      isLoading,
+      renderTimestamp: new Date().toISOString()
     });
-  }, [timeSlots, date, selectedTimeSlotId, isLoading, selectedStaff, uniqueSelectedStaff]); // Added timeSlots as first dependency
+  }, [timeSlots, date, selectedTimeSlotId, isLoading, selectedStaff, uniqueSelectedStaff]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +158,40 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     setDate(selectedDate);
     // Clear selected time slot when date changes
     setSelectedTimeSlotId(null);
+  };
+
+  // 🚨 CRITICAL: Log before rendering buttons
+  const renderTimeSlots = () => {
+    console.log('🚨 [UI_RENDER] renderTimeSlots called with:', {
+      timeSlotsLength: timeSlots?.length,
+      availableCount: timeSlots?.filter(s => s.available)?.length,
+      firstSlot: timeSlots?.[0],
+      timestamp: new Date().toISOString()
+    });
+
+    if (!timeSlots || timeSlots.length === 0) {
+      console.log('❌ [UI_RENDER] No timeSlots to render');
+      return null;
+    }
+
+    return timeSlots.map((slot) => {
+      console.log(`🚨 [UI_BUTTON_RENDER] Rendering button for slot:`, slot);
+      return (
+        <Button
+          key={slot.id}
+          type="button"
+          variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
+          className="h-auto py-2 transition-all duration-200 hover:scale-105"
+          onClick={() => {
+            console.log('🎯 [UI_CLICK] Slot clicked (multi-staff DEDUPLICATED):', slot, 'for unique staff:', uniqueSelectedStaff);
+            setSelectedTimeSlotId(slot.id);
+          }}
+          disabled={!slot.available || isLoading}
+        >
+          {slot.time}
+        </Button>
+      );
+    });
   };
 
   // Full screen loading overlay for booking submission with branded animation
@@ -210,6 +254,32 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
           {showTimeSlots && date && (
             <div className="animate-fade-in">
               <Label>Horários disponíveis</Label>
+              
+              {/* 🚨 CRITICAL: Visual debug table for timeSlots */}
+              <div className="mb-4 p-3 bg-blue-50 rounded text-xs">
+                <div className="font-bold mb-2">🚨 VISUAL DEBUG: timeSlots Prop Structure</div>
+                <div className="max-h-40 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-blue-100">
+                        <th className="p-1 text-left">ID</th>
+                        <th className="p-1 text-left">Time</th>
+                        <th className="p-1 text-left">Available</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {timeSlots?.map((slot, index) => (
+                        <tr key={index} className={slot.available ? 'bg-green-50' : 'bg-red-50'}>
+                          <td className="p-1">{slot.id}</td>
+                          <td className="p-1">{slot.time}</td>
+                          <td className="p-1">{slot.available ? '✅ YES' : '❌ NO'}</td>
+                        </tr>
+                      )) || []}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin mr-2" />
@@ -226,55 +296,14 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                     <div><span className="font-bold">Deduplication applied:</span> {selectedStaff.length !== uniqueSelectedStaff.length ? 'YES' : 'NO'}</div>
                     <div><span className="font-bold">Unique Staff IDs:</span> {uniqueSelectedStaff.join(', ')}</div>
                     <div><span className="font-bold">Service Duration:</span> {serviceDuration} minutes</div>
+                    <div><span className="font-bold">Test slot present:</span> {timeSlots.some(s => s.id === 'test-09:00:00') ? 'YES' : 'NO'}</div>
                     {timeSlots.length > 0 && timeSlots.filter(s => s.available).length === 0 && (
                       <div className="text-red-600 font-bold">⚠️ All slots marked as unavailable!</div>
                     )}
                   </div>
                   
-                  {/* 🚨 CRITICAL: Visual debug table for timeSlots */}
-                  <div className="mb-4 p-3 bg-blue-50 rounded text-xs">
-                    <div className="font-bold mb-2">🚨 VISUAL DEBUG: timeSlots Prop Structure</div>
-                    <div className="max-h-40 overflow-y-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-blue-100">
-                            <th className="p-1 text-left">ID</th>
-                            <th className="p-1 text-left">Time</th>
-                            <th className="p-1 text-left">Available</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {timeSlots.map((slot, index) => (
-                            <tr key={index} className={slot.available ? 'bg-green-50' : 'bg-red-50'}>
-                              <td className="p-1">{slot.id}</td>
-                              <td className="p-1">{slot.time}</td>
-                              <td className="p-1">{slot.available ? '✅ YES' : '❌ NO'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                  
                   <div className="grid grid-cols-3 gap-2 mt-2">
-                    {timeSlots.map((slot) => {
-                      console.log(`🚨 [UI_BUTTON_RENDER] Rendering button for slot:`, slot);
-                      return (
-                        <Button
-                          key={slot.id}
-                          type="button"
-                          variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
-                          className="h-auto py-2 transition-all duration-200 hover:scale-105"
-                          onClick={() => {
-                            console.log('🎯 [UI_CLICK] Slot clicked (multi-staff DEDUPLICATED):', slot, 'for unique staff:', uniqueSelectedStaff);
-                            setSelectedTimeSlotId(slot.id);
-                          }}
-                          disabled={!slot.available || isLoading}
-                        >
-                          {slot.time}
-                        </Button>
-                      );
-                    })}
+                    {renderTimeSlots()}
                   </div>
                 </div>
               ) : (

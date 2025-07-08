@@ -64,6 +64,16 @@ export const useAppointmentData = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
 
+  // 🚨 CRITICAL: Add logging to trace state changes
+  useEffect(() => {
+    console.log('🔍 [STATE_TRACE] timeSlots state changed:', {
+      length: timeSlots.length,
+      timeSlots: timeSlots,
+      availableCount: timeSlots.filter(s => s.available).length,
+      timestamp: new Date().toISOString()
+    });
+  }, [timeSlots]);
+
   const fetchServices = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -165,9 +175,19 @@ export const useAppointmentData = () => {
     setIsLoading: (loading: boolean) => void,
     selectedService: Service | null
   ) => {
+    console.log('🚨 [FETCH_TIME_SLOTS] ===== FUNCTION ENTRY =====');
+    console.log('🚨 [FETCH_TIME_SLOTS] Parameters received:', {
+      date: date?.toISOString(),
+      staffIds,
+      staffCount: staffIds?.length,
+      selectedService: selectedService?.name,
+      timestamp: new Date().toISOString()
+    });
+
     // Prevent unnecessary fetches
     if (!selectedService || !date || !staffIds || staffIds.length === 0) {
-      console.log('🚨 [FETCH_TIME_SLOTS] Missing required parameters - skipping fetch');
+      console.log('🚨 [FETCH_TIME_SLOTS] Missing required parameters - CLEARING SLOTS');
+      console.log('🚨 [FETCH_TIME_SLOTS] Calling setTimeSlots([]) due to missing params');
       setTimeSlots([]);
       return;
     }
@@ -181,14 +201,11 @@ export const useAppointmentData = () => {
       deduplicationApplied: staffIds.length !== uniqueStaffIds.length
     });
     
-    console.log('🎯 [FETCH_TIME_SLOTS] FINAL staff IDs for slot validation:', uniqueStaffIds);
-    
     const dateForQuery = format(date, 'yyyy-MM-dd');
     const serviceDuration = selectedService.default_duration || 60;
     
-    console.log('📋 [FETCH_TIME_SLOTS] Parameters:', {
+    console.log('📋 [FETCH_TIME_SLOTS] Query parameters:', {
       date: dateForQuery,
-      originalStaffIds: staffIds,
       uniqueStaffIds,
       uniqueStaffCount: uniqueStaffIds.length,
       serviceDuration
@@ -207,24 +224,16 @@ export const useAppointmentData = () => {
       if (error) {
         console.error('❌ [FETCH_TIME_SLOTS] Error fetching staff availability:', error);
         toast.error('Erro ao buscar horários disponíveis');
+        console.log('🚨 [FETCH_TIME_SLOTS] Calling setTimeSlots([]) due to error');
         setTimeSlots([]);
         return;
       }
 
       console.log(`📊 [FETCH_TIME_SLOTS] Raw availability data: ${availabilityData?.length || 0} records for ${uniqueStaffIds.length} UNIQUE staff`);
-      
-      // 🔍 NEW: Log the COMPLETE fetched availability data structure
-      console.log('📋 [FETCH_TIME_SLOTS] COMPLETE BACKEND DATA:', {
-        totalRecords: availabilityData?.length || 0,
-        sampleRecords: availabilityData?.slice(0, 10),
-        uniqueStaffIdsInData: [...new Set(availabilityData?.map(r => r.staff_profile_id) || [])],
-        uniqueTimeSlotsInData: [...new Set(availabilityData?.map(r => r.time_slot) || [])].sort(),
-        availableCount: availabilityData?.filter(r => r.available).length || 0,
-        unavailableCount: availabilityData?.filter(r => !r.available).length || 0
-      });
 
       if (!availabilityData || availabilityData.length === 0) {
         console.log('⚠️ [FETCH_TIME_SLOTS] NO AVAILABILITY DATA FOUND!');
+        console.log('🚨 [FETCH_TIME_SLOTS] Calling setTimeSlots([]) due to no data');
         setTimeSlots([]);
         setIsLoading(false);
         return;
@@ -322,23 +331,38 @@ export const useAppointmentData = () => {
         availableSlotsOnly: availableSlots.filter(s => s.available),
         sampleSlot: availableSlots[0],
         typeof: typeof availableSlots,
-        isArray: Array.isArray(availableSlots)
+        isArray: Array.isArray(availableSlots),
+        timestamp: new Date().toISOString()
       });
 
-      // 🚨 CRITICAL: Call setTimeSlots and log immediately after
-      console.log(`🎯 [FETCH_TIME_SLOTS] Calling setTimeSlots with ${availableSlots.length} slots...`);
-      setTimeSlots(availableSlots);
+      // 🚨 CRITICAL: Add test slot to verify UI rendering
+      const testSlot = {
+        id: 'test-09:00:00',
+        time: '09:00',
+        available: true
+      };
+      const slotsWithTest = [...availableSlots, testSlot];
+      
+      console.log(`🧪 [FETCH_TIME_SLOTS] ADDING TEST SLOT - calling setTimeSlots with ${slotsWithTest.length} slots (including test)...`);
+      console.log(`🧪 [FETCH_TIME_SLOTS] Test slot added:`, testSlot);
+      console.log(`🧪 [FETCH_TIME_SLOTS] Full array with test:`, slotsWithTest);
+      
+      // Call setTimeSlots with the test slot included
+      setTimeSlots(slotsWithTest);
       
       // 🚨 CRITICAL: Log immediately after setTimeSlots call
       console.log(`✅ [FETCH_TIME_SLOTS] setTimeSlots called successfully with:`, {
-        inputArray: availableSlots,
-        inputLength: availableSlots.length,
-        availableInInput: availableSlots.filter(s => s.available).length
+        inputArray: slotsWithTest,
+        inputLength: slotsWithTest.length,
+        availableInInput: slotsWithTest.filter(s => s.available).length,
+        testSlotIncluded: slotsWithTest.some(s => s.id === 'test-09:00:00'),
+        timestamp: new Date().toISOString()
       });
 
     } catch (error) {
       console.error('❌ [FETCH_TIME_SLOTS] Unexpected error:', error);
       toast.error('Erro inesperado ao buscar horários');
+      console.log('🚨 [FETCH_TIME_SLOTS] Calling setTimeSlots([]) due to unexpected error');
       setTimeSlots([]);
     } finally {
       setIsLoading(false);

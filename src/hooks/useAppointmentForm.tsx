@@ -152,11 +152,25 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     return getSelectedStaffIds.sort().join(',');
   }, [getSelectedStaffIds]);
 
-  // Updated useEffect for fetching time slots with stable dependencies
+  // 🚨 CRITICAL: Log when fetchTimeSlots is about to be triggered
   useEffect(() => {
+    console.log('\n🚨 [APPOINTMENT_FORM] ===== FETCH TRIGGER EVALUATION =====');
+    console.log('🚨 [APPOINTMENT_FORM] useEffect evaluation:', {
+      hasDate: !!date,
+      dateValue: date?.toISOString(),
+      hasSelectedService: !!selectedService,
+      serviceName: selectedService?.name,
+      staffIdsKey,
+      staffIds: getSelectedStaffIds,
+      serviceRequiresStaff,
+      serviceRequirementsLoaded,
+      formStep,
+      timestamp: new Date().toISOString()
+    });
+
     // Guard against missing requirements
     if (!date || !selectedService || staffIdsKey === '') {
-      console.log('🚨 [USE_EFFECT] Missing requirements for fetchTimeSlots:', {
+      console.log('🚨 [APPOINTMENT_FORM] Missing requirements for fetchTimeSlots:', {
         hasDate: !!date,
         hasService: !!selectedService,
         staffIdsKey,
@@ -170,15 +184,22 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     if (formStep === 3 || (formStep === 2 && !serviceRequiresStaff)) {
       const staffIds = getSelectedStaffIds;
       
-      console.log('🔄 [USE_EFFECT] Triggering fetchTimeSlots with:', {
+      console.log('🔄 [APPOINTMENT_FORM] TRIGGERING fetchTimeSlots with:', {
         date: date.toISOString().split('T')[0],
         staffIds,
         staffCount: staffIds.length,
         serviceRequiresStaff,
-        formStep
+        formStep,
+        timestamp: new Date().toISOString()
       });
       
       fetchTimeSlots(date, staffIds, setIsLoading, selectedService);
+    } else {
+      console.log('🚨 [APPOINTMENT_FORM] NOT triggering fetchTimeSlots - wrong step:', {
+        formStep,
+        serviceRequiresStaff,
+        shouldTrigger: formStep === 3 || (formStep === 2 && !serviceRequiresStaff)
+      });
     }
   }, [date, staffIdsKey, selectedService, serviceRequiresStaff, fetchTimeSlots, formStep, getSelectedStaffIds]);
 
