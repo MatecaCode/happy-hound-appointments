@@ -69,7 +69,15 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   const canSubmit = date && selectedTimeSlotId && !isLoading;
 
   // CRITICAL: Deduplicate staff IDs at the very start for availability hook
-  const uniqueSelectedStaff = React.useMemo(() => [...new Set(selectedStaff)], [selectedStaff]);
+  const uniqueSelectedStaff = React.useMemo(() => {
+    const unique = [...new Set(selectedStaff)];
+    console.log('🎯 [UI_DATETIME_FORM] Staff deduplication:', {
+      original: selectedStaff,
+      unique,
+      deduplicationApplied: selectedStaff.length !== unique.length
+    });
+    return unique;
+  }, [selectedStaff]);
   
   const { isDateDisabled, isLoading: availabilityLoading } = useStaffAvailability({
     selectedStaffIds: uniqueSelectedStaff,
@@ -78,7 +86,8 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 
   // Enhanced debugging for multi-staff support with deduplication
   React.useEffect(() => {
-    console.log('🎯 [UI_DEBUG] DateTimeForm timeSlots prop changed:', {
+    console.log('\n🎯 [UI_DEBUG] ===== DateTimeForm timeSlots prop changed =====');
+    console.log('🎯 [UI_DEBUG] DateTimeForm received timeSlots:', {
       totalSlots: timeSlots.length,
       availableSlots: timeSlots.filter(s => s.available).length,
       slots: timeSlots.map(s => ({ id: s.id, time: s.time, available: s.available })),
@@ -93,6 +102,20 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     });
     
     console.log('🎯 [UI_DEBUG] FINAL staff IDs for UI display:', uniqueSelectedStaff);
+    
+    // NEW: Log the full timeSlots array structure
+    console.log('📋 [UI_DEBUG] Full timeSlots array received by DateTimeForm:', timeSlots);
+    
+    if (timeSlots.length === 0) {
+      console.log('⚠️ [UI_DEBUG] WARNING: timeSlots array is empty!');
+    }
+    
+    const availableSlots = timeSlots.filter(s => s.available);
+    if (availableSlots.length === 0 && timeSlots.length > 0) {
+      console.log('⚠️ [UI_DEBUG] WARNING: No available slots found in timeSlots array!');
+      console.log('❌ [UI_DEBUG] All slots marked as unavailable:', timeSlots.map(s => `${s.time}: ${s.available}`));
+    }
+    
   }, [timeSlots, date, selectedTimeSlotId, isLoading, selectedStaff, uniqueSelectedStaff]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -190,13 +213,17 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               ) : timeSlots.length > 0 ? (
                 <div>
                   {/* Enhanced UI debugging info for multi-staff with deduplication */}
-                  <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
-                    <div>Total slots: {timeSlots.length}</div>
-                    <div>Available slots: {timeSlots.filter(s => s.available).length}</div>
-                    <div>Original staff: {selectedStaff.length} selection(s)</div>
-                    <div>Unique staff: {uniqueSelectedStaff.length} professional(s)</div>
-                    <div>Deduplication applied: {selectedStaff.length !== uniqueSelectedStaff.length ? 'YES' : 'NO'}</div>
-                    <div>Unique Staff IDs: {uniqueSelectedStaff.join(', ')}</div>
+                  <div className="mb-4 p-3 bg-gray-100 rounded text-xs space-y-1">
+                    <div><span className="font-bold">Total slots:</span> {timeSlots.length}</div>
+                    <div><span className="font-bold">Available slots:</span> {timeSlots.filter(s => s.available).length}</div>
+                    <div><span className="font-bold">Original staff:</span> {selectedStaff.length} selection(s)</div>
+                    <div><span className="font-bold">Unique staff:</span> {uniqueSelectedStaff.length} professional(s)</div>
+                    <div><span className="font-bold">Deduplication applied:</span> {selectedStaff.length !== uniqueSelectedStaff.length ? 'YES' : 'NO'}</div>
+                    <div><span className="font-bold">Unique Staff IDs:</span> {uniqueSelectedStaff.join(', ')}</div>
+                    <div><span className="font-bold">Service Duration:</span> {serviceDuration} minutes</div>
+                    {timeSlots.length > 0 && timeSlots.filter(s => s.available).length === 0 && (
+                      <div className="text-red-600 font-bold">⚠️ All slots marked as unavailable!</div>
+                    )}
                   </div>
                   
                   <div className="grid grid-cols-3 gap-2 mt-2">
@@ -222,14 +249,15 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                   <p className="text-muted-foreground mt-2">
                     Nenhum horário disponível para esta data com os profissionais selecionados.
                   </p>
-                  <div className="mt-2 p-2 bg-red-100 rounded text-xs">
-                    <div>Debug: Total slots = {timeSlots.length}</div>
-                    <div>Debug: Loading = {isLoading.toString()}</div>
-                    <div>Debug: Date = {date?.toISOString()}</div>
-                    <div>Debug: Original staff count = {selectedStaff.length}</div>
-                    <div>Debug: Unique staff count = {uniqueSelectedStaff.length}</div>
-                    <div>Debug: Original Staff IDs = {selectedStaff.join(', ')}</div>
-                    <div>Debug: Unique Staff IDs = {uniqueSelectedStaff.join(', ')}</div>
+                  <div className="mt-2 p-3 bg-red-100 rounded text-xs space-y-1">
+                    <div><span className="font-bold">Debug: Total slots =</span> {timeSlots.length}</div>
+                    <div><span className="font-bold">Debug: Loading =</span> {isLoading.toString()}</div>
+                    <div><span className="font-bold">Debug: Date =</span> {date?.toISOString()}</div>
+                    <div><span className="font-bold">Debug: Original staff count =</span> {selectedStaff.length}</div>
+                    <div><span className="font-bold">Debug: Unique staff count =</span> {uniqueSelectedStaff.length}</div>
+                    <div><span className="font-bold">Debug: Original Staff IDs =</span> {selectedStaff.join(', ')}</div>
+                    <div><span className="font-bold">Debug: Unique Staff IDs =</span> {uniqueSelectedStaff.join(', ')}</div>
+                    <div><span className="font-bold">Debug: Service Duration =</span> {serviceDuration} minutes</div>
                   </div>
                 </div>
               )}

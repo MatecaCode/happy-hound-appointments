@@ -23,14 +23,19 @@ export function generateClientTimeSlots(): string[] {
     slots.push(timeString);
   }
   
+  console.log('🔄 [TIME_SLOT_HELPERS] Generated client slots:', slots);
   return slots;
 }
 
 // Get all 10-minute slots needed for a service duration starting at a given time
 export function getRequiredBackendSlots(startTime: string, durationMinutes: number): string[] {
+  console.log(`🔍 [TIME_SLOT_HELPERS] getRequiredBackendSlots called with startTime: ${startTime}, duration: ${durationMinutes}min`);
+  
   const slots: string[] = [];
   const [startHour, startMinute] = startTime.split(':').map(Number);
   const startTotalMinutes = startHour * 60 + startMinute;
+  
+  console.log(`🔍 [TIME_SLOT_HELPERS] Start time breakdown: ${startHour}:${startMinute} = ${startTotalMinutes} total minutes`);
   
   // Generate all 10-minute slots for the duration
   for (let offset = 0; offset < durationMinutes; offset += TIME_SLOT_CONFIG.BACKEND_INTERVAL_MINUTES) {
@@ -40,13 +45,16 @@ export function getRequiredBackendSlots(startTime: string, durationMinutes: numb
     
     // Stop if we go beyond business hours
     if (slotHour >= TIME_SLOT_CONFIG.END_HOUR) {
+      console.log(`⚠️ [TIME_SLOT_HELPERS] Stopping at ${slotHour}:${slotMinute} - beyond business hours`);
       break;
     }
     
     const timeString = `${slotHour.toString().padStart(2, '0')}:${slotMinute.toString().padStart(2, '0')}:00`;
     slots.push(timeString);
+    console.log(`✅ [TIME_SLOT_HELPERS] Added required slot: ${timeString} (offset: ${offset}min)`);
   }
   
+  console.log(`📊 [TIME_SLOT_HELPERS] Required backend slots for ${startTime} + ${durationMinutes}min:`, slots);
   return slots;
 }
 
@@ -56,7 +64,12 @@ export function isClientSlotAvailable(
   serviceDuration: number, 
   staffAvailability: Array<{ time_slot: string; available: boolean }>
 ): boolean {
+  console.log(`\n🔍 [TIME_SLOT_HELPERS] ===== CHECKING CLIENT SLOT AVAILABILITY =====`);
+  console.log(`🔍 [TIME_SLOT_HELPERS] Checking client slot: ${clientSlot}, duration: ${serviceDuration}min`);
+  console.log(`📊 [TIME_SLOT_HELPERS] Staff availability data (${staffAvailability.length} records):`, staffAvailability);
+  
   const requiredSlots = getRequiredBackendSlots(clientSlot, serviceDuration);
+  console.log(`📋 [TIME_SLOT_HELPERS] Required backend slots:`, requiredSlots);
   
   // Create availability lookup for faster checking
   const availabilityMap = new Map();
@@ -64,15 +77,21 @@ export function isClientSlotAvailable(
     availabilityMap.set(slot.time_slot, slot.available);
   });
   
+  console.log(`🗂️ [TIME_SLOT_HELPERS] Availability map:`, Object.fromEntries(availabilityMap));
+  
   // Check each required slot
   for (const requiredSlot of requiredSlots) {
     const isAvailable = availabilityMap.get(requiredSlot);
     
+    console.log(`🔍 [TIME_SLOT_HELPERS] Checking required slot ${requiredSlot}: ${isAvailable === true ? 'AVAILABLE' : isAvailable === false ? 'UNAVAILABLE' : 'MISSING'}`);
+    
     if (!isAvailable) {
+      console.log(`❌ [TIME_SLOT_HELPERS] Client slot ${clientSlot} UNAVAILABLE - required slot ${requiredSlot} is ${isAvailable === false ? 'marked unavailable' : 'missing from data'}`);
       return false;
     }
   }
   
+  console.log(`✅ [TIME_SLOT_HELPERS] Client slot ${clientSlot} AVAILABLE - all required slots are available`);
   return true;
 }
 
