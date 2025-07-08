@@ -141,6 +141,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       deduplicationApplied: staffIds.length !== uniqueStaffIds.length
     });
     
+    console.log('🎯 [GET_SELECTED_STAFF_IDS] FINAL staff IDs for all operations:', uniqueStaffIds);
+    
     return uniqueStaffIds;
   }, [selectedStaff, selectedGroomerId]);
 
@@ -181,7 +183,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
 
     // Get staff IDs - use parameter if provided, otherwise get from state (DEDUPLICATED)
-    const staffIds = selectedStaffIds || getSelectedStaffIds();
+    const rawStaffIds = selectedStaffIds || getSelectedStaffIds();
+    // CRITICAL: Deduplicate staff IDs at the very start of booking
+    const uniqueStaffIds = [...new Set(rawStaffIds)];
     
     console.log('📋 [BOOKING_SUBMIT] Multi-staff booking details (DEDUPLICATED):', {
       user: user.id,
@@ -189,10 +193,14 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       service: selectedService.name,
       date: date.toISOString().split('T')[0],
       time: selectedTimeSlotId,
-      staffIds,
-      uniqueStaffCount: staffIds.length,
+      rawStaffIds,
+      uniqueStaffIds,
+      uniqueStaffCount: uniqueStaffIds.length,
+      deduplicationApplied: rawStaffIds.length !== uniqueStaffIds.length,
       serviceDuration: pricing?.duration || selectedService.default_duration || 60
     });
+    
+    console.log('🎯 [BOOKING_SUBMIT] FINAL staff IDs for booking:', uniqueStaffIds);
 
     try {
       setIsLoading(true);
@@ -210,7 +218,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         service: selectedService.name,
         date: date.toISOString().split('T')[0],
         time: selectedTimeSlotId,
-        staffIds: staffIds || [],
+        uniqueStaffIds: uniqueStaffIds,
         serviceDuration: pricing?.duration || selectedService.default_duration || 60
       });
 
@@ -259,10 +267,10 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         console.log('✅ [BOOKING_SUBMIT] Appointment created:', appointment.id);
 
         // Link ALL UNIQUE selected staff members
-        if (staffIds.length > 0) {
-          console.log('🔗 [BOOKING_SUBMIT] Linking UNIQUE staff members:', staffIds);
+        if (uniqueStaffIds.length > 0) {
+          console.log('🔗 [BOOKING_SUBMIT] Linking UNIQUE staff members:', uniqueStaffIds);
           
-          for (const staffId of staffIds) {
+          for (const staffId of uniqueStaffIds) {
             const { error: staffLinkError } = await supabase
               .from('appointment_staff')
               .insert({
@@ -281,7 +289,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
           // Update staff availability for ALL UNIQUE selected staff using 10-minute granular logic
           console.log('🔒 [BOOKING_SUBMIT] Updating staff availability for UNIQUE staff members...');
 
-          for (const staffId of staffIds) {
+          for (const staffId of uniqueStaffIds) {
             // Get all 10-minute slots that need to be marked unavailable
             const requiredSlots = getRequiredBackendSlots(selectedTimeSlotId, serviceDuration);
             

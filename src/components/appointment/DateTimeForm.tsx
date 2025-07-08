@@ -67,7 +67,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 }) => {
   const canSubmit = date && selectedTimeSlotId && !isLoading;
 
-  // Use staff availability hook to get proper date filtering with multi-staff support (DEDUPLICATED)
+  // CRITICAL: Deduplicate staff IDs at the very start for availability hook
   const uniqueSelectedStaff = [...new Set(selectedStaff)];
   const { isDateDisabled, isLoading: availabilityLoading } = useStaffAvailability({
     selectedStaffIds: uniqueSelectedStaff,
@@ -89,6 +89,8 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
       deduplicationApplied: selectedStaff.length !== uniqueStaffForDebug.length,
       isLoading
     });
+    
+    console.log('🎯 [UI_DEBUG] FINAL staff IDs for UI display:', uniqueStaffForDebug);
   }, [timeSlots, date, selectedTimeSlotId, isLoading, selectedStaff]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -170,7 +172,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             />
             {availabilityLoading && (
               <p className="text-sm text-muted-foreground mt-2 animate-pulse">
-                Carregando disponibilidade para {selectedStaff.length} profissionais...
+                Carregando disponibilidade para {[...new Set(selectedStaff)].length} profissionais únicos...
               </p>
             )}
           </div>

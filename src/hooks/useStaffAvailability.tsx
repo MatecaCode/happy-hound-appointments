@@ -18,16 +18,18 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   const [isLoading, setIsLoading] = useState(false);
 
   const checkBatchAvailability = useCallback(async (): Promise<Set<string>> => {
-    if (selectedStaffIds.length === 0) return new Set();
-
-    // CRITICAL: Deduplicate staff IDs to prevent double-checking same staff
+    // CRITICAL: Deduplicate staff IDs at the very start
     const uniqueStaffIds = [...new Set(selectedStaffIds)];
+    
+    if (uniqueStaffIds.length === 0) return new Set();
 
     console.log(`🔄 [BATCH_AVAILABILITY] Checking availability with DEDUPLICATION:`, {
       originalStaffIds: selectedStaffIds,
       uniqueStaffIds,
       deduplicationApplied: selectedStaffIds.length !== uniqueStaffIds.length
     });
+    
+    console.log('🎯 [BATCH_AVAILABILITY] FINAL staff IDs for batch validation:', uniqueStaffIds);
     
     try {
       // Check next 90 days
@@ -135,7 +137,10 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   }, [selectedStaffIds, serviceDuration]);
 
   const updateUnavailableDates = useCallback(async () => {
-    if (selectedStaffIds.length === 0) {
+    // CRITICAL: Deduplicate staff IDs at the very start
+    const uniqueStaffIds = [...new Set(selectedStaffIds)];
+    
+    if (uniqueStaffIds.length === 0) {
       setUnavailableDates(new Set());
       return;
     }
@@ -169,7 +174,10 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   }, [unavailableDates]);
 
   const checkDateAvailability = useCallback(async (date: Date): Promise<boolean> => {
-    if (selectedStaffIds.length === 0) return true;
+    // CRITICAL: Deduplicate staff IDs at the very start
+    const uniqueStaffIds = [...new Set(selectedStaffIds)];
+    
+    if (uniqueStaffIds.length === 0) return true;
 
     const dateStr = format(date, 'yyyy-MM-dd');
     return !unavailableDates.has(dateStr);

@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -164,24 +165,27 @@ export const useAppointmentData = () => {
     setIsLoading: (loading: boolean) => void,
     selectedService: Service | null
   ) => {
-    if (!selectedService || !staffIds || staffIds.length === 0) {
+    // CRITICAL: Deduplicate staff IDs at the very start
+    const uniqueStaffIds = [...new Set(staffIds)];
+    
+    if (!selectedService || !uniqueStaffIds || uniqueStaffIds.length === 0) {
       console.log('🚨 [FETCH_TIME_SLOTS] Missing required parameters:', {
         hasService: !!selectedService,
-        staffIds,
-        staffIdsLength: staffIds?.length || 0
+        originalStaffIds: staffIds,
+        uniqueStaffIds,
+        uniqueStaffIdsLength: uniqueStaffIds?.length || 0
       });
       setTimeSlots([]);
       return;
     }
-
-    // CRITICAL: Deduplicate staff IDs to prevent double-checking same staff
-    const uniqueStaffIds = [...new Set(staffIds)];
     
     console.log('🔍 [FETCH_TIME_SLOTS] Starting multi-staff fetch with DEDUPLICATION...', {
       originalStaffIds: staffIds,
       uniqueStaffIds,
       deduplicationApplied: staffIds.length !== uniqueStaffIds.length
     });
+    
+    console.log('🎯 [FETCH_TIME_SLOTS] FINAL staff IDs for slot validation:', uniqueStaffIds);
     
     const dateForQuery = format(date, 'yyyy-MM-dd');
     const serviceDuration = selectedService.default_duration || 60;
