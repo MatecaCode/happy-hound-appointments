@@ -212,10 +212,16 @@ export const useAppointmentData = () => {
       }
 
       console.log(`📊 [FETCH_TIME_SLOTS] Raw availability data: ${availabilityData?.length || 0} records for ${uniqueStaffIds.length} UNIQUE staff`);
-      console.log('🔍 [FETCH_TIME_SLOTS] Backend slot data sample:', availabilityData?.slice(0, 5));
-
-      // NEW: Log the FULL availability data for debugging
-      console.log('📋 [FETCH_TIME_SLOTS] FULL AVAILABILITY DATA:', availabilityData);
+      
+      // 🔍 NEW: Log the COMPLETE fetched availability data structure
+      console.log('📋 [FETCH_TIME_SLOTS] COMPLETE BACKEND DATA:', {
+        totalRecords: availabilityData?.length || 0,
+        sampleRecords: availabilityData?.slice(0, 10),
+        uniqueStaffIdsInData: [...new Set(availabilityData?.map(r => r.staff_profile_id) || [])],
+        uniqueTimeSlotsInData: [...new Set(availabilityData?.map(r => r.time_slot) || [])].sort(),
+        availableCount: availabilityData?.filter(r => r.available).length || 0,
+        unavailableCount: availabilityData?.filter(r => !r.available).length || 0
+      });
 
       if (!availabilityData || availabilityData.length === 0) {
         console.log('⚠️ [FETCH_TIME_SLOTS] NO AVAILABILITY DATA FOUND!');
@@ -243,15 +249,6 @@ export const useAppointmentData = () => {
         uniqueStaffWithData: Array.from(availabilityByStaff.keys())
       });
 
-      // NEW: Log the grouped availability data for each staff
-      availabilityByStaff.forEach((availability, staffId) => {
-        const availableSlots = availability.filter(slot => slot.available).length;
-        const totalSlots = availability.length;
-        console.log(`📊 [FETCH_TIME_SLOTS] Staff ${staffId}: ${availableSlots}/${totalSlots} available slots`);
-        console.log(`📋 [FETCH_TIME_SLOTS] Available slots for ${staffId}:`, 
-          availability.filter(slot => slot.available).map(slot => slot.time_slot));
-      });
-
       // Generate 30-minute client slots and check multi-staff availability
       console.log('🔄 [FETCH_TIME_SLOTS] Generating 30-minute client slots...');
       const clientSlots = generateClientTimeSlots();
@@ -270,7 +267,6 @@ export const useAppointmentData = () => {
           const staffAvailability = availabilityByStaff.get(staffId) || [];
           
           console.log(`🔍 [FETCH_TIME_SLOTS] Checking staff ${staffId} for slot ${clientSlot}`);
-          console.log(`📊 [FETCH_TIME_SLOTS] Staff availability data:`, staffAvailability);
           
           const isStaffAvailable = isClientSlotAvailable(
             clientSlot, 
@@ -310,17 +306,35 @@ export const useAppointmentData = () => {
         }
       }
 
-      console.log(`\n📊 [FETCH_TIME_SLOTS] ===== FINAL RESULTS =====`);
+      console.log(`\n📊 [FETCH_TIME_SLOTS] ===== SLOT AGGREGATION COMPLETE =====`);
       console.log(`📊 [FETCH_TIME_SLOTS] Final Results for ${uniqueStaffIds.length} UNIQUE staff:`);
       console.log(`   Total slots generated: ${availableSlots.length}`);
       console.log(`   Available slots: ${availableSlots.filter(s => s.available).length}`);
       
       const availableSlotTimes = availableSlots.filter(s => s.available).map(s => s.time);
       console.log(`   Available times:`, availableSlotTimes);
-      console.log(`📋 [FETCH_TIME_SLOTS] Full available slots array:`, availableSlots);
+      
+      // 🚨 CRITICAL: Log the EXACT array before React state update
+      console.log(`🚨 [FETCH_TIME_SLOTS] CRITICAL: availableSlots array BEFORE setTimeSlots:`, {
+        arrayLength: availableSlots.length,
+        availableCount: availableSlots.filter(s => s.available).length,
+        fullArray: availableSlots,
+        availableSlotsOnly: availableSlots.filter(s => s.available),
+        sampleSlot: availableSlots[0],
+        typeof: typeof availableSlots,
+        isArray: Array.isArray(availableSlots)
+      });
 
-      console.log(`🎯 [FETCH_TIME_SLOTS] Setting timeSlots state with ${availableSlots.length} slots`);
+      // 🚨 CRITICAL: Call setTimeSlots and log immediately after
+      console.log(`🎯 [FETCH_TIME_SLOTS] Calling setTimeSlots with ${availableSlots.length} slots...`);
       setTimeSlots(availableSlots);
+      
+      // 🚨 CRITICAL: Log immediately after setTimeSlots call
+      console.log(`✅ [FETCH_TIME_SLOTS] setTimeSlots called successfully with:`, {
+        inputArray: availableSlots,
+        inputLength: availableSlots.length,
+        availableInInput: availableSlots.filter(s => s.available).length
+      });
 
     } catch (error) {
       console.error('❌ [FETCH_TIME_SLOTS] Unexpected error:', error);
