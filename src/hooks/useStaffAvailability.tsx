@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { 
@@ -17,10 +17,17 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   const [unavailableDates, setUnavailableDates] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
 
+  // Memoize the unique staff IDs to prevent infinite loops
+  const uniqueStaffIds = useMemo(() => {
+    return [...new Set(selectedStaffIds)];
+  }, [selectedStaffIds]);
+
+  // Memoize the staff IDs as a string for stable dependency comparison
+  const staffIdsKey = useMemo(() => {
+    return uniqueStaffIds.sort().join(',');
+  }, [uniqueStaffIds]);
+
   const checkBatchAvailability = useCallback(async (): Promise<Set<string>> => {
-    // CRITICAL: Deduplicate staff IDs at the very start
-    const uniqueStaffIds = [...new Set(selectedStaffIds)];
-    
     if (uniqueStaffIds.length === 0) return new Set();
 
     console.log(`🔄 [BATCH_AVAILABILITY] Checking availability with DEDUPLICATION:`, {
@@ -46,7 +53,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       const { data: availabilityData, error } = await supabase
         .from('staff_availability')
         .select('staff_profile_id, date, time_slot, available')
-        .in('staff_profile_id', uniqueStaffIds) // Query for UNIQUE staff only
+        .in('staff_profile_id', uniqueStaffIds)
         .gte('date', startDateStr)
         .lte('date', endDateStr)
         .eq('available', true);
@@ -134,12 +141,9 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       console.error('❌ [BATCH_AVAILABILITY] Error in batch availability check:', error);
       return new Set();
     }
-  }, [selectedStaffIds, serviceDuration]);
+  }, [uniqueStaffIds, serviceDuration]);
 
   const updateUnavailableDates = useCallback(async () => {
-    // CRITICAL: Deduplicate staff IDs at the very start
-    const uniqueStaffIds = [...new Set(selectedStaffIds)];
-    
     if (uniqueStaffIds.length === 0) {
       setUnavailableDates(new Set());
       return;
@@ -149,11 +153,17 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     const unavailableDatesSet = await checkBatchAvailability();
     setUnavailableDates(unavailableDatesSet);
     setIsLoading(false);
-  }, [selectedStaffIds, checkBatchAvailability]);
+  }, [uniqueStaffIds, checkBatchAvailability]);
 
+  // Use the memoized staffIdsKey to prevent infinite loops
   useEffect(() => {
+    // Guard against empty staff IDs or zero service duration
+    if (staffIdsKey === '' || serviceDuration <= 0) {
+      return;
+    }
+    
     updateUnavailableDates();
-  }, [updateUnavailableDates]);
+  }, [staffIdsKey, serviceDuration, updateUnavailableDates]);
 
   const isDateDisabled = useCallback((date: Date) => {
     const today = new Date();
@@ -174,14 +184,11 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   }, [unavailableDates]);
 
   const checkDateAvailability = useCallback(async (date: Date): Promise<boolean> => {
-    // CRITICAL: Deduplicate staff IDs at the very start
-    const uniqueStaffIds = [...new Set(selectedStaffIds)];
-    
     if (uniqueStaffIds.length === 0) return true;
 
     const dateStr = format(date, 'yyyy-MM-dd');
     return !unavailableDates.has(dateStr);
-  }, [selectedStaffIds, unavailableDates]);
+  }, [uniqueStaffIds, unavailableDates]);
 
   return {
     isDateDisabled,

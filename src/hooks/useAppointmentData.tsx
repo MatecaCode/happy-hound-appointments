@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -165,19 +165,15 @@ export const useAppointmentData = () => {
     setIsLoading: (loading: boolean) => void,
     selectedService: Service | null
   ) => {
-    // CRITICAL: Deduplicate staff IDs at the very start
-    const uniqueStaffIds = [...new Set(staffIds)];
-    
-    if (!selectedService || !uniqueStaffIds || uniqueStaffIds.length === 0) {
-      console.log('🚨 [FETCH_TIME_SLOTS] Missing required parameters:', {
-        hasService: !!selectedService,
-        originalStaffIds: staffIds,
-        uniqueStaffIds,
-        uniqueStaffIdsLength: uniqueStaffIds?.length || 0
-      });
+    // Prevent unnecessary fetches
+    if (!selectedService || !date || !staffIds || staffIds.length === 0) {
+      console.log('🚨 [FETCH_TIME_SLOTS] Missing required parameters - skipping fetch');
       setTimeSlots([]);
       return;
     }
+
+    // CRITICAL: Deduplicate staff IDs at the very start
+    const uniqueStaffIds = [...new Set(staffIds)];
     
     console.log('🔍 [FETCH_TIME_SLOTS] Starting multi-staff fetch with DEDUPLICATION...', {
       originalStaffIds: staffIds,
@@ -205,7 +201,7 @@ export const useAppointmentData = () => {
       const { data: availabilityData, error } = await supabase
         .from('staff_availability')
         .select('staff_profile_id, time_slot, available')
-        .in('staff_profile_id', uniqueStaffIds) // Query for UNIQUE staff only
+        .in('staff_profile_id', uniqueStaffIds)
         .eq('date', dateForQuery);
 
       if (error) {
@@ -216,6 +212,7 @@ export const useAppointmentData = () => {
       }
 
       console.log(`📊 [FETCH_TIME_SLOTS] Raw availability data: ${availabilityData?.length || 0} records for ${uniqueStaffIds.length} UNIQUE staff`);
+      console.log('🔍 [FETCH_TIME_SLOTS] Backend slot data sample:', availabilityData?.slice(0, 5));
 
       if (!availabilityData || availabilityData.length === 0) {
         console.log('⚠️ [FETCH_TIME_SLOTS] NO AVAILABILITY DATA FOUND!');
@@ -308,10 +305,6 @@ export const useAppointmentData = () => {
       setIsLoading(false);
     }
   }, []);
-
-  useEffect(() => {
-    console.log('timeSlots state changed:', timeSlots);
-  }, [timeSlots]);
 
   return {
     timeSlots,

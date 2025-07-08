@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { useAppointmentData } from './useAppointmentData';
 import { supabase } from '@/integrations/supabase/client';
@@ -117,8 +118,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [user, fetchUserPets]);
 
-  // Helper function to get all selected staff IDs as an array (DEDUPLICATED)
-  const getSelectedStaffIds = useCallback((): string[] => {
+  // Helper function to get all selected staff IDs as an array (DEDUPLICATED and MEMOIZED)
+  const getSelectedStaffIds = useMemo((): string[] => {
     const staffIds: string[] = [];
     
     if (selectedStaff.batherId) staffIds.push(selectedStaff.batherId);
@@ -146,10 +147,28 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     return uniqueStaffIds;
   }, [selectedStaff, selectedGroomerId]);
 
-  // Updated useEffect for fetching time slots with multi-staff support
+  // Memoize the staff IDs as a string for stable dependency comparison
+  const staffIdsKey = useMemo(() => {
+    return getSelectedStaffIds.sort().join(',');
+  }, [getSelectedStaffIds]);
+
+  // Updated useEffect for fetching time slots with stable dependencies
   useEffect(() => {
-    if (date && selectedService && (formStep === 3 || (formStep === 2 && !serviceRequiresStaff))) {
-      const staffIds = getSelectedStaffIds();
+    // Guard against missing requirements
+    if (!date || !selectedService || staffIdsKey === '') {
+      console.log('🚨 [USE_EFFECT] Missing requirements for fetchTimeSlots:', {
+        hasDate: !!date,
+        hasService: !!selectedService,
+        staffIdsKey,
+        serviceRequiresStaff,
+        formStep
+      });
+      return;
+    }
+
+    // Only fetch if we're on the right step
+    if (formStep === 3 || (formStep === 2 && !serviceRequiresStaff)) {
+      const staffIds = getSelectedStaffIds;
       
       console.log('🔄 [USE_EFFECT] Triggering fetchTimeSlots with:', {
         date: date.toISOString().split('T')[0],
@@ -161,7 +180,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       
       fetchTimeSlots(date, staffIds, setIsLoading, selectedService);
     }
-  }, [date, selectedStaff, selectedGroomerId, selectedService, serviceRequiresStaff, fetchTimeSlots, formStep, getSelectedStaffIds]);
+  }, [date, staffIdsKey, selectedService, serviceRequiresStaff, fetchTimeSlots, formStep, getSelectedStaffIds]);
 
   const handleNextAvailableSelect = useCallback(() => {
     if (nextAvailable) {
@@ -183,7 +202,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
 
     // Get staff IDs - use parameter if provided, otherwise get from state (DEDUPLICATED)
-    const rawStaffIds = selectedStaffIds || getSelectedStaffIds();
+    const rawStaffIds = selectedStaffIds || getSelectedStaffIds;
     // CRITICAL: Deduplicate staff IDs at the very start of booking
     const uniqueStaffIds = [...new Set(rawStaffIds)];
     

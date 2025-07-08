@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -68,7 +69,8 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
   const canSubmit = date && selectedTimeSlotId && !isLoading;
 
   // CRITICAL: Deduplicate staff IDs at the very start for availability hook
-  const uniqueSelectedStaff = [...new Set(selectedStaff)];
+  const uniqueSelectedStaff = React.useMemo(() => [...new Set(selectedStaff)], [selectedStaff]);
+  
   const { isDateDisabled, isLoading: availabilityLoading } = useStaffAvailability({
     selectedStaffIds: uniqueSelectedStaff,
     serviceDuration: serviceDuration
@@ -76,22 +78,22 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 
   // Enhanced debugging for multi-staff support with deduplication
   React.useEffect(() => {
-    const uniqueStaffForDebug = [...new Set(selectedStaff)];
-    console.log('🎯 [UI_DEBUG] DateTimeForm received (multi-staff with DEDUPLICATION):', {
+    console.log('🎯 [UI_DEBUG] DateTimeForm timeSlots prop changed:', {
       totalSlots: timeSlots.length,
       availableSlots: timeSlots.filter(s => s.available).length,
+      slots: timeSlots.map(s => ({ id: s.id, time: s.time, available: s.available })),
       selectedDate: date,
       selectedTime: selectedTimeSlotId,
       originalSelectedStaff: selectedStaff,
-      uniqueSelectedStaff: uniqueStaffForDebug,
+      uniqueSelectedStaff,
       originalStaffCount: selectedStaff.length,
-      uniqueStaffCount: uniqueStaffForDebug.length,
-      deduplicationApplied: selectedStaff.length !== uniqueStaffForDebug.length,
+      uniqueStaffCount: uniqueSelectedStaff.length,
+      deduplicationApplied: selectedStaff.length !== uniqueSelectedStaff.length,
       isLoading
     });
     
-    console.log('🎯 [UI_DEBUG] FINAL staff IDs for UI display:', uniqueStaffForDebug);
-  }, [timeSlots, date, selectedTimeSlotId, isLoading, selectedStaff]);
+    console.log('🎯 [UI_DEBUG] FINAL staff IDs for UI display:', uniqueSelectedStaff);
+  }, [timeSlots, date, selectedTimeSlotId, isLoading, selectedStaff, uniqueSelectedStaff]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,7 +174,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             />
             {availabilityLoading && (
               <p className="text-sm text-muted-foreground mt-2 animate-pulse">
-                Carregando disponibilidade para {[...new Set(selectedStaff)].length} profissionais únicos...
+                Carregando disponibilidade para {uniqueSelectedStaff.length} profissionais únicos...
               </p>
             )}
           </div>
@@ -192,9 +194,9 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                     <div>Total slots: {timeSlots.length}</div>
                     <div>Available slots: {timeSlots.filter(s => s.available).length}</div>
                     <div>Original staff: {selectedStaff.length} selection(s)</div>
-                    <div>Unique staff: {[...new Set(selectedStaff)].length} professional(s)</div>
-                    <div>Deduplication applied: {selectedStaff.length !== [...new Set(selectedStaff)].length ? 'YES' : 'NO'}</div>
-                    <div>Unique Staff IDs: {[...new Set(selectedStaff)].join(', ')}</div>
+                    <div>Unique staff: {uniqueSelectedStaff.length} professional(s)</div>
+                    <div>Deduplication applied: {selectedStaff.length !== uniqueSelectedStaff.length ? 'YES' : 'NO'}</div>
+                    <div>Unique Staff IDs: {uniqueSelectedStaff.join(', ')}</div>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-2 mt-2">
@@ -205,8 +207,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                         variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
                         className="h-auto py-2 transition-all duration-200 hover:scale-105"
                         onClick={() => {
-                          const uniqueStaff = [...new Set(selectedStaff)];
-                          console.log('🎯 [UI_CLICK] Slot clicked (multi-staff DEDUPLICATED):', slot, 'for unique staff:', uniqueStaff);
+                          console.log('🎯 [UI_CLICK] Slot clicked (multi-staff DEDUPLICATED):', slot, 'for unique staff:', uniqueSelectedStaff);
                           setSelectedTimeSlotId(slot.id);
                         }}
                         disabled={!slot.available || isLoading}
@@ -226,9 +227,9 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                     <div>Debug: Loading = {isLoading.toString()}</div>
                     <div>Debug: Date = {date?.toISOString()}</div>
                     <div>Debug: Original staff count = {selectedStaff.length}</div>
-                    <div>Debug: Unique staff count = {[...new Set(selectedStaff)].length}</div>
+                    <div>Debug: Unique staff count = {uniqueSelectedStaff.length}</div>
                     <div>Debug: Original Staff IDs = {selectedStaff.join(', ')}</div>
-                    <div>Debug: Unique Staff IDs = {[...new Set(selectedStaff)].join(', ')}</div>
+                    <div>Debug: Unique Staff IDs = {uniqueSelectedStaff.join(', ')}</div>
                   </div>
                 </div>
               )}
