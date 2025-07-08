@@ -1,11 +1,9 @@
-
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { 
   generateClientTimeSlots, 
-  isClientSlotAvailable,
   formatTimeSlot,
   TIME_SLOT_CONFIG
 } from '@/utils/timeSlotHelpers';
@@ -165,26 +163,24 @@ export const useAppointmentData = () => {
     setIsLoading: (loading: boolean) => void,
     selectedService: Service | null
   ) => {
-    console.log('\n🔥 [REAL_AVAILABILITY_FIX] ===== STARTING AVAILABILITY FETCH =====');
-    console.log('🔥 [REAL_AVAILABILITY_FIX] Parameters:', {
+    console.log('\n🔥 ===== TIME SLOT PIPELINE START =====');
+    console.log('🔥 Input Parameters:', {
       date: date?.toISOString(),
       staffIds,
-      staffCount: staffIds?.length,
       selectedService: selectedService?.name,
       serviceDuration: selectedService?.default_duration || 60
     });
 
     // Prevent unnecessary fetches
     if (!selectedService || !date || !staffIds || staffIds.length === 0) {
-      console.log('🔥 [REAL_AVAILABILITY_FIX] Missing required parameters - CLEARING SLOTS');
+      console.log('🔥 Missing required parameters - CLEARING SLOTS');
       setTimeSlots([]);
       return;
     }
 
-    // CRITICAL: Deduplicate staff IDs at the very start
+    // CRITICAL: Deduplicate staff IDs
     const uniqueStaffIds = [...new Set(staffIds)];
-    
-    console.log('🔍 [REAL_AVAILABILITY_FIX] Using UNIQUE staff IDs:', uniqueStaffIds);
+    console.log('🔥 Unique Staff IDs:', uniqueStaffIds);
     
     const dateForQuery = format(date, 'yyyy-MM-dd');
     const serviceDuration = selectedService.default_duration || 60;
@@ -192,132 +188,126 @@ export const useAppointmentData = () => {
     setIsLoading(true);
 
     try {
-      // STEP A: Fetch the REAL availability from Supabase - INCLUDING FALSE VALUES
-      console.log('📋 [REAL_AVAILABILITY_FIX] STEP A: Fetching RAW availability from database...');
+      // STEP 1: Fetch RAW availability from Supabase - ALL records (TRUE and FALSE)
+      console.log('\n📋 STEP 1: Fetching RAW staff availability from database...');
       
-      const { data: availabilityData, error } = await supabase
+      const { data: rawAvailabilityData, error } = await supabase
         .from('staff_availability')
         .select('staff_profile_id, time_slot, available')
         .in('staff_profile_id', uniqueStaffIds)
         .eq('date', dateForQuery);
 
       if (error) {
-        console.error('❌ [REAL_AVAILABILITY_FIX] Error fetching staff availability:', error);
+        console.error('❌ Error fetching staff availability:', error);
         toast.error('Erro ao buscar horários disponíveis');
         setTimeSlots([]);
         return;
       }
 
-      console.log('📊 [REAL_AVAILABILITY_FIX] RAW DATABASE RESPONSE:');
-      console.log('   Total records:', availabilityData?.length || 0);
-      console.log('   Raw data:', availabilityData);
+      console.log('📊 RAW SUPABASE RESPONSE:');
+      console.log('   Total records:', rawAvailabilityData?.length || 0);
+      console.log('   Raw data:', rawAvailabilityData);
       
-      if (!availabilityData || availabilityData.length === 0) {
-        console.log('⚠️ [REAL_AVAILABILITY_FIX] NO AVAILABILITY DATA FOUND!');
+      if (!rawAvailabilityData || rawAvailabilityData.length === 0) {
+        console.log('⚠️ NO RAW AVAILABILITY DATA FOUND!');
         setTimeSlots([]);
         setIsLoading(false);
         return;
       }
 
-      // STEP B: Build the Combined Availability Map
-      console.log('📋 [REAL_AVAILABILITY_FIX] STEP B: Building combined availability map...');
+      // STEP 2: Build FULL MATRIX - every 10-min slot for every staff
+      console.log('\n📋 STEP 2: Building full availability matrix...');
       
-      // Group availability by time slot, then by staff
-      const availabilityByTimeSlot = new Map<string, Map<string, boolean>>();
-      
-      availabilityData.forEach(record => {
-        if (!availabilityByTimeSlot.has(record.time_slot)) {
-          availabilityByTimeSlot.set(record.time_slot, new Map());
+      // Generate all possible 10-minute slots for the day
+      const all10MinSlots: string[] = [];
+      for (let hour = 9; hour < 17; hour++) {
+        for (let minute = 0; minute < 60; minute += 10) {
+          const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
+          all10MinSlots.push(timeString);
         }
-        availabilityByTimeSlot.get(record.time_slot)!.set(record.staff_profile_id, record.available);
-      });
-
-      console.log('🗂️ [REAL_AVAILABILITY_FIX] Combined availability map by time slot:');
-      for (const [timeSlot, staffMap] of availabilityByTimeSlot.entries()) {
-        const staffAvailability = Object.fromEntries(staffMap);
-        console.log(`   ${timeSlot}:`, staffAvailability);
       }
 
-      // STEP C: Map to 30-Minute Slots for the UI
-      console.log('📋 [REAL_AVAILABILITY_FIX] STEP C: Generating 30-minute client slots...');
-      const clientSlots = generateClientTimeSlots();
-      console.log('   Generated client slots:', clientSlots);
+      // Build matrix: [time_slot][staff_id] = available value
+      const availabilityMatrix: Record<string, Record<string, boolean>> = {};
       
+      // Initialize matrix with all slots as unavailable (FALSE)
+      for (const slot of all10MinSlots) {
+        availabilityMatrix[slot] = {};
+        for (const staffId of uniqueStaffIds) {
+          availabilityMatrix[slot][staffId] = false; // Default to FALSE
+        }
+      }
+
+      // Fill matrix with actual data from database
+      rawAvailabilityData.forEach(record => {
+        if (availabilityMatrix[record.time_slot]) {
+          availabilityMatrix[record.time_slot][record.staff_profile_id] = record.available;
+        }
+      });
+
+      console.log('🗂️ FULL AVAILABILITY MATRIX:');
+      console.table(availabilityMatrix);
+
+      // STEP 3: Check each 30-minute slot for full duration availability
+      console.log('\n📋 STEP 3: Checking 30-minute slots for availability...');
+      
+      const clientSlots = generateClientTimeSlots();
       const availableSlots: TimeSlot[] = [];
 
       for (const clientSlot of clientSlots) {
-        console.log(`\n🔍 [REAL_AVAILABILITY_FIX] ===== CHECKING CLIENT SLOT: ${clientSlot} =====`);
+        console.log(`\n🔍 Checking 30-min slot: ${clientSlot}`);
         
         // Get all 10-minute slots needed for this service duration
         const requiredSlots = getRequiredBackendSlots(clientSlot, serviceDuration);
-        console.log(`📋 [REAL_AVAILABILITY_FIX] Required 10-min slots for ${clientSlot}:`, requiredSlots);
+        console.log(`📋 Required 10-min slots:`, requiredSlots);
         
+        let isSlotAvailable = true;
+        let blockingReason = '';
+
         // Check if ALL required slots are available for ALL selected staff
-        let allStaffAvailableForAllSlots = true;
-        const slotAnalysis: Record<string, Record<string, boolean | 'MISSING'>> = {};
-        
         for (const requiredSlot of requiredSlots) {
-          slotAnalysis[requiredSlot] = {};
-          
-          const staffAvailabilityForSlot = availabilityByTimeSlot.get(requiredSlot);
-          
           for (const staffId of uniqueStaffIds) {
-            const isStaffAvailable = staffAvailabilityForSlot?.get(staffId);
+            const staffAvailable = availabilityMatrix[requiredSlot]?.[staffId];
             
-            if (isStaffAvailable === undefined) {
-              // Slot is missing for this staff - treat as unavailable
-              slotAnalysis[requiredSlot][staffId] = 'MISSING';
-              allStaffAvailableForAllSlots = false;
-              console.log(`❌ [REAL_AVAILABILITY_FIX] Staff ${staffId} MISSING data for slot ${requiredSlot}`);
-            } else if (isStaffAvailable === false) {
-              // Slot is explicitly unavailable
-              slotAnalysis[requiredSlot][staffId] = false;
-              allStaffAvailableForAllSlots = false;
-              console.log(`❌ [REAL_AVAILABILITY_FIX] Staff ${staffId} UNAVAILABLE for slot ${requiredSlot}`);
-            } else {
-              // Slot is available
-              slotAnalysis[requiredSlot][staffId] = true;
-              console.log(`✅ [REAL_AVAILABILITY_FIX] Staff ${staffId} AVAILABLE for slot ${requiredSlot}`);
+            if (!staffAvailable) {
+              isSlotAvailable = false;
+              blockingReason = `Staff ${staffId} unavailable at ${requiredSlot}`;
+              console.log(`❌ BLOCKED: ${blockingReason}`);
+              break;
             }
           }
+          if (!isSlotAvailable) break;
         }
 
-        console.log(`📊 [REAL_AVAILABILITY_FIX] Complete slot analysis for ${clientSlot}:`, slotAnalysis);
-        console.log(`📊 [REAL_AVAILABILITY_FIX] All staff available for all required slots: ${allStaffAvailableForAllSlots}`);
+        if (isSlotAvailable) {
+          console.log(`✅ AVAILABLE: ${clientSlot}`);
+        } else {
+          console.log(`❌ UNAVAILABLE: ${clientSlot} - ${blockingReason}`);
+        }
 
-        const slotObject = {
+        availableSlots.push({
           id: clientSlot,
           time: formatTimeSlot(clientSlot),
-          available: allStaffAvailableForAllSlots
-        };
-
-        availableSlots.push(slotObject);
+          available: isSlotAvailable
+        });
       }
 
-      console.log(`\n📊 [REAL_AVAILABILITY_FIX] ===== FINAL SLOT AGGREGATION =====`);
-      console.log(`📊 [REAL_AVAILABILITY_FIX] Total client slots generated: ${availableSlots.length}`);
-      console.log(`📊 [REAL_AVAILABILITY_FIX] Available slots: ${availableSlots.filter(s => s.available).length}`);
-      console.log(`📊 [REAL_AVAILABILITY_FIX] Unavailable slots: ${availableSlots.filter(s => !s.available).length}`);
-      
-      const availableSlotTimes = availableSlots.filter(s => s.available).map(s => s.time);
-      console.log(`📊 [REAL_AVAILABILITY_FIX] Available times:`, availableSlotTimes);
-      
-      // STEP D: Log the final array being sent to UI
-      console.log(`🔥 [REAL_AVAILABILITY_FIX] STEP D: Final array BEFORE setTimeSlots:`, {
-        arrayLength: availableSlots.length,
-        availableCount: availableSlots.filter(s => s.available).length,
-        fullArray: availableSlots,
-        availableSlotsOnly: availableSlots.filter(s => s.available),
-        timestamp: new Date().toISOString()
-      });
+      console.log('\n📊 FINAL AVAILABLE SLOTS ARRAY:');
+      console.log('Available slots array:', availableSlots);
+      console.log('Total slots:', availableSlots.length);
+      console.log('Available count:', availableSlots.filter(s => s.available).length);
+      console.log('Unavailable count:', availableSlots.filter(s => !s.available).length);
 
-      // Set the time slots
+      // STEP 4: Set state - no modification, no filtering
+      console.log('\n📋 STEP 4: Setting timeSlots state...');
+      console.log('🔥 BEFORE setTimeSlots - availableSlots array:', availableSlots);
+      
       setTimeSlots(availableSlots);
       
-      console.log(`🔥 [REAL_AVAILABILITY_FIX] setTimeSlots called with ${availableSlots.length} slots`);
+      console.log('🔥 setTimeSlots called with array length:', availableSlots.length);
 
     } catch (error) {
-      console.error('❌ [REAL_AVAILABILITY_FIX] Unexpected error:', error);
+      console.error('❌ Pipeline error:', error);
       toast.error('Erro inesperado ao buscar horários');
       setTimeSlots([]);
     } finally {
@@ -325,22 +315,18 @@ export const useAppointmentData = () => {
     }
   }, []);
 
-  // Helper function to get required backend slots (copied from timeSlotHelpers but with logging)
+  // Helper function to get required backend slots
   const getRequiredBackendSlots = (startTime: string, durationMinutes: number): string[] => {
     const slots: string[] = [];
     const [startHour, startMinute] = startTime.split(':').map(Number);
     const startTotalMinutes = startHour * 60 + startMinute;
     
-    // Generate all 10-minute slots for the duration
     for (let offset = 0; offset < durationMinutes; offset += 10) {
       const slotTotalMinutes = startTotalMinutes + offset;
       const slotHour = Math.floor(slotTotalMinutes / 60);
       const slotMinute = slotTotalMinutes % 60;
       
-      // Stop if we go beyond business hours
-      if (slotHour >= 17) {
-        break;
-      }
+      if (slotHour >= 17) break;
       
       const timeString = `${slotHour.toString().padStart(2, '0')}:${slotMinute.toString().padStart(2, '0')}:00`;
       slots.push(timeString);
@@ -349,16 +335,12 @@ export const useAppointmentData = () => {
     return slots;
   };
 
-  // Log timeSlots state changes
+  // Monitor timeSlots state changes
   useEffect(() => {
-    console.log('\n🔥 [REAL_AVAILABILITY_FIX] ===== timeSlots STATE CHANGED =====');
-    console.log('🔥 [REAL_AVAILABILITY_FIX] New timeSlots state:', {
-      length: timeSlots.length,
-      availableCount: timeSlots.filter(s => s.available).length,
-      fullArray: timeSlots,
-      availableSlotsOnly: timeSlots.filter(s => s.available),
-      timestamp: new Date().toISOString()
-    });
+    console.log('\n🔥 ===== timeSlots STATE CHANGED =====');
+    console.log('🔥 New timeSlots state:', timeSlots);
+    console.log('🔥 State length:', timeSlots.length);
+    console.log('🔥 Available in state:', timeSlots.filter(s => s.available).length);
   }, [timeSlots]);
 
   return {
