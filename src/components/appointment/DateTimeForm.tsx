@@ -93,35 +93,12 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
       length: timeSlots?.length || 0,
       totalSlots: timeSlots?.length || 0,
       availableSlots: timeSlots?.filter(s => s.available)?.length || 0,
+      unavailableSlots: timeSlots?.filter(s => !s.available)?.length || 0,
       fullArray: timeSlots,
       availableSlotsOnly: timeSlots?.filter(s => s.available) || [],
-      sampleSlot: timeSlots?.[0],
+      unavailableSlotsOnly: timeSlots?.filter(s => !s.available) || [],
       allSlotStructure: timeSlots?.map(s => ({ id: s.id, time: s.time, available: s.available })) || [],
       timestamp: new Date().toISOString()
-    });
-    
-    console.log('🚨 [UI_DATETIME_FORM] Complete timeSlots prop structure:', timeSlots);
-    
-    if (timeSlots && timeSlots.length > 0) {
-      console.log('✅ [UI_DATETIME_FORM] timeSlots prop is NOT empty!');
-      const availableSlots = timeSlots.filter(s => s.available);
-      console.log('✅ [UI_DATETIME_FORM] Available slots in prop:', availableSlots);
-      
-      if (availableSlots.length === 0) {
-        console.log('⚠️ [UI_DATETIME_FORM] WARNING: timeSlots prop has data but NO available slots!');
-        console.log('⚠️ [UI_DATETIME_FORM] All slots marked as unavailable:', timeSlots.map(s => `${s.time}: ${s.available}`));
-      }
-    } else {
-      console.log('❌ [UI_DATETIME_FORM] timeSlots prop is empty or undefined!');
-    }
-    
-    console.log('🚨 [UI_DATETIME_FORM] Other debug info:', {
-      selectedDate: date,
-      selectedTime: selectedTimeSlotId,
-      originalSelectedStaff: selectedStaff,
-      uniqueSelectedStaff,
-      isLoading,
-      renderTimestamp: new Date().toISOString()
     });
   }, [timeSlots, date, selectedTimeSlotId, isLoading, selectedStaff, uniqueSelectedStaff]);
 
@@ -157,6 +134,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     console.log('🚨 [UI_RENDER] renderTimeSlots called with:', {
       timeSlotsLength: timeSlots?.length,
       availableCount: timeSlots?.filter(s => s.available)?.length,
+      unavailableCount: timeSlots?.filter(s => !s.available)?.length,
       firstSlot: timeSlots?.[0],
       timestamp: new Date().toISOString()
     });
@@ -173,14 +151,21 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
           key={slot.id}
           type="button"
           variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
-          className="h-auto py-2 transition-all duration-200 hover:scale-105"
+          className={`h-auto py-2 transition-all duration-200 hover:scale-105 ${
+            slot.available ? '' : 'opacity-50 cursor-not-allowed'
+          }`}
           onClick={() => {
-            console.log('🎯 [UI_CLICK] Slot clicked (multi-staff DEDUPLICATED):', slot, 'for unique staff:', uniqueSelectedStaff);
-            setSelectedTimeSlotId(slot.id);
+            if (slot.available) {
+              console.log('🎯 [UI_CLICK] Available slot clicked:', slot, 'for unique staff:', uniqueSelectedStaff);
+              setSelectedTimeSlotId(slot.id);
+            } else {
+              console.log('🎯 [UI_CLICK] Unavailable slot clicked (ignored):', slot);
+            }
           }}
           disabled={!slot.available || isLoading}
         >
           {slot.time}
+          {!slot.available && <span className="ml-1 text-xs">✕</span>}
         </Button>
       );
     });
@@ -248,8 +233,8 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               <Label>Horários disponíveis</Label>
               
               {/* 🔥 CRITICAL: Enhanced visual debug for complete data flow tracing */}
-              <div className="mb-4 p-4 bg-red-50 border-2 border-red-200 rounded text-xs">
-                <div className="font-bold mb-3 text-red-800">🔥 DATA FLOW DEBUG: Complete timeSlots Analysis</div>
+              <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded text-xs">
+                <div className="font-bold mb-3 text-blue-800">🔥 REAL AVAILABILITY DEBUG: Complete timeSlots Analysis</div>
                 
                 <div className="mb-3 space-y-1">
                   <div><span className="font-bold">Props received at render:</span> {new Date().toISOString()}</div>
@@ -257,6 +242,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                   <div><span className="font-bold">timeSlots isArray:</span> {Array.isArray(timeSlots).toString()}</div>
                   <div><span className="font-bold">timeSlots length:</span> {timeSlots?.length || 'undefined'}</div>
                   <div><span className="font-bold">Available count:</span> {timeSlots?.filter(s => s?.available)?.length || 0}</div>
+                  <div><span className="font-bold">Unavailable count:</span> {timeSlots?.filter(s => !s?.available)?.length || 0}</div>
                   <div><span className="font-bold">Raw timeSlots object:</span> {JSON.stringify(timeSlots)}</div>
                 </div>
 
@@ -264,12 +250,12 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                   <div className="max-h-40 overflow-y-auto">
                     <table className="w-full text-xs border">
                       <thead>
-                        <tr className="bg-red-100">
+                        <tr className="bg-blue-100">
                           <th className="p-1 border text-left">Index</th>
                           <th className="p-1 border text-left">ID</th>
                           <th className="p-1 border text-left">Time</th>
                           <th className="p-1 border text-left">Available</th>
-                          <th className="p-1 border text-left">Type</th>
+                          <th className="p-1 border text-left">Status</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -278,8 +264,8 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                             <td className="p-1 border">{index}</td>
                             <td className="p-1 border">{slot?.id || 'MISSING'}</td>
                             <td className="p-1 border">{slot?.time || 'MISSING'}</td>
-                            <td className="p-1 border">{slot?.available ? '✅ YES' : '❌ NO'}</td>
-                            <td className="p-1 border">{typeof slot}</td>
+                            <td className="p-1 border">{slot?.available ? '✅ TRUE' : '❌ FALSE'}</td>
+                            <td className="p-1 border">{slot?.available ? 'BOOKABLE' : 'BLOCKED'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -304,13 +290,14 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                   <div className="mb-4 p-3 bg-gray-100 rounded text-xs space-y-1">
                     <div><span className="font-bold">Total slots:</span> {timeSlots.length}</div>
                     <div><span className="font-bold">Available slots:</span> {timeSlots.filter(s => s.available).length}</div>
+                    <div><span className="font-bold">Unavailable slots:</span> {timeSlots.filter(s => !s.available).length}</div>
                     <div><span className="font-bold">Original staff:</span> {selectedStaff.length} selection(s)</div>
                     <div><span className="font-bold">Unique staff:</span> {uniqueSelectedStaff.length} professional(s)</div>
                     <div><span className="font-bold">Deduplication applied:</span> {selectedStaff.length !== uniqueSelectedStaff.length ? 'YES' : 'NO'}</div>
                     <div><span className="font-bold">Unique Staff IDs:</span> {uniqueSelectedStaff.join(', ')}</div>
                     <div><span className="font-bold">Service Duration:</span> {serviceDuration} minutes</div>
                     {timeSlots.length > 0 && timeSlots.filter(s => s.available).length === 0 && (
-                      <div className="text-red-600 font-bold">⚠️ All slots marked as unavailable!</div>
+                      <div className="text-red-600 font-bold">⚠️ All slots marked as unavailable - check database!</div>
                     )}
                   </div>
                   
