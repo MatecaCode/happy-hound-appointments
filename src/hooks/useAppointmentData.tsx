@@ -335,27 +335,15 @@ export const useAppointmentData = () => {
         timestamp: new Date().toISOString()
       });
 
-      // 🚨 CRITICAL: Add test slot to verify UI rendering
-      const testSlot = {
-        id: 'test-09:00:00',
-        time: '09:00',
-        available: true
-      };
-      const slotsWithTest = [...availableSlots, testSlot];
-      
-      console.log(`🧪 [FETCH_TIME_SLOTS] ADDING TEST SLOT - calling setTimeSlots with ${slotsWithTest.length} slots (including test)...`);
-      console.log(`🧪 [FETCH_TIME_SLOTS] Test slot added:`, testSlot);
-      console.log(`🧪 [FETCH_TIME_SLOTS] Full array with test:`, slotsWithTest);
-      
-      // Call setTimeSlots with the test slot included
-      setTimeSlots(slotsWithTest);
+      // 🚨 CRITICAL: Call setTimeSlots with the actual availableSlots array (NO TEST SLOT)
+      console.log(`✅ [FETCH_TIME_SLOTS] Calling setTimeSlots with ${availableSlots.length} slots...`);
+      setTimeSlots(availableSlots);
       
       // 🚨 CRITICAL: Log immediately after setTimeSlots call
       console.log(`✅ [FETCH_TIME_SLOTS] setTimeSlots called successfully with:`, {
-        inputArray: slotsWithTest,
-        inputLength: slotsWithTest.length,
-        availableInInput: slotsWithTest.filter(s => s.available).length,
-        testSlotIncluded: slotsWithTest.some(s => s.id === 'test-09:00:00'),
+        inputArray: availableSlots,
+        inputLength: availableSlots.length,
+        availableInInput: availableSlots.filter(s => s.available).length,
         timestamp: new Date().toISOString()
       });
 

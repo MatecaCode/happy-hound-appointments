@@ -107,14 +107,6 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
       const availableSlots = timeSlots.filter(s => s.available);
       console.log('✅ [UI_DATETIME_FORM] Available slots in prop:', availableSlots);
       
-      // Check for test slot
-      const testSlot = timeSlots.find(s => s.id === 'test-09:00:00');
-      if (testSlot) {
-        console.log('🧪 [UI_DATETIME_FORM] TEST SLOT FOUND IN PROPS:', testSlot);
-      } else {
-        console.log('🧪 [UI_DATETIME_FORM] TEST SLOT NOT FOUND IN PROPS');
-      }
-      
       if (availableSlots.length === 0) {
         console.log('⚠️ [UI_DATETIME_FORM] WARNING: timeSlots prop has data but NO available slots!');
         console.log('⚠️ [UI_DATETIME_FORM] All slots marked as unavailable:', timeSlots.map(s => `${s.time}: ${s.available}`));
@@ -296,7 +288,6 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                     <div><span className="font-bold">Deduplication applied:</span> {selectedStaff.length !== uniqueSelectedStaff.length ? 'YES' : 'NO'}</div>
                     <div><span className="font-bold">Unique Staff IDs:</span> {uniqueSelectedStaff.join(', ')}</div>
                     <div><span className="font-bold">Service Duration:</span> {serviceDuration} minutes</div>
-                    <div><span className="font-bold">Test slot present:</span> {timeSlots.some(s => s.id === 'test-09:00:00') ? 'YES' : 'NO'}</div>
                     {timeSlots.length > 0 && timeSlots.filter(s => s.available).length === 0 && (
                       <div className="text-red-600 font-bold">⚠️ All slots marked as unavailable!</div>
                     )}

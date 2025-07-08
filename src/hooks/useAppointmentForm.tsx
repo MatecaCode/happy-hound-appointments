@@ -89,6 +89,17 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     fetchTimeSlots,
   } = useAppointmentData();
 
+  // 🚨 CRITICAL: Log timeSlots received from useAppointmentData
+  useEffect(() => {
+    console.log('🚨 [APPOINTMENT_FORM] timeSlots received from useAppointmentData:', {
+      length: timeSlots.length,
+      availableCount: timeSlots.filter(s => s.available).length,
+      fullArray: timeSlots,
+      availableSlotsOnly: timeSlots.filter(s => s.available),
+      timestamp: new Date().toISOString()
+    });
+  }, [timeSlots]);
+
   // Get pricing for current pet/service combination
   const pricingParams = selectedPet && selectedService ? {
     serviceId: selectedService.id,
