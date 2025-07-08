@@ -64,14 +64,20 @@ export const useAppointmentData = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
 
-  // 🚨 CRITICAL: Add logging to trace state changes
+  // 🔥 CRITICAL: Monitor state changes with detailed logging
   useEffect(() => {
-    console.log('🔍 [STATE_TRACE] timeSlots state changed:', {
+    console.log('\n🔥 [STATE_MONITOR] ===== timeSlots State Changed =====');
+    console.log('🔥 [STATE_MONITOR] New timeSlots state:', {
       length: timeSlots.length,
-      timeSlots: timeSlots,
       availableCount: timeSlots.filter(s => s.available).length,
-      timestamp: new Date().toISOString()
+      firstSlot: timeSlots[0],
+      allSlots: timeSlots.map(s => ({ id: s.id, time: s.time, available: s.available })),
+      fullArray: timeSlots,
+      timestamp: new Date().toISOString(),
+      isArray: Array.isArray(timeSlots),
+      hasHardcodedSlot: timeSlots.some(s => s.id === 'hardcoded-09:00')
     });
+    console.log('🔥 [STATE_MONITOR] Complete state object:', timeSlots);
   }, [timeSlots]);
 
   const fetchServices = useCallback(async () => {
@@ -335,17 +341,28 @@ export const useAppointmentData = () => {
         timestamp: new Date().toISOString()
       });
 
-      // 🚨 CRITICAL: Call setTimeSlots with the actual availableSlots array (NO TEST SLOT)
-      console.log(`✅ [FETCH_TIME_SLOTS] Calling setTimeSlots with ${availableSlots.length} slots...`);
-      setTimeSlots(availableSlots);
-      
-      // 🚨 CRITICAL: Log immediately after setTimeSlots call
-      console.log(`✅ [FETCH_TIME_SLOTS] setTimeSlots called successfully with:`, {
-        inputArray: availableSlots,
-        inputLength: availableSlots.length,
-        availableInInput: availableSlots.filter(s => s.available).length,
+      // 🚨 CRITICAL: Log the EXACT array that will be passed to setTimeSlots
+      console.log(`🔥 [BEFORE_SET_STATE] EXACT array before setTimeSlots:`, {
+        availableSlots: availableSlots,
+        length: availableSlots.length,
+        availableCount: availableSlots.filter(s => s.available).length,
+        firstSlot: availableSlots[0],
+        allSlots: availableSlots.map(s => ({ id: s.id, time: s.time, available: s.available })),
         timestamp: new Date().toISOString()
       });
+      
+      // Call setTimeSlots with the actual availableSlots array
+      setTimeSlots(availableSlots);
+      
+      console.log(`🔥 [AFTER_SET_STATE] setTimeSlots called with ${availableSlots.length} slots`);
+      
+      // Add hardcoded slot to test UI rendering
+      const testSlots = [
+        { id: 'hardcoded-09:00', time: '09:00', available: true },
+        ...availableSlots
+      ];
+      console.log(`🧪 [TEST_HARDCODE] Adding hardcoded slot, total slots: ${testSlots.length}`);
+      setTimeSlots(testSlots);
 
     } catch (error) {
       console.error('❌ [FETCH_TIME_SLOTS] Unexpected error:', error);

@@ -247,29 +247,50 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             <div className="animate-fade-in">
               <Label>Horários disponíveis</Label>
               
-              {/* 🚨 CRITICAL: Visual debug table for timeSlots */}
-              <div className="mb-4 p-3 bg-blue-50 rounded text-xs">
-                <div className="font-bold mb-2">🚨 VISUAL DEBUG: timeSlots Prop Structure</div>
-                <div className="max-h-40 overflow-y-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-blue-100">
-                        <th className="p-1 text-left">ID</th>
-                        <th className="p-1 text-left">Time</th>
-                        <th className="p-1 text-left">Available</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {timeSlots?.map((slot, index) => (
-                        <tr key={index} className={slot.available ? 'bg-green-50' : 'bg-red-50'}>
-                          <td className="p-1">{slot.id}</td>
-                          <td className="p-1">{slot.time}</td>
-                          <td className="p-1">{slot.available ? '✅ YES' : '❌ NO'}</td>
-                        </tr>
-                      )) || []}
-                    </tbody>
-                  </table>
+              {/* 🔥 CRITICAL: Enhanced visual debug for complete data flow tracing */}
+              <div className="mb-4 p-4 bg-red-50 border-2 border-red-200 rounded text-xs">
+                <div className="font-bold mb-3 text-red-800">🔥 DATA FLOW DEBUG: Complete timeSlots Analysis</div>
+                
+                <div className="mb-3 space-y-1">
+                  <div><span className="font-bold">Props received at render:</span> {new Date().toISOString()}</div>
+                  <div><span className="font-bold">timeSlots type:</span> {typeof timeSlots}</div>
+                  <div><span className="font-bold">timeSlots isArray:</span> {Array.isArray(timeSlots).toString()}</div>
+                  <div><span className="font-bold">timeSlots length:</span> {timeSlots?.length || 'undefined'}</div>
+                  <div><span className="font-bold">Available count:</span> {timeSlots?.filter(s => s?.available)?.length || 0}</div>
+                  <div><span className="font-bold">Raw timeSlots object:</span> {JSON.stringify(timeSlots)}</div>
                 </div>
+
+                {timeSlots && timeSlots.length > 0 ? (
+                  <div className="max-h-40 overflow-y-auto">
+                    <table className="w-full text-xs border">
+                      <thead>
+                        <tr className="bg-red-100">
+                          <th className="p-1 border text-left">Index</th>
+                          <th className="p-1 border text-left">ID</th>
+                          <th className="p-1 border text-left">Time</th>
+                          <th className="p-1 border text-left">Available</th>
+                          <th className="p-1 border text-left">Type</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {timeSlots.map((slot, index) => (
+                          <tr key={index} className={slot?.available ? 'bg-green-50' : 'bg-red-50'}>
+                            <td className="p-1 border">{index}</td>
+                            <td className="p-1 border">{slot?.id || 'MISSING'}</td>
+                            <td className="p-1 border">{slot?.time || 'MISSING'}</td>
+                            <td className="p-1 border">{slot?.available ? '✅ YES' : '❌ NO'}</td>
+                            <td className="p-1 border">{typeof slot}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-red-200 border border-red-400 rounded">
+                    <div className="font-bold text-red-800">❌ NO SLOTS RECEIVED IN PROPS</div>
+                    <div>timeSlots is: {timeSlots === null ? 'null' : timeSlots === undefined ? 'undefined' : 'empty array'}</div>
+                  </div>
+                )}
               </div>
               
               {isLoading ? (
