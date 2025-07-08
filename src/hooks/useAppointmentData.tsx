@@ -174,26 +174,34 @@ export const useAppointmentData = () => {
       return;
     }
 
-    console.log('🔍 [FETCH_TIME_SLOTS] Starting multi-staff fetch...');
+    // CRITICAL: Deduplicate staff IDs to prevent double-checking same staff
+    const uniqueStaffIds = [...new Set(staffIds)];
+    
+    console.log('🔍 [FETCH_TIME_SLOTS] Starting multi-staff fetch with DEDUPLICATION...', {
+      originalStaffIds: staffIds,
+      uniqueStaffIds,
+      deduplicationApplied: staffIds.length !== uniqueStaffIds.length
+    });
     
     const dateForQuery = format(date, 'yyyy-MM-dd');
     const serviceDuration = selectedService.default_duration || 60;
     
     console.log('📋 [FETCH_TIME_SLOTS] Parameters:', {
       date: dateForQuery,
-      staffIds,
-      staffCount: staffIds.length,
+      originalStaffIds: staffIds,
+      uniqueStaffIds,
+      uniqueStaffCount: uniqueStaffIds.length,
       serviceDuration
     });
 
     setIsLoading(true);
 
     try {
-      // Fetch 10-minute availability for ALL selected staff on this date
+      // Fetch 10-minute availability for ALL UNIQUE selected staff on this date
       const { data: availabilityData, error } = await supabase
         .from('staff_availability')
         .select('staff_profile_id, time_slot, available')
-        .in('staff_profile_id', staffIds) // Query for all selected staff
+        .in('staff_profile_id', uniqueStaffIds) // Query for UNIQUE staff only
         .eq('date', dateForQuery);
 
       if (error) {
@@ -203,7 +211,7 @@ export const useAppointmentData = () => {
         return;
       }
 
-      console.log(`📊 [FETCH_TIME_SLOTS] Raw availability data: ${availabilityData?.length || 0} records for ${staffIds.length} staff`);
+      console.log(`📊 [FETCH_TIME_SLOTS] Raw availability data: ${availabilityData?.length || 0} records for ${uniqueStaffIds.length} UNIQUE staff`);
 
       if (!availabilityData || availabilityData.length === 0) {
         console.log('⚠️ [FETCH_TIME_SLOTS] NO AVAILABILITY DATA FOUND!');
@@ -225,10 +233,10 @@ export const useAppointmentData = () => {
         });
       });
 
-      console.log('🗂️ [FETCH_TIME_SLOTS] Availability grouped by staff:', {
-        totalStaff: availabilityByStaff.size,
-        expectedStaff: staffIds.length,
-        staffWithData: Array.from(availabilityByStaff.keys())
+      console.log('🗂️ [FETCH_TIME_SLOTS] Availability grouped by UNIQUE staff:', {
+        totalUniqueStaff: availabilityByStaff.size,
+        expectedUniqueStaff: uniqueStaffIds.length,
+        uniqueStaffWithData: Array.from(availabilityByStaff.keys())
       });
 
       // Generate 30-minute client slots and check multi-staff availability
@@ -240,11 +248,11 @@ export const useAppointmentData = () => {
       for (const clientSlot of clientSlots) {
         console.log(`🔍 [FETCH_TIME_SLOTS] Checking availability for slot: ${clientSlot}`);
         
-        // Check if ALL selected staff are available for this client slot
-        let allStaffAvailable = true;
+        // Check if ALL UNIQUE selected staff are available for this client slot
+        let allUniqueStaffAvailable = true;
         const staffAvailabilityResults: Record<string, boolean> = {};
         
-        for (const staffId of staffIds) {
+        for (const staffId of uniqueStaffIds) {
           const staffAvailability = availabilityByStaff.get(staffId) || [];
           const isStaffAvailable = isClientSlotAvailable(
             clientSlot, 
@@ -255,31 +263,31 @@ export const useAppointmentData = () => {
           staffAvailabilityResults[staffId] = isStaffAvailable;
           
           if (!isStaffAvailable) {
-            allStaffAvailable = false;
+            allUniqueStaffAvailable = false;
           }
         }
 
-        console.log(`📊 [FETCH_TIME_SLOTS] Slot ${clientSlot} staff availability:`, {
-          allStaffAvailable,
-          staffResults: staffAvailabilityResults
+        console.log(`📊 [FETCH_TIME_SLOTS] Slot ${clientSlot} UNIQUE staff availability:`, {
+          allUniqueStaffAvailable,
+          uniqueStaffResults: staffAvailabilityResults
         });
 
         const slotObject = {
           id: clientSlot,
           time: formatTimeSlot(clientSlot),
-          available: allStaffAvailable
+          available: allUniqueStaffAvailable
         };
 
         availableSlots.push(slotObject);
         
-        if (allStaffAvailable) {
-          console.log(`✅ [FETCH_TIME_SLOTS] Available slot: ${clientSlot} (all ${staffIds.length} staff available)`);
+        if (allUniqueStaffAvailable) {
+          console.log(`✅ [FETCH_TIME_SLOTS] Available slot: ${clientSlot} (all ${uniqueStaffIds.length} UNIQUE staff available)`);
         } else {
-          console.log(`❌ [FETCH_TIME_SLOTS] Unavailable slot: ${clientSlot} (some staff unavailable)`);
+          console.log(`❌ [FETCH_TIME_SLOTS] Unavailable slot: ${clientSlot} (some UNIQUE staff unavailable)`);
         }
       }
 
-      console.log(`📊 [FETCH_TIME_SLOTS] Final Results for ${staffIds.length} staff:`);
+      console.log(`📊 [FETCH_TIME_SLOTS] Final Results for ${uniqueStaffIds.length} UNIQUE staff:`);
       console.log(`   Total slots generated: ${availableSlots.length}`);
       console.log(`   Available slots: ${availableSlots.filter(s => s.available).length}`);
       

@@ -117,7 +117,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     }
   }, [user, fetchUserPets]);
 
-  // Helper function to get all selected staff IDs as an array
+  // Helper function to get all selected staff IDs as an array (DEDUPLICATED)
   const getSelectedStaffIds = useCallback((): string[] => {
     const staffIds: string[] = [];
     
@@ -130,13 +130,18 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       staffIds.push(selectedGroomerId);
     }
     
-    console.log('🎯 [GET_SELECTED_STAFF_IDS] Current selected staff:', {
+    // CRITICAL: Deduplicate staff IDs to prevent double-checking same staff
+    const uniqueStaffIds = [...new Set(staffIds)];
+    
+    console.log('🎯 [GET_SELECTED_STAFF_IDS] Staff selection analysis:', {
       selectedStaff,
       selectedGroomerId,
-      resultingStaffIds: staffIds
+      rawStaffIds: staffIds,
+      uniqueStaffIds: uniqueStaffIds,
+      deduplicationApplied: staffIds.length !== uniqueStaffIds.length
     });
     
-    return staffIds;
+    return uniqueStaffIds;
   }, [selectedStaff, selectedGroomerId]);
 
   // Updated useEffect for fetching time slots with multi-staff support
@@ -175,17 +180,17 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       return;
     }
 
-    // Get staff IDs - use parameter if provided, otherwise get from state
+    // Get staff IDs - use parameter if provided, otherwise get from state (DEDUPLICATED)
     const staffIds = selectedStaffIds || getSelectedStaffIds();
     
-    console.log('📋 [BOOKING_SUBMIT] Multi-staff booking details:', {
+    console.log('📋 [BOOKING_SUBMIT] Multi-staff booking details (DEDUPLICATED):', {
       user: user.id,
       pet: selectedPet.name,
       service: selectedService.name,
       date: date.toISOString().split('T')[0],
       time: selectedTimeSlotId,
       staffIds,
-      staffCount: staffIds.length,
+      uniqueStaffCount: staffIds.length,
       serviceDuration: pricing?.duration || selectedService.default_duration || 60
     });
 
@@ -253,9 +258,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
 
         console.log('✅ [BOOKING_SUBMIT] Appointment created:', appointment.id);
 
-        // Link ALL selected staff members
+        // Link ALL UNIQUE selected staff members
         if (staffIds.length > 0) {
-          console.log('🔗 [BOOKING_SUBMIT] Linking multiple staff members:', staffIds);
+          console.log('🔗 [BOOKING_SUBMIT] Linking UNIQUE staff members:', staffIds);
           
           for (const staffId of staffIds) {
             const { error: staffLinkError } = await supabase
@@ -273,14 +278,14 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
             }
           }
 
-          // Update staff availability for ALL selected staff using 10-minute granular logic
-          console.log('🔒 [BOOKING_SUBMIT] Updating staff availability for all selected staff...');
+          // Update staff availability for ALL UNIQUE selected staff using 10-minute granular logic
+          console.log('🔒 [BOOKING_SUBMIT] Updating staff availability for UNIQUE staff members...');
 
           for (const staffId of staffIds) {
             // Get all 10-minute slots that need to be marked unavailable
             const requiredSlots = getRequiredBackendSlots(selectedTimeSlotId, serviceDuration);
             
-            console.log(`🔒 [BOOKING_SUBMIT] Marking ${requiredSlots.length} 10-min slots unavailable for staff ${staffId}:`, requiredSlots);
+            console.log(`🔒 [BOOKING_SUBMIT] Marking ${requiredSlots.length} 10-min slots unavailable for UNIQUE staff ${staffId}:`, requiredSlots);
 
             for (const timeSlot of requiredSlots) {
               const { error: availabilityError } = await supabase
@@ -297,7 +302,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
                   error: availabilityError
                 });
               } else {
-                console.log(`✅ [BOOKING_SUBMIT] Marked 10-min slot ${timeSlot} unavailable for staff ${staffId}`);
+                console.log(`✅ [BOOKING_SUBMIT] Marked 10-min slot ${timeSlot} unavailable for UNIQUE staff ${staffId}`);
               }
             }
           }
@@ -319,7 +324,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         }
       });
 
-      console.log('🎉 [BOOKING_SUBMIT] Multi-staff booking completed successfully!');
+      console.log('🎉 [BOOKING_SUBMIT] Multi-staff booking completed successfully with UNIQUE staff!');
       
       // Reset form
       setSelectedPet(null);

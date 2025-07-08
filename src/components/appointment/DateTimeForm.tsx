@@ -67,21 +67,26 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 }) => {
   const canSubmit = date && selectedTimeSlotId && !isLoading;
 
-  // Use staff availability hook to get proper date filtering with multi-staff support
+  // Use staff availability hook to get proper date filtering with multi-staff support (DEDUPLICATED)
+  const uniqueSelectedStaff = [...new Set(selectedStaff)];
   const { isDateDisabled, isLoading: availabilityLoading } = useStaffAvailability({
-    selectedStaffIds: selectedStaff,
+    selectedStaffIds: uniqueSelectedStaff,
     serviceDuration: serviceDuration
   });
 
-  // Enhanced debugging for multi-staff support
+  // Enhanced debugging for multi-staff support with deduplication
   React.useEffect(() => {
-    console.log('🎯 [UI_DEBUG] DateTimeForm received (multi-staff):', {
+    const uniqueStaffForDebug = [...new Set(selectedStaff)];
+    console.log('🎯 [UI_DEBUG] DateTimeForm received (multi-staff with DEDUPLICATION):', {
       totalSlots: timeSlots.length,
       availableSlots: timeSlots.filter(s => s.available).length,
       selectedDate: date,
       selectedTime: selectedTimeSlotId,
-      selectedStaff,
-      staffCount: selectedStaff.length,
+      originalSelectedStaff: selectedStaff,
+      uniqueSelectedStaff: uniqueStaffForDebug,
+      originalStaffCount: selectedStaff.length,
+      uniqueStaffCount: uniqueStaffForDebug.length,
+      deduplicationApplied: selectedStaff.length !== uniqueStaffForDebug.length,
       isLoading
     });
   }, [timeSlots, date, selectedTimeSlotId, isLoading, selectedStaff]);
@@ -180,12 +185,14 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                 </div>
               ) : timeSlots.length > 0 ? (
                 <div>
-                  {/* Enhanced UI debugging info for multi-staff */}
+                  {/* Enhanced UI debugging info for multi-staff with deduplication */}
                   <div className="mb-4 p-2 bg-gray-100 rounded text-xs">
                     <div>Total slots: {timeSlots.length}</div>
                     <div>Available slots: {timeSlots.filter(s => s.available).length}</div>
-                    <div>Selected staff: {selectedStaff.length} professional(s)</div>
-                    <div>Staff IDs: {selectedStaff.join(', ')}</div>
+                    <div>Original staff: {selectedStaff.length} selection(s)</div>
+                    <div>Unique staff: {[...new Set(selectedStaff)].length} professional(s)</div>
+                    <div>Deduplication applied: {selectedStaff.length !== [...new Set(selectedStaff)].length ? 'YES' : 'NO'}</div>
+                    <div>Unique Staff IDs: {[...new Set(selectedStaff)].join(', ')}</div>
                   </div>
                   
                   <div className="grid grid-cols-3 gap-2 mt-2">
@@ -196,7 +203,8 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                         variant={selectedTimeSlotId === slot.id ? "default" : "outline"}
                         className="h-auto py-2 transition-all duration-200 hover:scale-105"
                         onClick={() => {
-                          console.log('🎯 [UI_CLICK] Slot clicked (multi-staff):', slot, 'for staff:', selectedStaff);
+                          const uniqueStaff = [...new Set(selectedStaff)];
+                          console.log('🎯 [UI_CLICK] Slot clicked (multi-staff DEDUPLICATED):', slot, 'for unique staff:', uniqueStaff);
                           setSelectedTimeSlotId(slot.id);
                         }}
                         disabled={!slot.available || isLoading}
@@ -215,8 +223,10 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
                     <div>Debug: Total slots = {timeSlots.length}</div>
                     <div>Debug: Loading = {isLoading.toString()}</div>
                     <div>Debug: Date = {date?.toISOString()}</div>
-                    <div>Debug: Staff count = {selectedStaff.length}</div>
-                    <div>Debug: Staff IDs = {selectedStaff.join(', ')}</div>
+                    <div>Debug: Original staff count = {selectedStaff.length}</div>
+                    <div>Debug: Unique staff count = {[...new Set(selectedStaff)].length}</div>
+                    <div>Debug: Original Staff IDs = {selectedStaff.join(', ')}</div>
+                    <div>Debug: Unique Staff IDs = {[...new Set(selectedStaff)].join(', ')}</div>
                   </div>
                 </div>
               )}
