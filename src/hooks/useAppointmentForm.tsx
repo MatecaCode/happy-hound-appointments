@@ -163,65 +163,46 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     return getSelectedStaffIds.sort().join(',');
   }, [getSelectedStaffIds]);
 
-  // 🚨 CRITICAL: Log when fetchTimeSlots is about to be triggered
+  // Only fetch time slots when we have ALL required data
   useEffect(() => {
     console.log('\n🚨 [APPOINTMENT_FORM] ===== FETCH TRIGGER EVALUATION =====');
-    console.log('🚨 [APPOINTMENT_FORM] useEffect evaluation:', {
+    console.log('🚨 [APPOINTMENT_FORM] Checking requirements:', {
       hasDate: !!date,
-      dateValue: date?.toISOString(),
       hasSelectedService: !!selectedService,
       serviceName: selectedService?.name,
-      staffIdsKey,
       staffIds: getSelectedStaffIds,
       serviceRequiresStaff,
-      serviceRequirementsLoaded,
       formStep,
-      timestamp: new Date().toISOString()
+      isStep3: formStep === 3
     });
 
-    // Guard against missing requirements
-    if (!date || !selectedService) {
-      console.log('🚨 [APPOINTMENT_FORM] Missing requirements for fetchTimeSlots:', {
-        hasDate: !!date,
-        hasService: !!selectedService,
-        staffIdsKey,
-        serviceRequiresStaff,
-        formStep
-      });
+    // CRITICAL: Only fetch on step 3 (date/time selection) and when we have ALL required data
+    if (formStep !== 3) {
+      console.log('🚨 [APPOINTMENT_FORM] Not on step 3 - skipping fetchTimeSlots');
       return;
     }
 
-    // Only fetch if we're on the right step
-    if (formStep === 3 || (formStep === 2 && !serviceRequiresStaff)) {
-      const staffIds = getSelectedStaffIds;
-      
-      // CRITICAL: If service requires staff but no staff selected, pass empty array
-      if (serviceRequiresStaff && staffIds.length === 0) {
-        console.log('🚨 [APPOINTMENT_FORM] Service requires staff but none selected - will trigger fetchTimeSlots with empty array');
-        fetchTimeSlots(date, [], setIsLoading, selectedService);
-        return;
-      }
-      
-      // For services that don't require staff, use a dummy staff ID or handle differently
-      const effectiveStaffIds = serviceRequiresStaff ? staffIds : ['dummy-staff-id'];
-      
-      console.log('🔄 [APPOINTMENT_FORM] TRIGGERING fetchTimeSlots with:', {
-        date: date.toISOString().split('T')[0],
-        staffIds: effectiveStaffIds,
-        staffCount: effectiveStaffIds.length,
-        serviceRequiresStaff,
-        formStep,
-        timestamp: new Date().toISOString()
-      });
-      
-      fetchTimeSlots(date, effectiveStaffIds, setIsLoading, selectedService);
-    } else {
-      console.log('🚨 [APPOINTMENT_FORM] NOT triggering fetchTimeSlots - wrong step:', {
-        formStep,
-        serviceRequiresStaff,
-        shouldTrigger: formStep === 3 || (formStep === 2 && !serviceRequiresStaff)
-      });
+    if (!date || !selectedService) {
+      console.log('🚨 [APPOINTMENT_FORM] Missing date or service - clearing slots');
+      return;
     }
+
+    // If service requires staff, make sure staff is selected
+    if (serviceRequiresStaff && getSelectedStaffIds.length === 0) {
+      console.log('🚨 [APPOINTMENT_FORM] Service requires staff but none selected - clearing slots');
+      return;
+    }
+
+    // Now we have all required data - fetch time slots
+    const staffIds = serviceRequiresStaff ? getSelectedStaffIds : [];
+    
+    console.log('✅ [APPOINTMENT_FORM] All requirements met - TRIGGERING fetchTimeSlots:', {
+      date: date.toISOString().split('T')[0],
+      staffIds,
+      service: selectedService.name
+    });
+    
+    fetchTimeSlots(date, staffIds, setIsLoading, selectedService);
   }, [date, staffIdsKey, selectedService, serviceRequiresStaff, fetchTimeSlots, formStep, getSelectedStaffIds]);
 
   const handleNextAvailableSelect = useCallback(() => {
