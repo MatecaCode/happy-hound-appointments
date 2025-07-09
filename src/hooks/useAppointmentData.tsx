@@ -285,35 +285,111 @@ export const useAppointmentData = () => {
       for (const clientSlot of clientSlots) {
         console.log(`\n🔍 Checking 30-min slot: ${clientSlot}`);
         
-        // Get all 10-minute slots needed for this service duration
-        const requiredSlots = getRequiredBackendSlots(clientSlot, serviceDuration);
-        console.log(`📋 Required 10-min slots:`, requiredSlots);
-        
         let isSlotAvailable = true;
         let blockingReason = '';
 
-        // Check if ALL required slots are available for ALL selected staff
-        for (const requiredSlot of requiredSlots) {
-          // Check if this required slot exists in our matrix
-          if (!availabilityMatrix[requiredSlot]) {
+        // SEQUENTIAL AVAILABILITY LOGIC - Different staff work at different times
+        
+        // Get service requirements to determine staff roles
+        const serviceRequiresBath = selectedService.requires_bath;
+        const serviceRequiresGrooming = selectedService.requires_grooming;
+        const serviceRequiresVet = selectedService.requires_vet;
+        
+        // Define service segments based on staff roles
+        const serviceSegments = [];
+        let currentOffset = 0;
+        
+        if (serviceRequiresBath) {
+          serviceSegments.push({
+            role: 'bath',
+            startOffset: currentOffset,
+            duration: 60, // Bath takes 60 minutes
+            staffIds: uniqueStaffIds.filter(id => {
+              // This is a simplified check - in reality you'd check staff capabilities from DB
+              return true; // For now, assume any selected staff can do bath
+            })
+          });
+          currentOffset += 60;
+        }
+        
+        if (serviceRequiresGrooming) {
+          serviceSegments.push({
+            role: 'grooming', 
+            startOffset: currentOffset,
+            duration: 60, // Grooming takes 60 minutes
+            staffIds: uniqueStaffIds.filter(id => {
+              // This is a simplified check - in reality you'd check staff capabilities from DB
+              return true; // For now, assume any selected staff can do grooming
+            })
+          });
+          currentOffset += 60;
+        }
+        
+        if (serviceRequiresVet) {
+          serviceSegments.push({
+            role: 'vet',
+            startOffset: currentOffset, 
+            duration: serviceDuration, // Vet takes full service duration
+            staffIds: uniqueStaffIds.filter(id => {
+              // This is a simplified check - in reality you'd check staff capabilities from DB
+              return true; // For now, assume any selected staff can do vet
+            })
+          });
+        }
+        
+        // If no specific roles, treat as single segment with all staff
+        if (serviceSegments.length === 0) {
+          serviceSegments.push({
+            role: 'general',
+            startOffset: 0,
+            duration: serviceDuration,
+            staffIds: uniqueStaffIds
+          });
+        }
+
+        console.log(`📋 Service segments for ${clientSlot}:`, serviceSegments);
+
+        // Check availability for each segment
+        for (const segment of serviceSegments) {
+          console.log(`🔍 Checking segment: ${segment.role} (${segment.startOffset}-${segment.startOffset + segment.duration}min)`);
+          
+          // Calculate required slots for this segment
+          const segmentStartTime = clientSlot.split(':').map(Number);
+          const segmentStartMinutes = segmentStartTime[0] * 60 + segmentStartTime[1] + segment.startOffset;
+          const segmentStartHour = Math.floor(segmentStartMinutes / 60);
+          const segmentStartMin = segmentStartMinutes % 60;
+          const segmentStartSlot = `${segmentStartHour.toString().padStart(2, '0')}:${segmentStartMin.toString().padStart(2, '0')}:00`;
+          
+          const segmentRequiredSlots = getRequiredBackendSlots(segmentStartSlot, segment.duration);
+          console.log(`📋 Segment ${segment.role} required slots:`, segmentRequiredSlots);
+          
+          // Check if at least ONE staff member from this segment is available for ALL required slots
+          let segmentHasAvailableStaff = false;
+          
+          for (const staffId of segment.staffIds) {
+            let staffAvailableForSegment = true;
+            
+            for (const requiredSlot of segmentRequiredSlots) {
+              if (!availabilityMatrix[requiredSlot] || availabilityMatrix[requiredSlot][staffId] !== true) {
+                staffAvailableForSegment = false;
+                console.log(`❌ Staff ${staffId} unavailable at ${requiredSlot} for ${segment.role}`);
+                break;
+              }
+            }
+            
+            if (staffAvailableForSegment) {
+              segmentHasAvailableStaff = true;
+              console.log(`✅ Staff ${staffId} available for entire ${segment.role} segment`);
+              break; // Found available staff for this segment
+            }
+          }
+          
+          if (!segmentHasAvailableStaff) {
             isSlotAvailable = false;
-            blockingReason = `Required slot ${requiredSlot} not found in matrix`;
+            blockingReason = `No staff available for ${segment.role} segment`;
             console.log(`❌ BLOCKED: ${blockingReason}`);
             break;
           }
-          
-          for (const staffId of uniqueStaffIds) {
-            const staffAvailable = availabilityMatrix[requiredSlot][staffId];
-            console.log(`🔍 Checking staff ${staffId} at ${requiredSlot}: ${staffAvailable}`);
-            
-            if (staffAvailable !== true) {
-              isSlotAvailable = false;
-              blockingReason = `Staff ${staffId} unavailable at ${requiredSlot} (value: ${staffAvailable})`;
-              console.log(`❌ BLOCKED: ${blockingReason}`);
-              break;
-            }
-          }
-          if (!isSlotAvailable) break;
         }
 
         console.log(`🔍 Final availability for ${clientSlot}: ${isSlotAvailable}`);
