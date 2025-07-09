@@ -163,7 +163,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     return getSelectedStaffIds.sort().join(',');
   }, [getSelectedStaffIds]);
 
-  // Only fetch time slots when we have ALL required data
+  // Only fetch time slots when we have ALL required data - FIXED DEPENDENCIES
   useEffect(() => {
     console.log('\n🚨 [APPOINTMENT_FORM] ===== FETCH TRIGGER EVALUATION =====');
     console.log('🚨 [APPOINTMENT_FORM] Checking requirements:', {
@@ -203,7 +203,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     });
     
     fetchTimeSlots(date, staffIds, setIsLoading, selectedService);
-  }, [date, staffIdsKey, selectedService, serviceRequiresStaff, fetchTimeSlots, formStep, getSelectedStaffIds]);
+  }, [date, staffIdsKey, selectedService, serviceRequiresStaff, fetchTimeSlots, formStep]); // REMOVED getSelectedStaffIds to prevent race conditions
 
   const handleNextAvailableSelect = useCallback(() => {
     if (nextAvailable) {
