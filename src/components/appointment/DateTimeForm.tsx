@@ -84,7 +84,10 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     console.log('🔥 timeSlots.length:', timeSlots?.length || 0);
     console.log('🔥 Available slots in prop:', timeSlots?.filter(s => s.available)?.length || 0);
     console.log('🔥 Full timeSlots array:', JSON.stringify(timeSlots, null, 2));
-  }, [timeSlots]);
+    console.log('🔥 selectedStaff:', selectedStaff);
+    console.log('🔥 serviceDuration:', serviceDuration);
+    console.log('🔥 date:', date?.toISOString());
+  }, [timeSlots, selectedStaff, serviceDuration, date]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

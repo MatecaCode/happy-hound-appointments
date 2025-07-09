@@ -172,10 +172,32 @@ export const useAppointmentData = () => {
     });
 
     // Prevent unnecessary fetches
-    if (!selectedService || !date || !staffIds || staffIds.length === 0) {
+    if (!selectedService || !date) {
       console.log('🔥 Missing required parameters - CLEARING SLOTS');
       setTimeSlots([]);
       return;
+    }
+    
+    // If no staff provided, return all available slots for services that don't require staff
+    if (!staffIds || staffIds.length === 0) {
+      console.log('🔥 No staff selected - checking if service requires staff');
+      const serviceRequiresStaff = selectedService.requires_grooming || selectedService.requires_vet || selectedService.requires_bath;
+      
+      if (serviceRequiresStaff) {
+        console.log('🔥 Service requires staff but none selected - CLEARING SLOTS');
+        setTimeSlots([]);
+        return;
+      } else {
+        console.log('🔥 Service does not require staff - generating default availability');
+        // Generate default time slots for services that don't require staff
+        const defaultSlots = generateClientTimeSlots().map(slot => ({
+          id: slot,
+          time: formatTimeSlot(slot),
+          available: true
+        }));
+        setTimeSlots(defaultSlots);
+        return;
+      }
     }
 
     // CRITICAL: Deduplicate staff IDs
@@ -190,6 +212,12 @@ export const useAppointmentData = () => {
     try {
       // STEP 1: Fetch RAW availability from Supabase - ALL records (TRUE and FALSE)
       console.log('\n📋 STEP 1: Fetching RAW staff availability from database...');
+      console.log('📋 Query parameters:', {
+        table: 'staff_availability',
+        staff_profile_ids: uniqueStaffIds,
+        date: dateForQuery,
+        select: 'staff_profile_id, time_slot, available'
+      });
       
       const { data: rawAvailabilityData, error } = await supabase
         .from('staff_availability')

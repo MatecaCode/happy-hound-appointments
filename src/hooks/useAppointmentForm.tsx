@@ -180,7 +180,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     });
 
     // Guard against missing requirements
-    if (!date || !selectedService || staffIdsKey === '') {
+    if (!date || !selectedService) {
       console.log('🚨 [APPOINTMENT_FORM] Missing requirements for fetchTimeSlots:', {
         hasDate: !!date,
         hasService: !!selectedService,
@@ -195,16 +195,26 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     if (formStep === 3 || (formStep === 2 && !serviceRequiresStaff)) {
       const staffIds = getSelectedStaffIds;
       
+      // CRITICAL: If service requires staff but no staff selected, pass empty array
+      if (serviceRequiresStaff && staffIds.length === 0) {
+        console.log('🚨 [APPOINTMENT_FORM] Service requires staff but none selected - will trigger fetchTimeSlots with empty array');
+        fetchTimeSlots(date, [], setIsLoading, selectedService);
+        return;
+      }
+      
+      // For services that don't require staff, use a dummy staff ID or handle differently
+      const effectiveStaffIds = serviceRequiresStaff ? staffIds : ['dummy-staff-id'];
+      
       console.log('🔄 [APPOINTMENT_FORM] TRIGGERING fetchTimeSlots with:', {
         date: date.toISOString().split('T')[0],
-        staffIds,
-        staffCount: staffIds.length,
+        staffIds: effectiveStaffIds,
+        staffCount: effectiveStaffIds.length,
         serviceRequiresStaff,
         formStep,
         timestamp: new Date().toISOString()
       });
       
-      fetchTimeSlots(date, staffIds, setIsLoading, selectedService);
+      fetchTimeSlots(date, effectiveStaffIds, setIsLoading, selectedService);
     } else {
       console.log('🚨 [APPOINTMENT_FORM] NOT triggering fetchTimeSlots - wrong step:', {
         formStep,
