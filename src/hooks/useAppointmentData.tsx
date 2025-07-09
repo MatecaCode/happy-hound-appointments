@@ -381,6 +381,7 @@ export const useAppointmentData = () => {
     console.log('🔥 New timeSlots state:', timeSlots);
     console.log('🔥 State length:', timeSlots.length);
     console.log('🔥 Available in state:', timeSlots.filter(s => s.available).length);
+    console.log('🔥 Available slots:', timeSlots.filter(s => s.available).map(s => `${s.id} - ${s.time}`));
   }, [timeSlots]);
 
   return {
