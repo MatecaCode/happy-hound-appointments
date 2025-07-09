@@ -294,12 +294,21 @@ export const useAppointmentData = () => {
 
         // Check if ALL required slots are available for ALL selected staff
         for (const requiredSlot of requiredSlots) {
+          // Check if this required slot exists in our matrix
+          if (!availabilityMatrix[requiredSlot]) {
+            isSlotAvailable = false;
+            blockingReason = `Required slot ${requiredSlot} not found in matrix`;
+            console.log(`❌ BLOCKED: ${blockingReason}`);
+            break;
+          }
+          
           for (const staffId of uniqueStaffIds) {
-            const staffAvailable = availabilityMatrix[requiredSlot]?.[staffId];
+            const staffAvailable = availabilityMatrix[requiredSlot][staffId];
+            console.log(`🔍 Checking staff ${staffId} at ${requiredSlot}: ${staffAvailable}`);
             
-            if (!staffAvailable) {
+            if (staffAvailable !== true) {
               isSlotAvailable = false;
-              blockingReason = `Staff ${staffId} unavailable at ${requiredSlot}`;
+              blockingReason = `Staff ${staffId} unavailable at ${requiredSlot} (value: ${staffAvailable})`;
               console.log(`❌ BLOCKED: ${blockingReason}`);
               break;
             }
@@ -307,6 +316,7 @@ export const useAppointmentData = () => {
           if (!isSlotAvailable) break;
         }
 
+        console.log(`🔍 Final availability for ${clientSlot}: ${isSlotAvailable}`);
         if (isSlotAvailable) {
           console.log(`✅ AVAILABLE: ${clientSlot}`);
         } else {
