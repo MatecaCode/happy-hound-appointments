@@ -146,17 +146,21 @@ const Appointments = () => {
           const serviceDuration = appointment.duration || 60;
           
           for (const staffLink of staffLinks) {
-            // Calculate all time slots that were blocked
-            const slotsToFree = [];
+            // Calculate all time slots that need to be freed up
+            const appointmentTime = appointment.time; // e.g., "11:00:00"
+            const [hours, minutes] = appointmentTime.split(':').map(Number);
+            
+            // Generate all 30-minute slots that were blocked
             for (let offset = 0; offset < serviceDuration; offset += 30) {
-              const slotTime = new Date(`1970-01-01T${appointment.time}`);
-              slotTime.setMinutes(slotTime.getMinutes() + offset);
-              const timeStr = slotTime.toTimeString().split(' ')[0];
-              slotsToFree.push(timeStr);
-            }
-
-            // Free up each time slot
-            for (const timeSlot of slotsToFree) {
+              const slotMinutes = minutes + offset;
+              const slotHours = hours + Math.floor(slotMinutes / 60);
+              const finalMinutes = slotMinutes % 60;
+              
+              const timeSlot = `${String(slotHours).padStart(2, '0')}:${String(finalMinutes).padStart(2, '0')}:00`;
+              
+              console.log(`🔄 [CANCEL] Freeing slot ${timeSlot} for staff ${staffLink.staff_profile_id}`);
+              
+              // Free up this time slot
               await supabase
                 .from('staff_availability')
                 .update({ available: true })
