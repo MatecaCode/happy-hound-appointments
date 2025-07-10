@@ -376,12 +376,25 @@ const Appointments = () => {
     </Dialog>
   );
   
-  const upcomingAppointments = appointments.filter(apt => 
-    apt.status === 'pending' || apt.status === 'confirmed'
-  );
-  const pastAppointments = appointments.filter(apt => 
-    apt.status === 'completed' || apt.status === 'cancelled'
-  );
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
+
+  const upcomingAppointments = appointments.filter(apt => {
+    const appointmentDate = new Date(apt.date);
+    appointmentDate.setHours(0, 0, 0, 0); // Reset time for comparison
+    
+    // Upcoming: future dates OR today with pending/confirmed status
+    return (appointmentDate >= today && (apt.status === 'pending' || apt.status === 'confirmed')) ||
+           (appointmentDate.getTime() === today.getTime() && (apt.status === 'pending' || apt.status === 'confirmed'));
+  });
+  
+  const pastAppointments = appointments.filter(apt => {
+    const appointmentDate = new Date(apt.date);
+    appointmentDate.setHours(0, 0, 0, 0); // Reset time for comparison
+    
+    // Past: past dates OR completed/cancelled appointments
+    return appointmentDate < today || apt.status === 'completed' || apt.status === 'cancelled';
+  });
 
   return (
     <Layout>
