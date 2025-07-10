@@ -94,7 +94,7 @@ const Appointments = () => {
               id: apt.id,
               pet_name: apt.pets?.name || 'Pet',
               service_name: apt.services?.name || 'Serviço',
-              date: new Date(apt.date),
+              date: new Date(apt.date + 'T12:00:00'),
               time: apt.time,
               status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
               service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
@@ -134,23 +134,24 @@ const Appointments = () => {
       
       if (updateError) throw updateError;
 
-      // Restore provider availability (using legacy provider system)
-      // Get provider assignments
-      const { data: providerLinks } = await supabase
-        .from('appointment_providers_legacy')
-        .select('provider_id')
+      // Get staff IDs linked to this appointment
+      const { data: staffLinks } = await supabase
+        .from('appointment_staff')
+        .select('staff_profile_id')
         .eq('appointment_id', appointmentId);
 
-      if (providerLinks && providerLinks.length > 0) {
+      if (staffLinks && staffLinks.length > 0) {
         const serviceDuration = appointment.duration || 60;
+        const appointmentDate = new Date(appointment.date + 'T12:00:00').toISOString().split('T')[0];
         
-        for (const providerLink of providerLinks) {
-          console.log(`🔄 [CANCEL] Freeing availability for provider ${providerLink.provider_id}, duration: ${serviceDuration}min`);
+        console.log(`🔄 [CANCEL] Freeing availability for ${staffLinks.length} staff members, duration: ${serviceDuration}min, date: ${appointmentDate}`);
+        
+        for (const staffLink of staffLinks) {
+          console.log(`🔄 [CANCEL] Processing staff ${staffLink.staff_profile_id}`);
           
           // Calculate all time slots that need to be freed up
-          const appointmentTime = appointment.time; // e.g., "13:00:00"
+          const appointmentTime = appointment.time; // e.g., "15:00:00"
           const [hours, minutes] = appointmentTime.split(':').map(Number);
-          const appointmentDate = new Date(appointment.date).toISOString().split('T')[0];
           
           // Generate all 30-minute slots that were blocked
           for (let offset = 0; offset < serviceDuration; offset += 30) {
@@ -160,58 +161,20 @@ const Appointments = () => {
             
             const timeSlot = `${String(slotHours).padStart(2, '0')}:${String(finalMinutes).padStart(2, '0')}:00`;
             
-            console.log(`🔄 [CANCEL] Freeing slot ${timeSlot} for provider ${providerLink.provider_id} on ${appointmentDate}`);
+            console.log(`🔄 [CANCEL] Freeing slot ${timeSlot} for staff ${staffLink.staff_profile_id} on ${appointmentDate}`);
             
-            // Free up this time slot in provider_availability_legacy
+            // Free up this time slot in staff_availability
             const { error: updateError } = await supabase
-              .from('provider_availability_legacy')
+              .from('staff_availability')
               .update({ available: true })
-              .eq('provider_id', providerLink.provider_id)
+              .eq('staff_profile_id', staffLink.staff_profile_id)
               .eq('date', appointmentDate)
               .eq('time_slot', timeSlot);
               
             if (updateError) {
               console.error(`❌ Error freeing slot ${timeSlot}:`, updateError);
             } else {
-              console.log(`✅ Freed slot ${timeSlot} for provider ${providerLink.provider_id}`);
-            }
-          }
-        }
-      }
-
-      // Also check for staff availability (new system)
-      if (appointment.staff_names && appointment.staff_names.length > 0) {
-        // Get staff IDs linked to this appointment
-        const { data: staffLinks } = await supabase
-          .from('appointment_staff')
-          .select('staff_profile_id')
-          .eq('appointment_id', appointmentId);
-
-        if (staffLinks) {
-          const serviceDuration = appointment.duration || 60;
-          
-          for (const staffLink of staffLinks) {
-            // Calculate all time slots that need to be freed up
-            const appointmentTime = appointment.time; // e.g., "11:00:00"
-            const [hours, minutes] = appointmentTime.split(':').map(Number);
-            
-            // Generate all 30-minute slots that were blocked
-            for (let offset = 0; offset < serviceDuration; offset += 30) {
-              const slotMinutes = minutes + offset;
-              const slotHours = hours + Math.floor(slotMinutes / 60);
-              const finalMinutes = slotMinutes % 60;
-              
-              const timeSlot = `${String(slotHours).padStart(2, '0')}:${String(finalMinutes).padStart(2, '0')}:00`;
-              
-              console.log(`🔄 [CANCEL] Freeing slot ${timeSlot} for staff ${staffLink.staff_profile_id}`);
-              
-              // Free up this time slot
-              await supabase
-                .from('staff_availability')
-                .update({ available: true })
-                .eq('staff_profile_id', staffLink.staff_profile_id)
-                .eq('date', appointment.date.toISOString().split('T')[0])
-                .eq('time_slot', timeSlot);
+              console.log(`✅ Freed slot ${timeSlot} for staff ${staffLink.staff_profile_id}`);
             }
           }
         }
