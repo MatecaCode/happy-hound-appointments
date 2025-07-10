@@ -134,7 +134,52 @@ const Appointments = () => {
       
       if (updateError) throw updateError;
 
-      // Restore staff availability if there are linked staff members
+      // Restore provider availability (using legacy provider system)
+      // Get provider assignments
+      const { data: providerLinks } = await supabase
+        .from('appointment_providers_legacy')
+        .select('provider_id')
+        .eq('appointment_id', appointmentId);
+
+      if (providerLinks && providerLinks.length > 0) {
+        const serviceDuration = appointment.duration || 60;
+        
+        for (const providerLink of providerLinks) {
+          console.log(`🔄 [CANCEL] Freeing availability for provider ${providerLink.provider_id}, duration: ${serviceDuration}min`);
+          
+          // Calculate all time slots that need to be freed up
+          const appointmentTime = appointment.time; // e.g., "13:00:00"
+          const [hours, minutes] = appointmentTime.split(':').map(Number);
+          const appointmentDate = new Date(appointment.date).toISOString().split('T')[0];
+          
+          // Generate all 30-minute slots that were blocked
+          for (let offset = 0; offset < serviceDuration; offset += 30) {
+            const slotMinutes = minutes + offset;
+            const slotHours = hours + Math.floor(slotMinutes / 60);
+            const finalMinutes = slotMinutes % 60;
+            
+            const timeSlot = `${String(slotHours).padStart(2, '0')}:${String(finalMinutes).padStart(2, '0')}:00`;
+            
+            console.log(`🔄 [CANCEL] Freeing slot ${timeSlot} for provider ${providerLink.provider_id} on ${appointmentDate}`);
+            
+            // Free up this time slot in provider_availability_legacy
+            const { error: updateError } = await supabase
+              .from('provider_availability_legacy')
+              .update({ available: true })
+              .eq('provider_id', providerLink.provider_id)
+              .eq('date', appointmentDate)
+              .eq('time_slot', timeSlot);
+              
+            if (updateError) {
+              console.error(`❌ Error freeing slot ${timeSlot}:`, updateError);
+            } else {
+              console.log(`✅ Freed slot ${timeSlot} for provider ${providerLink.provider_id}`);
+            }
+          }
+        }
+      }
+
+      // Also check for staff availability (new system)
       if (appointment.staff_names && appointment.staff_names.length > 0) {
         // Get staff IDs linked to this appointment
         const { data: staffLinks } = await supabase

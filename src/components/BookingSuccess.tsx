@@ -211,7 +211,7 @@ const BookingSuccess: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
                     <span>
-                      {format(new Date(booking.date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                      {format(new Date(booking.date + 'T12:00:00'), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
