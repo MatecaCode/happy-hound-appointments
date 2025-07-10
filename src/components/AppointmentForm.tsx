@@ -17,8 +17,6 @@ interface AppointmentFormProps {
 }
 
 const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'grooming' }) => {
-  const [selectedStaff, setSelectedStaff] = React.useState<SelectedStaff>({});
-
   const {
     date,
     setDate,
@@ -45,6 +43,9 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     serviceRequiresStaff,
     serviceRequirementsLoaded,
     pricing,
+    // Use the hook's staff state instead of local state
+    selectedStaff,
+    setSelectedStaff,
   } = useAppointmentForm(serviceType);
 
   // Use the staff filtering hook
@@ -67,7 +68,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     if (selectedService) {
       setSelectedStaff({});
     }
-  }, [selectedService]);
+  }, [selectedService, setSelectedStaff]);
 
   const handleStaffSelect = (role: 'bather' | 'groomer' | 'vet', staffId: string) => {
     setSelectedStaff(prev => {
