@@ -134,20 +134,20 @@ const Appointments = () => {
       
       if (updateError) throw updateError;
 
-      // Get provider IDs from appointment_providers_legacy (this is what booking uses)
-      const { data: providerLinks } = await supabase
-        .from('appointment_providers_legacy')
-        .select('provider_id')
+      // Get staff IDs linked to this appointment (using NEW tables)
+      const { data: staffLinks } = await supabase
+        .from('appointment_staff')
+        .select('staff_profile_id')
         .eq('appointment_id', appointmentId);
 
-      if (providerLinks && providerLinks.length > 0) {
+      if (staffLinks && staffLinks.length > 0) {
         const serviceDuration = appointment.duration || 60;
         const appointmentDate = new Date(appointment.date + 'T12:00:00').toISOString().split('T')[0];
         
-        console.log(`🔄 [CANCEL] Freeing availability for ${providerLinks.length} providers, duration: ${serviceDuration}min, date: ${appointmentDate}`);
+        console.log(`🔄 [CANCEL] Freeing availability for ${staffLinks.length} staff members, duration: ${serviceDuration}min, date: ${appointmentDate}`);
         
-        for (const providerLink of providerLinks) {
-          console.log(`🔄 [CANCEL] Processing provider ${providerLink.provider_id}`);
+        for (const staffLink of staffLinks) {
+          console.log(`🔄 [CANCEL] Processing staff ${staffLink.staff_profile_id}`);
           
           // Calculate all time slots that need to be freed up - EXACT SAME LOGIC AS BOOKING
           const appointmentTime = appointment.time; // e.g., "15:00:00"
@@ -163,20 +163,20 @@ const Appointments = () => {
             
             const timeSlot = `${String(slotHours).padStart(2, '0')}:${String(slotMinutes).padStart(2, '0')}:00`;
             
-            console.log(`🔄 [CANCEL] Freeing slot ${timeSlot} for provider ${providerLink.provider_id} on ${appointmentDate}`);
+            console.log(`🔄 [CANCEL] Freeing slot ${timeSlot} for staff ${staffLink.staff_profile_id} on ${appointmentDate}`);
             
-            // Free up this time slot in provider_availability_legacy (same table used by booking)
+            // Free up this time slot in staff_availability (NEW table)
             const { error: updateError } = await supabase
-              .from('provider_availability_legacy')
+              .from('staff_availability')
               .update({ available: true })
-              .eq('provider_id', providerLink.provider_id)
+              .eq('staff_profile_id', staffLink.staff_profile_id)
               .eq('date', appointmentDate)
               .eq('time_slot', timeSlot);
               
             if (updateError) {
               console.error(`❌ Error freeing slot ${timeSlot}:`, updateError);
             } else {
-              console.log(`✅ Freed slot ${timeSlot} for provider ${providerLink.provider_id}`);
+              console.log(`✅ Freed slot ${timeSlot} for staff ${staffLink.staff_profile_id}`);
             }
             
             checkMinutes += 30;

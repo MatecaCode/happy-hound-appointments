@@ -1,5 +1,4 @@
 
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.50.0'
 
 const corsHeaders = {
@@ -21,45 +20,35 @@ Deno.serve(async (req) => {
 
     console.log('🔧 Starting availability refresh...')
 
-    // Step 1: Clean up past availability records
+    // Step 1: Clean up past availability records (NEW TABLES ONLY)
     const today = new Date().toISOString().split('T')[0]
     console.log(`🧹 Cleaning up availability records before ${today}`)
 
-    // Delete past provider availability
-    const { data: deletedProviderSlots, error: deleteProviderError } = await supabase
-      .from('provider_availability')
+    // Delete past staff availability (NEW TABLE)
+    const { data: deletedStaffSlots, error: deleteStaffError } = await supabase
+      .from('staff_availability')
       .delete()
       .lt('date', today)
 
-    if (deleteProviderError) {
-      console.error('Error deleting past provider availability:', deleteProviderError)
-      throw deleteProviderError
+    if (deleteStaffError) {
+      console.error('Error deleting past staff availability:', deleteStaffError)
+      throw deleteStaffError
     }
 
-    // Delete past shower availability  
-    const { data: deletedShowerSlots, error: deleteShowerError } = await supabase
-      .from('shower_availability')
-      .delete()
-      .lt('date', today)
+    console.log(`✅ Cleaned up past staff availability records before ${today}`)
 
-    if (deleteShowerError) {
-      console.error('Error deleting past shower availability:', deleteShowerError)
-      throw deleteShowerError
+    // Step 2: Fetch all active staff profiles (NEW TABLE)
+    const { data: staffProfiles, error: staffError } = await supabase
+      .from('staff_profiles')
+      .select('id, name, can_groom, can_vet, can_bathe')
+      .eq('active', true)
+
+    if (staffError) {
+      console.error('Error fetching staff profiles:', staffError)
+      throw staffError
     }
 
-    console.log(`✅ Cleaned up past availability records before ${today}`)
-
-    // Step 2: Fetch all active provider profiles
-    const { data: providers, error: providersError } = await supabase
-      .from('provider_profiles')
-      .select('id, type')
-
-    if (providersError) {
-      console.error('Error fetching providers:', providersError)
-      throw providersError
-    }
-
-    console.log(`📋 Found ${providers?.length || 0} active providers`)
+    console.log(`📋 Found ${staffProfiles?.length || 0} active staff members`)
 
     // Step 3: Generate time slots from 09:00 to 16:30 (every 30 minutes)
     const timeSlots = []
@@ -79,61 +68,36 @@ Deno.serve(async (req) => {
 
     let totalSlots = 0
 
-    // Step 4: Generate provider availability for each provider
-    for (const provider of providers || []) {
-      const providerSlots = []
+    // Step 4: Generate staff availability for each staff member (NEW TABLE)
+    for (const staff of staffProfiles || []) {
+      const staffSlots = []
       
       for (const timeSlot of timeSlots) {
-        providerSlots.push({
-          provider_id: provider.id,
+        staffSlots.push({
+          staff_profile_id: staff.id,
           date: targetDateString,
           time_slot: timeSlot,
           available: true
         })
       }
 
-      // Insert provider availability slots
-      const { error: providerError } = await supabase
-        .from('provider_availability')
-        .upsert(providerSlots, {
-          onConflict: 'provider_id,date,time_slot'
+      // Insert staff availability slots
+      const { error: staffAvailabilityError } = await supabase
+        .from('staff_availability')
+        .upsert(staffSlots, {
+          onConflict: 'staff_profile_id,date,time_slot'
         })
 
-      if (providerError) {
-        console.error(`Error inserting provider availability for ${provider.id}:`, providerError)
-        throw providerError
+      if (staffAvailabilityError) {
+        console.error(`Error inserting staff availability for ${staff.id}:`, staffAvailabilityError)
+        throw staffAvailabilityError
       }
 
-      totalSlots += providerSlots.length
-      console.log(`✅ Generated ${providerSlots.length} slots for provider ${provider.id} (${provider.type})`)
+      totalSlots += staffSlots.length
+      console.log(`✅ Generated ${staffSlots.length} slots for staff ${staff.name} (${staff.id})`)
     }
 
-    // Step 5: Generate shower availability (shared resource, no specific provider)
-    const showerSlots = []
-    for (const timeSlot of timeSlots) {
-      showerSlots.push({
-        date: targetDateString,
-        time_slot: timeSlot,
-        available_spots: 5 // 5 shower spots available per time slot
-      })
-    }
-
-    // Insert shower availability slots
-    const { error: showerError } = await supabase
-      .from('shower_availability')
-      .upsert(showerSlots, {
-        onConflict: 'date,time_slot'
-      })
-
-    if (showerError) {
-      console.error('Error inserting shower availability:', showerError)
-      throw showerError
-    }
-
-    totalSlots += showerSlots.length
-    console.log(`✅ Generated ${showerSlots.length} shower availability slots`)
-
-    const successMessage = `✅ Successfully refreshed availability! Cleaned up past records and generated ${totalSlots} total slots for ${targetDateString}.`
+    const successMessage = `✅ Successfully refreshed staff availability! Cleaned up past records and generated ${totalSlots} total slots for ${targetDateString}.`
     console.log(successMessage)
 
     return new Response(
@@ -144,10 +108,9 @@ Deno.serve(async (req) => {
         targetDate: targetDateString,
         cleanupDate: today,
         breakdown: {
-          providers: providers?.length || 0,
-          timeSlotsPerProvider: timeSlots.length,
-          providerSlots: (providers?.length || 0) * timeSlots.length,
-          showerSlots: showerSlots.length
+          staffMembers: staffProfiles?.length || 0,
+          timeSlotsPerStaff: timeSlots.length,
+          staffSlots: totalSlots
         }
       }),
       {
@@ -170,4 +133,3 @@ Deno.serve(async (req) => {
     )
   }
 })
-

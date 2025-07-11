@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -21,15 +20,25 @@ serve(async (req) => {
 
     console.log('🔄 Starting daily availability roll...');
 
-    // Call the database function to roll provider availability
-    const { error: providerError } = await supabase.rpc('roll_daily_availability');
+    // Generate staff availability for the target date (today + 90 days)
+    const targetDate = new Date();
+    targetDate.setDate(targetDate.getDate() + 90);
+    const dateString = targetDate.toISOString().split('T')[0];
 
-    if (providerError) {
-      console.error('❌ Error rolling provider availability:', providerError);
+    console.log(`📅 Adding staff availability for ${dateString}`);
+
+    // Fetch all active staff profiles
+    const { data: staffProfiles, error: staffError } = await supabase
+      .from('staff_profiles')
+      .select('id, name, can_groom, can_vet, can_bathe')
+      .eq('active', true);
+
+    if (staffError) {
+      console.error('❌ Error fetching staff profiles:', staffError);
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Provider availability error: ${providerError.message}` 
+          error: `Staff profiles error: ${staffError.message}` 
         }),
         { 
           status: 500, 
@@ -38,14 +47,7 @@ serve(async (req) => {
       );
     }
 
-    console.log('✅ Provider availability rolled successfully');
-
-    // Generate shower availability for the target date (today + 90 days)
-    const targetDate = new Date();
-    targetDate.setDate(targetDate.getDate() + 90);
-    const dateString = targetDate.toISOString().split('T')[0];
-
-    console.log(`🚿 Adding shower availability for ${dateString}`);
+    console.log(`👥 Found ${staffProfiles?.length || 0} active staff members`);
 
     // Generate time slots (09:00-16:30 every 30 minutes)
     const timeSlots = [];
@@ -56,37 +58,57 @@ serve(async (req) => {
       }
     }
 
-    // Create availability entries
-    const showerSlots = timeSlots.map((time) => ({
-      date: dateString,
-      time_slot: time,
-      available_spots: 5,
-    }));
+    let totalSlotsCreated = 0;
 
-    console.log(`📋 Inserting ${showerSlots.length} shower slots for ${dateString}`);
+    // Create availability entries for each staff member
+    for (const staff of staffProfiles || []) {
+      const staffSlots = timeSlots.map((time) => ({
+        staff_profile_id: staff.id,
+        date: dateString,
+        time_slot: time,
+        available: true,
+      }));
 
-    // Insert shower availability slots
-    const { error: showerError } = await supabase
-      .from('shower_availability')
-      .upsert(showerSlots, {
-        onConflict: 'date,time_slot'
-      });
+      console.log(`📋 Inserting ${staffSlots.length} slots for staff ${staff.name}`);
 
-    if (showerError) {
-      console.error('❌ Error inserting shower availability:', showerError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: `Shower availability error: ${showerError.message}` 
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      // Insert staff availability slots
+      const { error: staffAvailabilityError } = await supabase
+        .from('staff_availability')
+        .upsert(staffSlots, {
+          onConflict: 'staff_profile_id,date,time_slot'
+        });
+
+      if (staffAvailabilityError) {
+        console.error(`❌ Error inserting staff availability for ${staff.name}:`, staffAvailabilityError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: `Staff availability error for ${staff.name}: ${staffAvailabilityError.message}` 
+          }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      totalSlotsCreated += staffSlots.length;
+      console.log(`✅ Created ${staffSlots.length} slots for ${staff.name}`);
     }
 
-    console.log('✅ Shower availability added successfully');
+    // Clean up old availability (older than today)
+    const today = new Date().toISOString().split('T')[0];
+    const { error: cleanupError } = await supabase
+      .from('staff_availability')
+      .delete()
+      .lt('date', today);
+
+    if (cleanupError) {
+      console.warn('⚠️ Warning: Could not clean up old availability records:', cleanupError.message);
+    } else {
+      console.log(`🧹 Cleaned up old availability records before ${today}`);
+    }
+
     console.log('🎉 Daily availability roll completed successfully');
 
     return new Response(
@@ -94,9 +116,9 @@ serve(async (req) => {
         success: true, 
         message: 'Daily availability rolled successfully',
         details: {
-          providerAvailability: 'Updated via roll_daily_availability function',
-          showerAvailability: `Added ${showerSlots.length} slots for ${dateString}`,
-          targetDate: dateString
+          staffAvailability: `Added ${totalSlotsCreated} slots for ${staffProfiles?.length || 0} staff members`,
+          targetDate: dateString,
+          cleanupDate: today
         },
         timestamp: new Date().toISOString()
       }),
