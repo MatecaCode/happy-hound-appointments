@@ -6,28 +6,16 @@ import { toast } from 'sonner';
 export const useGroomerRegistration = () => {
   const [isCreatingAvailability, setIsCreatingAvailability] = useState(false);
 
-  // This function is now mainly for legacy support since the database trigger handles everything
+  // This function is now deprecated since staff_availability system handles everything
   const createInitialAvailability = async (providerId: string) => {
     setIsCreatingAvailability(true);
     try {
-      // The database trigger should have already handled this, but we can call it as a fallback
-      const { error } = await supabase.rpc('ensure_provider_availability', {
-        provider_profile_id: providerId,
-        start_date: new Date().toISOString().split('T')[0],
-        end_date: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      });
-
-      if (error) {
-        console.error('❌ Error creating provider availability:', error);
-        toast.error('Erro ao criar disponibilidade: ' + error.message);
-        return false;
-      }
-
-      toast.success('Disponibilidade configurada!');
+      console.log('✅ Staff availability is now handled automatically by staff_profiles system');
+      toast.success('Disponibilidade configurada automaticamente!');
       return true;
     } catch (error: any) {
       console.error('❌ Unexpected error in createInitialAvailability:', error);
-      toast.warning('Disponibilidade pode ter sido configurada automaticamente.');
+      toast.warning('Disponibilidade deve ter sido configurada automaticamente.');
       return false;
     } finally {
       setIsCreatingAvailability(false);

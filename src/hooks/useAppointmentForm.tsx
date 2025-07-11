@@ -295,67 +295,37 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       console.log('📝 [BOOKING_SUBMIT] Creating appointment with data:', appointmentData);
 
       const bookingPromise = (async () => {
-        const { data: appointment, error: appointmentError } = await supabase
-          .from('appointments')
-          .insert(appointmentData)
-          .select()
-          .single();
+        console.log('🚀 [BOOKING_SUBMIT] Using create_booking_atomic function...');
+        
+        // Use the atomic create_booking_atomic function
+        const { data: appointmentId, error: atomicError } = await supabase.rpc('create_booking_atomic', {
+          _user_id: user.id,
+          _pet_id: selectedPet.id,
+          _service_id: selectedService.id,
+          _provider_ids: uniqueStaffIds,
+          _booking_date: dateStr,
+          _time_slot: selectedTimeSlotId,
+          _notes: notes || null
+        });
 
-        if (appointmentError || !appointment) {
-          console.error('❌ [BOOKING_SUBMIT] Appointment creation failed:', appointmentError);
-          throw new Error(`Erro ao criar agendamento: ${appointmentError?.message || 'Erro desconhecido'}`);
+        if (atomicError || !appointmentId) {
+          console.error('❌ [BOOKING_SUBMIT] Atomic booking failed:', atomicError);
+          throw new Error(`Erro ao criar agendamento: ${atomicError?.message || 'Erro desconhecido'}`);
         }
 
-        console.log('✅ [BOOKING_SUBMIT] Appointment created:', appointment.id);
+        console.log('✅ [BOOKING_SUBMIT] Atomic booking successful, appointment ID:', appointmentId);
 
-        // Link ALL UNIQUE selected staff members
-        if (uniqueStaffIds.length > 0) {
-          console.log('🔗 [BOOKING_SUBMIT] Linking UNIQUE staff members:', uniqueStaffIds);
-          
-          for (const staffId of uniqueStaffIds) {
-            const { error: staffLinkError } = await supabase
-              .from('appointment_staff')
-              .insert({
-                appointment_id: appointment.id,
-                staff_profile_id: staffId,
-                role: 'primary'
-              });
+        // Fetch the created appointment details for response
+        const { data: appointment, error: fetchError } = await supabase
+          .from('appointments')
+          .select('*')
+          .eq('id', appointmentId)
+          .single();
 
-            if (staffLinkError) {
-              console.error('⚠️ [BOOKING_SUBMIT] Staff linking failed for:', staffId, staffLinkError);
-            } else {
-              console.log('✅ [BOOKING_SUBMIT] Staff linked:', staffId);
-            }
-          }
-
-          // Update staff availability for ALL UNIQUE selected staff using 10-minute granular logic
-          console.log('🔒 [BOOKING_SUBMIT] Updating staff availability for UNIQUE staff members...');
-
-          for (const staffId of uniqueStaffIds) {
-            // Get all 10-minute slots that need to be marked unavailable
-            const requiredSlots = getRequiredBackendSlots(selectedTimeSlotId, serviceDuration);
-            
-            console.log(`🔒 [BOOKING_SUBMIT] Marking ${requiredSlots.length} 10-min slots unavailable for UNIQUE staff ${staffId}:`, requiredSlots);
-
-            for (const timeSlot of requiredSlots) {
-              const { error: availabilityError } = await supabase
-                .from('staff_availability')
-                .update({ available: false })
-                .eq('staff_profile_id', staffId)
-                .eq('date', dateStr)
-                .eq('time_slot', timeSlot);
-
-              if (availabilityError) {
-                console.error('⚠️ [BOOKING_SUBMIT] Availability update failed:', {
-                  staffId,
-                  timeSlot,
-                  error: availabilityError
-                });
-              } else {
-                console.log(`✅ [BOOKING_SUBMIT] Marked 10-min slot ${timeSlot} unavailable for UNIQUE staff ${staffId}`);
-              }
-            }
-          }
+        if (fetchError || !appointment) {
+          console.error('❌ [BOOKING_SUBMIT] Failed to fetch created appointment:', fetchError);
+          // Still return appointmentId since booking was successful
+          return { id: appointmentId };
         }
 
         return appointment;
