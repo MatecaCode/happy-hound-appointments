@@ -1249,18 +1249,6 @@ export type Database = {
         }
         Returns: string
       }
-      ensure_provider_availability: {
-        Args: {
-          provider_profile_id: string
-          start_date: string
-          end_date: string
-        }
-        Returns: undefined
-      }
-      ensure_shower_availability: {
-        Args: { start_date: string; end_date: string }
-        Returns: undefined
-      }
       fix_missing_provider_profiles: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1271,25 +1259,6 @@ export type Database = {
       }
       generate_time_slots: {
         Args: Record<PropertyKey, never>
-        Returns: {
-          time_slot: string
-        }[]
-      }
-      get_available_providers: {
-        Args: {
-          _service_id: string
-          _date: string
-          _time_slot: string
-          _duration?: number
-        }
-        Returns: {
-          provider_id: string
-          provider_type: string
-          user_id: string
-        }[]
-      }
-      get_available_slots_for_service: {
-        Args: { _service_id: string; _date: string; _provider_id?: string }
         Returns: {
           time_slot: string
         }[]
