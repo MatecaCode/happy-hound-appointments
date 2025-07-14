@@ -55,28 +55,40 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
 
       if (updateError) throw updateError;
 
-      // Restore staff availability
+      // Restore staff availability using 10-minute increments
       if (appointment.appointment_staff && appointment.appointment_staff.length > 0) {
         const serviceDuration = appointment.services.default_duration || 60;
         const appointmentDate = appointment.date;
         const appointmentTime = appointment.time;
 
+        console.log(`[CANCELLATION] Restoring ${serviceDuration} minutes of availability starting at ${appointmentTime}`);
+
         for (const staff of appointment.appointment_staff) {
           let checkMinutes = 0;
           while (checkMinutes < serviceDuration) {
-            const timeSlot = new Date(`1970-01-01T${appointmentTime}`);
-            timeSlot.setMinutes(timeSlot.getMinutes() + checkMinutes);
-            const timeSlotString = timeSlot.toTimeString().slice(0, 8);
+            // Create time slot by parsing the time string properly
+            const [hours, minutes, seconds] = appointmentTime.split(':').map(Number);
+            const baseTime = new Date();
+            baseTime.setHours(hours, minutes + checkMinutes, seconds || 0, 0);
+            const timeSlotString = baseTime.toTimeString().slice(0, 8);
 
-            await supabase
+            console.log(`[CANCELLATION] Restoring slot: ${timeSlotString} for staff ${staff.staff_profile_id}`);
+
+            const { error: updateError } = await supabase
               .from('staff_availability')
               .update({ available: true })
               .eq('staff_profile_id', staff.staff_profile_id)
               .eq('date', appointmentDate)
               .eq('time_slot', timeSlotString);
 
-            checkMinutes += 30;
+            if (updateError) {
+              console.error(`Error restoring slot ${timeSlotString}:`, updateError);
+            }
+
+            // Use 10-minute increments to match database structure
+            checkMinutes += 10;
           }
+          console.log(`[CANCELLATION] Restored all slots for staff ${staff.staff_profile_id}`);
         }
       }
 
