@@ -10,4 +10,21 @@ export interface CustomDatabaseFunctions {
     };
     Returns: void;
   };
+  log_cancellation_debug: {
+    Args: {
+      p_appointment_id: string;
+      p_message: string;
+      p_data: any;
+    };
+    Returns: void;
+  };
+  atomic_cancel_appointment: {
+    Args: {
+      p_appointment_id: string;
+      p_appointment_date: string;
+      p_slots_to_revert: string[];
+      p_staff_ids: string[];
+    };
+    Returns: void;
+  };
 }
