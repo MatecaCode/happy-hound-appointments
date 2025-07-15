@@ -7,11 +7,12 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Dog, Clock, CheckCircle, XCircle, Play, AlertCircle, Calendar, User, Trash2 } from 'lucide-react';
+import { Dog, Clock, CheckCircle, XCircle, Play, AlertCircle, Calendar, User } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import AppointmentActions from '@/components/appointment/AppointmentActions';
 
 interface AppointmentWithDetails {
   id: string;
@@ -32,7 +33,6 @@ const Appointments = () => {
   const { user } = useAuth();
   const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [cancellingId, setCancellingId] = useState<string | null>(null);
   
   // Load user's appointments from the database with detailed information
   useEffect(() => {
@@ -120,91 +120,82 @@ const Appointments = () => {
     fetchAppointments();
   }, [user]);
   
-  const cancelAppointment = async (appointmentId: string) => {
-    setCancellingId(appointmentId);
+  const refreshAppointments = async () => {
+    if (!user) return;
+    
+    setIsLoading(true);
     try {
-      const appointment = appointments.find(a => a.id === appointmentId);
-      if (!appointment) return;
-
-      // Update appointment status to cancelled
-      const { error: updateError } = await supabase
-        .from('appointments')
-        .update({ status: 'cancelled' })
-        .eq('id', appointmentId);
+      console.log('🔄 [APPOINTMENTS] Refreshing appointments after cancellation');
       
-      if (updateError) throw updateError;
+      // First get client_id from user
+      const { data: clientData, error: clientError } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
 
-      // Get staff IDs linked to this appointment (using NEW tables)
-      const { data: staffLinks } = await supabase
-        .from('appointment_staff')
-        .select('staff_profile_id')
-        .eq('appointment_id', appointmentId);
+      if (clientError || !clientData) {
+        console.log('❌ [APPOINTMENTS] No client record found for user:', user.id);
+        setAppointments([]);
+        return;
+      }
 
-      if (staffLinks && staffLinks.length > 0) {
-        const serviceDuration = appointment.duration || 60;
-        const appointmentDate = new Date(appointment.date + 'T12:00:00').toISOString().split('T')[0];
-        
-        console.log(`🔄 [CANCEL] Freeing availability for ${staffLinks.length} staff members, duration: ${serviceDuration}min, date: ${appointmentDate}`);
-        
-        for (const staffLink of staffLinks) {
-          console.log(`🔄 [CANCEL] Processing staff ${staffLink.staff_profile_id}`);
-          
-          // Calculate all time slots that need to be freed up - EXACT SAME LOGIC AS BOOKING
-          const appointmentTime = appointment.time; // e.g., "15:00:00"
-          const [hours, minutes] = appointmentTime.split(':').map(Number);
-          
-          // Use the same logic as create_booking_atomic function
-          let checkMinutes = 0;
-          while (checkMinutes < serviceDuration) {
-            // Calculate the exact time slot
-            const totalMinutes = minutes + checkMinutes;
-            const slotHours = hours + Math.floor(totalMinutes / 60);
-            const slotMinutes = totalMinutes % 60;
-            
-            const timeSlot = `${String(slotHours).padStart(2, '0')}:${String(slotMinutes).padStart(2, '0')}:00`;
-            
-            console.log(`🔄 [CANCEL] Freeing slot ${timeSlot} for staff ${staffLink.staff_profile_id} on ${appointmentDate}`);
-            
-            // Free up this time slot in staff_availability (NEW table)
-            const { error: updateError } = await supabase
-              .from('staff_availability')
-              .update({ available: true })
-              .eq('staff_profile_id', staffLink.staff_profile_id)
-              .eq('date', appointmentDate)
-              .eq('time_slot', timeSlot);
-              
-            if (updateError) {
-              console.error(`❌ Error freeing slot ${timeSlot}:`, updateError);
-            } else {
-              console.log(`✅ Freed slot ${timeSlot} for staff ${staffLink.staff_profile_id}`);
-            }
-            
-            checkMinutes += 30;
-          }
-        }
+      // Get appointments with related data including staff from appointment_staff
+      const { data, error } = await supabase
+        .from('appointments')
+        .select(`
+          id,
+          date,
+          time,
+          status,
+          service_status,
+          notes,
+          duration,
+          total_price,
+          client_id,
+          pets:pet_id (name),
+          services:service_id (name),
+          appointment_staff (
+            staff_profiles (name)
+          )
+        `)
+        .eq('client_id', clientData.id)
+        .order('date', { ascending: true });
+      
+      if (error) {
+        console.error('❌ [APPOINTMENTS] Supabase error:', error);
+        throw error;
       }
       
-      // Update local state
-      setAppointments(prevAppointments =>
-        prevAppointments.map(apt => 
-          apt.id === appointmentId
-            ? { ...apt, status: 'cancelled' as const }
-            : apt
-        )
-      );
-      
-      toast.success(`Agendamento para ${appointment.pet_name} foi cancelado.`, {
-        style: {
-          background: '#EF4444',
-          color: 'white',
-          border: 'none'
-        }
-      });
+      if (data) {
+        const formattedData = data.map((apt) => {
+          // Get all staff names from appointment_staff relationship
+          const staffNames = apt.appointment_staff?.map((as: any) => as.staff_profiles?.name).filter(Boolean) || [];
+
+          return {
+            id: apt.id,
+            pet_name: (apt.pets as any)?.name || 'Pet',
+            service_name: (apt.services as any)?.name || 'Serviço',
+            date: new Date(apt.date + 'T12:00:00'),
+            time: apt.time,
+            status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
+            service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
+            notes: apt.notes || undefined,
+            staff_names: staffNames,
+            staff_name: staffNames.length > 0 ? staffNames.join(', ') : undefined,
+            duration: apt.duration || 60,
+            total_price: apt.total_price || 0
+          };
+        });
+        
+        console.log('✅ [APPOINTMENTS] Refreshed appointments:', formattedData);
+        setAppointments(formattedData);
+      }
     } catch (error: any) {
-      console.error('❌ [APPOINTMENTS] Error cancelling appointment:', error.message);
-      toast.error('Erro ao cancelar agendamento');
+      console.error('❌ [APPOINTMENTS] Error refreshing appointments:', error.message);
+      toast.error('Erro ao atualizar os agendamentos');
     } finally {
-      setCancellingId(null);
+      setIsLoading(false);
     }
   };
 
@@ -363,30 +354,13 @@ const Appointments = () => {
             )}
           </div>
 
-          {appointment.status === 'pending' && (
-            <Button 
-              variant="destructive" 
-              size="sm" 
-              onClick={(e) => {
-                e.stopPropagation();
-                cancelAppointment(appointment.id);
-              }}
-              disabled={cancellingId === appointment.id}
-              className="w-full"
-            >
-              {cancellingId === appointment.id ? (
-                <>
-                  <Clock className="w-4 h-4 mr-2 animate-spin" />
-                  Cancelando...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Cancelar Agendamento
-                </>
-              )}
-            </Button>
-          )}
+          <div className="flex justify-center">
+            <AppointmentActions 
+              appointmentId={appointment.id}
+              status={appointment.status}
+              onCancel={refreshAppointments}
+            />
+          </div>
         </div>
       </DialogContent>
     </Dialog>
