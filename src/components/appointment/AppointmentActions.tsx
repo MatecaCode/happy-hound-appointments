@@ -39,7 +39,7 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
           time,
           service_id,
           status,
-          services (
+          services!inner (
             name,
             default_duration
           ),
@@ -66,8 +66,8 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
         id: appointment.id,
         date: appointment.date,
         time: appointment.time,
-        service: appointment.services?.name,
-        duration: appointment.services?.default_duration,
+        service: Array.isArray(appointment.services) ? appointment.services[0]?.name : appointment.services?.name,
+        duration: Array.isArray(appointment.services) ? appointment.services[0]?.default_duration : appointment.services?.default_duration,
         staffCount: appointment.appointment_staff.length,
         currentStatus: appointment.status
       });
@@ -83,7 +83,7 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
         return;
       }
 
-      const serviceDuration = appointment.services?.default_duration || 60;
+      const serviceDuration = (Array.isArray(appointment.services) ? appointment.services[0]?.default_duration : appointment.services?.default_duration) || 60;
       const appointmentDate = appointment.date;
       const appointmentTime = appointment.time;
 

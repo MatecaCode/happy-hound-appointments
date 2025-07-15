@@ -58,7 +58,10 @@ const Cart = () => {
         
       if (error) throw error;
       
-      setCartItems(data || []);
+      setCartItems((data || []).map(item => ({
+        ...item,
+        product: Array.isArray(item.product) ? item.product[0] : item.product
+      })));
     } catch (error: any) {
       toast.error('Erro ao carregar itens do carrinho: ' + error.message);
     } finally {
