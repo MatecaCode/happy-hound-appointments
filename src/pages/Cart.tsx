@@ -52,7 +52,7 @@ const Cart = () => {
           id,
           product_id,
           quantity,
-          product:products(id, name, price, image_url, stock_quantity)
+          product:products!inner(id, name, price, image_url, stock_quantity)
         `)
         .eq('user_id', user?.id);
         

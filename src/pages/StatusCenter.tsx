@@ -82,7 +82,7 @@ const StatusCenter: React.FC = () => {
             .single();
           
           if (staffData?.staff_profiles) {
-            providerName = staffData.staff_profiles.name;
+            providerName = Array.isArray(staffData.staff_profiles) ? staffData.staff_profiles[0]?.name : staffData.staff_profiles?.name;
           }
           
           return {
@@ -91,8 +91,8 @@ const StatusCenter: React.FC = () => {
             time: apt.time,
             status: apt.status,
             notes: apt.notes,
-            pet_name: apt.pets?.name || 'Pet',
-            service_name: apt.services?.name || 'Serviço',
+            pet_name: Array.isArray(apt.pets) ? apt.pets[0]?.name : apt.pets?.name || 'Pet',
+            service_name: Array.isArray(apt.services) ? apt.services[0]?.name : apt.services?.name || 'Serviço',
             user_name: userData?.name || 'Cliente',
             user_email: 'N/A', // We don't have direct access to email from clients table
             provider_name: providerName

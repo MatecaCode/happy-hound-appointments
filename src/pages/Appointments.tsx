@@ -92,8 +92,8 @@ const Appointments = () => {
 
             return {
               id: apt.id,
-              pet_name: apt.pets?.name || 'Pet',
-              service_name: apt.services?.name || 'Serviço',
+              pet_name: Array.isArray(apt.pets) ? apt.pets[0]?.name : apt.pets?.name || 'Pet',
+              service_name: Array.isArray(apt.services) ? apt.services[0]?.name : apt.services?.name || 'Serviço',
               date: new Date(apt.date + 'T12:00:00'),
               time: apt.time,
               status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',

@@ -71,8 +71,8 @@ const BookingSuccess: React.FC = () => {
             notes: appointment.notes,
             duration: appointment.duration || 60,
             total_price: appointment.total_price || 0,
-            pet_name: appointment.pets?.name || 'Pet',
-            service_name: appointment.services?.name || 'Serviço',
+            pet_name: Array.isArray(appointment.pets) ? appointment.pets[0]?.name : appointment.pets?.name || 'Pet',
+            service_name: Array.isArray(appointment.services) ? appointment.services[0]?.name : appointment.services?.name || 'Serviço',
             staff_names: staffNames
           });
         }
