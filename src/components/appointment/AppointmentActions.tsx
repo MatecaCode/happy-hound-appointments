@@ -66,8 +66,8 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
         id: appointment.id,
         date: appointment.date,
         time: appointment.time,
-        service: Array.isArray(appointment.services) ? appointment.services[0]?.name : appointment.services?.name,
-        duration: Array.isArray(appointment.services) ? appointment.services[0]?.default_duration : appointment.services?.default_duration,
+        service: (appointment.services as any)?.name,
+        duration: (appointment.services as any)?.default_duration,
         staffCount: appointment.appointment_staff.length,
         currentStatus: appointment.status
       });
@@ -83,7 +83,7 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
         return;
       }
 
-      const serviceDuration = (Array.isArray(appointment.services) ? appointment.services[0]?.default_duration : appointment.services?.default_duration) || 60;
+      const serviceDuration = (appointment.services as any)?.default_duration || 60;
       const appointmentDate = appointment.date;
       const appointmentTime = appointment.time;
 
@@ -124,7 +124,7 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
           slots_to_revert: slotsToRevert,
           staff_assignments: appointment.appointment_staff.map(s => ({
             staff_id: s.staff_profile_id,
-            staff_name: Array.isArray(s.staff_profiles) ? s.staff_profiles[0]?.name : s.staff_profiles?.name
+            staff_name: (s.staff_profiles as any)?.name
           }))
         }
       });
