@@ -186,7 +186,7 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
             <AlertDialogTitle>Cancelar Agendamento</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita.
-              Todos os horários bloqueados serão liberados automaticamente.
+              Os profissionais selecionados ficarão disponíveis e você pode não conseguir reagendar no mesmo horário.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
