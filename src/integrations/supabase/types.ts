@@ -1237,6 +1237,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      atomic_cancel_appointment: {
+        Args: {
+          p_appointment_id: string
+          p_appointment_date: string
+          p_slots_to_revert: string[]
+          p_staff_ids: string[]
+        }
+        Returns: undefined
+      }
       create_booking_atomic: {
         Args: {
           _user_id: string
