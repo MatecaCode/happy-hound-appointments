@@ -66,10 +66,13 @@ const Pets = () => {
         return;
       }
 
-      // Now get pets using client_id
+      // Now get pets using client_id with breed information
       const { data, error } = await supabase
         .from('pets')
-        .select('*')
+        .select(`
+          *,
+          breeds(name)
+        `)
         .eq('client_id', clientData.id)
         .eq('active', true)
         .order('created_at', { ascending: false });
@@ -87,8 +90,14 @@ const Pets = () => {
         return;
       }
 
-      setPets(data || []);
-      console.log('✅ Pets loaded successfully:', data?.length || 0, 'pets');
+      // Transform data to include breed name from join
+      const transformedPets = data?.map(pet => ({
+        ...pet,
+        breed: pet.breeds?.name || pet.breed // Use joined breed name or fallback to existing breed field
+      })) || [];
+      
+      setPets(transformedPets);
+      console.log('✅ Pets loaded successfully:', transformedPets?.length || 0, 'pets');
       
     } catch (error: any) {
       console.error('💥 Unexpected error fetching pets:', error);

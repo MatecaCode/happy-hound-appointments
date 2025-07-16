@@ -68,9 +68,13 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
         return;
       }
 
+      // Get the breed name from the selected breed_id
+      const selectedBreed = breeds.find(breed => breed.id === formData.breed_id);
+      
       const petData = {
         name: formData.name,
         breed_id: formData.breed_id || null,
+        breed: selectedBreed?.name || null, // Save breed name for easier access
         birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null,
         size: formData.size || null,
         weight: formData.weight ? parseFloat(formData.weight.toString()) : null,

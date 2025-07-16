@@ -97,10 +97,13 @@ export const useAppointmentData = () => {
         return;
       }
 
-      // Then fetch pets using the client_id
+      // Then fetch pets using the client_id with breed information
       const { data, error } = await supabase
         .from('pets')
-        .select('*')
+        .select(`
+          *,
+          breeds(name)
+        `)
         .eq('client_id', clientData.id);
 
       if (error) {
@@ -109,7 +112,13 @@ export const useAppointmentData = () => {
         return;
       }
 
-      setUserPets(data || []);
+      // Transform data to include breed name from join
+      const transformedPets = data?.map(pet => ({
+        ...pet,
+        breed: pet.breeds?.name || pet.breed // Use joined breed name or fallback to existing breed field
+      })) || [];
+      
+      setUserPets(transformedPets);
     } catch (error) {
       console.error('Unexpected error fetching user pets:', error);
       toast.error('Erro inesperado ao buscar pets do usuário');
