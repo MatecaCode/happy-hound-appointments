@@ -139,8 +139,8 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
             <h4 className="font-medium mb-2">{selectedService.name}</h4>
             <div className="text-sm space-y-1">
               <p>Pet: {selectedPet.name}</p>
-              {selectedPet.breed && <p>Raça: {selectedPet.breed}</p>}
               {selectedPet.size && <p>Porte: {formatSizeLabel(selectedPet.size)}</p>}
+              {selectedPet.breed && <p>Raça: {selectedPet.breed}</p>}
               
               {pricingLoading ? (
                 <div className="flex items-center space-x-2">
