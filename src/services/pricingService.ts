@@ -9,7 +9,7 @@ export interface PricingResult {
 
 export interface PricingParams {
   serviceId: string;
-  breedId?: string;
+  breedId?: string; // This is actually the breed name, not ID
   size?: string;
 }
 

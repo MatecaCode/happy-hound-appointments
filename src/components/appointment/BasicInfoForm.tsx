@@ -31,7 +31,7 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   // Calculate pricing when both pet and service are selected
   const pricingParams = selectedPet && selectedService ? {
     serviceId: selectedService.id,
-    breedId: selectedPet.breed_id,
+    breedId: selectedPet.breed,
     size: selectedPet.size
   } : null;
 
