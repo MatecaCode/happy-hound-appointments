@@ -297,7 +297,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       const bookingPromise = (async () => {
         console.log('🚀 [BOOKING_SUBMIT] Using create_booking_atomic function...');
         
-        // Use the atomic create_booking_atomic function
+        // Use the atomic create_booking_atomic function with calculated values
         const { data: appointmentId, error: atomicError } = await supabase.rpc('create_booking_atomic', {
           _user_id: user.id,
           _pet_id: selectedPet.id,
@@ -305,7 +305,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
           _provider_ids: uniqueStaffIds,
           _booking_date: dateStr,
           _time_slot: selectedTimeSlotId,
-          _notes: notes || null
+          _notes: notes || null,
+          _calculated_price: pricing?.price || selectedService.base_price || 0,
+          _calculated_duration: pricing?.duration || selectedService.default_duration || 60
         });
 
         if (atomicError || !appointmentId) {
