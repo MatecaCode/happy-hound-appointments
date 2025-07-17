@@ -9,19 +9,35 @@ import { useAuth } from '@/hooks/useAuth';
 import Layout from '@/components/Layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+type AccountType = 'cliente' | 'staff' | 'admin';
+
+interface StaffCapabilities {
+  can_bathe: boolean;
+  can_groom: boolean;
+  can_vet: boolean;
+}
 
 const Register = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'client' | 'groomer' | 'vet' | 'admin'>('client');
+  const [accountType, setAccountType] = useState<AccountType>('cliente');
+  const [staffCapabilities, setStaffCapabilities] = useState<StaffCapabilities>({
+    can_bathe: false,
+    can_groom: false,
+    can_vet: false,
+  });
+  const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [registrationCode, setRegistrationCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [codeRequired, setCodeRequired] = useState(false);
+  const [locations, setLocations] = useState<any[]>([]);
   
   const { signUp, user } = useAuth();
   const navigate = useNavigate();
@@ -30,8 +46,8 @@ const Register = () => {
   
   useEffect(() => {
     if (suggestGroomerRole) {
-      setRole('groomer');
-      setCodeRequired(true);
+      setAccountType('staff');
+      setStaffCapabilities(prev => ({ ...prev, can_groom: true }));
     }
   }, [suggestGroomerRole]);
   
@@ -41,19 +57,36 @@ const Register = () => {
     }
   }, [user, navigate]);
 
-  // Update code requirement when role changes
+  // Fetch locations for staff selection
   useEffect(() => {
-    setCodeRequired(role === 'groomer' || role === 'vet' || role === 'admin');
-  }, [role]);
+    const fetchLocations = async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('active', true)
+        .order('name');
+      
+      if (!error && data) {
+        setLocations(data);
+      }
+    };
+    
+    if (accountType === 'staff') {
+      fetchLocations();
+    }
+  }, [accountType]);
+
+  const requiresCode = accountType === 'staff' || accountType === 'admin';
   
   const validateAndUseRegistrationCode = async () => {
-    if (!codeRequired) return true;
+    if (!requiresCode) return true;
     
     try {
-      // Validate the registration code
+      const roleValue = accountType === 'admin' ? 'admin' : 'staff';
+      
       const { data: isValid, error: validateError } = await supabase.rpc('validate_registration_code', {
         code_value: registrationCode,
-        role_value: role
+        role_value: roleValue
       });
       
       if (validateError) {
@@ -63,10 +96,8 @@ const Register = () => {
       }
       
       if (!isValid) {
-        const roleText = role === 'groomer' ? 'tosador' : 
-                        role === 'vet' ? 'veterinário' : 
-                        role === 'admin' ? 'administrador' : role;
-        setError(`Código de registro inválido para ${roleText}.`);
+        const typeText = accountType === 'admin' ? 'administrador' : 'funcionário';
+        setError(`Código de registro inválido para ${typeText}.`);
         return false;
       }
       
@@ -79,7 +110,7 @@ const Register = () => {
   };
 
   const markCodeAsUsed = async () => {
-    if (!codeRequired) return;
+    if (!requiresCode) return;
     
     try {
       await supabase.rpc('mark_code_as_used', {
@@ -87,6 +118,30 @@ const Register = () => {
       });
     } catch (error) {
       console.error('Error marking code as used:', error);
+    }
+  };
+
+  const createStaffProfile = async (userId: string) => {
+    if (accountType !== 'staff') return;
+
+    const staffData = {
+      user_id: userId,
+      name: name,
+      email: email,
+      location_id: selectedLocation || null,
+      can_bathe: staffCapabilities.can_bathe,
+      can_groom: staffCapabilities.can_groom,
+      can_vet: staffCapabilities.can_vet,
+      active: true
+    };
+
+    const { error } = await supabase
+      .from('staff_profiles')
+      .insert([staffData]);
+
+    if (error) {
+      console.error('Error creating staff profile:', error);
+      throw new Error('Erro ao criar perfil de funcionário.');
     }
   };
   
@@ -104,19 +159,25 @@ const Register = () => {
       return;
     }
     
-    if (codeRequired && !registrationCode) {
-      const roleText = role === 'groomer' ? 'tosadores' : 
-                      role === 'vet' ? 'veterinários' : 
-                      role === 'admin' ? 'administradores' : role;
-      setError(`Código de registro é obrigatório para ${roleText}.`);
+    if (requiresCode && !registrationCode) {
+      const typeText = accountType === 'admin' ? 'administradores' : 'funcionários';
+      setError(`Código de registro é obrigatório para ${typeText}.`);
       return;
+    }
+
+    if (accountType === 'staff') {
+      const hasAtLeastOneCapability = staffCapabilities.can_bathe || staffCapabilities.can_groom || staffCapabilities.can_vet;
+      if (!hasAtLeastOneCapability) {
+        setError('Selecione pelo menos uma função para funcionários.');
+        return;
+      }
     }
     
     setIsLoading(true);
     
     try {
       // Validate registration code if required
-      if (codeRequired) {
+      if (requiresCode) {
         const isValid = await validateAndUseRegistrationCode();
         if (!isValid) {
           setIsLoading(false);
@@ -124,37 +185,72 @@ const Register = () => {
         }
       }
       
-      // Create the user account (the handle_new_user trigger will handle everything)
-      await signUp(email, password, name, role);
+      // Determine the role for the signUp function
+      let userRole = 'client';
+      if (accountType === 'admin') {
+        userRole = 'admin';
+      } else if (accountType === 'staff') {
+        userRole = 'staff';
+      }
+      
+      // Create the user account
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name,
+            role: userRole,
+          },
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      });
+
+      if (authError) throw authError;
+
+      // Create staff profile if needed
+      if (accountType === 'staff' && authData.user) {
+        await createStaffProfile(authData.user.id);
+      }
       
       // Mark the code as used after successful signup
-      if (codeRequired) {
+      if (requiresCode) {
         await markCodeAsUsed();
       }
       
-      // Show success message based on role
-      if (role === 'groomer') {
-        toast.success('Registro realizado! Sua disponibilidade foi configurada automaticamente. Verifique seu email para confirmar a conta.');
-      } else if (role === 'vet') {
-        toast.success('Registro realizado! Sua agenda foi configurada automaticamente. Verifique seu email para confirmar a conta.');
-      } else if (role === 'admin') {
+      // Show success message based on account type
+      if (accountType === 'staff') {
+        const capabilities = [];
+        if (staffCapabilities.can_bathe) capabilities.push('banho');
+        if (staffCapabilities.can_groom) capabilities.push('tosa');
+        if (staffCapabilities.can_vet) capabilities.push('veterinário');
+        
+        toast.success(`Registro realizado! Funções: ${capabilities.join(', ')}. Verifique seu email para confirmar a conta.`);
+      } else if (accountType === 'admin') {
         toast.success('Registro de administrador realizado! Verifique seu email para confirmar a conta.');
       } else {
         toast.success('Registro realizado! Verifique seu email para confirmar a conta.');
       }
       
-      // Signup function will navigate to login
+      navigate('/login');
     } catch (error: any) {
       setError(error.message || 'Erro ao criar conta.');
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleStaffCapabilityChange = (capability: keyof StaffCapabilities, checked: boolean) => {
+    setStaffCapabilities(prev => ({
+      ...prev,
+      [capability]: checked
+    }));
+  };
   
   return (
     <Layout>
       <div className="flex justify-center items-center py-12">
-        <Card className="w-[450px]">
+        <Card className="w-[500px]">
           <CardHeader>
             <CardTitle className="text-2xl">Criar Conta</CardTitle>
             <CardDescription>
@@ -216,71 +312,111 @@ const Register = () => {
                 <div className="grid gap-2">
                   <Label>Tipo de Conta</Label>
                   <RadioGroup
-                    value={role}
-                    onValueChange={(value: 'client' | 'groomer' | 'vet' | 'admin') => setRole(value)}
-                    className="grid grid-cols-2 gap-2"
+                    value={accountType}
+                    onValueChange={(value: AccountType) => setAccountType(value)}
+                    className="grid grid-cols-3 gap-2"
                   >
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="client" id="client" />
-                      <Label htmlFor="client">Cliente</Label>
+                      <RadioGroupItem value="cliente" id="cliente" />
+                      <Label htmlFor="cliente">Cliente</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="groomer" id="groomer" />
-                      <Label htmlFor="groomer">Tosador</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="vet" id="vet" />
-                      <Label htmlFor="vet">Veterinário</Label>
+                      <RadioGroupItem value="staff" id="staff" />
+                      <Label htmlFor="staff">Staff</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <RadioGroupItem value="admin" id="admin" />
-                      <Label htmlFor="admin">Administrador</Label>
+                      <Label htmlFor="admin">Admin</Label>
                     </div>
                   </RadioGroup>
-                  
-                  {role !== 'client' && (
-                    <Alert className="mt-2">
-                      <AlertDescription>
-                        {role === 'groomer' && (
-                          <>
-                            Ao se cadastrar como tosador, você terá acesso ao calendário de agendamentos e será listado como 
-                            profissional disponível para os clientes. Sua disponibilidade será configurada automaticamente para os próximos 90 dias.
-                          </>
-                        )}
-                        {role === 'vet' && (
-                          <>
-                            Ao se cadastrar como veterinário, você terá acesso ao calendário de agendamentos e será listado como 
-                            profissional disponível para os clientes. Sua agenda será configurada automaticamente para os próximos 90 dias.
-                          </>
-                        )}
-                        {role === 'admin' && (
-                          <>
-                            Ao se cadastrar como administrador, você terá acesso completo ao sistema, incluindo o painel administrativo 
-                            para gerenciar agendamentos, usuários e configurações.
-                          </>
-                        )}
-                      </AlertDescription>
-                    </Alert>
-                  )}
                 </div>
+
+                {accountType === 'staff' && (
+                  <>
+                    <div className="grid gap-3">
+                      <Label>Funções (selecione todas que se aplicam)</Label>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="can_bathe"
+                            checked={staffCapabilities.can_bathe}
+                            onCheckedChange={(checked) => handleStaffCapabilityChange('can_bathe', checked as boolean)}
+                          />
+                          <Label htmlFor="can_bathe">Você vai dar banhos?</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="can_groom"
+                            checked={staffCapabilities.can_groom}
+                            onCheckedChange={(checked) => handleStaffCapabilityChange('can_groom', checked as boolean)}
+                          />
+                          <Label htmlFor="can_groom">Você vai trabalhar na tosa?</Label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="can_vet"
+                            checked={staffCapabilities.can_vet}
+                            onCheckedChange={(checked) => handleStaffCapabilityChange('can_vet', checked as boolean)}
+                          />
+                          <Label htmlFor="can_vet">Você vai performar como veterinário?</Label>
+                        </div>
+                      </div>
+                    </div>
+
+                    {locations.length > 0 && (
+                      <div className="grid gap-2">
+                        <Label>Local de Trabalho (opcional)</Label>
+                        <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione um local (opcional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {locations.map((location) => (
+                              <SelectItem key={location.id} value={location.id}>
+                                {location.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </>
+                )}
                 
-                {codeRequired && (
+                {(accountType === 'staff' || accountType === 'admin') && (
+                  <Alert className="mb-2">
+                    <AlertDescription>
+                      {accountType === 'staff' && (
+                        <>
+                          Ao se cadastrar como staff, você terá acesso ao calendário de agendamentos e será listado como 
+                          profissional disponível para os clientes com base nas funções selecionadas.
+                        </>
+                      )}
+                      {accountType === 'admin' && (
+                        <>
+                          Ao se cadastrar como administrador, você terá acesso completo ao sistema, incluindo o painel administrativo 
+                          para gerenciar agendamentos, usuários e configurações.
+                        </>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )}
+                
+                {requiresCode && (
                   <div className="grid gap-2">
                     <Label htmlFor="registrationCode">Código de Registro</Label>
                     <Input
                       id="registrationCode"
                       type="text"
                       placeholder={`Insira o código de registro de ${
-                        role === 'groomer' ? 'tosador' : 
-                        role === 'vet' ? 'veterinário' : 
-                        role === 'admin' ? 'administrador' : role
+                        accountType === 'admin' ? 'administrador' : 'funcionário'
                       }`}
                       value={registrationCode}
                       onChange={(e) => setRegistrationCode(e.target.value)}
                       required
                     />
                     <p className="text-sm text-muted-foreground">
-                      Código fornecido pelo pet shop para registro de profissionais
+                      Código fornecido pelo pet shop para registro de {accountType === 'admin' ? 'administradores' : 'funcionários'}
                     </p>
                   </div>
                 )}

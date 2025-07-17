@@ -1,4 +1,3 @@
-
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
@@ -17,6 +16,7 @@ interface AuthContextType {
   isClient: boolean;
   isGroomer: boolean;
   isVet: boolean;
+  isStaff: boolean;
   userRole: string | null;
   userRoles: string[];
   hasRole: (role: string) => boolean;
@@ -36,9 +36,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const isClient = userRoles.includes('client');
   const isGroomer = userRoles.includes('groomer');
   const isVet = userRoles.includes('vet');
+  const isStaff = userRoles.includes('staff');
   
-  // Primary role priority: admin > groomer > vet > client
+  // Primary role priority: admin > staff > groomer > vet > client
   const userRole = isAdmin ? 'admin' : 
+                   isStaff ? 'staff' :
                    isGroomer ? 'groomer' : 
                    isVet ? 'vet' : 
                    isClient ? 'client' : null;
@@ -326,6 +328,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isClient,
         isGroomer,
         isVet,
+        isStaff,
         userRole,
         userRoles,
         hasRole,
