@@ -82,11 +82,11 @@ const Register = () => {
     if (!requiresCode) return true;
     
     try {
-      const roleValue = accountType === 'admin' ? 'admin' : 'staff';
+      const accountTypeValue = accountType; // 'admin' or 'staff'
       
-      const { data: isValid, error: validateError } = await supabase.rpc('validate_registration_code', {
+      const { data: isValid, error: validateError } = await supabase.rpc('validate_staff_registration_code', {
         code_value: registrationCode,
-        role_value: roleValue
+        account_type_value: accountTypeValue
       });
       
       if (validateError) {
@@ -113,7 +113,7 @@ const Register = () => {
     if (!requiresCode) return;
     
     try {
-      await supabase.rpc('mark_code_as_used', {
+      await supabase.rpc('mark_staff_code_as_used', {
         code_value: registrationCode
       });
     } catch (error) {
@@ -363,23 +363,22 @@ const Register = () => {
                       </div>
                     </div>
 
-                    {locations.length > 0 && (
-                      <div className="grid gap-2">
-                        <Label>Local de Trabalho (opcional)</Label>
-                        <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione um local (opcional)" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {locations.map((location) => (
-                              <SelectItem key={location.id} value={location.id}>
-                                {location.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                    <div className="grid gap-2">
+                      <Label>Local de Trabalho (opcional)</Label>
+                      <Select value={selectedLocation} onValueChange={setSelectedLocation}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione um local (opcional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Nenhum local específico</SelectItem>
+                          {locations.map((location) => (
+                            <SelectItem key={location.id} value={location.id}>
+                              {location.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </>
                 )}
                 

@@ -1149,6 +1149,39 @@ export type Database = {
           },
         ]
       }
+      staff_registration_codes: {
+        Row: {
+          account_type: string
+          code: string
+          created_at: string | null
+          id: string
+          is_used: boolean | null
+          notes: string | null
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          account_type: string
+          code: string
+          created_at?: string | null
+          id?: string
+          is_used?: boolean | null
+          notes?: string | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          account_type?: string
+          code?: string
+          created_at?: string | null
+          id?: string
+          is_used?: boolean | null
+          notes?: string | null
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: []
+      }
       staff_services: {
         Row: {
           created_at: string | null
@@ -1304,6 +1337,10 @@ export type Database = {
         Args: { code_value: string }
         Returns: undefined
       }
+      mark_staff_code_as_used: {
+        Args: { code_value: string }
+        Returns: undefined
+      }
       migrate_existing_users_to_roles: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -1318,6 +1355,10 @@ export type Database = {
       }
       validate_registration_code: {
         Args: { code_value: string; role_value: string }
+        Returns: boolean
+      }
+      validate_staff_registration_code: {
+        Args: { code_value: string; account_type_value: string }
         Returns: boolean
       }
     }
