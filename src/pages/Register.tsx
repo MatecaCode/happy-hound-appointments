@@ -121,39 +121,6 @@ const Register = () => {
     }
   };
 
-  const createStaffProfile = async (userId: string) => {
-    if (accountType !== 'staff') return;
-
-    const staffData = {
-      user_id: userId,
-      name: name,
-      email: email,
-      location_id: selectedLocation === 'none' ? null : selectedLocation || null,
-      can_bathe: staffCapabilities.can_bathe,
-      can_groom: staffCapabilities.can_groom,
-      can_vet: staffCapabilities.can_vet,
-      active: true
-    };
-
-    const { error } = await supabase
-      .from('staff_profiles')
-      .insert([staffData]);
-
-    if (error) {
-      console.error('Error creating staff profile:', error);
-      
-      // Provide specific error messages
-      if (error.code === '23505') {
-        throw new Error('Já existe um perfil de funcionário para este usuário.');
-      } else if (error.code === '23502') {
-        throw new Error('Dados obrigatórios em falta. Verifique se todos os campos estão preenchidos.');
-      } else if (error.message.includes('already exists')) {
-        throw new Error('Este email já está registrado como funcionário.');
-      } else {
-        throw new Error('Erro ao criar perfil de funcionário: ' + error.message);
-      }
-    }
-  };
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,25 +170,32 @@ const Register = () => {
         userRole = 'staff';
       }
       
-      // Create the user account
+      // Create the user account with staff capabilities in metadata
+      const signUpData: any = {
+        name,
+        role: userRole,
+      };
+
+      // Add staff capabilities to metadata if it's a staff account
+      if (accountType === 'staff') {
+        signUpData.can_groom = staffCapabilities.can_groom;
+        signUpData.can_vet = staffCapabilities.can_vet;
+        signUpData.can_bathe = staffCapabilities.can_bathe;
+        signUpData.location_id = selectedLocation === 'none' ? null : selectedLocation;
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            name,
-            role: userRole,
-          },
+          data: signUpData,
           emailRedirectTo: `${window.location.origin}/`,
         },
       });
 
       if (authError) throw authError;
 
-      // Create staff profile if needed
-      if (accountType === 'staff' && authData.user) {
-        await createStaffProfile(authData.user.id);
-      }
+      // Staff profile will be created automatically by the handle_new_user trigger
       
       // Mark the code as used after successful signup
       if (requiresCode) {
