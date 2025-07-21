@@ -1098,7 +1098,7 @@ export type Database = {
           email: string | null
           hourly_rate: number | null
           id: string
-          location_id: string
+          location_id: string | null
           name: string
           phone: string | null
           photo_url: string | null
@@ -1115,7 +1115,7 @@ export type Database = {
           email?: string | null
           hourly_rate?: number | null
           id?: string
-          location_id: string
+          location_id?: string | null
           name: string
           phone?: string | null
           photo_url?: string | null
@@ -1132,7 +1132,7 @@ export type Database = {
           email?: string | null
           hourly_rate?: number | null
           id?: string
-          location_id?: string
+          location_id?: string | null
           name?: string
           phone?: string | null
           photo_url?: string | null

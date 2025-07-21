@@ -141,7 +141,17 @@ const Register = () => {
 
     if (error) {
       console.error('Error creating staff profile:', error);
-      throw new Error('Erro ao criar perfil de funcionário.');
+      
+      // Provide specific error messages
+      if (error.code === '23505') {
+        throw new Error('Já existe um perfil de funcionário para este usuário.');
+      } else if (error.code === '23502') {
+        throw new Error('Dados obrigatórios em falta. Verifique se todos os campos estão preenchidos.');
+      } else if (error.message.includes('already exists')) {
+        throw new Error('Este email já está registrado como funcionário.');
+      } else {
+        throw new Error('Erro ao criar perfil de funcionário: ' + error.message);
+      }
     }
   };
   
@@ -234,7 +244,20 @@ const Register = () => {
       
       navigate('/login');
     } catch (error: any) {
-      setError(error.message || 'Erro ao criar conta.');
+      console.error('Registration error:', error);
+      
+      // Provide specific error messages for common auth errors
+      if (error.message?.includes('User already registered')) {
+        setError('Este email já está registrado. Tente fazer login ou use outro email.');
+      } else if (error.message?.includes('Invalid email')) {
+        setError('Email inválido. Verifique o formato do email.');
+      } else if (error.message?.includes('Password should be at least')) {
+        setError('A senha deve ter pelo menos 6 caracteres.');
+      } else if (error.message?.includes('Signup is disabled')) {
+        setError('Registros estão temporariamente desabilitados.');
+      } else {
+        setError(error.message || 'Erro ao criar conta. Tente novamente.');
+      }
     } finally {
       setIsLoading(false);
     }
