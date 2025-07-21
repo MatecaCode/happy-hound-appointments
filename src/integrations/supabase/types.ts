@@ -1270,6 +1270,10 @@ export type Database = {
             }
         Returns: string
       }
+      ensure_staff_availability: {
+        Args: { staff_profile_id: string; start_date: string; end_date: string }
+        Returns: undefined
+      }
       fix_missing_provider_profiles: {
         Args: Record<PropertyKey, never>
         Returns: {
