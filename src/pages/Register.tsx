@@ -128,7 +128,7 @@ const Register = () => {
       user_id: userId,
       name: name,
       email: email,
-      location_id: selectedLocation || null,
+      location_id: selectedLocation === 'none' ? null : selectedLocation || null,
       can_bathe: staffCapabilities.can_bathe,
       can_groom: staffCapabilities.can_groom,
       can_vet: staffCapabilities.can_vet,
@@ -370,7 +370,7 @@ const Register = () => {
                           <SelectValue placeholder="Selecione um local (opcional)" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Nenhum local específico</SelectItem>
+                          <SelectItem value="none">Nenhum local específico</SelectItem>
                           {locations.map((location) => (
                             <SelectItem key={location.id} value={location.id}>
                               {location.name}
