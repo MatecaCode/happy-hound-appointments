@@ -1218,7 +1218,7 @@ export type Database = {
           },
         ]
       }
-      user_roles: {
+      user_roles_legacy: {
         Row: {
           created_at: string | null
           id: string
