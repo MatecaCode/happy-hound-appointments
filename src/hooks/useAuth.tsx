@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       const fetchPromise = supabase
-        .from('user_roles')
+        .from('user_roles_legacy')
         .select('role')
         .eq('user_id', userId);
 
