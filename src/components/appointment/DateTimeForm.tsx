@@ -186,6 +186,11 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               onSelect={handleDateSelect}
               locale={ptBR}
               disabled={(date) => isDateDisabled(date)}
+              fromDate={new Date()} // Start from today
+              toDate={new Date(Date.now() + 120 * 24 * 60 * 60 * 1000)} // 120 days from now
+              fromYear={new Date().getFullYear()}
+              toYear={new Date().getFullYear() + 1}
+              captionLayout="dropdown-buttons"
               className="rounded-md border transition-all duration-200 hover:shadow-md"
             />
             {availabilityLoading && (
