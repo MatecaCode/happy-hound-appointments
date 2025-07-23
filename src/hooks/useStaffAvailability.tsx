@@ -58,6 +58,13 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         .lte('date', endDateStr)
         .eq('available', true);
 
+      console.log(`🎯 [BATCH_AVAILABILITY] Query executed with params:`, {
+        staffIds: uniqueStaffIds,
+        startDate: startDateStr,
+        endDate: endDateStr,
+        resultCount: availabilityData?.length || 0
+      });
+
       if (error) {
         console.error('❌ [BATCH_AVAILABILITY] Error fetching availability:', error);
         return new Set();
@@ -95,12 +102,14 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         
         // Skip Sundays (day 0)
         if (checkDate.getDay() === 0) {
+          console.log(`⏭️ [BATCH_AVAILABILITY] Skipping ${dateStr} - Sunday`);
           unavailableDatesSet.add(dateStr);
           continue;
         }
 
         const dateAvailability = availabilityByDate.get(dateStr);
         if (!dateAvailability) {
+          console.log(`❌ [BATCH_AVAILABILITY] No availability data for ${dateStr} - marking unavailable`);
           unavailableDatesSet.add(dateStr);
           continue;
         }
@@ -108,6 +117,8 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         // Check if any 30-minute client slot is available for ALL UNIQUE selected staff
         let hasAvailableClientSlot = false;
         const clientSlots = generateClientTimeSlots();
+
+        console.log(`🔍 [BATCH_AVAILABILITY] Checking ${dateStr} - has ${dateAvailability.size} staff with data`);
 
         for (const clientSlot of clientSlots) {
           // Check if ALL UNIQUE selected staff have availability for this client slot
@@ -129,7 +140,10 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         }
 
         if (!hasAvailableClientSlot) {
+          console.log(`❌ [BATCH_AVAILABILITY] ${dateStr} marked unavailable - no client slots available for all staff`);
           unavailableDatesSet.add(dateStr);
+        } else {
+          console.log(`✅ [BATCH_AVAILABILITY] ${dateStr} available - has at least one client slot for all staff`);
         }
       }
 
