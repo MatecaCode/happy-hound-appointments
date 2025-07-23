@@ -39,10 +39,10 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     console.log('🎯 [BATCH_AVAILABILITY] FINAL staff IDs for batch validation:', uniqueStaffIds);
     
     try {
-      // Check next 90 days
+      // Check next 120 days to ensure full availability coverage
       const today = new Date();
       const endDate = new Date(today);
-      endDate.setDate(today.getDate() + 90);
+      endDate.setDate(today.getDate() + 120);
       
       const startDateStr = format(today, 'yyyy-MM-dd');
       const endDateStr = format(endDate, 'yyyy-MM-dd');
@@ -86,8 +86,8 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
 
       const unavailableDatesSet = new Set<string>();
 
-      // Check each date in the 90-day range
-      for (let i = 0; i < 90; i++) {
+      // Check each date in the 120-day range
+      for (let i = 0; i < 120; i++) {
         const checkDate = new Date(today);
         checkDate.setDate(today.getDate() + i);
         
@@ -133,7 +133,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         }
       }
 
-      console.log(`✅ [BATCH_AVAILABILITY] Found ${unavailableDatesSet.size} unavailable dates out of 90 checked for ${uniqueStaffIds.length} UNIQUE staff`);
+      console.log(`✅ [BATCH_AVAILABILITY] Found ${unavailableDatesSet.size} unavailable dates out of 120 checked for ${uniqueStaffIds.length} UNIQUE staff`);
       
       return unavailableDatesSet;
 

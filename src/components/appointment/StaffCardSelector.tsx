@@ -147,20 +147,20 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900 truncate">
+                      <h3 className="font-semibold text-lg text-gray-900 truncate">
                         {member.name}
                       </h3>
                       
                       <Badge 
                         variant="secondary" 
-                        className={`text-xs mt-1 ${getRoleColor(member.role)}`}
+                        className={`text-sm mt-1 px-2 py-1 ${getRoleColor(member.role)}`}
                       >
                         {getRoleLabel(member.role)}
                       </Badge>
                       
                       <div className="flex items-center gap-1 mt-2">
                         {renderStars(member.rating)}
-                        <span className="text-xs text-muted-foreground ml-1">
+                        <span className="text-sm text-muted-foreground ml-1 font-medium">
                           {member.rating.toFixed(1)}
                         </span>
                       </div>
@@ -169,20 +169,20 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
 
                   {/* Specialty */}
                   {member.specialty && (
-                    <div className="text-sm text-muted-foreground">
-                      <span className="font-medium">Especialidade:</span> {member.specialty}
+                    <div className="text-base text-muted-foreground">
+                      <span className="font-semibold">Especialidade:</span> {member.specialty}
                     </div>
                   )}
 
                   {/* About/Bio */}
                   {member.about && (
-                    <div className="text-sm text-muted-foreground line-clamp-2">
+                    <div className="text-base text-muted-foreground line-clamp-2">
                       {member.about}
                     </div>
                   )}
 
                   {/* Selection indicator */}
-                  <div className={`text-center py-2 rounded-md text-sm font-medium transition-colors ${
+                  <div className={`text-center py-3 rounded-md text-base font-semibold transition-colors ${
                     isSelected 
                       ? 'bg-primary text-primary-foreground' 
                       : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
