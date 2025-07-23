@@ -16,7 +16,7 @@ const Book = () => {
           <h1 className="mb-4">Agende um <span className="text-primary">Serviço</span></h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
             {appointmentType === 'grooming' 
-              ? 'Marque uma sessão de tosa para seu amigo peludo usando nosso sistema de agendamento online.' 
+              ? 'Marque um serviço de banho e tosa para seu amigo peludo usando nosso sistema de agendamento online.' 
               : 'Marque uma consulta veterinária para seu animal de estimação usando nosso sistema de agendamento online.'}
           </p>
         </div>
@@ -31,7 +31,7 @@ const Book = () => {
             className="mb-8"
           >
             <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-              <TabsTrigger value="grooming">Serviço de Tosa</TabsTrigger>
+              <TabsTrigger value="grooming">Banho e Tosa</TabsTrigger>
               <TabsTrigger value="veterinary">Consulta Veterinária</TabsTrigger>
             </TabsList>
           </Tabs>

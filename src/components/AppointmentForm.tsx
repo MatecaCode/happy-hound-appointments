@@ -60,8 +60,8 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
 
   // Fetch appropriate services when service type changes
   React.useEffect(() => {
-    fetchServices();
-  }, [fetchServices]);
+    fetchServices(serviceType);
+  }, [fetchServices, serviceType]);
 
   // Reset selected staff when service changes
   React.useEffect(() => {

@@ -62,12 +62,23 @@ export const useAppointmentData = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
 
-  const fetchServices = useCallback(async () => {
+  const fetchServices = useCallback(async (serviceType?: 'grooming' | 'veterinary') => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('services')
         .select('*')
         .eq('active', true);
+
+      // Filter services based on service type
+      if (serviceType === 'grooming') {
+        // For grooming, show services that require bath or grooming (but not vet)
+        query = query.or('requires_bath.eq.true,requires_grooming.eq.true').eq('requires_vet', false);
+      } else if (serviceType === 'veterinary') {
+        // For veterinary, show services that require vet
+        query = query.eq('requires_vet', true);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         console.error('Error fetching services:', error);
