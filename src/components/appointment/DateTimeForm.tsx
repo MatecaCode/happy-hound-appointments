@@ -77,6 +77,22 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     serviceDuration: serviceDuration
   });
 
+  // Dynamic date range based on staff selection
+  const calendarDateRange = React.useMemo(() => {
+    if (uniqueSelectedStaff.length === 0) {
+      // If no staff selected, show next 30 days as fallback
+      return {
+        fromDate: new Date(),
+        toDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      };
+    }
+    // When staff are selected, show up to 120 days but let isDateDisabled handle availability
+    return {
+      fromDate: new Date(),
+      toDate: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000)
+    };
+  }, [uniqueSelectedStaff.length]);
+
   // CRITICAL: Log prop received by DateTimeForm
   React.useEffect(() => {
     console.log('\n🔥 ===== DateTimeForm PROP RECEIVED =====');
@@ -186,8 +202,8 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               onSelect={handleDateSelect}
               locale={ptBR}
               disabled={(date) => isDateDisabled(date)}
-              fromDate={new Date()} // Start from today
-              toDate={new Date(Date.now() + 120 * 24 * 60 * 60 * 1000)} // 120 days from now
+              fromDate={calendarDateRange.fromDate}
+              toDate={calendarDateRange.toDate}
               fromYear={new Date().getFullYear()}
               toYear={new Date().getFullYear() + 1}
               captionLayout="dropdown-buttons"
