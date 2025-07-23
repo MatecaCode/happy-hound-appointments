@@ -1304,7 +1304,11 @@ export type Database = {
         Returns: string
       }
       ensure_staff_availability: {
-        Args: { staff_profile_id: string; start_date: string; end_date: string }
+        Args: {
+          p_staff_profile_id: string
+          p_start_date: string
+          p_end_date: string
+        }
         Returns: undefined
       }
       fix_missing_provider_profiles: {
