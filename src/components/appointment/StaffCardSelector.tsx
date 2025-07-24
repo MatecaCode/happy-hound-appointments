@@ -28,14 +28,15 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
     return Array(5).fill(0).map((_, i) => (
       <Star
         key={i}
-        className={`h-4 w-4 transition-all duration-300 ${
+        className={`h-4 w-4 transition-all duration-700 ease-out ${
           i < Math.floor(rating) 
             ? `text-yellow-400 fill-yellow-400 ${isHovered ? 'animate-pulse drop-shadow-sm' : ''}` 
             : 'text-gray-300'
         } ${isHovered ? 'transform scale-110' : ''}`}
         style={isHovered ? {
-          animationDelay: `${i * 100}ms`,
-          filter: 'drop-shadow(0 0 4px rgba(251, 191, 36, 0.6))'
+          animationDelay: `${i * 200}ms`,
+          filter: 'drop-shadow(0 0 6px rgba(251, 191, 36, 0.8))',
+          animationDuration: '1.5s'
         } : {}}
       />
     ));
