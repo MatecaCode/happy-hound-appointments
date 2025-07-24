@@ -199,9 +199,9 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   }, [uniqueStaffIds, availableDates]);
 
   return {
-    isDateDisabled,
-    isLoading,
-    checkDateAvailability
-    availableDates
+  isDateDisabled,
+  isLoading,
+  checkDateAvailability,
+  availableDates
   };
 };
