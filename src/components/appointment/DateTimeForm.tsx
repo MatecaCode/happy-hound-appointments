@@ -73,7 +73,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     return unique;
   }, [selectedStaff]);
   
-  const { isDateDisabled, isLoading: availabilityLoading } = useStaffAvailability({
+  const { isDateDisabled, isLoading: availabilityLoading, availableDates } = useStaffAvailability({
     selectedStaffIds: uniqueSelectedStaff,
     serviceDuration: serviceDuration
   });
