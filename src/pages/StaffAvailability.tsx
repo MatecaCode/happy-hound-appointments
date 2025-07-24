@@ -182,6 +182,52 @@ const StaffAvailability = () => {
     updateAvailability(timeSlot, newStatus);
   };
 
+  const markAllUnavailable = async () => {
+    if (!selectedDate || !staffProfile) return;
+
+    try {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      
+      // Get all 10-minute backend slots for the entire day
+      const allBackendSlots: string[] = [];
+      timeSlots.forEach(clientSlot => {
+        const backendSlots = getRequiredBackendSlots(`${clientSlot.time}:00`, 30);
+        allBackendSlots.push(...backendSlots);
+      });
+
+      // Update all backend slots to unavailable
+      const promises = allBackendSlots.map(backendSlot => 
+        supabase
+          .from('staff_availability')
+          .upsert({
+            staff_profile_id: staffProfile.id,
+            date: dateStr,
+            time_slot: backendSlot,
+            available: false,
+          }, {
+            onConflict: 'staff_profile_id,date,time_slot'
+          })
+      );
+
+      const results = await Promise.all(promises);
+      const hasError = results.some(result => result.error);
+
+      if (hasError) {
+        throw new Error('Failed to update some availability slots');
+      }
+
+      // Update local state - mark all slots as unavailable
+      setTimeSlots(prevSlots =>
+        prevSlots.map(slot => ({ ...slot, status: 'unavailable' as AvailabilityStatus }))
+      );
+
+      toast.success('Todos os horários foram marcados como indisponíveis');
+    } catch (error) {
+      console.error('Error marking all unavailable:', error);
+      toast.error('Erro ao marcar horários como indisponíveis');
+    }
+  };
+
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -220,38 +266,65 @@ const StaffAvailability = () => {
                 Horários - {selectedDate ? format(selectedDate, "dd 'de' MMMM", { locale: ptBR }) : ''}
               </CardTitle>
               <CardDescription>
-                Clique nos horários para alternar disponibilidade
+                Clique nos blocos para alternar disponibilidade
               </CardDescription>
+              <div className="flex gap-2 mt-4">
+                <Button 
+                  variant="destructive" 
+                  size="sm"
+                  onClick={markAllUnavailable}
+                  disabled={loading}
+                >
+                  Marcar Tudo Indisponível
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
              {loading ? (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="space-y-2">
                   {[...Array(16)].map((_, i) => (
-                    <div key={i} className="h-12 bg-gray-200 rounded animate-pulse"></div>
+                    <div key={i} className="h-14 bg-muted rounded-lg animate-pulse"></div>
                   ))}
                 </div>
                ) : (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="space-y-2">
                   {timeSlots.map((slot) => (
-                    <Button
+                    <div
                       key={slot.time}
-                      variant="outline"
-                      size="default"
-                      className={`h-12 text-sm font-medium text-white border-0 ${getStatusColor(slot.status)}`}
+                      className={`flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer hover:bg-muted/50 ${
+                        slot.status === 'available' 
+                          ? 'border-green-200 bg-green-50' 
+                          : 'border-red-200 bg-red-50'
+                      }`}
                       onClick={() => toggleAvailability(slot.time, slot.status)}
                     >
-                      {slot.time}
-                    </Button>
+                      <div className="flex items-center gap-3">
+                        <div className="text-lg font-medium">
+                          {slot.time} - {format(new Date(`2000-01-01 ${slot.time}:00`), 'HH:mm', { locale: ptBR })}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          (30 minutos)
+                        </div>
+                      </div>
+                      <Badge 
+                        variant={slot.status === 'available' ? 'default' : 'destructive'}
+                        className={slot.status === 'available' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}
+                      >
+                        {slot.status === 'available' ? '✓ Disponível' : '✗ Indisponível'}
+                      </Badge>
+                    </div>
                   ))}
                 </div>
               )}
               
               <div className="flex gap-4 mt-6 justify-center">
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-green-500 text-white">Disponível</Badge>
+                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  <span className="text-sm">Disponível</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-red-500 text-white">Indisponível</Badge>
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <span className="text-sm">Indisponível</span>
                 </div>
               </div>
             </CardContent>

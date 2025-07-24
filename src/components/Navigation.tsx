@@ -61,7 +61,7 @@ const Navigation = () => {
     if (isStaff || hasRole('groomer') || hasRole('vet')) {
       return [
         { name: 'Dashboard', href: '/staff-dashboard' },
-        { name: 'Calendário', href: '/staff-availability' },
+        { name: 'Calendário', href: '/staff-calendar' },
         { name: 'Serviços', href: '/services' },
       ];
     }
@@ -194,7 +194,10 @@ const Navigation = () => {
                           <Link to="/staff-dashboard">Dashboard</Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <Link to="/staff-availability">Calendário</Link>
+                          <Link to="/staff-calendar">Calendário</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/staff-availability">Disponibilidade</Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <Link to="/pets">Meus Pets</Link>
@@ -337,11 +340,18 @@ const Navigation = () => {
                         Dashboard
                       </Link>
                       <Link
-                        to="/staff-availability"
+                        to="/staff-calendar"
                         className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
                         onClick={() => setIsOpen(false)}
                       >
                         Calendário
+                      </Link>
+                      <Link
+                        to="/staff-availability"
+                        className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        Disponibilidade
                       </Link>
                       <Link
                         to="/pets"
