@@ -56,7 +56,8 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         .in('staff_profile_id', uniqueStaffIds)
         .gte('date', startDateStr)
         .lte('date', endDateStr)
-        .eq('available', true);
+        .eq('available', true)
+        .limit(10000); // Increase limit to handle full 365-day range
 
       console.log(`🎯 [BATCH_AVAILABILITY] Query executed with params:`, {
         staffIds: uniqueStaffIds,
