@@ -57,7 +57,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   .in('staff_profile_id', uniqueStaffIds)
   .gte('date', startDateStr)
   .lte('date', endDateStr)
-  .filter('available', 'in', '(true,null)')
+  .eq('available', true)
   .range(0, 99999);
         if (availabilityData?.length) {
          const maxFetchedDate = availabilityData
