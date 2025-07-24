@@ -61,6 +61,7 @@ const Navigation = () => {
     if (isStaff || hasRole('groomer') || hasRole('vet')) {
       return [
         { name: 'Dashboard', href: '/staff-dashboard' },
+        { name: 'Calendário', href: '/staff-availability' },
         { name: 'Serviços', href: '/services' },
       ];
     }
