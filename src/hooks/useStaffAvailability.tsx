@@ -154,6 +154,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   const updateAvailableDates = useCallback(async () => {
     if (uniqueStaffIds.length === 0) {
       setAvailableDates(new Set());
+      console.log('[UPDATE] Available dates updated:', Array.from(availableDatesSet));
       return;
     }
 
@@ -188,7 +189,9 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     }
     
     const dateStr = format(date, 'yyyy-MM-dd');
-    return !availableDates.has(dateStr);
+  const isAvailable = availableDates.has(dateStr);
+  console.log('[DEBUG isDateDisabled]', dateStr, '->', !isAvailable ? 'DISABLED' : 'ENABLED');
+  return !isAvailable;
   }, [availableDates]);
 
   const checkDateAvailability = useCallback(async (date: Date): Promise<boolean> => {

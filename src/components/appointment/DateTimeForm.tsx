@@ -73,6 +73,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     return unique;
   }, [selectedStaff]);
   
+  console.log('[AVAILABILITY HOOK INIT] uniqueSelectedStaff:', uniqueSelectedStaff);
   const { isDateDisabled, isLoading: availabilityLoading, availableDates } = useStaffAvailability({
     selectedStaffIds: uniqueSelectedStaff,
     serviceDuration: serviceDuration
