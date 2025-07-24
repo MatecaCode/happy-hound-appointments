@@ -9,7 +9,6 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useStaffAvailability } from '@/hooks/useStaffAvailability';
 import { BrandedLoading } from '@/components/ui/branded-loading';
-import { format } from "date-fns";
 
 
 interface TimeSlot {
