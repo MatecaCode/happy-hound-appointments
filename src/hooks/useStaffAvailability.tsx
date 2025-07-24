@@ -202,5 +202,6 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     isDateDisabled,
     isLoading,
     checkDateAvailability
+    availableDates
   };
 };
