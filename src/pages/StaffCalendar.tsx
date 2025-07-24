@@ -311,14 +311,10 @@ const StaffCalendar: React.FC = () => {
       const promises = allBackendSlots.map(backendSlot => 
         supabase
           .from('staff_availability')
-          .upsert({
-            staff_profile_id: staffProfile.id,
-            date: dateStr,
-            time_slot: backendSlot,
-            available: false,
-          }, {
-            onConflict: 'staff_profile_id,date,time_slot'
-          })
+          .update({ available: false })
+          .eq('staff_profile_id', staffProfile.id)
+          .eq('date', dateStr)
+          .eq('time_slot', backendSlot)
       );
 
       const results = await Promise.all(promises);
@@ -336,6 +332,45 @@ const StaffCalendar: React.FC = () => {
     } catch (error) {
       console.error('Error marking all unavailable:', error);
       toast.error('Erro ao marcar horários como indisponíveis');
+    }
+  };
+
+  const markAllAvailable = async () => {
+    if (!availabilityDate || !staffProfile) return;
+
+    try {
+      const dateStr = format(availabilityDate, 'yyyy-MM-dd');
+      
+      const allBackendSlots: string[] = [];
+      timeSlots.forEach(clientSlot => {
+        const backendSlots = getRequiredBackendSlots(`${clientSlot.time}:00`, 30);
+        allBackendSlots.push(...backendSlots);
+      });
+
+      const promises = allBackendSlots.map(backendSlot => 
+        supabase
+          .from('staff_availability')
+          .update({ available: true })
+          .eq('staff_profile_id', staffProfile.id)
+          .eq('date', dateStr)
+          .eq('time_slot', backendSlot)
+      );
+
+      const results = await Promise.all(promises);
+      const hasError = results.some(result => result.error);
+
+      if (hasError) {
+        throw new Error('Failed to update some availability slots');
+      }
+
+      setTimeSlots(prevSlots =>
+        prevSlots.map(slot => ({ ...slot, status: 'available' as AvailabilityStatus }))
+      );
+
+      toast.success('Todos os horários foram marcados como disponíveis');
+    } catch (error) {
+      console.error('Error marking all available:', error);
+      toast.error('Erro ao marcar horários como disponíveis');
     }
   };
 
@@ -587,16 +622,25 @@ const StaffCalendar: React.FC = () => {
                   <CardDescription>
                     Clique nos blocos para alternar disponibilidade
                   </CardDescription>
-                  <div className="flex gap-2 mt-4">
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={markAllUnavailable}
-                      disabled={availabilityLoading}
-                    >
-                      Marcar Tudo Indisponível
-                    </Button>
-                  </div>
+                   <div className="flex gap-2 mt-4">
+                     <Button 
+                       variant="destructive" 
+                       size="sm"
+                       onClick={markAllUnavailable}
+                       disabled={availabilityLoading}
+                     >
+                       Marcar Tudo Indisponível
+                     </Button>
+                     <Button 
+                       variant="default" 
+                       size="sm"
+                       onClick={markAllAvailable}
+                       disabled={availabilityLoading}
+                       className="bg-green-600 hover:bg-green-700"
+                     >
+                       Marcar Tudo Disponível
+                     </Button>
+                   </div>
                 </CardHeader>
                 <CardContent>
                  {availabilityLoading ? (
@@ -605,17 +649,16 @@ const StaffCalendar: React.FC = () => {
                         <div key={i} className="h-14 bg-muted rounded-lg animate-pulse"></div>
                       ))}
                     </div>
-                   ) : (
-                    <div className="space-y-2">
-                      {timeSlots.map((slot) => (
+                    ) : (
+                     <div className="space-y-2">
+                       {timeSlots.map((slot) => (
                          <div
                            key={slot.time}
-                           className={`flex items-center justify-between p-4 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md ${
+                           className={`flex items-center justify-between p-4 rounded-lg border transition-all duration-200 ${
                              slot.status === 'available' 
-                               ? 'border-green-200 bg-green-50 hover:bg-green-100' 
-                               : 'border-red-200 bg-red-50 hover:bg-red-100'
+                               ? 'border-green-200 bg-green-50' 
+                               : 'border-red-200 bg-red-50'
                            }`}
-                           onClick={() => toggleAvailability(slot.time, slot.status)}
                          >
                            <div className="flex items-center gap-3">
                              <div className="text-lg font-medium">
@@ -640,18 +683,15 @@ const StaffCalendar: React.FC = () => {
                                    ? 'border-red-300 text-red-700 hover:bg-red-50' 
                                    : 'border-green-300 text-green-700 hover:bg-green-50'
                                }`}
-                               onClick={(e) => {
-                                 e.stopPropagation();
-                                 toggleAvailability(slot.time, slot.status);
-                               }}
+                               onClick={() => toggleAvailability(slot.time, slot.status)}
                              >
                                {slot.status === 'available' ? 'Tornar Indisponível' : 'Tornar Disponível'}
                              </Button>
                            </div>
                          </div>
-                      ))}
-                    </div>
-                  )}
+                       ))}
+                     </div>
+                   )}
                   
                   <div className="flex gap-4 mt-6 justify-center">
                     <div className="flex items-center gap-2">
