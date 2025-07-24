@@ -58,7 +58,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         .gte('date', startDateStr)
         .lte('date', endDateStr)
         .or('available.eq.true,available.is.null') // Treat NULL as available
-        .limit(35000); // Limit for 1 year: 2 staff × 96 slots × 360 days ≈ 35k available slots
+        .range(0, 99999)
 
       console.log(`🎯 [BATCH_AVAILABILITY] Query executed with params:`, {
         staffIds: uniqueStaffIds,
