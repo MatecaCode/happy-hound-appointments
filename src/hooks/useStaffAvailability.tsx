@@ -146,7 +146,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       }
 
       console.log(`✅ [BATCH_AVAILABILITY] Found ${availableDatesSet.size} available dates out of ${totalDays} checked for ${uniqueStaffIds.length} UNIQUE staff`);
-      
+      console.log('🎯 [BATCH_AVAILABILITY] Available dates found:', Array.from(availableDatesSet).sort());
       return availableDatesSet;
 
     } catch (error) {

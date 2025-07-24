@@ -28,12 +28,12 @@ export default function CreateAvailabilitySlots() {
 
       // Manually create 10-minute availability slots since the RPC doesn't exist
       const today = new Date();
-      const endDate = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
+      const endDate = new Date(Date.now() + 360 * 24 * 60 * 60 * 1000); // Changed from 90 to 360 days
 
       for (const staff of staffProfiles) {
         const availabilitySlots = [];
         
-        // Generate dates for next 90 days
+        // Generate dates for next 360 days
         for (let d = new Date(today); d <= endDate; d.setDate(d.getDate() + 1)) {
           const dateStr = d.toISOString().split('T')[0];
           
@@ -109,7 +109,7 @@ export default function CreateAvailabilitySlots() {
         <div className="text-sm text-gray-600">
           <p>
             This will create 10-minute availability slots for all active staff members 
-            for the next 90 days, using the new Phase 1 database schema.
+            for the next 360 days, using the new Phase 1 database schema.
           </p>
         </div>
       </CardContent>
