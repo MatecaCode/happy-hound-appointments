@@ -52,12 +52,13 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       // Fetch all 10-minute availability data for the date range and UNIQUE selected staff
       // Test: Handle NULL values in available column
       const { data: availabilityData, error } = await supabase
-        .from('staff_availability')
-        .select('staff_profile_id, date, time_slot, available')
-        .in('staff_profile_id', uniqueStaffIds)
-        .gte('date', startDateStr)
-        .lte('date', endDateStr)
-        .range(0, 99999)
+  .from('staff_availability')
+  .select('staff_profile_id, date, time_slot, available')
+  .in('staff_profile_id', uniqueStaffIds)
+  .gte('date', startDateStr)
+  .lte('date', endDateStr)
+  .filter('available', 'in', '(true,null)')
+  .range(0, 99999);
         if (availabilityData?.length) {
          const maxFetchedDate = availabilityData
           .map(d => new Date(d.date))
