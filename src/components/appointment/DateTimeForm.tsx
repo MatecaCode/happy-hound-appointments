@@ -205,7 +205,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               fromDate={calendarDateRange.fromDate}
               toDate={calendarDateRange.toDate}
               fromYear={new Date().getFullYear()}
-              toYear={new Date().getFullYear() + 1}
+              toYear={calendarDateRange.toDate.getFullYear()}
               captionLayout="dropdown-buttons"
               className="rounded-md border transition-all duration-200 hover:shadow-md"
             />
