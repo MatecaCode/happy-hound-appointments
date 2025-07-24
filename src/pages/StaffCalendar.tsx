@@ -3,12 +3,15 @@ import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Calendar, Clock, User, Dog } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, User, Dog } from 'lucide-react';
+import { generateClientTimeSlots, getRequiredBackendSlots, formatTimeSlot, isClientSlotAvailable } from '@/utils/timeSlotHelpers';
 
 interface Appointment {
   id: string;
@@ -22,6 +25,13 @@ interface Appointment {
   status: string;
 }
 
+type AvailabilityStatus = 'available' | 'unavailable';
+
+interface TimeSlot {
+  time: string;
+  status: AvailabilityStatus;
+}
+
 type ViewMode = 'day' | 'week';
 
 const StaffCalendar: React.FC = () => {
@@ -31,6 +41,11 @@ const StaffCalendar: React.FC = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(false);
   const [staffProfile, setStaffProfile] = useState<any>(null);
+  
+  // Availability management state
+  const [availabilityDate, setAvailabilityDate] = useState<Date | undefined>(new Date());
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -43,6 +58,12 @@ const StaffCalendar: React.FC = () => {
       fetchAppointments();
     }
   }, [selectedDate, viewMode, staffProfile]);
+
+  useEffect(() => {
+    if (availabilityDate && staffProfile) {
+      fetchAvailability();
+    }
+  }, [availabilityDate, staffProfile]);
 
   const loadStaffProfile = async () => {
     if (!user) return;
@@ -187,6 +208,141 @@ const StaffCalendar: React.FC = () => {
     );
   };
 
+  // Availability management functions
+  const generateClientFacingSlots = () => {
+    return generateClientTimeSlots().map(slot => formatTimeSlot(slot));
+  };
+
+  const fetchAvailability = async () => {
+    if (!availabilityDate || !staffProfile) return;
+
+    try {
+      setAvailabilityLoading(true);
+      const dateStr = format(availabilityDate, 'yyyy-MM-dd');
+      
+      const { data: availability, error } = await supabase
+        .from('staff_availability')
+        .select('time_slot, available')
+        .eq('staff_profile_id', staffProfile.id)
+        .eq('date', dateStr);
+
+      if (error) throw error;
+
+      const clientSlots = generateClientFacingSlots();
+      
+      const formattedSlots: TimeSlot[] = clientSlots.map(clientSlot => {
+        const serviceDuration = 30;
+        const isAvailable = isClientSlotAvailable(
+          `${clientSlot}:00`, 
+          serviceDuration, 
+          availability || []
+        );
+
+        return {
+          time: clientSlot,
+          status: isAvailable ? 'available' : 'unavailable'
+        };
+      });
+
+      setTimeSlots(formattedSlots);
+    } catch (error) {
+      console.error('Error fetching availability:', error);
+      toast.error('Erro ao carregar disponibilidade');
+    } finally {
+      setAvailabilityLoading(false);
+    }
+  };
+
+  const updateAvailability = async (timeSlot: string, newStatus: AvailabilityStatus) => {
+    if (!availabilityDate || !staffProfile) return;
+
+    try {
+      const dateStr = format(availabilityDate, 'yyyy-MM-dd');
+      const isAvailable = newStatus === 'available';
+
+      const backendSlots = getRequiredBackendSlots(`${timeSlot}:00`, 30);
+
+      const promises = backendSlots.map(backendSlot => 
+        supabase
+          .from('staff_availability')
+          .upsert({
+            staff_profile_id: staffProfile.id,
+            date: dateStr,
+            time_slot: backendSlot,
+            available: isAvailable,
+          }, {
+            onConflict: 'staff_profile_id,date,time_slot'
+          })
+      );
+
+      const results = await Promise.all(promises);
+      const hasError = results.some(result => result.error);
+
+      if (hasError) {
+        throw new Error('Failed to update some availability slots');
+      }
+
+      setTimeSlots(prevSlots =>
+        prevSlots.map(slot =>
+          slot.time === timeSlot ? { ...slot, status: newStatus } : slot
+        )
+      );
+
+      toast.success(`Horário ${timeSlot} ${isAvailable ? 'liberado' : 'bloqueado'}`);
+    } catch (error) {
+      console.error('Error updating availability:', error);
+      toast.error('Erro ao atualizar disponibilidade');
+    }
+  };
+
+  const toggleAvailability = (timeSlot: string, currentStatus: AvailabilityStatus) => {
+    const newStatus = currentStatus === 'available' ? 'unavailable' : 'available';
+    updateAvailability(timeSlot, newStatus);
+  };
+
+  const markAllUnavailable = async () => {
+    if (!availabilityDate || !staffProfile) return;
+
+    try {
+      const dateStr = format(availabilityDate, 'yyyy-MM-dd');
+      
+      const allBackendSlots: string[] = [];
+      timeSlots.forEach(clientSlot => {
+        const backendSlots = getRequiredBackendSlots(`${clientSlot.time}:00`, 30);
+        allBackendSlots.push(...backendSlots);
+      });
+
+      const promises = allBackendSlots.map(backendSlot => 
+        supabase
+          .from('staff_availability')
+          .upsert({
+            staff_profile_id: staffProfile.id,
+            date: dateStr,
+            time_slot: backendSlot,
+            available: false,
+          }, {
+            onConflict: 'staff_profile_id,date,time_slot'
+          })
+      );
+
+      const results = await Promise.all(promises);
+      const hasError = results.some(result => result.error);
+
+      if (hasError) {
+        throw new Error('Failed to update some availability slots');
+      }
+
+      setTimeSlots(prevSlots =>
+        prevSlots.map(slot => ({ ...slot, status: 'unavailable' as AvailabilityStatus }))
+      );
+
+      toast.success('Todos os horários foram marcados como indisponíveis');
+    } catch (error) {
+      console.error('Error marking all unavailable:', error);
+      toast.error('Erro ao marcar horários como indisponíveis');
+    }
+  };
+
   const renderDayView = () => {
     const timeSlots = generateTimeSlots();
     
@@ -318,78 +474,187 @@ const StaffCalendar: React.FC = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Calendário</h1>
           <p className="text-muted-foreground">
-            Visualize seus agendamentos em formato de calendário
+            Visualize seus agendamentos e gerencie sua disponibilidade
           </p>
         </div>
 
-        {/* View Toggle */}
-        <div className="flex items-center gap-4 mb-6">
-          <div className="flex items-center gap-2">
-            <Button
-              variant={viewMode === 'day' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('day')}
-            >
-              Dia
-            </Button>
-            <Button
-              variant={viewMode === 'week' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('week')}
-            >
-              Semana
-            </Button>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectedDate(new Date(selectedDate.getTime() - (viewMode === 'day' ? 86400000 : 604800000)))}
-            >
-              ←
-            </Button>
-            <span className="font-medium min-w-48 text-center">
-              {viewMode === 'day' 
-                ? format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
-                : `${format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'dd MMM', { locale: ptBR })} - ${format(endOfWeek(selectedDate, { weekStartsOn: 1 }), 'dd MMM yyyy', { locale: ptBR })}`
-              }
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setSelectedDate(new Date(selectedDate.getTime() + (viewMode === 'day' ? 86400000 : 604800000)))}
-            >
-              →
-            </Button>
-          </div>
-        </div>
+        <Tabs defaultValue="appointments" className="w-full">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-8">
+            <TabsTrigger value="appointments" className="flex items-center gap-2">
+              <CalendarIcon className="w-4 h-4" />
+              Ver Agendamentos
+            </TabsTrigger>
+            <TabsTrigger value="availability" className="flex items-center gap-2">
+              🛠️ Gerenciar Disponibilidade
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Calendar Content */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              {viewMode === 'day' ? 'Agenda do Dia' : 'Agenda da Semana'}
-            </CardTitle>
-            <CardDescription>
-              Seus agendamentos organizados por horário
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-4">
-                {[...Array(8)].map((_, i) => (
-                  <div key={i} className="h-16 bg-muted rounded-lg animate-pulse"></div>
-                ))}
+          <TabsContent value="appointments" className="space-y-6">
+            {/* View Toggle */}
+            <div className="flex items-center gap-4 mb-6">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={viewMode === 'day' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('day')}
+                >
+                  Dia
+                </Button>
+                <Button
+                  variant={viewMode === 'week' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('week')}
+                >
+                  Semana
+                </Button>
               </div>
-            ) : (
-              <>
-                {viewMode === 'day' ? renderDayView() : renderWeekView()}
-              </>
-            )}
-          </CardContent>
-        </Card>
+              
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedDate(new Date(selectedDate.getTime() - (viewMode === 'day' ? 86400000 : 604800000)))}
+                >
+                  ←
+                </Button>
+                <span className="font-medium min-w-48 text-center">
+                  {viewMode === 'day' 
+                    ? format(selectedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })
+                    : `${format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'dd MMM', { locale: ptBR })} - ${format(endOfWeek(selectedDate, { weekStartsOn: 1 }), 'dd MMM yyyy', { locale: ptBR })}`
+                  }
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedDate(new Date(selectedDate.getTime() + (viewMode === 'day' ? 86400000 : 604800000)))}
+                >
+                  →
+                </Button>
+              </div>
+            </div>
+
+            {/* Calendar Content */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarIcon className="w-5 h-5" />
+                  {viewMode === 'day' ? 'Agenda do Dia' : 'Agenda da Semana'}
+                </CardTitle>
+                <CardDescription>
+                  Seus agendamentos organizados por horário
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="space-y-4">
+                    {[...Array(8)].map((_, i) => (
+                      <div key={i} className="h-16 bg-muted rounded-lg animate-pulse"></div>
+                    ))}
+                  </div>
+                ) : (
+                  <>
+                    {viewMode === 'day' ? renderDayView() : renderWeekView()}
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="availability" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Calendar */}
+              <Card className="lg:col-span-1">
+                <CardHeader>
+                  <CardTitle>Selecionar Data</CardTitle>
+                  <CardDescription>
+                    Escolha o dia para gerenciar sua disponibilidade
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Calendar
+                    mode="single"
+                    selected={availabilityDate}
+                    onSelect={setAvailabilityDate}
+                    disabled={(date) => date < new Date() || date.getDay() === 0}
+                    locale={ptBR}
+                    className="rounded-md border"
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Time Slots */}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>
+                    Horários - {availabilityDate ? format(availabilityDate, "dd 'de' MMMM", { locale: ptBR }) : ''}
+                  </CardTitle>
+                  <CardDescription>
+                    Clique nos blocos para alternar disponibilidade
+                  </CardDescription>
+                  <div className="flex gap-2 mt-4">
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={markAllUnavailable}
+                      disabled={availabilityLoading}
+                    >
+                      Marcar Tudo Indisponível
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                 {availabilityLoading ? (
+                    <div className="space-y-2">
+                      {[...Array(16)].map((_, i) => (
+                        <div key={i} className="h-14 bg-muted rounded-lg animate-pulse"></div>
+                      ))}
+                    </div>
+                   ) : (
+                    <div className="space-y-2">
+                      {timeSlots.map((slot) => (
+                        <div
+                          key={slot.time}
+                          className={`flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer hover:bg-muted/50 ${
+                            slot.status === 'available' 
+                              ? 'border-green-200 bg-green-50' 
+                              : 'border-red-200 bg-red-50'
+                          }`}
+                          onClick={() => toggleAvailability(slot.time, slot.status)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="text-lg font-medium">
+                              {slot.time} - {format(new Date(`2000-01-01 ${slot.time}:00`), 'HH:mm', { locale: ptBR })}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              (30 minutos)
+                            </div>
+                          </div>
+                          <Badge 
+                            variant={slot.status === 'available' ? 'default' : 'destructive'}
+                            className={slot.status === 'available' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}
+                          >
+                            {slot.status === 'available' ? '✓ Disponível' : '✗ Indisponível'}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-4 mt-6 justify-center">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span className="text-sm">Disponível</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      <span className="text-sm">Indisponível</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
