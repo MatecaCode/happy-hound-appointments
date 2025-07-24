@@ -2,7 +2,7 @@
 import React from 'react';
 import Layout from '@/components/Layout';
 import CreateTestData from '@/components/CreateTestData';
-import SetupResourceTypes from '@/components/SetupResourceTypes';
+
 import CreateTestServices from '@/components/CreateTestServices';
 import CreateAvailabilitySlots from '@/components/CreateAvailabilitySlots';
 
@@ -13,7 +13,6 @@ const TestDataPage = () => {
         <h1 className="text-3xl font-bold mb-8">Configuração do Sistema</h1>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <SetupResourceTypes />
           <CreateTestServices />
           <CreateTestData />
           <CreateAvailabilitySlots />
