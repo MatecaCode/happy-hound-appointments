@@ -86,10 +86,10 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
         toDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       };
     }
-    // When staff are selected, show up to 120 days but let isDateDisabled handle availability
+    // When staff are selected, show up to 365 days to match availability hook
     return {
       fromDate: new Date(),
-      toDate: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000)
+      toDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
     };
   }, [uniqueSelectedStaff.length]);
 
