@@ -9,8 +9,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { generateClientTimeSlots, getRequiredBackendSlots, formatTimeSlot, isClientSlotAvailable } from '@/utils/timeSlotHelpers';
 
-type AvailabilityStatus = 'available' | 'unavailable' | 'pending';
+type AvailabilityStatus = 'available' | 'unavailable';
 
 interface TimeSlot {
   time: string;
@@ -58,15 +59,9 @@ const StaffAvailability = () => {
     }
   };
 
-  const generateTimeSlots = () => {
-    const slots: string[] = [];
-    for (let hour = 9; hour < 17; hour++) {
-      for (let minute = 0; minute < 60; minute += 10) {
-        const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        slots.push(timeString);
-      }
-    }
-    return slots;
+  const generateClientFacingSlots = () => {
+    // Use the 30-minute slots from timeSlotHelpers
+    return generateClientTimeSlots().map(slot => formatTimeSlot(slot));
   };
 
   const fetchAvailability = async () => {
@@ -76,7 +71,7 @@ const StaffAvailability = () => {
       setLoading(true);
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       
-      // Get existing availability for the selected date
+      // Get existing availability for the selected date (all 10-minute backend slots)
       const { data: availability, error } = await supabase
         .from('staff_availability')
         .select('time_slot, available')
@@ -85,21 +80,26 @@ const StaffAvailability = () => {
 
       if (error) throw error;
 
-      // Generate all possible time slots
-      const allSlots = generateTimeSlots();
-      const availabilityMap = new Map(
-        availability?.map(item => [
-          format(new Date(`2000-01-01T${item.time_slot}`), 'HH:mm'),
-          item.available
-        ]) || []
-      );
+      // Generate 30-minute client-facing slots
+      const clientSlots = generateClientFacingSlots();
+      
+      // Check availability for each 30-minute slot by checking all underlying 10-minute slots
+      const formattedSlots: TimeSlot[] = clientSlots.map(clientSlot => {
+        // For availability management, we assume 30-minute duration for each slot
+        const serviceDuration = 30;
+        
+        // Check if this 30-minute slot is available
+        const isAvailable = isClientSlotAvailable(
+          `${clientSlot}:00`, 
+          serviceDuration, 
+          availability || []
+        );
 
-      const formattedSlots: TimeSlot[] = allSlots.map(time => ({
-        time,
-        status: availabilityMap.has(time) 
-          ? (availabilityMap.get(time) ? 'available' : 'unavailable')
-          : 'available' // Default to available if not set
-      }));
+        return {
+          time: clientSlot,
+          status: isAvailable ? 'available' : 'unavailable'
+        };
+      });
 
       setTimeSlots(formattedSlots);
     } catch (error) {
@@ -117,19 +117,29 @@ const StaffAvailability = () => {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const isAvailable = newStatus === 'available';
 
-      // Upsert the availability record
-      const { error } = await supabase
-        .from('staff_availability')
-        .upsert({
-          staff_profile_id: staffProfile.id,
-          date: dateStr,
-          time_slot: `${timeSlot}:00`,
-          available: isAvailable,
-        }, {
-          onConflict: 'staff_profile_id,date,time_slot'
-        });
+      // Get all 10-minute backend slots for this 30-minute period
+      const backendSlots = getRequiredBackendSlots(`${timeSlot}:00`, 30);
 
-      if (error) throw error;
+      // Update all backend slots for this 30-minute period
+      const promises = backendSlots.map(backendSlot => 
+        supabase
+          .from('staff_availability')
+          .upsert({
+            staff_profile_id: staffProfile.id,
+            date: dateStr,
+            time_slot: backendSlot,
+            available: isAvailable,
+          }, {
+            onConflict: 'staff_profile_id,date,time_slot'
+          })
+      );
+
+      const results = await Promise.all(promises);
+      const hasError = results.some(result => result.error);
+
+      if (hasError) {
+        throw new Error('Failed to update some availability slots');
+      }
 
       // Update local state
       setTimeSlots(prevSlots =>
@@ -138,7 +148,7 @@ const StaffAvailability = () => {
         )
       );
 
-      toast.success('Disponibilidade atualizada');
+      toast.success(`Horário ${timeSlot} ${isAvailable ? 'liberado' : 'bloqueado'}`);
     } catch (error) {
       console.error('Error updating availability:', error);
       toast.error('Erro ao atualizar disponibilidade');
@@ -214,20 +224,20 @@ const StaffAvailability = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {loading ? (
-                <div className="grid grid-cols-6 gap-2">
-                  {[...Array(48)].map((_, i) => (
-                    <div key={i} className="h-10 bg-gray-200 rounded animate-pulse"></div>
+             {loading ? (
+                <div className="grid grid-cols-4 gap-2">
+                  {[...Array(16)].map((_, i) => (
+                    <div key={i} className="h-12 bg-gray-200 rounded animate-pulse"></div>
                   ))}
                 </div>
-              ) : (
-                <div className="grid grid-cols-6 gap-2">
+               ) : (
+                <div className="grid grid-cols-4 gap-2">
                   {timeSlots.map((slot) => (
                     <Button
                       key={slot.time}
                       variant="outline"
-                      size="sm"
-                      className={`h-10 text-xs font-medium text-white border-0 ${getStatusColor(slot.status)}`}
+                      size="default"
+                      className={`h-12 text-sm font-medium text-white border-0 ${getStatusColor(slot.status)}`}
                       onClick={() => toggleAvailability(slot.time, slot.status)}
                     >
                       {slot.time}
