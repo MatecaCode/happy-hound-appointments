@@ -18,6 +18,8 @@ import GroomerDashboard from "./pages/GroomerDashboard";
 import GroomerCalendar from "./pages/GroomerCalendar";
 import GroomerSchedule from "./pages/GroomerSchedule";
 import VetCalendar from "./pages/VetCalendar";
+import StaffDashboard from "./pages/StaffDashboard";
+import StaffAvailability from "./pages/StaffAvailability";
 import Shop from "./pages/Shop";
 import Cart from "./pages/Cart";
 import About from "./pages/About";
@@ -63,6 +65,8 @@ function App() {
               <Route path="/groomer-schedule" element={<GroomerSchedule />} />
               <Route path="/groomer-availability" element={<GroomerAvailability />} />
               <Route path="/vet-calendar" element={<VetCalendar />} />
+              <Route path="/staff-dashboard" element={<StaffDashboard />} />
+              <Route path="/staff-availability" element={<StaffAvailability />} />
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/booking" element={<AdminBookingPage />} />
               <Route path="/admin/availability" element={<AdminAvailabilityManager />} />

@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Navigation from './Navigation';
 import Footer from './Footer';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -21,16 +22,19 @@ const Layout = ({ children }: LayoutProps) => {
     
     console.log('🔍 Layout Debug - User role:', userRole, 'Current path:', location.pathname);
     
-    // Redirect staff to their dashboards if they're on the home page
-    if (userRole === 'groomer' && location.pathname === '/') {
-      navigate('/groomer-dashboard');
-      return;
-    }
+    // Check if user is staff and redirect to staff dashboard
+    const checkStaffRedirect = async () => {
+      if (location.pathname !== '/') return;
+      
+      const { data: profile } = await supabase.from('staff_profiles')
+        .select('id').eq('user_id', user.id).single();
+      
+      if (profile || userRole === 'groomer' || userRole === 'vet') {
+        navigate('/staff-dashboard');
+      }
+    };
     
-    if (userRole === 'vet' && location.pathname === '/') {
-      navigate('/vet-calendar');
-      return;
-    }
+    checkStaffRedirect();
     
     // Clients and admins stay on whatever page they're on
   }, [user, userRole, location.pathname, navigate, loading]);

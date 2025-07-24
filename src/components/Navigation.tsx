@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -35,12 +36,31 @@ const Navigation = () => {
     }
   };
 
+  // Check if user is staff
+  const [isStaff, setIsStaff] = React.useState(false);
+  
+  React.useEffect(() => {
+    const checkStaffStatus = async () => {
+      if (!user) return;
+      
+      const { data: profile } = await supabase
+        .from('staff_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+        
+      setIsStaff(!!profile);
+    };
+    
+    checkStaffStatus();
+  }, [user]);
+
   // Different navigation items for staff vs regular users
   const getNavItems = () => {
-    // Staff members (groomers, vets, etc.) get simplified navigation
-    if (hasRole('groomer') || hasRole('vet')) {
+    // Staff members get simplified navigation
+    if (isStaff || hasRole('groomer') || hasRole('vet')) {
       return [
-        { name: 'Dashboard', href: hasRole('groomer') ? '/groomer-dashboard' : '/vet-calendar' },
+        { name: 'Dashboard', href: '/staff-dashboard' },
         { name: 'Serviços', href: '/services' },
       ];
     }
@@ -167,10 +187,13 @@ const Navigation = () => {
                       <Link to="/profile">Perfil</Link>
                     </DropdownMenuItem>
                     {/* Staff members get dashboard link and can have pets/appointments */}
-                    {(hasRole('groomer') || hasRole('vet')) && (
+                    {(isStaff || hasRole('groomer') || hasRole('vet')) && (
                       <>
                         <DropdownMenuItem asChild>
-                          <Link to={hasRole('groomer') ? '/groomer-dashboard' : '/vet-calendar'}>Dashboard</Link>
+                          <Link to="/staff-dashboard">Dashboard</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/staff-availability">Calendário</Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <Link to="/pets">Meus Pets</Link>
@@ -178,15 +201,10 @@ const Navigation = () => {
                         <DropdownMenuItem asChild>
                           <Link to="/appointments">Agendamentos</Link>
                         </DropdownMenuItem>
-                        {hasRole('groomer') && (
-                          <DropdownMenuItem asChild>
-                            <Link to="/groomer-availability">Disponibilidade</Link>
-                          </DropdownMenuItem>
-                        )}
                       </>
                     )}
                     {/* Regular clients get pets and appointments */}
-                    {!hasRole('groomer') && !hasRole('vet') && !hasRole('admin') && (
+                    {!isStaff && !hasRole('groomer') && !hasRole('vet') && !hasRole('admin') && (
                       <>
                         <DropdownMenuItem asChild>
                           <Link to="/pets">Meus Pets</Link>
@@ -308,14 +326,21 @@ const Navigation = () => {
                   </Link>
                   
                   {/* Staff members get dashboard link and can have pets/appointments */}
-                  {(hasRole('groomer') || hasRole('vet')) && (
+                  {(isStaff || hasRole('groomer') || hasRole('vet')) && (
                     <>
                       <Link
-                        to={hasRole('groomer') ? '/groomer-dashboard' : '/vet-calendar'}
+                        to="/staff-dashboard"
                         className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
                         onClick={() => setIsOpen(false)}
                       >
                         Dashboard
+                      </Link>
+                      <Link
+                        to="/staff-availability"
+                        className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        Calendário
                       </Link>
                       <Link
                         to="/pets"
@@ -331,20 +356,11 @@ const Navigation = () => {
                       >
                         Agendamentos
                       </Link>
-                      {hasRole('groomer') && (
-                        <Link
-                          to="/groomer-availability"
-                          className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
-                          onClick={() => setIsOpen(false)}
-                        >
-                          Disponibilidade
-                        </Link>
-                      )}
                     </>
                   )}
                   
                   {/* Regular clients get pets and appointments */}
-                  {!hasRole('groomer') && !hasRole('vet') && !hasRole('admin') && (
+                  {!isStaff && !hasRole('groomer') && !hasRole('vet') && !hasRole('admin') && (
                     <>
                       <Link
                         to="/pets"
