@@ -196,25 +196,16 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
                         {renderStars(member.rating, hoveredStaff === member.id)}
                       </div>
                       <span 
-                        className={`text-lg font-bold text-primary transition-all duration-1000 ease-out relative ${
-                          hoveredStaff === member.id ? 'animate-pulse' : ''
+                        className={`text-lg font-bold text-primary transition-all duration-1000 ease-out ${
+                          hoveredStaff === member.id ? 'drop-shadow-lg' : ''
                         }`}
                         style={hoveredStaff === member.id ? {
                           animationDelay: '1.5s',
                           filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.8))',
-                          animationDuration: '2s'
+                          transition: 'filter 0.5s ease-out'
                         } : {}}
                       >
                         {member.rating.toFixed(1)}
-                        {hoveredStaff === member.id && (
-                          <div className="absolute -right-6 top-1/2 -translate-y-1/2">
-                            <div className="flex flex-col gap-0.5 animate-pulse" style={{ animationDelay: '2.5s', animationDuration: '1s' }}>
-                              <div className="w-3 h-0.5 bg-primary/80 rounded-full animate-pulse" style={{ animationDelay: '2.5s' }}></div>
-                              <div className="w-2 h-0.5 bg-primary/60 rounded-full animate-pulse" style={{ animationDelay: '2.7s' }}></div>
-                              <div className="w-1 h-0.5 bg-primary/40 rounded-full animate-pulse" style={{ animationDelay: '2.9s' }}></div>
-                            </div>
-                          </div>
-                        )}
                       </span>
                     </div>
                   </div>
