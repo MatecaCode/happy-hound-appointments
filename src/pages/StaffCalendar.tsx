@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { format, startOfWeek, endOfWeek, addDays, isSameDay } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Calendar, Clock, User, Dog } from 'lucide-react';
 
@@ -24,7 +24,7 @@ interface Appointment {
 
 type ViewMode = 'day' | 'week';
 
-const StaffCalendar = () => {
+const StaffCalendar: React.FC = () => {
   const { user } = useAuth();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('day');
@@ -211,9 +211,9 @@ const StaffCalendar = () => {
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-lg">{getServiceIcon(apt.service_type)}</span>
                           <span className="font-medium">{apt.service_name}</span>
-                              <Badge variant="outline">
-                                {apt.duration}min
-                              </Badge>
+                          <Badge variant="outline">
+                            {apt.duration}min
+                          </Badge>
                         </div>
                         <div className="flex items-center gap-4 text-sm">
                           <div className="flex items-center gap-1">
