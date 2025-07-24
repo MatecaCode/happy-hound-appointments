@@ -79,21 +79,17 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     serviceDuration: serviceDuration
   });
 
-  // Dynamic date range based on staff selection
+  // Remove hard-coded date range limitations - let the calendar navigate freely
   const calendarDateRange = React.useMemo(() => {
-    if (uniqueSelectedStaff.length === 0) {
-      // If no staff selected, show next 30 days as fallback
-      return {
-        fromDate: new Date(),
-        toDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      };
-    }
-    // When staff are selected, show up to 365 days to match availability hook
+    const today = new Date();
+    const nextYear = new Date();
+    nextYear.setFullYear(today.getFullYear() + 2); // Allow 2 years ahead
+    
     return {
-      fromDate: new Date(),
-      toDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+      fromDate: today,
+      toDate: nextYear
     };
-  }, [uniqueSelectedStaff.length]);
+  }, []);
 
   // CRITICAL: Log prop received by DateTimeForm
   React.useEffect(() => {
@@ -203,17 +199,11 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               selected={date}
               onSelect={handleDateSelect}
               locale={ptBR}
-              disabled={(date) => {
-              const dateStr = format(date, "yyyy-MM-dd");
-              const result = !availableDates.has(dateStr);
-              console.log(`[CALENDAR DEBUG] ${dateStr} => disabled=${result}`);
-              return result;
-              }}
+              disabled={isDateDisabled}
               fromDate={calendarDateRange.fromDate}
               toDate={calendarDateRange.toDate}
               fromYear={calendarDateRange.fromDate.getFullYear()}
               toYear={calendarDateRange.toDate.getFullYear()}
-              toMonth={calendarDateRange.toDate}
               captionLayout="dropdown-buttons"
               className="rounded-md border transition-all duration-200 hover:shadow-md"
             />
