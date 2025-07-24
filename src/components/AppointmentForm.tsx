@@ -148,10 +148,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     await handleSubmit(e, staffIds);
   };
 
-  console.log('🔍 DEBUG: AppointmentForm render - Service requires staff:', serviceRequiresStaff);
-  console.log('🔍 DEBUG: Service requirements loaded:', serviceRequirementsLoaded);
-  console.log('🔍 DEBUG: Current form step:', formStep);
-  console.log('🔍 DEBUG: Selected staff:', selectedStaff);
+  // Component state tracking
 
   return (
     <form onSubmit={handleFormSubmit} className="space-y-8">

@@ -26,7 +26,7 @@ export const useServiceRequirements = () => {
     setError(null);
     
     try {
-      console.log('🔍 [SERVICE_REQUIREMENTS] Loading all service requirements from Phase 1 schema');
+      // Loading service requirements
       
       // Updated for Phase 1: Get requirements directly from services table
       const { data: services, error } = await supabase
@@ -47,7 +47,7 @@ export const useServiceRequirements = () => {
         throw error;
       }
 
-      console.log('📊 [SERVICE_REQUIREMENTS] Raw services data:', services);
+      // Services data loaded
 
       // Build requirements map
       const requirementsMap: Record<string, ServiceRequirements> = {};
@@ -63,7 +63,7 @@ export const useServiceRequirements = () => {
         };
       });
 
-      console.log('✅ [SERVICE_REQUIREMENTS] Requirements map built:', requirementsMap);
+      // Requirements map built
       setServiceRequirements(requirementsMap);
       
     } catch (err: any) {
@@ -77,17 +77,13 @@ export const useServiceRequirements = () => {
   const getServiceRequirements = (serviceId: string): ServiceRequirements | null => {
     const requirements = serviceRequirements[serviceId];
     
-    console.log('🔍 [SERVICE_REQUIREMENTS] Getting requirements for service:', {
-      serviceId,
-      requirements,
-      available_services: Object.keys(serviceRequirements)
-    });
+    // Getting service requirements
     
     return requirements || null;
   };
 
   const refreshServiceRequirements = () => {
-    console.log('🔄 [SERVICE_REQUIREMENTS] Refreshing service requirements');
+    // Refreshing service requirements
     loadAllServiceRequirements();
   };
 

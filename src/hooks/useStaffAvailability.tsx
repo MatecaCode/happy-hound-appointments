@@ -30,13 +30,10 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   const checkBatchAvailability = useCallback(async (): Promise<Set<string>> => {
     if (uniqueStaffIds.length === 0) return new Set();
 
-    console.log(`🔄 [BATCH_AVAILABILITY] Checking availability with DEDUPLICATION:`, {
-      originalStaffIds: selectedStaffIds,
-      uniqueStaffIds,
-      deduplicationApplied: selectedStaffIds.length !== uniqueStaffIds.length
-    });
-    
-    console.log('🎯 [BATCH_AVAILABILITY] FINAL staff IDs for batch validation:', uniqueStaffIds);
+    // Basic logging for availability check
+    if (uniqueStaffIds.length !== selectedStaffIds.length) {
+      console.log(`[AVAILABILITY] Deduplicated ${selectedStaffIds.length} staff to ${uniqueStaffIds.length} unique IDs`);
+    }
     
     try {
       // Check next 1 year to ensure full availability coverage
@@ -47,7 +44,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       const startDateStr = format(today, 'yyyy-MM-dd');
       const endDateStr = format(endDate, 'yyyy-MM-dd');
 
-      console.log(`🔍 [BATCH_AVAILABILITY] Fetching availability from ${startDateStr} to ${endDateStr}`);
+      // Fetching availability data for date range
 
       // Fetch all 10-minute availability data for the date range and UNIQUE selected staff
       // Test: Handle NULL values in available column
@@ -59,28 +56,17 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   .lte('date', endDateStr)
   .eq('available', true)
   .range(0, 99999);
-        if (availabilityData?.length) {
-         const maxFetchedDate = availabilityData
-          .map(d => new Date(d.date))
-      .sort((a, b) => b.getTime() - a.getTime())[0];
-
-    console.log('🧠 MAX DATE FETCHED FROM SUPABASE:', maxFetchedDate?.toISOString().slice(0, 10));
-        }
+        // Data fetched successfully
 
 
-      console.log(`🎯 [BATCH_AVAILABILITY] Query executed with params:`, {
-        staffIds: uniqueStaffIds,
-        startDate: startDateStr,
-        endDate: endDateStr,
-        resultCount: availabilityData?.length || 0
-      });
+      // Query executed successfully
 
       if (error) {
         console.error('❌ [BATCH_AVAILABILITY] Error fetching availability:', error);
         return new Set();
       }
 
-      console.log(`📊 [BATCH_AVAILABILITY] Fetched ${availabilityData?.length || 0} available 10-min records for ${uniqueStaffIds.length} UNIQUE staff`);
+      // Processing availability data
 
       // Group availability by date and staff
       const availabilityByDate = new Map<string, Map<string, Array<{ time_slot: string; available: boolean }>>>();
@@ -113,21 +99,17 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         
         // Skip Sundays (day 0) - they are never available
         if (checkDate.getDay() === 0) {
-          console.log(`⏭️ [BATCH_AVAILABILITY] Skipping ${dateStr} - Sunday`);
           continue;
         }
 
         const dateAvailability = availabilityByDate.get(dateStr);
         if (!dateAvailability) {
-          console.log(`❌ [BATCH_AVAILABILITY] No availability data for ${dateStr} - not adding to available dates`);
           continue;
         }
 
-        // SIMPLIFIED LOGIC: Check if ANY staff has ANY availability for this date
+        // Check if ANY staff has ANY availability for this date
         let hasAnyAvailability = false;
         let totalAvailableSlots = 0;
-
-        console.log(`🔍 [BATCH_AVAILABILITY] Checking ${dateStr} - has ${dateAvailability.size} staff with data`);
 
         // Count total available slots for all selected staff on this date
         for (const staffId of uniqueStaffIds) {
@@ -139,22 +121,14 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
           if (availableCount > 0) {
             hasAnyAvailability = true;
           }
-          
-          console.log(`👤 [BATCH_AVAILABILITY] Staff ${staffId} on ${dateStr}: ${availableCount} available slots (including NULLs as available)`);
         }
 
-        console.log(`📊 [BATCH_AVAILABILITY] ${dateStr} total available slots: ${totalAvailableSlots}`);
-
         if (hasAnyAvailability && totalAvailableSlots > 0) {
-          console.log(`✅ [BATCH_AVAILABILITY] ${dateStr} added to available dates - has ${totalAvailableSlots} total available slots`);
           availableDatesSet.add(dateStr);
-        } else {
-          console.log(`❌ [BATCH_AVAILABILITY] ${dateStr} not available - no available slots found`);
         }
       }
 
-      console.log(`✅ [BATCH_AVAILABILITY] Found ${availableDatesSet.size} available dates out of ${totalDays} checked for ${uniqueStaffIds.length} UNIQUE staff`);
-      console.log('🎯 [BATCH_AVAILABILITY] Available dates found:', Array.from(availableDatesSet).sort());
+      // Available dates processed
       return availableDatesSet;
 
     } catch (error) {
@@ -171,7 +145,6 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
 
     setIsLoading(true);
     const availableDatesSet = await checkBatchAvailability();
-    console.log('[UPDATE] Available dates updated:', Array.from(availableDatesSet));
     setAvailableDates(availableDatesSet);
     setIsLoading(false);
   }, [uniqueStaffIds, checkBatchAvailability]);
@@ -201,9 +174,8 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     }
     
     const dateStr = format(date, 'yyyy-MM-dd');
-  const isAvailable = availableDates.has(dateStr);
-  console.log('[DEBUG isDateDisabled]', dateStr, '->', !isAvailable ? 'DISABLED' : 'ENABLED');
-  return !isAvailable;
+    const isAvailable = availableDates.has(dateStr);
+    return !isAvailable;
   }, [availableDates]);
 
   const checkDateAvailability = useCallback(async (date: Date): Promise<boolean> => {

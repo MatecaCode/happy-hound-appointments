@@ -89,15 +89,12 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     fetchTimeSlots,
   } = useAppointmentData();
 
-  // 🚨 CRITICAL: Log timeSlots received from useAppointmentData
+  // Track available time slots
   useEffect(() => {
-    console.log('🚨 [APPOINTMENT_FORM] timeSlots received from useAppointmentData:', {
-      length: timeSlots.length,
-      availableCount: timeSlots.filter(s => s.available).length,
-      fullArray: timeSlots,
-      availableSlotsOnly: timeSlots.filter(s => s.available),
-      timestamp: new Date().toISOString()
-    });
+    const availableCount = timeSlots.filter(s => s.available).length;
+    if (availableCount === 0 && timeSlots.length > 0) {
+      console.log('[APPOINTMENT] No available slots found for selected date/staff');
+    }
   }, [timeSlots]);
 
   // Get pricing for current pet/service combination
@@ -112,9 +109,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   // Check service requirements when service is selected
   useEffect(() => {
     if (selectedService) {
-      console.log('🔍 DEBUG: Checking service requirements for:', selectedService.name);
       const requiresStaff = selectedService.requires_grooming || selectedService.requires_vet || selectedService.requires_bath;
-      console.log('🔍 DEBUG: Service requires staff:', requiresStaff);
       setServiceRequiresStaff(requiresStaff);
       setServiceRequirementsLoaded(true);
     } else {
@@ -142,18 +137,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       staffIds.push(selectedGroomerId);
     }
     
-    // CRITICAL: Deduplicate staff IDs to prevent double-checking same staff
+    // Deduplicate staff IDs to prevent double-checking same staff
     const uniqueStaffIds = [...new Set(staffIds)];
-    
-    console.log('🎯 [GET_SELECTED_STAFF_IDS] Staff selection analysis:', {
-      selectedStaff,
-      selectedGroomerId,
-      rawStaffIds: staffIds,
-      uniqueStaffIds: uniqueStaffIds,
-      deduplicationApplied: staffIds.length !== uniqueStaffIds.length
-    });
-    
-    console.log('🎯 [GET_SELECTED_STAFF_IDS] FINAL staff IDs for all operations:', uniqueStaffIds);
     
     return uniqueStaffIds;
   }, [selectedStaff, selectedGroomerId]);
@@ -163,47 +148,22 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     return getSelectedStaffIds.sort().join(',');
   }, [getSelectedStaffIds]);
 
-  // Only fetch time slots when we have ALL required data - FIXED DEPENDENCIES
+  // Only fetch time slots when we have ALL required data
   useEffect(() => {
-    console.log('\n🚨 [APPOINTMENT_FORM] ===== FETCH TRIGGER EVALUATION =====');
-    console.log('🚨 [APPOINTMENT_FORM] Checking requirements:', {
-      hasDate: !!date,
-      hasSelectedService: !!selectedService,
-      serviceName: selectedService?.name,
-      staffIds: getSelectedStaffIds,
-      serviceRequiresStaff,
-      formStep,
-      isStep3: formStep === 3
-    });
-
-    // CRITICAL: Only fetch on step 3 (date/time selection) and when we have ALL required data
-    if (formStep !== 3) {
-      console.log('🚨 [APPOINTMENT_FORM] Not on step 3 - skipping fetchTimeSlots');
-      return;
-    }
-
-    if (!date || !selectedService) {
-      console.log('🚨 [APPOINTMENT_FORM] Missing date or service - clearing slots');
+    // Only fetch on step 3 (date/time selection) and when we have ALL required data
+    if (formStep !== 3 || !date || !selectedService) {
       return;
     }
 
     // If service requires staff, make sure staff is selected
     if (serviceRequiresStaff && getSelectedStaffIds.length === 0) {
-      console.log('🚨 [APPOINTMENT_FORM] Service requires staff but none selected - clearing slots');
       return;
     }
 
     // Now we have all required data - fetch time slots
     const staffIds = serviceRequiresStaff ? getSelectedStaffIds : [];
-    
-    console.log('✅ [APPOINTMENT_FORM] All requirements met - TRIGGERING fetchTimeSlots:', {
-      date: date.toISOString().split('T')[0],
-      staffIds,
-      service: selectedService.name
-    });
-    
     fetchTimeSlots(date, staffIds, setIsLoading, selectedService);
-  }, [date, staffIdsKey, selectedService, serviceRequiresStaff, fetchTimeSlots, formStep]); // REMOVED getSelectedStaffIds to prevent race conditions
+  }, [date, staffIdsKey, selectedService, serviceRequiresStaff, fetchTimeSlots, formStep]);
 
   const handleNextAvailableSelect = useCallback(() => {
     if (nextAvailable) {
@@ -216,33 +176,17 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   const handleSubmit = useCallback(async (e: React.FormEvent, selectedStaffIds?: string[]) => {
     e.preventDefault();
     
-    console.log('🚀 [BOOKING_SUBMIT] Starting submission with multi-staff support...');
+    // Starting booking submission
     
     if (!user || !selectedPet || !selectedService || !date || !selectedTimeSlotId) {
-      console.error('❌ [BOOKING_SUBMIT] Missing required fields');
       toast.error('Por favor, preencha todos os campos obrigatórios');
       return;
     }
 
-    // Get staff IDs - use parameter if provided, otherwise get from state (DEDUPLICATED)
+    // Get staff IDs - use parameter if provided, otherwise get from state
     const rawStaffIds = selectedStaffIds || getSelectedStaffIds;
-    // CRITICAL: Deduplicate staff IDs at the very start of booking
+    // Deduplicate staff IDs at the very start of booking
     const uniqueStaffIds = [...new Set(rawStaffIds)];
-    
-    console.log('📋 [BOOKING_SUBMIT] Multi-staff booking details (DEDUPLICATED):', {
-      user: user.id,
-      pet: selectedPet.name,
-      service: selectedService.name,
-      date: date.toISOString().split('T')[0],
-      time: selectedTimeSlotId,
-      rawStaffIds,
-      uniqueStaffIds,
-      uniqueStaffCount: uniqueStaffIds.length,
-      deduplicationApplied: rawStaffIds.length !== uniqueStaffIds.length,
-      serviceDuration: pricing?.duration || selectedService.default_duration || 60
-    });
-    
-    console.log('🎯 [BOOKING_SUBMIT] FINAL staff IDs for booking:', uniqueStaffIds);
 
     try {
       setIsLoading(true);
@@ -254,15 +198,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       await debugAppointmentStatus();
       await debugServiceStatus();
       
-      console.log('📋 [BOOKING_SUBMIT] Booking details:', {
-        user: user.id,
-        pet: selectedPet.name,
-        service: selectedService.name,
-        date: date.toISOString().split('T')[0],
-        time: selectedTimeSlotId,
-        uniqueStaffIds: uniqueStaffIds,
-        serviceDuration: pricing?.duration || selectedService.default_duration || 60
-      });
+      // Preparing booking details
 
       // Get client_id from user_id
       const { data: clientData, error: clientError } = await supabase
@@ -272,7 +208,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         .single();
 
       if (clientError || !clientData) {
-        console.error('❌ [BOOKING_SUBMIT] Client not found:', clientError);
         throw new Error('Erro ao encontrar dados do cliente');
       }
 
@@ -292,11 +227,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         total_price: pricing?.price || selectedService.base_price || 0
       };
 
-      console.log('📝 [BOOKING_SUBMIT] Creating appointment with data:', appointmentData);
+      // Creating appointment
 
       const bookingPromise = (async () => {
-        console.log('🚀 [BOOKING_SUBMIT] Using create_booking_atomic function...');
-        
         // Use the atomic create_booking_atomic function with calculated values
         const { data: appointmentId, error: atomicError } = await supabase.rpc('create_booking_atomic', {
           _user_id: user.id,
@@ -311,11 +244,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         });
 
         if (atomicError || !appointmentId) {
-          console.error('❌ [BOOKING_SUBMIT] Atomic booking failed:', atomicError);
           throw new Error(`Erro ao criar agendamento: ${atomicError?.message || 'Erro desconhecido'}`);
         }
-
-        console.log('✅ [BOOKING_SUBMIT] Atomic booking successful, appointment ID:', appointmentId);
 
         // Fetch the created appointment details for response
         const { data: appointment, error: fetchError } = await supabase
@@ -325,7 +255,6 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
           .single();
 
         if (fetchError || !appointment) {
-          console.error('❌ [BOOKING_SUBMIT] Failed to fetch created appointment:', fetchError);
           // Still return appointmentId since booking was successful
           return { id: appointmentId };
         }
@@ -346,7 +275,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         }
       });
 
-      console.log('🎉 [BOOKING_SUBMIT] Multi-staff booking completed successfully with UNIQUE staff!');
+      // Booking completed successfully
       
       // Reset form
       setSelectedPet(null);
@@ -362,7 +291,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       navigate(`/booking-success?id=${appointment.id}`);
       
     } catch (error: any) {
-      console.error('❌ [BOOKING_SUBMIT] Fatal error:', error);
+      console.error('Booking error:', error);
       
       // Wait for minimum loading time even on error
       await new Promise(resolve => setTimeout(resolve, Math.max(0, 1500)));

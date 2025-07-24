@@ -183,32 +183,20 @@ export const useAppointmentData = () => {
     setIsLoading: (loading: boolean) => void,
     selectedService: Service | null
   ) => {
-    console.log('\n🔥 ===== TIME SLOT PIPELINE START =====');
-    console.log('🔥 Input Parameters:', {
-      date: date?.toISOString(),
-      staffIds,
-      selectedService: selectedService?.name,
-      serviceDuration: selectedService?.default_duration || 60
-    });
-
     // Prevent unnecessary fetches
     if (!selectedService || !date) {
-      console.log('🔥 Missing required parameters - CLEARING SLOTS');
       setTimeSlots([]);
       return;
     }
     
     // If no staff provided, return all available slots for services that don't require staff
     if (!staffIds || staffIds.length === 0) {
-      console.log('🔥 No staff selected - checking if service requires staff');
       const serviceRequiresStaff = selectedService.requires_grooming || selectedService.requires_vet || selectedService.requires_bath;
       
       if (serviceRequiresStaff) {
-        console.log('🔥 Service requires staff but none selected - CLEARING SLOTS');
         setTimeSlots([]);
         return;
       } else {
-        console.log('🔥 Service does not require staff - generating default availability');
         // Generate default time slots for services that don't require staff
         const defaultSlots = generateClientTimeSlots().map(slot => ({
           id: slot,
@@ -220,9 +208,8 @@ export const useAppointmentData = () => {
       }
     }
 
-    // CRITICAL: Deduplicate staff IDs
+    // Deduplicate staff IDs
     const uniqueStaffIds = [...new Set(staffIds)];
-    console.log('🔥 Unique Staff IDs:', uniqueStaffIds);
     
     const dateForQuery = format(date, 'yyyy-MM-dd');
     const serviceDuration = selectedService.default_duration || 60;
@@ -230,15 +217,7 @@ export const useAppointmentData = () => {
     setIsLoading(true);
 
     try {
-      // STEP 1: Fetch RAW availability from Supabase - ALL records (TRUE and FALSE)
-      console.log('\n📋 STEP 1: Fetching RAW staff availability from database...');
-      console.log('📋 Query parameters:', {
-        table: 'staff_availability',
-        staff_profile_ids: uniqueStaffIds,
-        date: dateForQuery,
-        select: 'staff_profile_id, time_slot, available'
-      });
-      
+      // Fetch staff availability from database
       const { data: rawAvailabilityData, error } = await supabase
         .from('staff_availability')
         .select('staff_profile_id, time_slot, available')
@@ -246,27 +225,19 @@ export const useAppointmentData = () => {
         .eq('date', dateForQuery);
 
       if (error) {
-        console.error('❌ Error fetching staff availability:', error);
+        console.error('Error fetching staff availability:', error);
         toast.error('Erro ao buscar horários disponíveis');
         setTimeSlots([]);
         return;
       }
-
-      console.log('📊 RAW SUPABASE RESPONSE:');
-      console.log('   Total records:', rawAvailabilityData?.length || 0);
-      console.log('   Raw data:', rawAvailabilityData);
       
       if (!rawAvailabilityData || rawAvailabilityData.length === 0) {
-        console.log('⚠️ NO RAW AVAILABILITY DATA FOUND!');
         setTimeSlots([]);
         setIsLoading(false);
         return;
       }
 
-      // STEP 2: Build FULL MATRIX - every 10-min slot for every staff
-      console.log('\n📋 STEP 2: Building full availability matrix...');
-      
-      // Generate all possible 10-minute slots for the day
+      // Build availability matrix
       const all10MinSlots: string[] = [];
       for (let hour = 9; hour < 17; hour++) {
         for (let minute = 0; minute < 60; minute += 10) {
@@ -275,14 +246,13 @@ export const useAppointmentData = () => {
         }
       }
 
-      // Build matrix: [time_slot][staff_id] = available value
       const availabilityMatrix: Record<string, Record<string, boolean>> = {};
       
-      // Initialize matrix with all slots as unavailable (FALSE)
+      // Initialize matrix with all slots as unavailable
       for (const slot of all10MinSlots) {
         availabilityMatrix[slot] = {};
         for (const staffId of uniqueStaffIds) {
-          availabilityMatrix[slot][staffId] = false; // Default to FALSE
+          availabilityMatrix[slot][staffId] = false;
         }
       }
 
@@ -293,56 +263,31 @@ export const useAppointmentData = () => {
         }
       });
 
-      console.log('🗂️ FULL AVAILABILITY MATRIX:');
-      console.table(availabilityMatrix);
-
-      // STEP 3: Check each 30-minute slot for full duration availability
-      console.log('\n📋 STEP 3: Checking 30-minute slots for availability...');
-      
+      // Check each 30-minute slot for availability
       const clientSlots = generateClientTimeSlots();
       const availableSlots: TimeSlot[] = [];
 
       for (const clientSlot of clientSlots) {
-        console.log(`\n🔍 Checking 30-min slot: ${clientSlot}`);
-        
         let isSlotAvailable = true;
-        let blockingReason = '';
 
-        // SIMPLIFIED AVAILABILITY LOGIC - All selected staff must be available for full duration
-        
         // Get all required slots for the full service duration
         const requiredSlots = getRequiredBackendSlots(clientSlot, serviceDuration);
-        console.log(`📋 Required slots for ${clientSlot} (${serviceDuration}min):`, requiredSlots);
         
         // Check if ALL selected staff are available for ALL required slots
         for (const staffId of uniqueStaffIds) {
-          console.log(`🔍 Checking staff ${staffId} for full ${serviceDuration}min duration`);
-          
           let staffAvailable = true;
           
           for (const requiredSlot of requiredSlots) {
             if (!availabilityMatrix[requiredSlot] || availabilityMatrix[requiredSlot][staffId] !== true) {
               staffAvailable = false;
-              blockingReason = `Staff ${staffId} unavailable at ${requiredSlot}`;
-              console.log(`❌ Staff ${staffId} unavailable at ${requiredSlot}`);
               break;
             }
           }
           
           if (!staffAvailable) {
             isSlotAvailable = false;
-            console.log(`❌ BLOCKED: ${blockingReason}`);
             break;
-          } else {
-            console.log(`✅ Staff ${staffId} available for full duration`);
           }
-        }
-
-        console.log(`🔍 Final availability for ${clientSlot}: ${isSlotAvailable}`);
-        if (isSlotAvailable) {
-          console.log(`✅ AVAILABLE: ${clientSlot}`);
-        } else {
-          console.log(`❌ UNAVAILABLE: ${clientSlot} - ${blockingReason}`);
         }
 
         availableSlots.push({
@@ -352,19 +297,7 @@ export const useAppointmentData = () => {
         });
       }
 
-      console.log('\n📊 FINAL AVAILABLE SLOTS ARRAY:');
-      console.log('Available slots array:', availableSlots);
-      console.log('Total slots:', availableSlots.length);
-      console.log('Available count:', availableSlots.filter(s => s.available).length);
-      console.log('Unavailable count:', availableSlots.filter(s => !s.available).length);
-
-      // STEP 4: Set state - no modification, no filtering
-      console.log('\n📋 STEP 4: Setting timeSlots state...');
-      console.log('🔥 BEFORE setTimeSlots - availableSlots array:', availableSlots);
-      
       setTimeSlots(availableSlots);
-      
-      console.log('🔥 setTimeSlots called with array length:', availableSlots.length);
 
     } catch (error) {
       console.error('❌ Pipeline error:', error);
@@ -395,13 +328,12 @@ export const useAppointmentData = () => {
     return slots;
   };
 
-  // Monitor timeSlots state changes
+  // Monitor critical time slot issues
   useEffect(() => {
-    console.log('\n🔥 ===== timeSlots STATE CHANGED =====');
-    console.log('🔥 New timeSlots state:', timeSlots);
-    console.log('🔥 State length:', timeSlots.length);
-    console.log('🔥 Available in state:', timeSlots.filter(s => s.available).length);
-    console.log('🔥 Available slots:', timeSlots.filter(s => s.available).map(s => `${s.id} - ${s.time}`));
+    const availableCount = timeSlots.filter(s => s.available).length;
+    if (timeSlots.length > 0 && availableCount === 0) {
+      console.log('[TIME_SLOTS] No available slots found for current selection');
+    }
   }, [timeSlots]);
 
   return {

@@ -32,27 +32,23 @@ const TimeSlotSelector = ({
   selectedTimeSlotId,
   onSelectTimeSlot,
 }: TimeSlotSelectorProps) => {
-  // 🔍 DEBUG: Log slot data for validation
+  // Monitor slot availability for debugging
   React.useEffect(() => {
-    console.log('🕐 [TIME_SLOT_SELECTOR] Rendering with slots:', {
-      total_slots: timeSlots.length,
-      available_slots: timeSlots.filter(s => s.available).length,
-      selected_slot: selectedTimeSlotId,
-      all_slots: timeSlots.map(s => ({ id: s.id, time: s.time, available: s.available }))
-    });
+    const availableCount = timeSlots.filter(s => s.available).length;
+    if (timeSlots.length > 0 && availableCount === 0) {
+      console.log('[TIME_SLOT] No available slots for current selection');
+    }
   }, [timeSlots, selectedTimeSlotId]);
 
-  // ✅ SIMPLIFIED: Just handle slot selection - no booking logic here
+  // Handle slot selection
   const handleSlotSelection = (slotId: string) => {
     const slot = timeSlots.find(s => s.id === slotId);
     
     if (!slot) {
-      console.error('❌ [TIME_SLOT_SELECTOR] Slot not found:', slotId);
       toast.error('Horário não encontrado');
       return;
     }
     
-    console.log('🎯 [TIME_SLOT_SELECTOR] Slot selected (no booking yet):', slot);
     onSelectTimeSlot(slotId);
     toast.success(`Horário ${slot.time} selecionado`);
   };

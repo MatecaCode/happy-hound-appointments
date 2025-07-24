@@ -24,7 +24,7 @@ export default function CreateAvailabilitySlots() {
         return;
       }
 
-      console.log('📅 Generating availability for staff:', staffProfiles);
+      // Generating availability for staff
 
       // Manually create 10-minute availability slots since the RPC doesn't exist
       const today = new Date();
@@ -67,7 +67,7 @@ export default function CreateAvailabilitySlots() {
           }
         }
 
-        console.log(`✅ Generated availability for ${staff.name}`);
+        // Generated availability for staff member
       }
 
       toast.success(`Generated 10-minute availability slots for ${staffProfiles.length} staff members`);

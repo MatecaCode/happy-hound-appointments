@@ -40,7 +40,7 @@ export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
       return;
     }
 
-    console.log('🔍 [STAFF_FILTERING] Starting role-based staff filtering for service:', service.name);
+    // Starting staff filtering
 
     setIsLoading(true);
     setError(null);
@@ -54,7 +54,7 @@ export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
       };
       setServiceRequirements(requirements);
 
-      console.log('📊 [STAFF_FILTERING] Service requirements:', requirements);
+      // Service requirements loaded
 
       // Fetch all active staff
       const { data: allStaff, error: staffError } = await supabase
@@ -68,7 +68,7 @@ export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
       }
 
       if (!allStaff || allStaff.length === 0) {
-        console.log('❌ [STAFF_FILTERING] No active staff found');
+        // No active staff found
         setError('No active staff members found');
         return;
       }
@@ -117,11 +117,7 @@ export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
         }
       });
 
-      console.log('🎉 [STAFF_FILTERING] Staff by role:', {
-        bathers: bathers.length,
-        groomers: groomers.length,
-        vets: vets.length
-      });
+      // Staff filtering completed
 
       setStaffByRole({ bathers, groomers, vets });
 
