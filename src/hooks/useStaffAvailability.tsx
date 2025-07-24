@@ -50,13 +50,14 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       console.log(`🔍 [BATCH_AVAILABILITY] Fetching availability from ${startDateStr} to ${endDateStr}`);
 
       // Fetch all 10-minute availability data for the date range and UNIQUE selected staff
+      // Test: Handle NULL values in available column
       const { data: availabilityData, error } = await supabase
         .from('staff_availability')
         .select('staff_profile_id, date, time_slot, available')
         .in('staff_profile_id', uniqueStaffIds)
         .gte('date', startDateStr)
         .lte('date', endDateStr)
-        .eq('available', true)
+        .or('available.eq.true,available.is.null') // Treat NULL as available
         .limit(10000); // Increase limit to handle full 365-day range
 
       console.log(`🎯 [BATCH_AVAILABILITY] Query executed with params:`, {
@@ -122,14 +123,15 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         // Count total available slots for all selected staff on this date
         for (const staffId of uniqueStaffIds) {
           const staffAvailability = dateAvailability.get(staffId) || [];
-          const availableCount = staffAvailability.filter(slot => slot.available).length;
+          // Treat NULL as available (true)
+          const availableCount = staffAvailability.filter(slot => slot.available === true || slot.available === null).length;
           totalAvailableSlots += availableCount;
           
           if (availableCount > 0) {
             hasAnyAvailability = true;
           }
           
-          console.log(`👤 [BATCH_AVAILABILITY] Staff ${staffId} on ${dateStr}: ${availableCount} available slots`);
+          console.log(`👤 [BATCH_AVAILABILITY] Staff ${staffId} on ${dateStr}: ${availableCount} available slots (including NULLs as available)`);
         }
 
         console.log(`📊 [BATCH_AVAILABILITY] ${dateStr} total available slots: ${totalAvailableSlots}`);
