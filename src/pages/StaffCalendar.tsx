@@ -612,30 +612,47 @@ const StaffCalendar: React.FC = () => {
                    ) : (
                     <div className="space-y-2">
                       {timeSlots.map((slot) => (
-                        <div
-                          key={slot.time}
-                          className={`flex items-center justify-between p-4 rounded-lg border transition-colors cursor-pointer hover:bg-muted/50 ${
-                            slot.status === 'available' 
-                              ? 'border-green-200 bg-green-50' 
-                              : 'border-red-200 bg-red-50'
-                          }`}
-                          onClick={() => toggleAvailability(slot.time, slot.status)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="text-lg font-medium">
-                              {slot.time} - {format(new Date(`2000-01-01 ${slot.time}:00`), 'HH:mm', { locale: ptBR })}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              (30 minutos)
-                            </div>
-                          </div>
-                          <Badge 
-                            variant={slot.status === 'available' ? 'default' : 'destructive'}
-                            className={slot.status === 'available' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'}
-                          >
-                            {slot.status === 'available' ? '✓ Disponível' : '✗ Indisponível'}
-                          </Badge>
-                        </div>
+                         <div
+                           key={slot.time}
+                           className={`flex items-center justify-between p-4 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md ${
+                             slot.status === 'available' 
+                               ? 'border-green-200 bg-green-50 hover:bg-green-100' 
+                               : 'border-red-200 bg-red-50 hover:bg-red-100'
+                           }`}
+                           onClick={() => toggleAvailability(slot.time, slot.status)}
+                         >
+                           <div className="flex items-center gap-3">
+                             <div className="text-lg font-medium">
+                               {slot.time} - {format(new Date(`2000-01-01 ${slot.time}:00`), 'HH:mm', { locale: ptBR })}
+                             </div>
+                             <div className="text-sm text-muted-foreground">
+                               (30 minutos)
+                             </div>
+                           </div>
+                           <div className="flex items-center gap-2">
+                             <Badge 
+                               variant={slot.status === 'available' ? 'default' : 'destructive'}
+                               className={`${slot.status === 'available' ? 'bg-green-500 hover:bg-green-600' : 'bg-red-500 hover:bg-red-600'} transition-colors`}
+                             >
+                               {slot.status === 'available' ? '✓ Disponível' : '✗ Indisponível'}
+                             </Badge>
+                             <Button
+                               size="sm"
+                               variant="outline"
+                               className={`ml-2 text-xs ${
+                                 slot.status === 'available' 
+                                   ? 'border-red-300 text-red-700 hover:bg-red-50' 
+                                   : 'border-green-300 text-green-700 hover:bg-green-50'
+                               }`}
+                               onClick={(e) => {
+                                 e.stopPropagation();
+                                 toggleAvailability(slot.time, slot.status);
+                               }}
+                             >
+                               {slot.status === 'available' ? 'Tornar Indisponível' : 'Tornar Disponível'}
+                             </Button>
+                           </div>
+                         </div>
                       ))}
                     </div>
                   )}

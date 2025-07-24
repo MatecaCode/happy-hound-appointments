@@ -84,6 +84,7 @@ const StaffDashboard = () => {
       // Calculate date range based on view mode
       let startDate: string, endDate: string;
       if (viewMode === 'week') {
+        // Use the selected date to determine the week range
         const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
         const weekEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
         startDate = format(weekStart, 'yyyy-MM-dd');
