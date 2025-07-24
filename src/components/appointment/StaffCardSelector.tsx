@@ -23,11 +23,20 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
   isLoading = false,
   error
 }) => {
-  const renderStars = (rating: number) => {
+  const [hoveredStaff, setHoveredStaff] = React.useState<string | null>(null);
+  const renderStars = (rating: number, isHovered: boolean = false) => {
     return Array(5).fill(0).map((_, i) => (
       <Star
         key={i}
-        className={`h-3 w-3 ${i < Math.floor(rating) ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'}`}
+        className={`h-4 w-4 transition-all duration-300 ${
+          i < Math.floor(rating) 
+            ? `text-yellow-400 fill-yellow-400 ${isHovered ? 'animate-pulse drop-shadow-sm' : ''}` 
+            : 'text-gray-300'
+        } ${isHovered ? 'transform scale-110' : ''}`}
+        style={isHovered ? {
+          animationDelay: `${i * 100}ms`,
+          filter: 'drop-shadow(0 0 4px rgba(251, 191, 36, 0.6))'
+        } : {}}
       />
     ));
   };
@@ -128,11 +137,13 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
                   : 'hover:border-primary/30 hover:shadow-lg border-border/50'
               } bg-card/80 backdrop-blur-sm`}
               onClick={() => onStaffSelect(member.id)}
+              onMouseEnter={() => setHoveredStaff(member.id)}
+              onMouseLeave={() => setHoveredStaff(null)}
             >
               <CardContent className="p-6">
-                <div className="space-y-5">
-                  {/* Header with avatar and basic info */}
-                  <div className="flex items-start space-x-4">
+                <div className="space-y-4">
+                  {/* Header with avatar and name */}
+                  <div className="flex items-center space-x-4">
                     <div className="relative">
                       <Avatar className={`h-20 w-20 border-3 transition-all duration-300 ${
                         isSelected ? 'border-primary shadow-lg' : 'border-border group-hover:border-primary/50'
@@ -157,42 +168,45 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
                       )}
                     </div>
                     
-                    <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex-1 min-w-0">
                       <h3 className={`font-bold text-xl transition-colors duration-300 ${
                         isSelected ? 'text-primary' : 'text-foreground group-hover:text-primary'
                       }`}>
                         {member.name}
                       </h3>
-                      
-                      <Badge 
-                        variant="secondary" 
-                        className={`text-sm font-medium px-3 py-1 transition-all duration-300 ${
-                          isSelected 
-                            ? 'bg-primary/20 text-primary border-primary/30' 
-                            : `${getRoleColor(member.role)} group-hover:scale-105`
-                        }`}
-                      >
-                        {getRoleLabel(member.role)}
-                      </Badge>
-                      
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1">
-                          {renderStars(member.rating)}
-                        </div>
-                        <span className="text-lg font-bold text-primary">
-                          {member.rating.toFixed(1)}
-                        </span>
-                      </div>
                     </div>
                   </div>
 
-                  {/* Specialty */}
+                  {/* Centralized Role and Rating */}
+                  <div className="text-center space-y-3">
+                    <Badge 
+                      variant="secondary" 
+                      className={`text-sm font-medium px-3 py-1 transition-all duration-300 ${
+                        isSelected 
+                          ? 'bg-primary/20 text-primary border-primary/30' 
+                          : `${getRoleColor(member.role)} group-hover:scale-105`
+                      }`}
+                    >
+                      {getRoleLabel(member.role)}
+                    </Badge>
+                    
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center gap-1">
+                        {renderStars(member.rating, hoveredStaff === member.id)}
+                      </div>
+                      <span className="text-lg font-bold text-primary">
+                        {member.rating.toFixed(1)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Specialty - Smaller */}
                   {member.specialty && (
-                    <div className="bg-secondary/30 rounded-lg p-3 border border-border/50">
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
+                    <div className="bg-secondary/20 rounded-md p-2 border border-border/30">
+                      <p className="text-xs font-medium text-muted-foreground mb-1">
                         Especialidade
                       </p>
-                      <p className="text-base font-semibold text-foreground">
+                      <p className="text-sm font-semibold text-foreground">
                         {member.specialty}
                       </p>
                     </div>
@@ -200,24 +214,24 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
 
                   {/* About/Bio */}
                   {member.about && (
-                    <div className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+                    <div className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
                       {member.about}
                     </div>
                   )}
 
-                  {/* Selection indicator */}
-                  <div className={`text-center py-4 rounded-xl font-bold text-base transition-all duration-300 transform ${
+                  {/* Selection indicator - Slimmer */}
+                  <div className={`text-center py-2 rounded-lg font-semibold text-sm transition-all duration-300 transform ${
                     isSelected 
-                      ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg scale-105' 
+                      ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-md scale-105' 
                       : 'bg-gradient-to-r from-secondary/50 to-secondary/80 text-foreground hover:from-primary/10 hover:to-primary/20 hover:text-primary group-hover:scale-105'
                   }`}>
                     {isSelected ? (
                       <div className="flex items-center justify-center gap-2">
-                        <CheckCircle className="h-5 w-5" />
+                        <CheckCircle className="h-4 w-4" />
                         <span>Selecionado</span>
                       </div>
                     ) : (
-                      'Selecionar Profissional'
+                      'Selecionar'
                     )}
                   </div>
                 </div>
