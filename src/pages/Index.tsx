@@ -1,18 +1,30 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Layout from '@/components/Layout';
 import Hero from '@/components/Hero';
 import ServiceCard from '@/components/ServiceCard';
 import Testimonials from '@/components/Testimonials';
 import { Scissors, ShowerHead, Dog, Sparkles, Syringe, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
+import { useAuth } from '@/hooks/useAuth';
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, isStaff, loading } = useAuth();
+  
   const institutionalAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
   const servicesHeaderAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
   const banhoTosaHeaderAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
   const ctaAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
+
+  // Redirect staff members to their dashboard
+  useEffect(() => {
+    if (!loading && user && isStaff) {
+      console.log('🏥 Staff member detected, redirecting to dashboard...');
+      navigate('/staff-dashboard', { replace: true });
+    }
+  }, [user, isStaff, loading, navigate]);
 
   const services = [
     {
