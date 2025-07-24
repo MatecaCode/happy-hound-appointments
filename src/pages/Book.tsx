@@ -28,15 +28,25 @@ const Book = () => {
             onValueChange={(value) => setAppointmentType(value as 'grooming' | 'veterinary')}
             className="mb-8"
           >
-            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-              <TabsTrigger value="grooming">Banho e Tosa</TabsTrigger>
-              <TabsTrigger value="veterinary">Consulta Veterinária</TabsTrigger>
+            <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 bg-background p-1 rounded-lg border">
+              <TabsTrigger 
+                value="grooming" 
+                className="relative data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-300 ease-in-out transform data-[state=active]:scale-105"
+              >
+                Banho e Tosa
+              </TabsTrigger>
+              <TabsTrigger 
+                value="veterinary"
+                className="relative data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all duration-300 ease-in-out transform data-[state=active]:scale-105"
+              >
+                Consulta Veterinária
+              </TabsTrigger>
             </TabsList>
           </Tabs>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2">
-              <AppointmentForm serviceType={appointmentType} />
+              <AppointmentForm key={appointmentType} serviceType={appointmentType} />
             </div>
             
             <div className="space-y-6">
