@@ -154,12 +154,12 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
   const updateAvailableDates = useCallback(async () => {
     if (uniqueStaffIds.length === 0) {
       setAvailableDates(new Set());
-      console.log('[UPDATE] Available dates updated:', Array.from(availableDatesSet));
       return;
     }
 
     setIsLoading(true);
     const availableDatesSet = await checkBatchAvailability();
+    console.log('[UPDATE] Available dates updated:', Array.from(availableDatesSet));
     setAvailableDates(availableDatesSet);
     setIsLoading(false);
   }, [uniqueStaffIds, checkBatchAvailability]);
