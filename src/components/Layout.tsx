@@ -21,13 +21,12 @@ const Layout = ({ children }: LayoutProps) => {
     
     console.log('🔍 Layout Debug - User role:', userRole, 'Current path:', location.pathname);
     
-    // Redirect groomers to their dashboard if they're on the home page
+    // Redirect staff to their dashboards if they're on the home page
     if (userRole === 'groomer' && location.pathname === '/') {
       navigate('/groomer-dashboard');
       return;
     }
     
-    // Redirect vets to their calendar if they're on the home page
     if (userRole === 'vet' && location.pathname === '/') {
       navigate('/vet-calendar');
       return;

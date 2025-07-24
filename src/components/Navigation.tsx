@@ -35,16 +35,17 @@ const Navigation = () => {
     }
   };
 
-  // Different navigation items for groomers vs regular users
+  // Different navigation items for staff vs regular users
   const getNavItems = () => {
-    if (hasRole('groomer')) {
+    // Staff members (groomers, vets, etc.) get simplified navigation
+    if (hasRole('groomer') || hasRole('vet')) {
       return [
-        { name: 'Dashboard', href: '/groomer-dashboard' },
-        { name: 'Banho & Tosa', href: '/', scrollTo: 'banho-e-tosa' },
+        { name: 'Dashboard', href: hasRole('groomer') ? '/groomer-dashboard' : '/vet-calendar' },
+        { name: 'Serviços', href: '/services' },
       ];
     }
     
-    // Default navigation for non-groomers
+    // Default navigation for clients and others
     return [
       { name: 'Início', href: '/' },
       { name: 'Serviços', href: '/services' },
@@ -165,25 +166,33 @@ const Navigation = () => {
                     <DropdownMenuItem asChild>
                       <Link to="/profile">Perfil</Link>
                     </DropdownMenuItem>
-                    {/* Only show pets and appointments for non-groomer users */}
-                    {!hasRole('groomer') && (
+                    {/* Staff members get dashboard link and can have pets/appointments */}
+                    {(hasRole('groomer') || hasRole('vet')) && (
                       <>
+                        <DropdownMenuItem asChild>
+                          <Link to={hasRole('groomer') ? '/groomer-dashboard' : '/vet-calendar'}>Dashboard</Link>
+                        </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <Link to="/pets">Meus Pets</Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <Link to="/appointments">Agendamentos</Link>
                         </DropdownMenuItem>
+                        {hasRole('groomer') && (
+                          <DropdownMenuItem asChild>
+                            <Link to="/groomer-availability">Disponibilidade</Link>
+                          </DropdownMenuItem>
+                        )}
                       </>
                     )}
-                    {/* Groomers can still register pets and book services */}
-                    {hasRole('groomer') && (
+                    {/* Regular clients get pets and appointments */}
+                    {!hasRole('groomer') && !hasRole('vet') && !hasRole('admin') && (
                       <>
                         <DropdownMenuItem asChild>
                           <Link to="/pets">Meus Pets</Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <Link to="/groomer-availability">Disponibilidade</Link>
+                          <Link to="/appointments">Agendamentos</Link>
                         </DropdownMenuItem>
                       </>
                     )}
@@ -298,9 +307,16 @@ const Navigation = () => {
                     Perfil
                   </Link>
                   
-                  {/* Only show pets and appointments for non-groomer users */}
-                  {!hasRole('groomer') && (
+                  {/* Staff members get dashboard link and can have pets/appointments */}
+                  {(hasRole('groomer') || hasRole('vet')) && (
                     <>
+                      <Link
+                        to={hasRole('groomer') ? '/groomer-dashboard' : '/vet-calendar'}
+                        className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                        onClick={() => setIsOpen(false)}
+                      >
+                        Dashboard
+                      </Link>
                       <Link
                         to="/pets"
                         className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
@@ -315,11 +331,20 @@ const Navigation = () => {
                       >
                         Agendamentos
                       </Link>
+                      {hasRole('groomer') && (
+                        <Link
+                          to="/groomer-availability"
+                          className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                          onClick={() => setIsOpen(false)}
+                        >
+                          Disponibilidade
+                        </Link>
+                      )}
                     </>
                   )}
                   
-                  {/* Groomers can still register pets and manage availability */}
-                  {hasRole('groomer') && (
+                  {/* Regular clients get pets and appointments */}
+                  {!hasRole('groomer') && !hasRole('vet') && !hasRole('admin') && (
                     <>
                       <Link
                         to="/pets"
@@ -329,11 +354,11 @@ const Navigation = () => {
                         Meus Pets
                       </Link>
                       <Link
-                        to="/groomer-availability"
+                        to="/appointments"
                         className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
                         onClick={() => setIsOpen(false)}
                       >
-                        Disponibilidade
+                        Agendamentos
                       </Link>
                     </>
                   )}
