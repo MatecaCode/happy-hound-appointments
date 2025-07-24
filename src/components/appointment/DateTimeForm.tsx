@@ -9,6 +9,8 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useStaffAvailability } from '@/hooks/useStaffAvailability';
 import { BrandedLoading } from '@/components/ui/branded-loading';
+import { format } from "date-fns";
+
 
 interface TimeSlot {
   id: string;
@@ -201,7 +203,12 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               selected={date}
               onSelect={handleDateSelect}
               locale={ptBR}
-              disabled={(date) => isDateDisabled(date)}
+              disabled={(date) => {
+              const dateStr = format(date, "yyyy-MM-dd");
+              const result = !availableDates.has(dateStr);
+              console.log(`[CALENDAR DEBUG] ${dateStr} => disabled=${result}`);
+              return result;
+              }}
               fromDate={calendarDateRange.fromDate}
               toDate={calendarDateRange.toDate}
               fromYear={calendarDateRange.fromDate.getFullYear()}
