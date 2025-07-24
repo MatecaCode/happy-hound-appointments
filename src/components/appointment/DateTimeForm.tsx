@@ -218,71 +218,19 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
             <div className="animate-fade-in">
               <Label>Horários disponíveis</Label>
               
-              {/* CRITICAL: Debug panel to verify data flow */}
-              <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded text-xs">
-                <div className="font-bold mb-3 text-blue-800">🔥 UI PROP VERIFICATION</div>
-                <div className="space-y-1">
-                  <div><span className="font-bold">Prop received:</span> {new Date().toISOString()}</div>
-                  <div><span className="font-bold">timeSlots type:</span> {typeof timeSlots}</div>
-                  <div><span className="font-bold">timeSlots isArray:</span> {Array.isArray(timeSlots).toString()}</div>
-                  <div><span className="font-bold">timeSlots length:</span> {timeSlots?.length || 'undefined'}</div>
-                  <div><span className="font-bold">Available count:</span> {timeSlots?.filter(s => s?.available)?.length || 0}</div>
-                  <div><span className="font-bold">Unavailable count:</span> {timeSlots?.filter(s => !s?.available)?.length || 0}</div>
-                </div>
-
-                {timeSlots && timeSlots.length > 0 ? (
-                  <div className="mt-3 max-h-32 overflow-y-auto">
-                    <table className="w-full text-xs border">
-                      <thead>
-                        <tr className="bg-blue-100">
-                          <th className="p-1 border text-left">Index</th>
-                          <th className="p-1 border text-left">ID</th>
-                          <th className="p-1 border text-left">Time</th>
-                          <th className="p-1 border text-left">Available</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {timeSlots.map((slot, index) => (
-                          <tr key={index} className={slot?.available ? 'bg-green-50' : 'bg-red-50'}>
-                            <td className="p-1 border">{index}</td>
-                            <td className="p-1 border">{slot?.id || 'MISSING'}</td>
-                            <td className="p-1 border">{slot?.time || 'MISSING'}</td>
-                            <td className="p-1 border">{slot?.available ? '✅ TRUE' : '❌ FALSE'}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="mt-3 p-3 bg-red-200 border border-red-400 rounded">
-                    <div className="font-bold text-red-800">❌ NO SLOTS IN PROP</div>
-                  </div>
-                )}
-              </div>
-              
               {isLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="w-6 h-6 animate-spin mr-2" />
                   <span>Carregando horários...</span>
                 </div>
               ) : timeSlots.length > 0 ? (
-                <div>
-                  <div className="grid grid-cols-3 gap-2 mt-2">
-                    {renderTimeSlots()}
-                  </div>
-                  
-                  {/* Verify buttons are actually rendered */}
-                  <div className="mt-4 p-3 bg-gray-100 rounded text-xs">
-                    <div><span className="font-bold">Buttons rendered:</span> {timeSlots.length}</div>
-                    <div><span className="font-bold">Available buttons:</span> {timeSlots.filter(s => s.available).length}</div>
-                  </div>
+                <div className="grid grid-cols-3 gap-2 mt-2">
+                  {renderTimeSlots()}
                 </div>
               ) : (
-                <div>
-                  <p className="text-muted-foreground mt-2">
-                    Nenhum horário disponível para esta data com os profissionais selecionados.
-                  </p>
-                </div>
+                <p className="text-muted-foreground mt-2">
+                  Nenhum horário disponível para esta data com os profissionais selecionados.
+                </p>
               )}
             </div>
           )}
