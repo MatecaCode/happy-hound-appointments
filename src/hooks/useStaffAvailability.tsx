@@ -14,7 +14,7 @@ interface UseStaffAvailabilityParams {
 }
 
 export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseStaffAvailabilityParams) => {
-  const [unavailableDates, setUnavailableDates] = useState<Set<string>>(new Set());
+  const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
 
   // Memoize the unique staff IDs to prevent infinite loops
@@ -91,7 +91,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         });
       });
 
-      const unavailableDatesSet = new Set<string>();
+      const availableDatesSet = new Set<string>();
 
       // Check each date in the 120-day range
       for (let i = 0; i < 120; i++) {
@@ -100,17 +100,15 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         
         const dateStr = format(checkDate, 'yyyy-MM-dd');
         
-        // Skip Sundays (day 0)
+        // Skip Sundays (day 0) - they are never available
         if (checkDate.getDay() === 0) {
           console.log(`⏭️ [BATCH_AVAILABILITY] Skipping ${dateStr} - Sunday`);
-          unavailableDatesSet.add(dateStr);
           continue;
         }
 
         const dateAvailability = availabilityByDate.get(dateStr);
         if (!dateAvailability) {
-          console.log(`❌ [BATCH_AVAILABILITY] No availability data for ${dateStr} - marking unavailable`);
-          unavailableDatesSet.add(dateStr);
+          console.log(`❌ [BATCH_AVAILABILITY] No availability data for ${dateStr} - not adding to available dates`);
           continue;
         }
 
@@ -135,17 +133,17 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
 
         console.log(`📊 [BATCH_AVAILABILITY] ${dateStr} total available slots: ${totalAvailableSlots}`);
 
-        if (!hasAnyAvailability || totalAvailableSlots === 0) {
-          console.log(`❌ [BATCH_AVAILABILITY] ${dateStr} marked unavailable - no available slots found`);
-          unavailableDatesSet.add(dateStr);
+        if (hasAnyAvailability && totalAvailableSlots > 0) {
+          console.log(`✅ [BATCH_AVAILABILITY] ${dateStr} added to available dates - has ${totalAvailableSlots} total available slots`);
+          availableDatesSet.add(dateStr);
         } else {
-          console.log(`✅ [BATCH_AVAILABILITY] ${dateStr} available - has ${totalAvailableSlots} total available slots`);
+          console.log(`❌ [BATCH_AVAILABILITY] ${dateStr} not available - no available slots found`);
         }
       }
 
-      console.log(`✅ [BATCH_AVAILABILITY] Found ${unavailableDatesSet.size} unavailable dates out of 120 checked for ${uniqueStaffIds.length} UNIQUE staff`);
+      console.log(`✅ [BATCH_AVAILABILITY] Found ${availableDatesSet.size} available dates out of 120 checked for ${uniqueStaffIds.length} UNIQUE staff`);
       
-      return unavailableDatesSet;
+      return availableDatesSet;
 
     } catch (error) {
       console.error('❌ [BATCH_AVAILABILITY] Error in batch availability check:', error);
@@ -153,15 +151,15 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     }
   }, [uniqueStaffIds, serviceDuration]);
 
-  const updateUnavailableDates = useCallback(async () => {
+  const updateAvailableDates = useCallback(async () => {
     if (uniqueStaffIds.length === 0) {
-      setUnavailableDates(new Set());
+      setAvailableDates(new Set());
       return;
     }
 
     setIsLoading(true);
-    const unavailableDatesSet = await checkBatchAvailability();
-    setUnavailableDates(unavailableDatesSet);
+    const availableDatesSet = await checkBatchAvailability();
+    setAvailableDates(availableDatesSet);
     setIsLoading(false);
   }, [uniqueStaffIds, checkBatchAvailability]);
 
@@ -172,8 +170,8 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       return;
     }
     
-    updateUnavailableDates();
-  }, [staffIdsKey, serviceDuration, updateUnavailableDates]);
+    updateAvailableDates();
+  }, [staffIdsKey, serviceDuration, updateAvailableDates]);
 
   const isDateDisabled = useCallback((date: Date) => {
     const today = new Date();
@@ -190,15 +188,15 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     }
     
     const dateStr = format(date, 'yyyy-MM-dd');
-    return unavailableDates.has(dateStr);
-  }, [unavailableDates]);
+    return !availableDates.has(dateStr);
+  }, [availableDates]);
 
   const checkDateAvailability = useCallback(async (date: Date): Promise<boolean> => {
     if (uniqueStaffIds.length === 0) return true;
 
     const dateStr = format(date, 'yyyy-MM-dd');
-    return !unavailableDates.has(dateStr);
-  }, [uniqueStaffIds, unavailableDates]);
+    return availableDates.has(dateStr);
+  }, [uniqueStaffIds, availableDates]);
 
   return {
     isDateDisabled,
