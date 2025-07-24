@@ -114,36 +114,32 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
           continue;
         }
 
-        // Check if any 30-minute client slot is available for ALL UNIQUE selected staff
-        let hasAvailableClientSlot = false;
-        const clientSlots = generateClientTimeSlots();
+        // SIMPLIFIED LOGIC: Check if ANY staff has ANY availability for this date
+        let hasAnyAvailability = false;
+        let totalAvailableSlots = 0;
 
         console.log(`🔍 [BATCH_AVAILABILITY] Checking ${dateStr} - has ${dateAvailability.size} staff with data`);
 
-        for (const clientSlot of clientSlots) {
-          // Check if ALL UNIQUE selected staff have availability for this client slot
-          let allUniqueStaffAvailable = true;
+        // Count total available slots for all selected staff on this date
+        for (const staffId of uniqueStaffIds) {
+          const staffAvailability = dateAvailability.get(staffId) || [];
+          const availableCount = staffAvailability.filter(slot => slot.available).length;
+          totalAvailableSlots += availableCount;
           
-          for (const staffId of uniqueStaffIds) {
-            const staffAvailability = dateAvailability.get(staffId) || [];
-            
-            if (!isClientSlotAvailable(clientSlot, serviceDuration, staffAvailability)) {
-              allUniqueStaffAvailable = false;
-              break;
-            }
+          if (availableCount > 0) {
+            hasAnyAvailability = true;
           }
-
-          if (allUniqueStaffAvailable) {
-            hasAvailableClientSlot = true;
-            break;
-          }
+          
+          console.log(`👤 [BATCH_AVAILABILITY] Staff ${staffId} on ${dateStr}: ${availableCount} available slots`);
         }
 
-        if (!hasAvailableClientSlot) {
-          console.log(`❌ [BATCH_AVAILABILITY] ${dateStr} marked unavailable - no client slots available for all staff`);
+        console.log(`📊 [BATCH_AVAILABILITY] ${dateStr} total available slots: ${totalAvailableSlots}`);
+
+        if (!hasAnyAvailability || totalAvailableSlots === 0) {
+          console.log(`❌ [BATCH_AVAILABILITY] ${dateStr} marked unavailable - no available slots found`);
           unavailableDatesSet.add(dateStr);
         } else {
-          console.log(`✅ [BATCH_AVAILABILITY] ${dateStr} available - has at least one client slot for all staff`);
+          console.log(`✅ [BATCH_AVAILABILITY] ${dateStr} available - has ${totalAvailableSlots} total available slots`);
         }
       }
 
