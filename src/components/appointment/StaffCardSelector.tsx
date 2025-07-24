@@ -105,62 +105,81 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="text-sm text-muted-foreground">
-        {allowMultiple ? 
-          'Selecione um ou mais profissionais para seu atendimento:' : 
-          'Selecione um profissional para seu atendimento:'
-        }
+    <div className="space-y-6">
+      <div className="text-center">
+        <p className="text-lg text-muted-foreground">
+          {allowMultiple ? 
+            'Selecione um ou mais profissionais para cuidar do seu pet' : 
+            'Escolha o profissional que irá cuidar do seu pet'
+          }
+        </p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {staff.map((member) => {
           const isSelected = selectedStaffIds.includes(member.id);
           
           return (
             <Card
               key={member.id}
-              className={`cursor-pointer transition-all duration-200 hover:shadow-md ${
+              className={`group cursor-pointer transition-all duration-300 ease-out transform hover:scale-[1.02] hover:shadow-xl ${
                 isSelected 
-                  ? 'border-primary ring-2 ring-primary/20 bg-primary/5' 
-                  : 'hover:border-gray-300'
-              }`}
+                  ? 'border-primary ring-2 ring-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 shadow-lg scale-[1.02]' 
+                  : 'hover:border-primary/30 hover:shadow-lg border-border/50'
+              } bg-card/80 backdrop-blur-sm`}
               onClick={() => onStaffSelect(member.id)}
             >
-              <CardContent className="p-4">
-                <div className="space-y-4">
+              <CardContent className="p-6">
+                <div className="space-y-5">
                   {/* Header with avatar and basic info */}
-                  <div className="flex items-start space-x-3">
+                  <div className="flex items-start space-x-4">
                     <div className="relative">
-                      <Avatar className="h-16 w-16 border-2 border-gray-100">
+                      <Avatar className={`h-20 w-20 border-3 transition-all duration-300 ${
+                        isSelected ? 'border-primary shadow-lg' : 'border-border group-hover:border-primary/50'
+                      }`}>
                         <AvatarImage 
                           src={member.profile_image || undefined} 
                           alt={member.name}
+                          className="object-cover"
                         />
-                        <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                        <AvatarFallback className={`text-lg font-bold transition-colors duration-300 ${
+                          isSelected 
+                            ? 'bg-primary text-primary-foreground' 
+                            : 'bg-gradient-to-br from-primary/10 to-primary/20 text-primary group-hover:from-primary/20 group-hover:to-primary/30'
+                        }`}>
                           {member.name.substring(0, 2).toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       {isSelected && (
-                        <CheckCircle className="absolute -top-1 -right-1 h-5 w-5 text-primary bg-white rounded-full" />
+                        <div className="absolute -top-2 -right-2 animate-scale-in">
+                          <CheckCircle className="h-6 w-6 text-primary bg-background rounded-full shadow-md" />
+                        </div>
                       )}
                     </div>
                     
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-lg text-gray-900 truncate">
+                    <div className="flex-1 min-w-0 space-y-2">
+                      <h3 className={`font-bold text-xl transition-colors duration-300 ${
+                        isSelected ? 'text-primary' : 'text-foreground group-hover:text-primary'
+                      }`}>
                         {member.name}
                       </h3>
                       
                       <Badge 
                         variant="secondary" 
-                        className={`text-sm mt-1 px-2 py-1 ${getRoleColor(member.role)}`}
+                        className={`text-sm font-medium px-3 py-1 transition-all duration-300 ${
+                          isSelected 
+                            ? 'bg-primary/20 text-primary border-primary/30' 
+                            : `${getRoleColor(member.role)} group-hover:scale-105`
+                        }`}
                       >
                         {getRoleLabel(member.role)}
                       </Badge>
                       
-                      <div className="flex items-center gap-1 mt-2">
-                        {renderStars(member.rating)}
-                        <span className="text-sm text-muted-foreground ml-1 font-medium">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                          {renderStars(member.rating)}
+                        </div>
+                        <span className="text-lg font-bold text-primary">
                           {member.rating.toFixed(1)}
                         </span>
                       </div>
@@ -169,25 +188,37 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
 
                   {/* Specialty */}
                   {member.specialty && (
-                    <div className="text-base text-muted-foreground">
-                      <span className="font-semibold">Especialidade:</span> {member.specialty}
+                    <div className="bg-secondary/30 rounded-lg p-3 border border-border/50">
+                      <p className="text-sm font-medium text-muted-foreground mb-1">
+                        Especialidade
+                      </p>
+                      <p className="text-base font-semibold text-foreground">
+                        {member.specialty}
+                      </p>
                     </div>
                   )}
 
                   {/* About/Bio */}
                   {member.about && (
-                    <div className="text-base text-muted-foreground line-clamp-2">
+                    <div className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
                       {member.about}
                     </div>
                   )}
 
                   {/* Selection indicator */}
-                  <div className={`text-center py-3 rounded-md text-base font-semibold transition-colors ${
+                  <div className={`text-center py-4 rounded-xl font-bold text-base transition-all duration-300 transform ${
                     isSelected 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                      ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground shadow-lg scale-105' 
+                      : 'bg-gradient-to-r from-secondary/50 to-secondary/80 text-foreground hover:from-primary/10 hover:to-primary/20 hover:text-primary group-hover:scale-105'
                   }`}>
-                    {isSelected ? '✓ Selecionado' : 'Clique para Selecionar'}
+                    {isSelected ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <CheckCircle className="h-5 w-5" />
+                        <span>Selecionado</span>
+                      </div>
+                    ) : (
+                      'Selecionar Profissional'
+                    )}
                   </div>
                 </div>
               </CardContent>
