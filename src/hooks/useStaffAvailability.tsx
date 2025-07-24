@@ -57,8 +57,15 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         .in('staff_profile_id', uniqueStaffIds)
         .gte('date', startDateStr)
         .lte('date', endDateStr)
-        .or('available.eq.true,available.is.null') // Treat NULL as available
         .range(0, 99999)
+        if (availabilityData?.length) {
+         const maxFetchedDate = availabilityData
+          .map(d => new Date(d.date))
+      .sort((a, b) => b.getTime() - a.getTime())[0];
+
+    console.log('🧠 MAX DATE FETCHED FROM SUPABASE:', maxFetchedDate?.toISOString().slice(0, 10));
+        }
+
 
       console.log(`🎯 [BATCH_AVAILABILITY] Query executed with params:`, {
         staffIds: uniqueStaffIds,
