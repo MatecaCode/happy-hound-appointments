@@ -28,15 +28,15 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
     return Array(5).fill(0).map((_, i) => (
       <Star
         key={i}
-        className={`h-4 w-4 transition-all duration-700 ease-out ${
+        className={`h-4 w-4 transition-all duration-1000 ease-out ${
           i < Math.floor(rating) 
             ? `text-yellow-400 fill-yellow-400 ${isHovered ? 'animate-pulse drop-shadow-sm' : ''}` 
             : 'text-gray-300'
         } ${isHovered ? 'transform scale-110' : ''}`}
         style={isHovered ? {
-          animationDelay: `${i * 200}ms`,
-          filter: 'drop-shadow(0 0 6px rgba(251, 191, 36, 0.8))',
-          animationDuration: '1.5s'
+          animationDelay: `${i * 300}ms`,
+          filter: 'drop-shadow(0 0 8px rgba(251, 191, 36, 0.9))',
+          animationDuration: '2s'
         } : {}}
       />
     ));
@@ -195,8 +195,26 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
                       <div className="flex items-center gap-1">
                         {renderStars(member.rating, hoveredStaff === member.id)}
                       </div>
-                      <span className="text-lg font-bold text-primary">
+                      <span 
+                        className={`text-lg font-bold text-primary transition-all duration-1000 ease-out relative ${
+                          hoveredStaff === member.id ? 'animate-pulse' : ''
+                        }`}
+                        style={hoveredStaff === member.id ? {
+                          animationDelay: '1.5s',
+                          filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.8))',
+                          animationDuration: '2s'
+                        } : {}}
+                      >
                         {member.rating.toFixed(1)}
+                        {hoveredStaff === member.id && (
+                          <div className="absolute -right-6 top-1/2 -translate-y-1/2">
+                            <div className="flex flex-col gap-0.5 animate-pulse" style={{ animationDelay: '2.5s', animationDuration: '1s' }}>
+                              <div className="w-3 h-0.5 bg-primary/80 rounded-full animate-pulse" style={{ animationDelay: '2.5s' }}></div>
+                              <div className="w-2 h-0.5 bg-primary/60 rounded-full animate-pulse" style={{ animationDelay: '2.7s' }}></div>
+                              <div className="w-1 h-0.5 bg-primary/40 rounded-full animate-pulse" style={{ animationDelay: '2.9s' }}></div>
+                            </div>
+                          </div>
+                        )}
                       </span>
                     </div>
                   </div>
