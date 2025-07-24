@@ -204,7 +204,7 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
               disabled={(date) => isDateDisabled(date)}
               fromDate={calendarDateRange.fromDate}
               toDate={calendarDateRange.toDate}
-              fromYear={new Date().getFullYear()}
+              fromYear={calendarDateRange.fromDate.getFullYear()}
               toYear={calendarDateRange.toDate.getFullYear()}
               captionLayout="dropdown-buttons"
               className="rounded-md border transition-all duration-200 hover:shadow-md"
