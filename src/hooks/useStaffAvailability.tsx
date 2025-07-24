@@ -39,10 +39,10 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
     console.log('🎯 [BATCH_AVAILABILITY] FINAL staff IDs for batch validation:', uniqueStaffIds);
     
     try {
-      // Check next 2 years to ensure full availability coverage
+      // Check next 1 year to ensure full availability coverage
       const today = new Date();
       const endDate = new Date(today);
-      endDate.setFullYear(today.getFullYear() + 2);
+      endDate.setDate(today.getDate() + 360);
       
       const startDateStr = format(today, 'yyyy-MM-dd');
       const endDateStr = format(endDate, 'yyyy-MM-dd');
@@ -58,7 +58,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
         .gte('date', startDateStr)
         .lte('date', endDateStr)
         .or('available.eq.true,available.is.null') // Treat NULL as available
-        .limit(50000); // Increase limit to handle full 2-year range
+        .limit(35000); // Limit for 1 year: 2 staff × 96 slots × 360 days ≈ 35k available slots
 
       console.log(`🎯 [BATCH_AVAILABILITY] Query executed with params:`, {
         staffIds: uniqueStaffIds,
@@ -95,7 +95,7 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
 
       const availableDatesSet = new Set<string>();
 
-      // Check each date in the 2-year range
+      // Check each date in the 1-year range
       const totalDays = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
       for (let i = 0; i < totalDays; i++) {
         const checkDate = new Date(today);
