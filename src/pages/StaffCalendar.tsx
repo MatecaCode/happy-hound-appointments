@@ -265,14 +265,10 @@ const StaffCalendar: React.FC = () => {
       const promises = backendSlots.map(backendSlot => 
         supabase
           .from('staff_availability')
-          .upsert({
-            staff_profile_id: staffProfile.id,
-            date: dateStr,
-            time_slot: backendSlot,
-            available: isAvailable,
-          }, {
-            onConflict: 'staff_profile_id,date,time_slot'
-          })
+          .update({ available: isAvailable })
+          .eq('staff_profile_id', staffProfile.id)
+          .eq('date', dateStr)
+          .eq('time_slot', backendSlot)
       );
 
       const results = await Promise.all(promises);
