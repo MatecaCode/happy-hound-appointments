@@ -252,8 +252,46 @@ const handleSubmit = async (e: React.FormEvent) => {
       }
     }
 
-    // 🔄 Continue with rest of your profile update logic here...
+    // Combine bio and specialties into a single bio field
+    const combinedBio = formData.specialties 
+      ? `Especialidades: ${formData.specialties}\n\n${formData.bio}`
+      : formData.bio;
 
+    const updateData = {
+      name: formData.name,
+      email: formData.email,
+      phone: formData.phone || null,
+      bio: combinedBio || null,
+      photo_url: photoUrl,
+      updated_at: new Date().toISOString(),
+    };
+
+    console.log('🔄 Updating staff profile with data:', updateData);
+
+    const { error } = await supabase
+      .from('staff_profiles')
+      .update(updateData)
+      .eq('id', profile.id);
+
+    console.log('📊 Database update result:', { error, profileId: profile.id });
+
+    if (error) {
+      console.error('❌ Error updating profile:', error);
+      throw error;
+    }
+
+    // Update local state
+    const updatedProfile = { ...profile, ...updateData };
+    setProfile(updatedProfile);
+    setPhotoFile(null);
+    setPhotoPreview(null);
+
+    console.log('✅ Profile updated successfully, new photo_url:', photoUrl);
+
+    // Force reload of staff profile to refresh Navigation component
+    await loadStaffProfile();
+
+    toast.success('Perfil atualizado com sucesso!');
   } catch (error) {
     console.error('❌ Error submitting form:', error);
     toast.error('Erro ao salvar perfil');
@@ -261,54 +299,6 @@ const handleSubmit = async (e: React.FormEvent) => {
     setSaving(false);
   }
 };
-
-      // Combine bio and specialties into a single bio field
-      const combinedBio = formData.specialties 
-        ? `Especialidades: ${formData.specialties}\n\n${formData.bio}`
-        : formData.bio;
-
-      const updateData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone || null,
-        bio: combinedBio || null, // Combine specialties and bio
-        photo_url: photoUrl,
-        updated_at: new Date().toISOString(),
-      };
-
-      console.log('🔄 Updating staff profile with data:', updateData);
-
-      const { error } = await supabase
-        .from('staff_profiles')
-        .update(updateData)
-        .eq('id', profile.id);
-
-      console.log('📊 Database update result:', { error, profileId: profile.id });
-
-      if (error) {
-        console.error('❌ Error updating profile:', error);
-        throw error;
-      }
-
-      // Update local state
-      const updatedProfile = { ...profile, ...updateData };
-      setProfile(updatedProfile);
-      setPhotoFile(null);
-      setPhotoPreview(null); // Clear preview to force using the new photo_url
-      
-      console.log('✅ Profile updated successfully, new photo_url:', photoUrl);
-      
-      // Force reload of staff profile to refresh Navigation component
-      await loadStaffProfile();
-      
-      toast.success('Perfil atualizado com sucesso!');
-    } catch (error) {
-      console.error('Error saving profile:', error);
-      toast.error('Erro ao salvar perfil');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (loading || isLoading) {
     return (
