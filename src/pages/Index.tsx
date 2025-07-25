@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Link, useNavigate } from 'react-router-dom';
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from '@/integrations/supabase/client';
+
 
 
 const Index = () => {
