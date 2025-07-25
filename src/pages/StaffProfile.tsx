@@ -277,10 +277,16 @@ const StaffProfile = () => {
       }
 
       // Update local state
-      setProfile({ ...profile, ...updateData });
+      const updatedProfile = { ...profile, ...updateData };
+      setProfile(updatedProfile);
       setPhotoFile(null);
+      setPhotoPreview(null); // Clear preview to force using the new photo_url
       
       console.log('✅ Profile updated successfully, new photo_url:', photoUrl);
+      
+      // Force reload of staff profile to refresh Navigation component
+      await loadStaffProfile();
+      
       toast.success('Perfil atualizado com sucesso!');
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -341,9 +347,11 @@ const StaffProfile = () => {
                   <div className="w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-full overflow-hidden bg-muted/20 flex items-center justify-center">
                     {photoPreview || profile.photo_url ? (
                       <img 
-                        src={photoPreview || profile.photo_url || undefined} 
+                        src={photoPreview || `${profile.photo_url}?t=${Date.now()}`} 
                         alt="Profile"
                         className="w-full h-full object-cover"
+                        onLoad={() => console.log('🖼️ Profile image loaded:', photoPreview || profile.photo_url)}
+                        onError={(e) => console.error('❌ Profile image failed to load:', e.currentTarget.src)}
                       />
                     ) : (
                       <div className="text-center">

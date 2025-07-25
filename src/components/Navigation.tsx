@@ -92,8 +92,16 @@ const Navigation = () => {
       )
       .subscribe();
 
+    // Also check for updates every few seconds to ensure we catch changes
+    const interval = setInterval(() => {
+      if (user) {
+        checkStaffStatus();
+      }
+    }, 3000);
+
     return () => {
       subscription.unsubscribe();
+      clearInterval(interval);
     };
   }, [user, staffPhotoUrl]);
 
@@ -200,12 +208,16 @@ const Navigation = () => {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="h-8 w-8 rounded-full">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={staffPhotoUrl || undefined} />
-                        <AvatarFallback>
-                          {user.email?.charAt(0).toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
+                       <Avatar className="h-8 w-8">
+                         <AvatarImage 
+                           src={staffPhotoUrl ? `${staffPhotoUrl}?t=${Date.now()}` : undefined}
+                           onLoad={() => console.log('🖼️ Nav avatar image loaded:', staffPhotoUrl)}
+                           onError={() => console.error('❌ Nav avatar image failed to load:', staffPhotoUrl)}
+                         />
+                         <AvatarFallback>
+                           {user.email?.charAt(0).toUpperCase()}
+                         </AvatarFallback>
+                       </Avatar>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-56" align="end" forceMount>
