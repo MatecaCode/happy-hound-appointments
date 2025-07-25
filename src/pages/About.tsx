@@ -5,6 +5,24 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { Heart, Calendar, Dog, Syringe, Cat } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { useEffect, useState } from 'react';
+
+const inaugurationUrl = supabase
+  .storage
+  .from('websitecontent')
+  .getPublicUrl('Inauguration Clinic.jpg').data.publicUrl;
+
+const caminhadaUrl = supabase
+  .storage
+  .from('websitecontent')
+  .getPublicUrl('Dog Minhada com pessoas.jpg').data.publicUrl;
+
+const journalUrl = supabase
+  .storage
+  .from('websitecontent')
+  .getPublicUrl('Journal DogMinhada.jpg').data.publicUrl;
+
+
 
 const About = () => {
   return (
@@ -39,7 +57,7 @@ const About = () => {
             </div>
             <div>
               <img 
-                src="/placeholder.svg" 
+                src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Inauguration%20Clinic.jpg"
                 alt="Nossa primeira clínica em 1990" 
                 className="rounded-lg shadow-lg h-96 w-full object-cover"
               />
@@ -109,7 +127,7 @@ const About = () => {
           
           <div className="mt-12">
             <img 
-              src="/placeholder.svg" 
+              src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Dog%20Minhada%20com%20pessoas.jpg"
               alt="Eventos da Cãominhada" 
               className="rounded-lg shadow-lg h-96 w-full object-cover"
             />
@@ -155,7 +173,7 @@ const About = () => {
           
           <div className="mt-12">
             <img 
-              src="/placeholder.svg" 
+               src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Journal%20DogMinhada.jpg" 
               alt="Nossa equipe atual" 
               className="rounded-lg shadow-lg h-96 w-full object-cover"
             />
