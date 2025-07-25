@@ -101,7 +101,7 @@ const StaffProfile = () => {
           specialties: specialties,
         });
         setPhotoPreview(staffData.photo_url);
-        console.log('📋 Loaded staff profile:', staffData);
+        console.log('📋 Loaded staff profile photo_url:', staffData.photo_url);
       }
     } catch (error) {
       console.error('Error loading staff profile:', error);
@@ -344,14 +344,22 @@ const StaffProfile = () => {
               <CardContent className="space-y-6">
                 {/* Photo Upload */}
                 <div className="flex flex-col items-center space-y-4">
+                  {console.log('🖼️ Rendering profile photo. photoPreview:', photoPreview, 'profile.photo_url:', profile.photo_url)}
                   <div className="w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-full overflow-hidden bg-muted/20 flex items-center justify-center">
-                    {photoPreview || profile.photo_url ? (
+                    {(photoPreview || profile.photo_url) ? (
                       <img 
                         src={photoPreview || `${profile.photo_url}?t=${Date.now()}`} 
                         alt="Profile"
                         className="w-full h-full object-cover"
-                        onLoad={() => console.log('🖼️ Profile image loaded:', photoPreview || profile.photo_url)}
-                        onError={(e) => console.error('❌ Profile image failed to load:', e.currentTarget.src)}
+                        onLoad={() => console.log('✅ Profile image loaded successfully:', photoPreview || profile.photo_url)}
+                        onError={(e) => {
+                          console.error('❌ Profile image failed to load:', e.currentTarget.src);
+                          // Try to load the image without cache buster as fallback
+                          if (e.currentTarget.src.includes('?t=')) {
+                            e.currentTarget.src = profile.photo_url || '';
+                          }
+                        }}
+                        crossOrigin="anonymous"
                       />
                     ) : (
                       <div className="text-center">

@@ -63,6 +63,7 @@ const Navigation = () => {
         setIsStaff(true);
         setStaffPhotoUrl(profile.photo_url);
         console.log('✅ Staff found, photo_url:', profile.photo_url);
+        console.log('🖼️ Navigation setting photo URL:', profile.photo_url);
       } else {
         setIsStaff(false);
         setStaffPhotoUrl(null);
@@ -209,10 +210,18 @@ const Navigation = () => {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="h-8 w-8 rounded-full">
                        <Avatar className="h-8 w-8">
+                         {console.log('🖼️ Rendering nav avatar. staffPhotoUrl:', staffPhotoUrl)}
                          <AvatarImage 
                            src={staffPhotoUrl ? `${staffPhotoUrl}?t=${Date.now()}` : undefined}
-                           onLoad={() => console.log('🖼️ Nav avatar image loaded:', staffPhotoUrl)}
-                           onError={() => console.error('❌ Nav avatar image failed to load:', staffPhotoUrl)}
+                           onLoad={() => console.log('✅ Nav avatar image loaded successfully:', staffPhotoUrl)}
+                           onError={(e) => {
+                             console.error('❌ Nav avatar image failed to load:', staffPhotoUrl);
+                             // Try to load without cache buster as fallback
+                             if (e.currentTarget.src.includes('?t=') && staffPhotoUrl) {
+                               e.currentTarget.src = staffPhotoUrl;
+                             }
+                           }}
+                           crossOrigin="anonymous"
                          />
                          <AvatarFallback>
                            {user.email?.charAt(0).toUpperCase()}
