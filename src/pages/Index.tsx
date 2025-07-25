@@ -126,10 +126,10 @@ useEffect(() => {
                 }`}
               >
                 <img 
-                  src="https://ieotixprkfglummoobkb.supabase.ap-southeast-1.supabase.co/storage/v1/object/public/websitecontent/Cao%20Minhada%20foto.jpg"
-                  alt="Clínica Vettale - fachada moderna da clínica veterinária" 
-                  className="rounded-lg shadow-lg h-80 w-full object-cover transition-transform duration-500 hover:scale-105"
-                />
+  src={imageUrl}
+  alt="Clínica Vettale - fachada moderna da clínica veterinária"
+  className="rounded-lg shadow-lg h-80 w-full object-cover transition-transform duration-500 hover:scale-105"
+/>
               </div>
             </div>
           </div>
