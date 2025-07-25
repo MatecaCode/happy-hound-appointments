@@ -21,7 +21,7 @@ const caminhadaUrl = supabase
 const journalUrl = supabase
   .storage
   .from('websitecontent')
-  .getPublicUrl('Journal DogMinhada.jpg').data.publicUrl;
+  .getPublicUrl('PinkClinic.jpg').data.publicUrl;
 
 
 
@@ -174,7 +174,7 @@ const About = () => {
           
           <div className="mt-12">
             <img 
-               src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Journal%20DogMinhada.jpg" 
+               src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//PinkClinic.jpg" 
               alt="Nossa equipe atual" 
               className="rounded-lg shadow-lg h-96 w-full object-cover"
             />
