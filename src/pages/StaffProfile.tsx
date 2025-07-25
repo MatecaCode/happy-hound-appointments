@@ -6,12 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Camera, Save, User, Briefcase, MapPin, Phone, Mail, DollarSign } from 'lucide-react';
+import { Camera, Save, User, Briefcase } from 'lucide-react';
 
 interface StaffProfile {
   id: string;
@@ -39,10 +37,7 @@ const StaffProfile = () => {
     email: '',
     phone: '',
     bio: '',
-    hourly_rate: '',
-    can_bathe: false,
-    can_groom: false,
-    can_vet: false,
+    specialties: '',
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -78,10 +73,7 @@ const StaffProfile = () => {
           email: staffData.email || '',
           phone: staffData.phone || '',
           bio: staffData.bio || '',
-          hourly_rate: staffData.hourly_rate?.toString() || '',
-          can_bathe: staffData.can_bathe || false,
-          can_groom: staffData.can_groom || false,
-          can_vet: staffData.can_vet || false,
+          specialties: staffData.bio || '', // We'll store specialties in bio for now
         });
         setPhotoPreview(staffData.photo_url);
       }
@@ -156,10 +148,6 @@ const StaffProfile = () => {
         email: formData.email,
         phone: formData.phone || null,
         bio: formData.bio || null,
-        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
-        can_bathe: formData.can_bathe,
-        can_groom: formData.can_groom,
-        can_vet: formData.can_vet,
         photo_url: photoUrl,
         updated_at: new Date().toISOString(),
       };
@@ -185,14 +173,6 @@ const StaffProfile = () => {
     } finally {
       setSaving(false);
     }
-  };
-
-  const getSpecialtyBadges = () => {
-    const specialties = [];
-    if (formData.can_bathe) specialties.push('Banho');
-    if (formData.can_groom) specialties.push('Tosa');
-    if (formData.can_vet) specialties.push('Veterinário');
-    return specialties;
   };
 
   if (loading || isLoading) {
@@ -302,19 +282,6 @@ const StaffProfile = () => {
                     placeholder="(11) 99999-9999"
                   />
                 </div>
-
-                {/* Hourly Rate */}
-                <div className="space-y-2">
-                  <Label htmlFor="hourly_rate">Valor por Hora (R$)</Label>
-                  <Input
-                    id="hourly_rate"
-                    type="number"
-                    step="0.01"
-                    value={formData.hourly_rate}
-                    onChange={(e) => setFormData({ ...formData, hourly_rate: e.target.value })}
-                    placeholder="0.00"
-                  />
-                </div>
               </CardContent>
             </Card>
 
@@ -329,63 +296,17 @@ const StaffProfile = () => {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Specialties */}
-                <div className="space-y-4">
-                  <Label>Especialidades</Label>
-                  
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="can_bathe"
-                          checked={formData.can_bathe}
-                          onCheckedChange={(checked) => 
-                            setFormData({ ...formData, can_bathe: checked })
-                          }
-                        />
-                        <Label htmlFor="can_bathe">Banho</Label>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="can_groom"
-                          checked={formData.can_groom}
-                          onCheckedChange={(checked) => 
-                            setFormData({ ...formData, can_groom: checked })
-                          }
-                        />
-                        <Label htmlFor="can_groom">Tosa</Label>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          id="can_vet"
-                          checked={formData.can_vet}
-                          onCheckedChange={(checked) => 
-                            setFormData({ ...formData, can_vet: checked })
-                          }
-                        />
-                        <Label htmlFor="can_vet">Consulta Veterinária</Label>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Show selected specialties */}
-                  <div className="flex flex-wrap gap-2">
-                    {getSpecialtyBadges().map((specialty) => (
-                      <Badge key={specialty} variant="secondary">
-                        {specialty}
-                      </Badge>
-                    ))}
-                    {getSpecialtyBadges().length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        Selecione pelo menos uma especialidade
-                      </p>
-                    )}
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="specialties">Especialidades</Label>
+                  <Input
+                    id="specialties"
+                    value={formData.specialties}
+                    onChange={(e) => setFormData({ ...formData, specialties: e.target.value })}
+                    placeholder="Ex: Tosa, Banho, Consulta Veterinária, Cirurgia..."
+                  />
+                  <p className="text-sm text-muted-foreground">
+                    Liste suas especialidades separadas por vírgula
+                  </p>
                 </div>
 
                 {/* Bio */}
@@ -395,7 +316,7 @@ const StaffProfile = () => {
                     id="bio"
                     value={formData.bio}
                     onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    placeholder="Conte um pouco sobre você, sua experiência e especialidades..."
+                    placeholder="Conte um pouco sobre você, sua experiência e formação..."
                     rows={6}
                   />
                   <p className="text-sm text-muted-foreground">
