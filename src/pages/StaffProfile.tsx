@@ -183,21 +183,17 @@ const StaffProfile = () => {
       setPhotoFile(croppedImage);
       console.log('✅ Cropped file saved:', croppedImage);
       
-      // Create preview URL for cropped image
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPhotoPreview(e.target?.result as string);
-      };
-      console.log('📸 Preview URL set to:', e.target?.result);
-      reader.readAsDataURL(croppedImage);
-      
-      setShowCropper(false);
-      toast.success('Imagem ajustada com sucesso!');
-    } catch (error) {
-      console.error('Error cropping image:', error);
-      toast.error('Erro ao ajustar imagem');
-    }
-  };
+    // Create preview URL for cropped image
+const reader = new FileReader();
+reader.onload = (e) => {
+  console.log('📸 Preview URL set to:', e.target?.result);
+  setPhotoPreview(e.target?.result as string);
+};
+reader.readAsDataURL(croppedImage);
+
+setShowCropper(false);
+toast.success('Imagem ajustada com sucesso!');
+
 
 const uploadPhoto = async (): Promise<string | null> => {
   if (!photoFile || !profile || !user) return null;
