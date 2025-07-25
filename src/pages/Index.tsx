@@ -110,7 +110,7 @@ const Index = () => {
                 }`}
               >
                 <img 
-                  src="/lovable-uploads/46b4db57-9aff-472d-a42a-f68fef707648.png" 
+                  src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Cao%20Minhada%20foto.jpg" 
                   alt="Clínica Vettale - fachada moderna da clínica veterinária" 
                   className="rounded-lg shadow-lg h-80 w-full object-cover transition-transform duration-500 hover:scale-105"
                 />
