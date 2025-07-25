@@ -36,8 +36,9 @@ const Navigation = () => {
     }
   };
 
-  // Check if user is staff
+  // Check if user is staff and get their photo
   const [isStaff, setIsStaff] = React.useState(false);
+  const [staffPhotoUrl, setStaffPhotoUrl] = React.useState<string | null>(null);
   
   React.useEffect(() => {
     const checkStaffStatus = async () => {
@@ -45,11 +46,17 @@ const Navigation = () => {
       
       const { data: profile } = await supabase
         .from('staff_profiles')
-        .select('id')
+        .select('id, photo_url')
         .eq('user_id', user.id)
         .single();
         
-      setIsStaff(!!profile);
+      if (profile) {
+        setIsStaff(true);
+        setStaffPhotoUrl(profile.photo_url);
+      } else {
+        setIsStaff(false);
+        setStaffPhotoUrl(null);
+      }
     };
     
     checkStaffStatus();
@@ -159,6 +166,7 @@ const Navigation = () => {
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="h-8 w-8 rounded-full">
                       <Avatar className="h-8 w-8">
+                        <AvatarImage src={staffPhotoUrl || undefined} />
                         <AvatarFallback>
                           {user.email?.charAt(0).toUpperCase()}
                         </AvatarFallback>
@@ -185,7 +193,7 @@ const Navigation = () => {
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
-                      <Link to="/profile">Perfil</Link>
+                      <Link to={isStaff ? "/staff-profile" : "/profile"}>Perfil</Link>
                     </DropdownMenuItem>
                     {/* Staff members get dashboard link and can have pets/appointments */}
                     {(isStaff || hasRole('groomer') || hasRole('vet')) && (
@@ -322,7 +330,7 @@ const Navigation = () => {
                   )}
                   
                   <Link
-                    to="/profile"
+                    to={isStaff ? "/staff-profile" : "/profile"}
                     className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
                     onClick={() => setIsOpen(false)}
                   >

@@ -1,15 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Camera, Save, User, Briefcase } from 'lucide-react';
+import { Camera, Save, User, Briefcase, Crop } from 'lucide-react';
+import Cropper from 'react-easy-crop';
+
+interface CropArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 interface StaffProfile {
   id: string;
@@ -41,6 +49,10 @@ const StaffProfile = () => {
   });
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [showCropper, setShowCropper] = useState(false);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<CropArea | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -92,8 +104,82 @@ const StaffProfile = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         setPhotoPreview(e.target?.result as string);
+        setShowCropper(true);
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const onCropComplete = useCallback((croppedArea: CropArea, croppedAreaPixels: CropArea) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const createImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const image = new Image();
+      image.addEventListener('load', () => resolve(image));
+      image.addEventListener('error', error => reject(error));
+      image.src = url;
+    });
+
+  const getCroppedImg = async (imageSrc: string, pixelCrop: CropArea): Promise<File> => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('Could not get canvas context');
+    }
+
+    // Set canvas size to cropped area
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+
+    // Draw the cropped image
+    ctx.drawImage(
+      image,
+      pixelCrop.x,
+      pixelCrop.y,
+      pixelCrop.width,
+      pixelCrop.height,
+      0,
+      0,
+      pixelCrop.width,
+      pixelCrop.height
+    );
+
+    return new Promise((resolve) => {
+      canvas.toBlob(
+        (file) => {
+          if (file) {
+            resolve(new File([file], 'cropped-image.jpg', { type: 'image/jpeg' }));
+          }
+        },
+        'image/jpeg',
+        0.9
+      );
+    });
+  };
+
+  const handleCropSave = async () => {
+    if (!photoPreview || !croppedAreaPixels) return;
+
+    try {
+      const croppedImage = await getCroppedImg(photoPreview, croppedAreaPixels);
+      setPhotoFile(croppedImage);
+      
+      // Create preview URL for cropped image
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPhotoPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(croppedImage);
+      
+      setShowCropper(false);
+      toast.success('Imagem ajustada com sucesso!');
+    } catch (error) {
+      console.error('Error cropping image:', error);
+      toast.error('Erro ao ajustar imagem');
     }
   };
 
@@ -223,13 +309,12 @@ const StaffProfile = () => {
               <CardContent className="space-y-6">
                 {/* Photo Upload */}
                 <div className="flex flex-col items-center space-y-4">
-                  <div className="w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg overflow-hidden bg-muted/20 flex items-center justify-center">
+                  <div className="w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-full overflow-hidden bg-muted/20 flex items-center justify-center">
                     {photoPreview || profile.photo_url ? (
                       <img 
                         src={photoPreview || profile.photo_url || undefined} 
                         alt="Profile"
-                        className="w-full h-full object-contain"
-                        style={{ objectPosition: 'center' }}
+                        className="w-full h-full object-cover"
                       />
                     ) : (
                       <div className="text-center">
@@ -255,10 +340,21 @@ const StaffProfile = () => {
                         </span>
                       </Button>
                     </Label>
+                    {photoFile && (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setShowCropper(true)}
+                      >
+                        <Crop className="h-4 w-4 mr-2" />
+                        Ajustar
+                      </Button>
+                    )}
                   </div>
                   {(photoPreview || profile.photo_url) && (
                     <p className="text-xs text-muted-foreground text-center">
-                      A foto será exibida como você enviar, sem ajustes automáticos
+                      Use o botão "Ajustar" para recortar a imagem antes de salvar
                     </p>
                   )}
                 </div>
@@ -349,6 +445,54 @@ const StaffProfile = () => {
             </Button>
           </div>
         </form>
+
+        {/* Image Cropper Dialog */}
+        <Dialog open={showCropper} onOpenChange={setShowCropper}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Ajustar Foto de Perfil</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {photoPreview && (
+                <div className="relative h-64 w-full">
+                  <Cropper
+                    image={photoPreview}
+                    crop={crop}
+                    zoom={zoom}
+                    aspect={1}
+                    onCropChange={setCrop}
+                    onCropComplete={onCropComplete}
+                    onZoomChange={setZoom}
+                    cropShape="round"
+                    showGrid={false}
+                  />
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label>Zoom</Label>
+                <input
+                  type="range"
+                  value={zoom}
+                  min={1}
+                  max={3}
+                  step={0.1}
+                  onChange={(e) => setZoom(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowCropper(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleCropSave}>
+                  Aplicar Ajuste
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
