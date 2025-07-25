@@ -443,7 +443,7 @@ const StaffCalendar: React.FC = () => {
             <Card key={day.toISOString()} className="overflow-hidden">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
+                  <CalendarIcon className="w-4 h-4" />
                   {format(day, "EEEE, dd 'de' MMMM", { locale: ptBR })}
                   <Badge variant="outline">
                     {dayAppointments.length} agendamento{dayAppointments.length !== 1 ? 's' : ''}
