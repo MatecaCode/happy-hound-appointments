@@ -94,6 +94,8 @@ const StaffDashboard = () => {
       }
 
       // Get appointments for the selected date/week range
+      console.log(`🔍 Fetching appointments for staff ${profile.id} from ${startDate} to ${endDate}`);
+      
       const { data: appointmentsData, error } = await supabase
         .from('appointments')
         .select(`
@@ -102,9 +104,9 @@ const StaffDashboard = () => {
           time,
           duration,
           status,
-          pets!inner(name),
-          services!inner(name, service_type, requires_bath, requires_grooming, requires_vet),
-          clients!inner(name),
+          pets(name),
+          services(name, service_type, requires_bath, requires_grooming, requires_vet),
+          clients(name),
           appointment_staff!inner(staff_profile_id)
         `)
         .eq('appointment_staff.staff_profile_id', profile.id)
@@ -113,22 +115,29 @@ const StaffDashboard = () => {
         .order('date')
         .order('time');
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error fetching appointments:', error);
+        throw error;
+      }
 
+      console.log(`📊 Found ${appointmentsData?.length || 0} appointments for staff ${profile.name}`);
+      
       const formattedAppointments: Appointment[] = appointmentsData?.map(apt => ({
         id: apt.id,
         time: apt.time,
         date: apt.date,
-        pet_name: (apt.pets as any).name,
-        service_name: (apt.services as any).name,
-        service_type: (apt.services as any).service_type,
+        pet_name: (apt.pets as any)?.name || 'Pet desconhecido',
+        service_name: (apt.services as any)?.name || 'Serviço desconhecido',
+        service_type: (apt.services as any)?.service_type || 'unknown',
         duration: apt.duration || 60,
-        owner_name: (apt.clients as any).name,
+        owner_name: (apt.clients as any)?.name || 'Cliente desconhecido',
         status: apt.status,
-        requires_bath: (apt.services as any).requires_bath,
-        requires_grooming: (apt.services as any).requires_grooming,
-        requires_vet: (apt.services as any).requires_vet,
+        requires_bath: (apt.services as any)?.requires_bath || false,
+        requires_grooming: (apt.services as any)?.requires_grooming || false,
+        requires_vet: (apt.services as any)?.requires_vet || false,
       })) || [];
+
+      console.log('📋 Formatted appointments:', formattedAppointments);
 
       setAppointments(formattedAppointments);
 
