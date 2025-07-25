@@ -112,18 +112,17 @@ const StaffProfile = () => {
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setPhotoFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPhotoPreview(e.target?.result as string);
-        setShowCropper(true);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
+  const file = e.target.files?.[0];
+  if (file) {
+    setPhotoFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setPhotoPreview(event.target?.result as string);
+      setShowCropper(true);
+    };
+    reader.readAsDataURL(file);
+  }
+};
   const onCropComplete = useCallback((croppedArea: CropArea, croppedAreaPixels: CropArea) => {
     setCroppedAreaPixels(croppedAreaPixels);
   }, []);
@@ -186,10 +185,10 @@ const handleCropSave = async () => {
 
     // Create preview URL for cropped image
     const reader = new FileReader();
-    reader.onload = (e) => {
-      console.log('📸 Preview URL set to:', e.target?.result);
-      setPhotoPreview(e.target?.result as string);
-    };
+    reader.onload = (event) => {
+  console.log('📸 Preview URL set to:', event.target?.result);
+  setPhotoPreview(event.target?.result as string);
+};
     reader.readAsDataURL(croppedImage);
 
     setShowCropper(false);
