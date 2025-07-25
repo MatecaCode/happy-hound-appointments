@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Link, useNavigate } from 'react-router-dom';
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from "@/integrations/supabase/client";
+
 
 const Index = () => {
   const navigate = useNavigate();
@@ -26,6 +28,20 @@ const Index = () => {
     }
   }, [user, isStaff, loading, navigate]);
 
+const [imageUrl, setImageUrl] = useState('');
+
+useEffect(() => {
+  const { data } = supabase
+    .storage
+    .from('websitecontent')
+    .getPublicUrl('Cao Minhada foto.jpg');
+
+  if (data?.publicUrl) {
+    setImageUrl(data.publicUrl);
+  }
+}, []);
+
+  
   const services = [
     {
       title: "Banho & Escovação Básica",
