@@ -330,44 +330,44 @@ const StaffProfile = () => {
           <p className="text-muted-foreground">Gerencie suas informações pessoais</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Profile Photo & Basic Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
-                  Informações Básicas
-                </CardTitle>
-                <CardDescription>Seus dados de conta</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Photo Upload */}
-                <div className="flex flex-col items-center space-y-4">
-                  {console.log('🖼️ Rendering profile photo. photoPreview:', photoPreview, 'profile.photo_url:', profile.photo_url)}
-                  <div className="w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-full overflow-hidden bg-muted/20 flex items-center justify-center">
-                    {(photoPreview || profile.photo_url) ? (
-                      <img 
-                        src={photoPreview || `${profile.photo_url}?t=${Date.now()}`} 
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                        onLoad={() => console.log('✅ Profile image loaded successfully:', photoPreview || profile.photo_url)}
-                        onError={(e) => {
-                          console.error('❌ Profile image failed to load:', e.currentTarget.src);
-                          // Try to load the image without cache buster as fallback
-                          if (e.currentTarget.src.includes('?t=')) {
-                            e.currentTarget.src = profile.photo_url || '';
-                          }
-                        }}
-                        crossOrigin="anonymous"
-                      />
-                    ) : (
-                      <div className="text-center">
-                        <Camera className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                        <p className="text-xs text-muted-foreground">Sem foto</p>
-                      </div>
-                    )}
-                  </div>
+       <form onSubmit={handleSubmit} className="space-y-6">
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    {/* Profile Photo & Basic Info */}
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <User className="h-5 w-5" />
+          Informações Básicas
+        </CardTitle>
+        <CardDescription>Seus dados de conta</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Photo Upload */}
+        <div className="flex flex-col items-center space-y-4">
+          <div className="w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-full overflow-hidden bg-muted/20 flex items-center justify-center">
+            {(photoPreview || profile.photo_url) ? (
+              <img 
+                src={photoPreview || `${profile.photo_url}?t=${Date.now()}`} 
+                alt="Profile"
+                className="w-full h-full object-cover"
+                onLoad={() => console.log('✅ Profile image loaded successfully:', photoPreview || profile.photo_url)}
+                onError={(e) => {
+                  console.error('❌ Profile image failed to load:', e.currentTarget.src);
+                  // Try to load the image without cache buster as fallback
+                  if (e.currentTarget.src.includes('?t=')) {
+                    e.currentTarget.src = profile.photo_url || '';
+                  }
+                }}
+                crossOrigin="anonymous"
+              />
+            ) : (
+              <div className="text-center">
+                <Camera className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-xs text-muted-foreground">Sem foto</p>
+              </div>
+            )}
+          </div>
+
                   
                   <div className="flex items-center gap-2">
                     <input
