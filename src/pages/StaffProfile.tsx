@@ -197,56 +197,59 @@ const StaffProfile = () => {
     }
   };
 
-  const uploadPhoto = async (): Promise<string | null> => {
-    if (!photoFile || !profile || !user) return null;
+const uploadPhoto = async (): Promise<string | null> => {
+  if (!photoFile || !profile || !user) return null;
 
-    try {
-      console.log('📤 Starting photo upload for user:', user.id, 'profile:', profile.id);
-      
-      const fileExt = photoFile.name.split('.').pop();
-      const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/staff-photos/${fileName}`;
+  try {
+    console.log('📸 Starting photo upload for user:', user.id, 'profile:', profile.id);
 
-      console.log('📁 Upload path:', filePath);
+    const fileExt = photoFile.name.split('.').pop();
+    const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
+    const filePath = `${user.id}/staff-photos/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('vettale')
-        .upload(filePath, photoFile);
+    console.log('📁 Upload path:', filePath);
 
-      if (uploadError) {
-        console.error('❌ Storage upload error:', uploadError);
-        throw uploadError;
-      }
+    // Upload to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from('vettale')
+      .upload(filePath, photoFile);
 
-      const { data: urlData } = supabase.storage
-        .from('vettale')
-        .getPublicUrl(filePath);
-
-      console.log('🔗 Generated public URL:', urlData.publicUrl);
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('❌ Error uploading photo:', error);
-      toast.error('Erro ao fazer upload da foto');
-      return null;
+    if (uploadError) {
+      console.error('❌ Storage upload error:', uploadError);
+      throw uploadError;
     }
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!profile) return;
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('vettale')
+      .getPublicUrl(filePath);
 
-    try {
-      setSaving(true);
+    console.log('✅ Generated public URL:', urlData.publicUrl);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('❌ Error uploading photo:', error);
+    toast.error('Erro ao fazer upload da foto');
+    return null;
+  }
+};
 
-      let photoUrl = profile.photo_url;
-      
-      // Upload new photo if selected
-      if (photoFile) {
-        const uploadedUrl = await uploadPhoto();
-        if (uploadedUrl) {
-          photoUrl = uploadedUrl;
-        }
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!profile) return;
+
+  try {
+    setSaving(true);
+
+    let photoUrl = profile.photo_url;
+
+    // Upload new photo if selected
+    if (photoFile) {
+      const uploadedUrl = await uploadPhoto();
+      if (uploadedUrl) {
+        photoUrl = uploadedUrl;
       }
+    }
+
 
       // Combine bio and specialties into a single bio field
       const combinedBio = formData.specialties 
