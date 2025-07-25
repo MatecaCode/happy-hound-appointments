@@ -98,12 +98,12 @@ const StaffProfile = () => {
   };
 
   const uploadPhoto = async (): Promise<string | null> => {
-    if (!photoFile || !profile) return null;
+    if (!photoFile || !profile || !user) return null;
 
     try {
       const fileExt = photoFile.name.split('.').pop();
       const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
-      const filePath = `staff-photos/${fileName}`;
+      const filePath = `${user.id}/staff-photos/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('vettale')
@@ -223,12 +223,21 @@ const StaffProfile = () => {
               <CardContent className="space-y-6">
                 {/* Photo Upload */}
                 <div className="flex flex-col items-center space-y-4">
-                  <Avatar className="h-24 w-24">
-                    <AvatarImage src={photoPreview || profile.photo_url || undefined} />
-                    <AvatarFallback>
-                      {profile.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'ST'}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="w-32 h-32 border-2 border-dashed border-muted-foreground/25 rounded-lg overflow-hidden bg-muted/20 flex items-center justify-center">
+                    {photoPreview || profile.photo_url ? (
+                      <img 
+                        src={photoPreview || profile.photo_url || undefined} 
+                        alt="Profile"
+                        className="w-full h-full object-contain"
+                        style={{ objectPosition: 'center' }}
+                      />
+                    ) : (
+                      <div className="text-center">
+                        <Camera className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                        <p className="text-xs text-muted-foreground">Sem foto</p>
+                      </div>
+                    )}
+                  </div>
                   
                   <div className="flex items-center gap-2">
                     <input
@@ -247,6 +256,11 @@ const StaffProfile = () => {
                       </Button>
                     </Label>
                   </div>
+                  {(photoPreview || profile.photo_url) && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      A foto será exibida como você enviar, sem ajustes automáticos
+                    </p>
+                  )}
                 </div>
 
                 {/* Name */}
