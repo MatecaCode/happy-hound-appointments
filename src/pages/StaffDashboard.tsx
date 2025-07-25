@@ -104,9 +104,12 @@ const StaffDashboard = () => {
           time,
           duration,
           status,
-          pets(name),
-          services(name, service_type, requires_bath, requires_grooming, requires_vet),
-          clients(name),
+          client_id,
+          pet_id,
+          service_id,
+          pets!inner(name),
+          services!inner(name, service_type, requires_bath, requires_grooming, requires_vet),
+          clients!inner(name),
           appointment_staff!inner(staff_profile_id)
         `)
         .eq('appointment_staff.staff_profile_id', profile.id)
