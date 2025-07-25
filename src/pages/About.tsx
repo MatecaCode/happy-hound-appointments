@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { Heart, Calendar, Dog, Syringe, Cat } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/integrations/supabase/client';
 
 
 const inaugurationUrl = supabase
