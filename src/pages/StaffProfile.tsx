@@ -175,26 +175,32 @@ const StaffProfile = () => {
     });
   };
 
-  const handleCropSave = async () => {
-    if (!photoPreview || !croppedAreaPixels) return;
+ // 🔧 Crop and preview
+const handleCropSave = async () => {
+  if (!photoPreview || !croppedAreaPixels) return;
 
-    try {
-      const croppedImage = await getCroppedImg(photoPreview, croppedAreaPixels);
-      setPhotoFile(croppedImage);
-      console.log('✅ Cropped file saved:', croppedImage);
-      
+  try {
+    const croppedImage = await getCroppedImg(photoPreview, croppedAreaPixels);
+    setPhotoFile(croppedImage);
+    console.log('✅ Cropped file saved:', croppedImage);
+
     // Create preview URL for cropped image
-const reader = new FileReader();
-reader.onload = (e) => {
-  console.log('📸 Preview URL set to:', e.target?.result);
-  setPhotoPreview(e.target?.result as string);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      console.log('📸 Preview URL set to:', e.target?.result);
+      setPhotoPreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(croppedImage);
+
+    setShowCropper(false);
+    toast.success('Imagem ajustada com sucesso!');
+  } catch (error) {
+    console.error('Error cropping image:', error);
+    toast.error('Erro ao ajustar imagem');
+  }
 };
-reader.readAsDataURL(croppedImage);
 
-setShowCropper(false);
-toast.success('Imagem ajustada com sucesso!');
-
-
+// 📤 Upload photo to Supabase
 const uploadPhoto = async (): Promise<string | null> => {
   if (!photoFile || !profile || !user) return null;
 
@@ -207,7 +213,6 @@ const uploadPhoto = async (): Promise<string | null> => {
 
     console.log('📁 Upload path:', filePath);
 
-    // Upload to Supabase Storage
     const { error: uploadError } = await supabase.storage
       .from('vettale')
       .upload(filePath, photoFile);
@@ -217,7 +222,6 @@ const uploadPhoto = async (): Promise<string | null> => {
       throw uploadError;
     }
 
-    // Get public URL
     const { data: urlData } = supabase.storage
       .from('vettale')
       .getPublicUrl(filePath);
@@ -231,13 +235,13 @@ const uploadPhoto = async (): Promise<string | null> => {
   }
 };
 
+// 📝 Submit form handler
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!profile) return;
 
   try {
     setSaving(true);
-
     let photoUrl = profile.photo_url;
 
     // Upload new photo if selected
@@ -248,6 +252,15 @@ const handleSubmit = async (e: React.FormEvent) => {
       }
     }
 
+    // 🔄 Continue with rest of your profile update logic here...
+
+  } catch (error) {
+    console.error('❌ Error submitting form:', error);
+    toast.error('Erro ao salvar perfil');
+  } finally {
+    setSaving(false);
+  }
+};
 
       // Combine bio and specialties into a single bio field
       const combinedBio = formData.specialties 
