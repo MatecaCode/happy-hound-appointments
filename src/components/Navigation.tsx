@@ -207,28 +207,27 @@ const Navigation = () => {
                 )}
 
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 rounded-full">
-                       <Avatar className="h-8 w-8">
-                         {console.log('🖼️ Rendering nav avatar. staffPhotoUrl:', staffPhotoUrl)}
-                         <AvatarImage 
-                           src={staffPhotoUrl ? `${staffPhotoUrl}?t=${Date.now()}` : undefined}
-                           onLoad={() => console.log('✅ Nav avatar image loaded successfully:', staffPhotoUrl)}
-                           onError={(e) => {
-                             console.error('❌ Nav avatar image failed to load:', staffPhotoUrl);
-                             // Try to load without cache buster as fallback
-                             if (e.currentTarget.src.includes('?t=') && staffPhotoUrl) {
-                               e.currentTarget.src = staffPhotoUrl;
-                             }
-                           }}
-                           crossOrigin="anonymous"
-                         />
-                         <AvatarFallback>
-                           {user.email?.charAt(0).toUpperCase()}
-                         </AvatarFallback>
-                       </Avatar>
-                    </Button>
-                  </DropdownMenuTrigger>
+  <DropdownMenuTrigger asChild>
+    <Button variant="ghost" className="h-8 w-8 rounded-full">
+      <Avatar className="h-8 w-8">
+        <AvatarImage 
+          src={staffPhotoUrl ? `${staffPhotoUrl}?t=${Date.now()}` : undefined}
+          onLoad={() => console.log('✅ Nav avatar image loaded successfully:', staffPhotoUrl)}
+          onError={(e) => {
+            console.error('❌ Nav avatar image failed to load:', staffPhotoUrl);
+            // Try to load without cache buster as fallback
+            if (e.currentTarget.src.includes('?t=') && staffPhotoUrl) {
+              e.currentTarget.src = staffPhotoUrl;
+            }
+          }}
+          crossOrigin="anonymous"
+        />
+        <AvatarFallback>
+          {user.email?.charAt(0).toUpperCase()}
+        </AvatarFallback>
+      </Avatar>
+    </Button>
+  </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-56" align="end" forceMount>
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
