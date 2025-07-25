@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,8 @@ import { supabase } from '@/integrations/supabase/client';
 const Profile = () => {
   const { user, loading } = useAuth();
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [isStaff, setIsStaff] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -20,6 +23,21 @@ const Profile = () => {
     if (!user) return;
 
     try {
+      setRoleLoading(true);
+      
+      // Check if user has a staff profile
+      const { data: staffData } = await supabase
+        .from('staff_profiles')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (staffData) {
+        setIsStaff(true);
+        setRoleLoading(false);
+        return;
+      }
+
       // Get user role from user_roles table
       const { data: roleData, error: roleError } = await supabase
         .from('user_roles')
@@ -29,16 +47,24 @@ const Profile = () => {
 
       if (roleError) {
         console.error('Error fetching user role:', roleError);
+        setRoleLoading(false);
         return;
       }
 
       setUserRole(roleData?.role || null);
     } catch (error) {
       console.error('Error in fetchUserRole:', error);
+    } finally {
+      setRoleLoading(false);
     }
   };
 
-  if (loading) {
+  // Redirect staff users to StaffProfile
+  if (isStaff) {
+    return <Navigate to="/staff-profile" replace />;
+  }
+
+  if (loading || roleLoading) {
     return (
       <Layout>
         <div className="max-w-md mx-auto py-16 text-center">

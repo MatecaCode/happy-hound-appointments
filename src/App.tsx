@@ -13,6 +13,7 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import StaffProfile from "./pages/StaffProfile";
 import Pets from "./pages/Pets";
 import GroomerDashboard from "./pages/GroomerDashboard";
 import GroomerCalendar from "./pages/GroomerCalendar";
@@ -55,6 +56,7 @@ function App() {
               <Route path="/shop" element={<Shop />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/staff-profile" element={<StaffProfile />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
