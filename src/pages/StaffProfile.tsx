@@ -181,12 +181,14 @@ const StaffProfile = () => {
     try {
       const croppedImage = await getCroppedImg(photoPreview, croppedAreaPixels);
       setPhotoFile(croppedImage);
+      console.log('✅ Cropped file saved:', croppedImage);
       
       // Create preview URL for cropped image
       const reader = new FileReader();
       reader.onload = (e) => {
         setPhotoPreview(e.target?.result as string);
       };
+      console.log('📸 Preview URL set to:', e.target?.result);
       reader.readAsDataURL(croppedImage);
       
       setShowCropper(false);
