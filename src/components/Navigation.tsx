@@ -42,25 +42,60 @@ const Navigation = () => {
   
   React.useEffect(() => {
     const checkStaffStatus = async () => {
-      if (!user) return;
+      if (!user) {
+        console.log('🚫 No user found, clearing staff status');
+        setIsStaff(false);
+        setStaffPhotoUrl(null);
+        return;
+      }
       
-      const { data: profile } = await supabase
+      console.log('👤 Checking staff status for user:', user.id);
+      
+      const { data: profile, error } = await supabase
         .from('staff_profiles')
         .select('id, photo_url')
         .eq('user_id', user.id)
         .single();
+
+      console.log('📊 Staff profile query result:', { profile, error });
         
       if (profile) {
         setIsStaff(true);
         setStaffPhotoUrl(profile.photo_url);
+        console.log('✅ Staff found, photo_url:', profile.photo_url);
       } else {
         setIsStaff(false);
         setStaffPhotoUrl(null);
+        console.log('❌ No staff profile found');
       }
     };
     
     checkStaffStatus();
-  }, [user]);
+
+    // Set up real-time subscription to refresh photo when it changes
+    const subscription = supabase
+      .channel('staff_profiles_changes')
+      .on('postgres_changes', 
+        { 
+          event: 'UPDATE', 
+          schema: 'public', 
+          table: 'staff_profiles',
+          filter: `user_id=eq.${user?.id}`
+        }, 
+        (payload) => {
+          console.log('🔄 Staff profile updated via subscription:', payload);
+          if (payload.new?.photo_url !== staffPhotoUrl) {
+            setStaffPhotoUrl(payload.new.photo_url);
+            console.log('📸 Updated staff photo URL:', payload.new.photo_url);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user, staffPhotoUrl]);
 
   // Different navigation items for staff vs regular users
   const getNavItems = () => {

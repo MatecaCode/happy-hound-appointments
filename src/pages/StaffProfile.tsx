@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -80,14 +80,28 @@ const StaffProfile = () => {
 
       if (staffData) {
         setProfile(staffData);
+        
+        // Parse specialties from bio if they exist
+        const bio = staffData.bio || '';
+        let specialties = '';
+        let cleanBio = bio;
+        
+        if (bio.startsWith('Especialidades: ')) {
+          const lines = bio.split('\n');
+          const specialtiesLine = lines[0];
+          specialties = specialtiesLine.replace('Especialidades: ', '');
+          cleanBio = lines.slice(2).join('\n'); // Skip the empty line too
+        }
+        
         setFormData({
           name: staffData.name || '',
           email: staffData.email || '',
           phone: staffData.phone || '',
-          bio: staffData.bio || '',
-          specialties: staffData.bio || '', // We'll store specialties in bio for now
+          bio: cleanBio,
+          specialties: specialties,
         });
         setPhotoPreview(staffData.photo_url);
+        console.log('📋 Loaded staff profile:', staffData);
       }
     } catch (error) {
       console.error('Error loading staff profile:', error);
@@ -187,16 +201,20 @@ const StaffProfile = () => {
     if (!photoFile || !profile || !user) return null;
 
     try {
+      console.log('📤 Starting photo upload for user:', user.id, 'profile:', profile.id);
+      
       const fileExt = photoFile.name.split('.').pop();
       const fileName = `${profile.id}-${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/staff-photos/${fileName}`;
+
+      console.log('📁 Upload path:', filePath);
 
       const { error: uploadError } = await supabase.storage
         .from('vettale')
         .upload(filePath, photoFile);
 
       if (uploadError) {
-        console.error('Error uploading photo:', uploadError);
+        console.error('❌ Storage upload error:', uploadError);
         throw uploadError;
       }
 
@@ -204,9 +222,10 @@ const StaffProfile = () => {
         .from('vettale')
         .getPublicUrl(filePath);
 
+      console.log('🔗 Generated public URL:', urlData.publicUrl);
       return urlData.publicUrl;
     } catch (error) {
-      console.error('Error uploading photo:', error);
+      console.error('❌ Error uploading photo:', error);
       toast.error('Erro ao fazer upload da foto');
       return null;
     }
@@ -229,22 +248,31 @@ const StaffProfile = () => {
         }
       }
 
+      // Combine bio and specialties into a single bio field
+      const combinedBio = formData.specialties 
+        ? `Especialidades: ${formData.specialties}\n\n${formData.bio}`
+        : formData.bio;
+
       const updateData = {
         name: formData.name,
         email: formData.email,
         phone: formData.phone || null,
-        bio: formData.bio || null,
+        bio: combinedBio || null, // Combine specialties and bio
         photo_url: photoUrl,
         updated_at: new Date().toISOString(),
       };
+
+      console.log('🔄 Updating staff profile with data:', updateData);
 
       const { error } = await supabase
         .from('staff_profiles')
         .update(updateData)
         .eq('id', profile.id);
 
+      console.log('📊 Database update result:', { error, profileId: profile.id });
+
       if (error) {
-        console.error('Error updating profile:', error);
+        console.error('❌ Error updating profile:', error);
         throw error;
       }
 
@@ -252,6 +280,7 @@ const StaffProfile = () => {
       setProfile({ ...profile, ...updateData });
       setPhotoFile(null);
       
+      console.log('✅ Profile updated successfully, new photo_url:', photoUrl);
       toast.success('Perfil atualizado com sucesso!');
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -451,6 +480,9 @@ const StaffProfile = () => {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Ajustar Foto de Perfil</DialogTitle>
+              <DialogDescription>
+                Use os controles abaixo para ajustar e recortar sua foto de perfil.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               {photoPreview && (
