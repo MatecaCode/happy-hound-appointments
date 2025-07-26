@@ -176,7 +176,7 @@ const About = () => {
             <img 
                src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Team.png" 
               alt="Nossa equipe atual" 
-              className="rounded-lg shadow-lg h-96 w-full object-cover"
+              className="rounded-lg shadow-lg h-96 w-full object-cover object-bottom"
             />
             <p className="text-sm text-center mt-2 text-muted-foreground">Nossa equipe de profissionais dedicados</p>
           </div>
