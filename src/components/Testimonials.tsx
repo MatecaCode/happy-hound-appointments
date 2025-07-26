@@ -158,16 +158,8 @@ const Testimonials: React.FC = () => {
             <ChevronRight className="h-5 w-5" />
           </Button>
 
-          {/* Reviews Grid with Slide Animation */}
-          <div 
-            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-500 ease-in-out ${
-              isTransitioning 
-                ? slideDirection === 'right' 
-                  ? 'transform translate-x-full opacity-0' 
-                  : 'transform -translate-x-full opacity-0'
-                : 'transform translate-x-0 opacity-100'
-            }`}
-          >
+          {/* Reviews Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {currentReviews.map((review, index) => {
               const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: index * 200 + 200 });
               
@@ -175,14 +167,11 @@ const Testimonials: React.FC = () => {
                 <Card 
                   key={`${currentGroup}-${index}-${review.author}`}
                   ref={cardAnimation.ref}
-                  className={`border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105 ${
-                    isTransitioning ? 'pointer-events-none' : ''
-                  } ${animationClasses.slideUp} ${
+                  className={`border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105 ${animationClasses.slideUp} ${
                     cardAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
                   }`}
                   style={{ 
-                    backgroundColor: index % 2 === 0 ? '#F5EEE5' : '#E9F3E1',
-                    transition: 'all 0.5s ease-in-out'
+                    backgroundColor: index % 2 === 0 ? '#F5EEE5' : '#E9F3E1'
                   }}
                 >
                   <CardContent className="pt-6 pb-4">
