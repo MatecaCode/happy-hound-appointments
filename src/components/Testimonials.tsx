@@ -45,6 +45,7 @@ const Testimonials: React.FC = () => {
   const [currentGroup, setCurrentGroup] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
+  const [nextGroup, setNextGroup] = useState<number | null>(null);
   const headerAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
 
   // Calculate how many reviews per view based on screen size
@@ -79,35 +80,48 @@ const Testimonials: React.FC = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isTransitioning) {
+        const next = (currentGroup + 1) % totalGroups;
+        setNextGroup(next);
         setIsTransitioning(true);
         setSlideDirection('right');
         setTimeout(() => {
-          setCurrentGroup((prev) => (prev + 1) % totalGroups);
-          setTimeout(() => setIsTransitioning(false), 100);
+          setCurrentGroup(next);
+          setNextGroup(null);
+          setIsTransitioning(false);
         }, 400);
       }
     }, 5500); // 5.5 seconds
 
     return () => clearInterval(interval);
-  }, [isTransitioning, totalGroups]);
+  }, [isTransitioning, currentGroup, totalGroups]);
 
   const goToNext = useCallback(() => {
     if (!isTransitioning) {
+      const next = (currentGroup + 1) % totalGroups;
+      setNextGroup(next);
       setIsTransitioning(true);
       setSlideDirection('right');
-      setCurrentGroup((prev) => (prev + 1) % totalGroups);
-      setTimeout(() => setIsTransitioning(false), 800);
+      setTimeout(() => {
+        setCurrentGroup(next);
+        setNextGroup(null);
+        setIsTransitioning(false);
+      }, 400);
     }
-  }, [isTransitioning, totalGroups]);
+  }, [isTransitioning, currentGroup, totalGroups]);
 
   const goToPrev = useCallback(() => {
     if (!isTransitioning) {
+      const next = (currentGroup - 1 + totalGroups) % totalGroups;
+      setNextGroup(next);
       setIsTransitioning(true);
       setSlideDirection('left');
-      setCurrentGroup((prev) => (prev - 1 + totalGroups) % totalGroups);
-      setTimeout(() => setIsTransitioning(false), 800);
+      setTimeout(() => {
+        setCurrentGroup(next);
+        setNextGroup(null);
+        setIsTransitioning(false);
+      }, 400);
     }
-  }, [isTransitioning, totalGroups]);
+  }, [isTransitioning, currentGroup, totalGroups]);
 
   // Get current reviews to display with proper cycling
   const getCurrentReviews = () => {
@@ -122,7 +136,23 @@ const Testimonials: React.FC = () => {
     return reviewsToShow;
   };
 
+  // Get next reviews for smooth transition
+  const getNextReviews = () => {
+    if (nextGroup === null) return [];
+    
+    const startIndex = nextGroup * reviewsPerView;
+    const reviewsToShow = [];
+    
+    for (let i = 0; i < reviewsPerView; i++) {
+      const index = (startIndex + i) % reviews.length;
+      reviewsToShow.push(reviews[index]);
+    }
+    
+    return reviewsToShow;
+  };
+
   const currentReviews = getCurrentReviews();
+  const nextReviews = getNextReviews();
 
   return (
     <section className="py-16" style={{ backgroundColor: '#FFFCF8' }}>
@@ -163,49 +193,91 @@ const Testimonials: React.FC = () => {
           </Button>
 
           {/* Reviews Grid with Slide Animation */}
-          <div 
-            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-800 ease-in-out ${
-              isTransitioning 
-                ? slideDirection === 'right' 
-                  ? 'transform translate-x-full opacity-0' 
-                  : 'transform -translate-x-full opacity-0'
-                : 'transform translate-x-0 opacity-100'
-            }`}
-          >
-            {currentReviews.map((review, index) => {
-              const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: index * 200 + 200 });
-              
-              return (
-                <Card 
-                  key={`${currentGroup}-${index}-${review.author}`}
-                  ref={cardAnimation.ref}
-                  className={`border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105 ${animationClasses.slideUp} ${
-                    cardAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
-                  }`}
-                  style={{ 
-                    backgroundColor: index % 2 === 0 ? '#F5EEE5' : '#E9F3E1'
-                  }}
-                >
-                  <CardContent className="pt-6 pb-4">
-                    <div className="space-y-4">
-                      <div className="flex gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <svg key={i} className="w-5 h-5 text-yellow-400 transition-transform duration-300 group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                        ))}
+          <div className="relative overflow-hidden">
+            {/* Current Reviews */}
+            <div 
+              className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-400 ease-in-out ${
+                isTransitioning 
+                  ? slideDirection === 'right' 
+                    ? 'transform translate-x-full opacity-0' 
+                    : 'transform -translate-x-full opacity-0'
+                  : 'transform translate-x-0 opacity-100'
+              }`}
+            >
+              {currentReviews.map((review, index) => {
+                const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: index * 200 + 200 });
+                
+                return (
+                  <Card 
+                    key={`current-${currentGroup}-${index}-${review.author}`}
+                    ref={cardAnimation.ref}
+                    className={`border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105 ${animationClasses.slideUp} ${
+                      cardAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+                    }`}
+                    style={{ 
+                      backgroundColor: index % 2 === 0 ? '#F5EEE5' : '#E9F3E1'
+                    }}
+                  >
+                    <CardContent className="pt-6 pb-4">
+                      <div className="space-y-4">
+                        <div className="flex gap-1">
+                          {[...Array(5)].map((_, i) => (
+                            <svg key={i} className="w-5 h-5 text-yellow-400 transition-transform duration-300 group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                          ))}
+                        </div>
+                        
+                        <p className="text-foreground font-medium leading-relaxed">"{review.text}"</p>
+                        
+                        <div>
+                          <p className="font-semibold text-foreground">{review.author}</p>
+                        </div>
                       </div>
-                      
-                      <p className="text-foreground font-medium leading-relaxed">"{review.text}"</p>
-                      
-                      <div>
-                        <p className="font-semibold text-foreground">{review.author}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Next Reviews (shown during transition) */}
+            {isTransitioning && nextReviews.length > 0 && (
+              <div 
+                className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-400 ease-in-out ${
+                  slideDirection === 'right' 
+                    ? 'transform -translate-x-full opacity-100' 
+                    : 'transform translate-x-full opacity-100'
+                }`}
+              >
+                {nextReviews.map((review, index) => (
+                  <Card 
+                    key={`next-${nextGroup}-${index}-${review.author}`}
+                    className="border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105"
+                    style={{ 
+                      backgroundColor: index % 2 === 0 ? '#F5EEE5' : '#E9F3E1'
+                    }}
+                  >
+                    <CardContent className="pt-6 pb-4">
+                      <div className="space-y-4">
+                        <div className="flex gap-1">
+                          {[...Array(5)].map((_, i) => (
+                            <svg key={i} className="w-5 h-5 text-yellow-400 transition-transform duration-300 group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                          ))}
+                        </div>
+                        
+                        <p className="text-foreground font-medium leading-relaxed">"{review.text}"</p>
+                        
+                        <div>
+                          <p className="font-semibold text-foreground">{review.author}</p>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Pagination Dots */}
