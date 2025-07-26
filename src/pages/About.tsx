@@ -132,7 +132,7 @@ const About = () => {
               alt="Eventos da Cãominhada" 
               className="rounded-lg shadow-lg h-96 w-full object-cover"
             />
-            <p className="text-sm text-center mt-2 text-muted-foreground">Um dos nossos eventos de Cãominhada que reuniu famílias em Atibaia</p>
+            <p className="text-sm text-center mt-2 text-muted-foreground">Nossa 2ª Cãominhada (1995): um encontro inesquecível que uniu famílias, espalhou sorrisos e arrecadou fundos para cães em situação de risco 🐶</p>
           </div>
         </div>
       </section>
@@ -174,7 +174,7 @@ const About = () => {
           
           <div className="mt-12">
             <img 
-               src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//PinkClinic.jpg" 
+               src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Team.png" 
               alt="Nossa equipe atual" 
               className="rounded-lg shadow-lg h-96 w-full object-cover"
             />

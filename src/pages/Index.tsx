@@ -36,7 +36,7 @@ useEffect(() => {
   const { data } = supabase
     .storage
     .from('websitecontent')
-    .getPublicUrl('Cao Minhada foto.jpg');
+    .getPublicUrl('TempInnovation.png');
 
   if (data?.publicUrl) {
     setImageUrl(data.publicUrl);
@@ -129,7 +129,7 @@ useEffect(() => {
               >
                 <img 
   src={imageUrl}
-  alt="Clínica Vettale - fachada moderna da clínica veterinária"
+  alt="Tradição e Inovação Vettale - Fundadores da clínica veterinária"
   className="rounded-lg shadow-lg h-80 w-full object-cover transition-transform duration-500 hover:scale-105"
 />
               </div>
