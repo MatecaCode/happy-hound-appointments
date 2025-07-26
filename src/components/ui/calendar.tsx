@@ -6,6 +6,7 @@ import { format, getYear, differenceInYears } from "date-fns";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>;
@@ -26,6 +27,7 @@ function Calendar({
   
   function CustomDropdowns(props: CustomDropdownProps) {
     const { currentMonth, fromYear, toYear } = props;
+    const [viewMode, setViewMode] = React.useState<'days' | 'months' | 'years'>('days');
     
     // Check if currentMonth exists before using it
     if (!currentMonth) {
@@ -47,51 +49,122 @@ function Calendar({
       "Maio", "Junho", "Julho", "Agosto", 
       "Setembro", "Outubro", "Novembro", "Dezembro"
     ], []);
+
+    const handleMonthClick = () => {
+      setViewMode(viewMode === 'days' ? 'months' : 'days');
+    };
+
+    const handleYearClick = () => {
+      setViewMode(viewMode === 'days' ? 'years' : 'days');
+    };
+
+    const handleMonthSelect = (monthIndex: number) => {
+      const newMonth = new Date(currentMonth);
+      newMonth.setMonth(monthIndex);
+      props.goToMonth(newMonth);
+      setViewMode('days');
+    };
+
+    const handleYearSelect = (year: number) => {
+      const newMonth = new Date(currentMonth);
+      newMonth.setFullYear(year);
+      props.goToMonth(newMonth);
+      setViewMode('months');
+    };
+
+    if (viewMode === 'months') {
+      return (
+        <div className="p-3">
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode('years')}
+              className="h-8 px-2"
+            >
+              {currentMonth.getFullYear()}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode('days')}
+              className="h-8 px-2"
+            >
+              ← Voltar
+            </Button>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {months.map((month, index) => (
+              <Button
+                key={month}
+                variant="ghost"
+                size="sm"
+                onClick={() => handleMonthSelect(index)}
+                className={cn(
+                  "h-8 text-sm",
+                  currentMonth.getMonth() === index && "bg-primary text-primary-foreground"
+                )}
+              >
+                {month.substring(0, 3)}
+              </Button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    if (viewMode === 'years') {
+      return (
+        <div className="p-3">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-medium">Selecione o ano</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setViewMode('months')}
+              className="h-8 px-2"
+            >
+              ← Voltar
+            </Button>
+          </div>
+          <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+            {years.map((year) => (
+              <Button
+                key={year}
+                variant="ghost"
+                size="sm"
+                onClick={() => handleYearSelect(year)}
+                className={cn(
+                  "h-8 text-sm",
+                  currentMonth.getFullYear() === year && "bg-primary text-primary-foreground"
+                )}
+              >
+                {year}
+              </Button>
+            ))}
+          </div>
+        </div>
+      );
+    }
     
     return (
       <div className="flex justify-center space-x-2">
-        <Select
-          value={months[currentMonth.getMonth()]}
-          onValueChange={(value) => {
-            const newMonth = new Date(currentMonth);
-            const monthIndex = months.findIndex(m => m === value);
-            if (monthIndex !== -1) {
-              newMonth.setMonth(monthIndex);
-              props.goToMonth(newMonth);
-            }
-          }}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleMonthClick}
+          className="h-8 px-3 font-medium hover:bg-accent"
         >
-          <SelectTrigger className="w-[130px] h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {months.map((month, i) => (
-              <SelectItem key={month} value={month}>
-                {month}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        <Select
-          value={currentMonth.getFullYear().toString()}
-          onValueChange={(value) => {
-            const newMonth = new Date(currentMonth);
-            newMonth.setFullYear(parseInt(value));
-            props.goToMonth(newMonth);
-          }}
+          {months[currentMonth.getMonth()]}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleYearClick}
+          className="h-8 px-3 font-medium hover:bg-accent"
         >
-          <SelectTrigger className="w-[100px] h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="max-h-[300px] overflow-y-auto">
-            {years.map((year) => (
-              <SelectItem key={year} value={year.toString()}>
-                {year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {currentMonth.getFullYear()}
+        </Button>
       </div>
     );
   }
@@ -105,10 +178,6 @@ function Calendar({
         month: "space-y-4",
         caption: "flex justify-center pt-1 relative items-center",
         caption_label: "text-sm font-medium",
-        caption_dropdowns: "flex gap-1",
-        dropdown: "w-full",
-        dropdown_year: "w-[80px]",
-        dropdown_month: "w-[120px]",
         nav: "space-x-1 flex items-center",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),

@@ -1,12 +1,13 @@
 
 import * as React from "react"
-import { format } from "date-fns"
+import { format, parse, isValid } from "date-fns"
 import { CalendarIcon } from "lucide-react"
 import { ptBR } from "date-fns/locale"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import { Input } from "@/components/ui/input"
 import {
   Popover,
   PopoverContent,
@@ -34,40 +35,89 @@ export function DatePicker({
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)
   const [tempDate, setTempDate] = React.useState<Date | undefined>(date)
+  const [inputValue, setInputValue] = React.useState("")
+  const [isTyping, setIsTyping] = React.useState(false)
 
   const handleSelect = (selectedDate: Date | undefined) => {
     setTempDate(selectedDate)
+    if (selectedDate) {
+      setInputValue(format(selectedDate, "dd/MM/yyyy", { locale: ptBR }))
+    }
   }
 
   const handleConfirm = () => {
     onSelect?.(tempDate)
     setOpen(false)
+    setIsTyping(false)
   }
 
   const handleCancel = () => {
     setTempDate(date)
+    setInputValue(date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : "")
     setOpen(false)
+    setIsTyping(false)
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setInputValue(value)
+    setIsTyping(true)
+
+    // Try to parse the date
+    if (value.length === 10) { // dd/MM/yyyy format
+      const parsedDate = parse(value, "dd/MM/yyyy", new Date())
+      if (isValid(parsedDate)) {
+        setTempDate(parsedDate)
+        setIsTyping(false)
+      }
+    }
+  }
+
+  const handleInputBlur = () => {
+    if (inputValue) {
+      const parsedDate = parse(inputValue, "dd/MM/yyyy", new Date())
+      if (isValid(parsedDate)) {
+        setTempDate(parsedDate)
+        setIsTyping(false)
+      } else {
+        // Reset to current date if invalid
+        setInputValue(date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : "")
+        setIsTyping(false)
+      }
+    }
   }
 
   React.useEffect(() => {
     setTempDate(date)
+    setInputValue(date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : "")
   }, [date])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className={cn(
-            "justify-start text-left font-normal",
-            !date && "text-muted-foreground",
-            className
-          )}
-          disabled={disabled}
-        >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : placeholder}
-        </Button>
+        <div className="relative">
+          <Input
+            value={inputValue}
+            onChange={handleInputChange}
+            onBlur={handleInputBlur}
+            placeholder={placeholder}
+            className={cn(
+              "pr-10",
+              className
+            )}
+            disabled={disabled}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            onClick={() => setOpen(true)}
+            disabled={disabled}
+          >
+            <CalendarIcon className="h-4 w-4" />
+          </Button>
+        </div>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar

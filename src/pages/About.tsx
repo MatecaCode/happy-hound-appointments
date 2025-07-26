@@ -183,6 +183,124 @@ const About = () => {
         </div>
       </section>
       
+      {/* Onde Estamos Hoje */}
+      <section className="py-20" style={{ backgroundColor: '#FFFCF8' }}>
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="mb-4">Onde Estamos <span className="text-primary">Hoje</span></h2>
+            <p className="text-muted-foreground max-w-3xl mx-auto">
+              Mais de 30 anos de dedicação em Atibaia nos transformaram de uma pequena clínica para um centro veterinário completo. 
+              Hoje, com tecnologia de ponta e o mesmo carinho de sempre, continuamos a missão dos fundadores.
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+            {/* Image Slot 1 - MundiauPet Era */}
+            <div className="space-y-4">
+              <div className="bg-gray-200 rounded-lg shadow-lg h-64 w-full flex items-center justify-center">
+                <div className="text-center text-gray-500">
+                  <div className="text-4xl mb-2">📸</div>
+                  <p className="text-sm">Imagem da Era MundiauPet</p>
+                  <p className="text-xs text-gray-400">(1990-2010)</p>
+                </div>
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-lg mb-2">Era MundiauPet</h3>
+                <p className="text-sm text-muted-foreground">
+                  Nossos primeiros 20 anos em Atibaia, estabelecendo a confiança da comunidade e construindo nossa reputação de excelência.
+                </p>
+              </div>
+            </div>
+            
+            {/* Image Slot 2 - Transition Period */}
+            <div className="space-y-4">
+              <div className="bg-gray-200 rounded-lg shadow-lg h-64 w-full flex items-center justify-center">
+                <div className="text-center text-gray-500">
+                  <div className="text-4xl mb-2">🏥</div>
+                  <p className="text-sm">Imagem da Transição</p>
+                  <p className="text-xs text-gray-400">(2010-2020)</p>
+                </div>
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-lg mb-2">Período de Crescimento</h3>
+                <p className="text-sm text-muted-foreground">
+                  Expansão dos serviços, modernização da infraestrutura e formação de uma equipe multidisciplinar especializada.
+                </p>
+              </div>
+            </div>
+            
+            {/* Image Slot 3 - Vettale Era */}
+            <div className="space-y-4">
+              <div className="bg-gray-200 rounded-lg shadow-lg h-64 w-full flex items-center justify-center">
+                <div className="text-center text-gray-500">
+                  <div className="text-4xl mb-2">🌟</div>
+                  <p className="text-sm">Imagem da Era Vettale</p>
+                  <p className="text-xs text-gray-400">(2020-Presente)</p>
+                </div>
+              </div>
+              <div className="text-center">
+                <h3 className="font-semibold text-lg mb-2">Era Vettale</h3>
+                <p className="text-sm text-muted-foreground">
+                  Nova identidade, tecnologia avançada e compromisso renovado com a excelência em cuidados veterinários.
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Métricas de Impacto */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white p-6 rounded-lg shadow text-center">
+              <div className="text-3xl font-bold text-primary mb-2">30.000+</div>
+              <h3 className="font-semibold text-lg mb-2">Banhos</h3>
+              <p className="text-sm text-muted-foreground">
+                Pets felizes e cheirosos que passaram por nossas mãos
+              </p>
+            </div>
+            
+            <div className="bg-white p-6 rounded-lg shadow text-center">
+              <div className="text-3xl font-bold text-primary mb-2">5.000+</div>
+              <h3 className="font-semibold text-lg mb-2">Atendimentos Veterinários</h3>
+              <p className="text-sm text-muted-foreground">
+                Consultas e cuidados especializados para cada pet
+              </p>
+            </div>
+            
+            <div className="bg-white p-6 rounded-lg shadow text-center">
+              <div className="text-3xl font-bold text-primary mb-2">600+</div>
+              <h3 className="font-semibold text-lg mb-2">Cirurgias</h3>
+              <p className="text-sm text-muted-foreground">
+                Procedimentos cirúrgicos realizados com excelência
+              </p>
+            </div>
+            
+            <div className="bg-white p-6 rounded-lg shadow text-center">
+              <div className="text-3xl font-bold text-primary mb-2">∞</div>
+              <h3 className="font-semibold text-lg mb-2">Sorrisos Incontáveis</h3>
+              <p className="text-sm text-muted-foreground">
+                Momentos de alegria e gratidão que não podem ser medidos
+              </p>
+            </div>
+          </div>
+          
+          {/* Additional Info Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-white p-8 rounded-lg shadow">
+              <h3 className="text-xl font-bold mb-4">Legado Preservado</h3>
+              <p className="text-muted-foreground">
+                Apesar do crescimento, mantemos viva a essência dos fundadores: cuidado personalizado, atenção aos detalhes e amor pelos animais.
+              </p>
+            </div>
+            
+            <div className="bg-white p-8 rounded-lg shadow">
+              <h3 className="text-xl font-bold mb-4">Tecnologia e Carinho</h3>
+              <p className="text-muted-foreground">
+                Combinamos equipamentos de última geração com o mesmo carinho e atenção que sempre nos caracterizou.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+      
       {/* CTA Section */}
       <section className="py-16 bg-primary text-primary-foreground">
         <div className="max-w-7xl mx-auto px-6 text-center">

@@ -44,9 +44,10 @@ const reviews: Review[] = [
 const Testimonials: React.FC = () => {
   const [currentGroup, setCurrentGroup] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
   const headerAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
 
-  // Calculate how many groups we have based on screen size
+  // Calculate how many reviews per view based on screen size
   const getReviewsPerView = () => {
     if (typeof window !== 'undefined') {
       if (window.innerWidth < 768) return 1; // mobile
@@ -61,19 +62,24 @@ const Testimonials: React.FC = () => {
   // Update reviews per view on window resize
   useEffect(() => {
     const handleResize = () => {
-      setReviewsPerView(getReviewsPerView());
+      const newReviewsPerView = getReviewsPerView();
+      setReviewsPerView(newReviewsPerView);
+      // Reset to first group when changing screen size
+      setCurrentGroup(0);
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const totalGroups = Math.ceil(reviews.length / reviewsPerView);
+  // Calculate total groups safely
+  const totalGroups = Math.max(1, Math.ceil(reviews.length / reviewsPerView));
 
   // Auto-scroll functionality
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isTransitioning) {
+        setSlideDirection('right');
         setCurrentGroup((prev) => (prev + 1) % totalGroups);
       }
     }, 4500); // 4.5 seconds
@@ -84,6 +90,7 @@ const Testimonials: React.FC = () => {
   const goToNext = useCallback(() => {
     if (!isTransitioning) {
       setIsTransitioning(true);
+      setSlideDirection('right');
       setCurrentGroup((prev) => (prev + 1) % totalGroups);
       setTimeout(() => setIsTransitioning(false), 500);
     }
@@ -92,16 +99,23 @@ const Testimonials: React.FC = () => {
   const goToPrev = useCallback(() => {
     if (!isTransitioning) {
       setIsTransitioning(true);
+      setSlideDirection('left');
       setCurrentGroup((prev) => (prev - 1 + totalGroups) % totalGroups);
       setTimeout(() => setIsTransitioning(false), 500);
     }
   }, [isTransitioning, totalGroups]);
 
-  // Get current reviews to display
+  // Get current reviews to display with proper cycling
   const getCurrentReviews = () => {
-    const startIndex = currentGroup * reviewsPerView;
-    const endIndex = startIndex + reviewsPerView;
-    return reviews.slice(startIndex, endIndex);
+    const startIndex = (currentGroup * reviewsPerView) % reviews.length;
+    const reviewsToShow = [];
+    
+    for (let i = 0; i < reviewsPerView; i++) {
+      const index = (startIndex + i) % reviews.length;
+      reviewsToShow.push(reviews[index]);
+    }
+    
+    return reviewsToShow;
   };
 
   const currentReviews = getCurrentReviews();
@@ -122,7 +136,7 @@ const Testimonials: React.FC = () => {
         </div>
         
         {/* Carousel Container */}
-        <div className="relative">
+        <div className="relative overflow-hidden">
           {/* Navigation Arrows */}
           <Button
             variant="outline"
@@ -144,17 +158,25 @@ const Testimonials: React.FC = () => {
             <ChevronRight className="h-5 w-5" />
           </Button>
 
-          {/* Reviews Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Reviews Grid with Slide Animation */}
+          <div 
+            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-500 ease-in-out ${
+              isTransitioning 
+                ? slideDirection === 'right' 
+                  ? 'transform translate-x-full opacity-0' 
+                  : 'transform -translate-x-full opacity-0'
+                : 'transform translate-x-0 opacity-100'
+            }`}
+          >
             {currentReviews.map((review, index) => {
               const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: index * 200 + 200 });
               
               return (
                 <Card 
-                  key={`${currentGroup}-${index}`}
+                  key={`${currentGroup}-${index}-${review.author}`}
                   ref={cardAnimation.ref}
                   className={`border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105 ${
-                    isTransitioning ? 'opacity-50' : 'opacity-100'
+                    isTransitioning ? 'pointer-events-none' : ''
                   } ${animationClasses.slideUp} ${
                     cardAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
                   }`}
@@ -193,6 +215,7 @@ const Testimonials: React.FC = () => {
                 onClick={() => {
                   if (!isTransitioning) {
                     setIsTransitioning(true);
+                    setSlideDirection(index > currentGroup ? 'right' : 'left');
                     setCurrentGroup(index);
                     setTimeout(() => setIsTransitioning(false), 500);
                   }
