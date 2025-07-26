@@ -81,8 +81,10 @@ const Testimonials: React.FC = () => {
       if (!isTransitioning) {
         setIsTransitioning(true);
         setSlideDirection('right');
-        setCurrentGroup((prev) => (prev + 1) % totalGroups);
-        setTimeout(() => setIsTransitioning(false), 800);
+        setTimeout(() => {
+          setCurrentGroup((prev) => (prev + 1) % totalGroups);
+          setTimeout(() => setIsTransitioning(false), 100);
+        }, 400);
       }
     }, 5500); // 5.5 seconds
 
@@ -145,9 +147,9 @@ const Testimonials: React.FC = () => {
             size="icon"
             onClick={goToPrev}
             disabled={isTransitioning}
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 z-10 bg-primary text-white border-0 hover:bg-primary/90 transition-all duration-300 hover:scale-110 shadow-lg"
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-16 z-20 bg-primary text-white border-0 hover:bg-primary/90 transition-all duration-300 hover:scale-110 shadow-lg w-12 h-12"
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-6 w-6" />
           </Button>
           
           <Button
@@ -155,9 +157,9 @@ const Testimonials: React.FC = () => {
             size="icon"
             onClick={goToNext}
             disabled={isTransitioning}
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 z-10 bg-primary text-white border-0 hover:bg-primary/90 transition-all duration-300 hover:scale-110 shadow-lg"
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-16 z-20 bg-primary text-white border-0 hover:bg-primary/90 transition-all duration-300 hover:scale-110 shadow-lg w-12 h-12"
           >
-            <ChevronRight className="h-5 w-5" />
+            <ChevronRight className="h-6 w-6" />
           </Button>
 
           {/* Reviews Grid with Slide Animation */}
