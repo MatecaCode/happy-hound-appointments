@@ -1,38 +1,110 @@
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
 
-interface TestimonialProps {
-  name: string;
+interface Review {
+  author: string;
   text: string;
-  dogName: string;
-  backgroundColor?: string;
 }
 
-const testimonials: TestimonialProps[] = [
+const reviews: Review[] = [
   {
-    name: "Mariana Silva",
-    dogName: "Max",
-    text: "A Vettale sempre acolhe o Max com muito carinho. A equipe é incrível — confiamos de olhos fechados!",
-    backgroundColor: "#F5EEE5"
+    author: "Mariana, dona do Thor",
+    text: "A equipe foi super atenciosa desde o primeiro contato. Meu cachorro saiu feliz e cheiroso! Obrigado pelo carinho."
   },
   {
-    name: "Miguel Santos",
-    dogName: "Bella",
-    text: "A equipe da Vettale é sensacional! Minha Bella fica animada toda vez que chegamos. A qualidade do atendimento é sempre excepcional.",
-    backgroundColor: "#E9F3E1"
+    author: "Rafael, dono da Lili",
+    text: "Fiquei impressionado com o cuidado no atendimento. Explicaram tudo com calma e mostraram real preocupação com meu gato."
   },
   {
-    name: "Júlia Oliveira",
-    dogName: "Cooper",
-    text: "Cooper nunca esteve melhor! O processo de agendamento da Vettale é super simples, e eles realmente entendem as necessidades de cada pet.",
-    backgroundColor: "#F5EEE5"
+    author: "Beatriz, dona do Scooby",
+    text: "Ambiente limpo, equipe gentil e serviço impecável. Já virou a clínica de confiança da nossa família."
   },
+  {
+    author: "Lucas, dono da Bela",
+    text: "Levei minha cadela para tosa e o resultado ficou lindo. Deram atenção até aos detalhes que pedi. Super indico."
+  },
+  {
+    author: "Fernanda, dona do Nino",
+    text: "Foram incríveis no atendimento de emergência. Deram suporte e tranquilidade o tempo todo."
+  },
+  {
+    author: "Caio, dono da Mel",
+    text: "Serviço profissional e ao mesmo tempo acolhedor. A Vettale realmente cuida da história de cada pet."
+  },
+  {
+    author: "Juliana, dona do Max",
+    text: "Pontuais, organizados e com muito carinho pelos animais. O tipo de cuidado que a gente procura faz tempo."
+  }
 ];
 
 const Testimonials: React.FC = () => {
+  const [currentGroup, setCurrentGroup] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const headerAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
+
+  // Calculate how many groups we have based on screen size
+  const getReviewsPerView = () => {
+    if (typeof window !== 'undefined') {
+      if (window.innerWidth < 768) return 1; // mobile
+      if (window.innerWidth < 1024) return 2; // tablet
+      return 3; // desktop
+    }
+    return 3; // default
+  };
+
+  const [reviewsPerView, setReviewsPerView] = useState(getReviewsPerView());
+
+  // Update reviews per view on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setReviewsPerView(getReviewsPerView());
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const totalGroups = Math.ceil(reviews.length / reviewsPerView);
+
+  // Auto-scroll functionality
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!isTransitioning) {
+        setCurrentGroup((prev) => (prev + 1) % totalGroups);
+      }
+    }, 4500); // 4.5 seconds
+
+    return () => clearInterval(interval);
+  }, [isTransitioning, totalGroups]);
+
+  const goToNext = useCallback(() => {
+    if (!isTransitioning) {
+      setIsTransitioning(true);
+      setCurrentGroup((prev) => (prev + 1) % totalGroups);
+      setTimeout(() => setIsTransitioning(false), 500);
+    }
+  }, [isTransitioning, totalGroups]);
+
+  const goToPrev = useCallback(() => {
+    if (!isTransitioning) {
+      setIsTransitioning(true);
+      setCurrentGroup((prev) => (prev - 1 + totalGroups) % totalGroups);
+      setTimeout(() => setIsTransitioning(false), 500);
+    }
+  }, [isTransitioning, totalGroups]);
+
+  // Get current reviews to display
+  const getCurrentReviews = () => {
+    const startIndex = currentGroup * reviewsPerView;
+    const endIndex = startIndex + reviewsPerView;
+    return reviews.slice(startIndex, endIndex);
+  };
+
+  const currentReviews = getCurrentReviews();
 
   return (
     <section className="py-16" style={{ backgroundColor: '#FFFCF8' }}>
@@ -49,40 +121,91 @@ const Testimonials: React.FC = () => {
           </p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {testimonials.map((testimonial, index) => {
-            const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: index * 200 + 200 });
-            
-            return (
-              <Card 
+        {/* Carousel Container */}
+        <div className="relative">
+          {/* Navigation Arrows */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={goToPrev}
+            disabled={isTransitioning}
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 bg-white/80 backdrop-blur-sm border-2 hover:bg-white transition-all duration-300 hover:scale-110 shadow-lg"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={goToNext}
+            disabled={isTransitioning}
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 bg-white/80 backdrop-blur-sm border-2 hover:bg-white transition-all duration-300 hover:scale-110 shadow-lg"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+
+          {/* Reviews Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {currentReviews.map((review, index) => {
+              const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: index * 200 + 200 });
+              
+              return (
+                <Card 
+                  key={`${currentGroup}-${index}`}
+                  ref={cardAnimation.ref}
+                  className={`border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105 ${
+                    isTransitioning ? 'opacity-50' : 'opacity-100'
+                  } ${animationClasses.slideUp} ${
+                    cardAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+                  }`}
+                  style={{ 
+                    backgroundColor: index % 2 === 0 ? '#F5EEE5' : '#E9F3E1',
+                    transition: 'all 0.5s ease-in-out'
+                  }}
+                >
+                  <CardContent className="pt-6 pb-4">
+                    <div className="space-y-4">
+                      <div className="flex gap-1">
+                        {[...Array(5)].map((_, i) => (
+                          <svg key={i} className="w-5 h-5 text-yellow-400 transition-transform duration-300 group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                      
+                      <p className="text-foreground font-medium leading-relaxed">"{review.text}"</p>
+                      
+                      <div>
+                        <p className="font-semibold text-foreground">{review.author}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Pagination Dots */}
+          <div className="flex justify-center mt-8 gap-2">
+            {Array.from({ length: totalGroups }, (_, index) => (
+              <button
                 key={index}
-                ref={cardAnimation.ref}
-                className={`border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105 ${animationClasses.slideUp} ${
-                  cardAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+                onClick={() => {
+                  if (!isTransitioning) {
+                    setIsTransitioning(true);
+                    setCurrentGroup(index);
+                    setTimeout(() => setIsTransitioning(false), 500);
+                  }
+                }}
+                className={`w-3 h-3 rounded-full transition-all duration-300 ${
+                  currentGroup === index 
+                    ? 'bg-primary scale-125' 
+                    : 'bg-muted hover:bg-primary/50'
                 }`}
-                style={{ backgroundColor: testimonial.backgroundColor }}
-              >
-                <CardContent className="pt-6 pb-4">
-                  <div className="space-y-4">
-                    <div className="flex gap-1">
-                      {[...Array(5)].map((_, i) => (
-                        <svg key={i} className="w-5 h-5 text-yellow-400 transition-transform duration-300 group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                    </div>
-                    
-                    <p className="text-foreground font-medium leading-relaxed">"{testimonial.text}"</p>
-                    
-                    <div>
-                      <p className="font-semibold text-foreground">{testimonial.name}</p>
-                      <p className="text-sm text-muted-foreground">Tutor(a) de {testimonial.dogName}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                disabled={isTransitioning}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </section>
