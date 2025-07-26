@@ -88,7 +88,7 @@ const Book = () => {
                   <p className="mt-2">
                     Tem dúvidas sobre nossos serviços?
                     <br />
-                    Ligue para (11) 1234-5678
+                    Ligue para (11) 2427-2827
                   </p>
                 </div>
 

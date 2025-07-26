@@ -287,7 +287,7 @@ const Shop = () => {
             <div className="bg-white p-6 rounded-lg shadow-sm">
               <h3 className="font-semibold mb-2">Dúvidas</h3>
               <p className="text-sm text-muted-foreground">
-                Entre em contato com nossa equipe de atendimento pelo telefone (11) 1234-5678.
+                Entre em contato com nossa equipe de atendimento pelo telefone (11) 2427-2827.
               </p>
             </div>
           </div>
