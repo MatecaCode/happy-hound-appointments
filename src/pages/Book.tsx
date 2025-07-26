@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import AppointmentForm from '@/components/AppointmentForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Layout from '@/components/Layout';
+
 
 const Book = () => {
   const [appointmentType, setAppointmentType] = useState<'grooming' | 'veterinary'>('grooming');
