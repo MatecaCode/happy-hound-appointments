@@ -47,10 +47,10 @@ const Footer: React.FC = () => {
           <div>
             <h4 className="font-semibold text-lg mb-4">Contato</h4>
             <address className="not-italic">
-              <p>Rua da Saúde Pet, 123</p>
-              <p>Atibaia, SP 12345</p>
+              <p>Alameda Prof. Lucas Nogueira Garcez, 4245 - Jardim Paulista</p>
+              <p>Atibaia - SP, 12947-000, Brazil</p>
               <p className="mt-2">Email: contato@vettale.com</p>
-              <p>Telefone: (11) 1234-5678</p>
+              <p>Telefone: (11) 2427-2827</p>
             </address>
           </div>
         </div>
