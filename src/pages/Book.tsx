@@ -30,7 +30,7 @@ const Book = () => {
 
           {/* Banner message */}
           <div className="absolute top-6 left-1/2 z-20 -translate-x-1/2 bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-2 rounded-lg shadow-md">
-            🐶 <strong>Agendamentos em Breve!</strong> Estamos finalizando os testes.
+            🐶 <strong>Agendamentos em Breve!</strong>
           </div>
 
           <Tabs
