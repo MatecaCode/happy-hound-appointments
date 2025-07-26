@@ -79,10 +79,12 @@ const Testimonials: React.FC = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       if (!isTransitioning) {
+        setIsTransitioning(true);
         setSlideDirection('right');
         setCurrentGroup((prev) => (prev + 1) % totalGroups);
+        setTimeout(() => setIsTransitioning(false), 800);
       }
-    }, 4500); // 4.5 seconds
+    }, 5500); // 5.5 seconds
 
     return () => clearInterval(interval);
   }, [isTransitioning, totalGroups]);
@@ -92,7 +94,7 @@ const Testimonials: React.FC = () => {
       setIsTransitioning(true);
       setSlideDirection('right');
       setCurrentGroup((prev) => (prev + 1) % totalGroups);
-      setTimeout(() => setIsTransitioning(false), 500);
+      setTimeout(() => setIsTransitioning(false), 800);
     }
   }, [isTransitioning, totalGroups]);
 
@@ -101,7 +103,7 @@ const Testimonials: React.FC = () => {
       setIsTransitioning(true);
       setSlideDirection('left');
       setCurrentGroup((prev) => (prev - 1 + totalGroups) % totalGroups);
-      setTimeout(() => setIsTransitioning(false), 500);
+      setTimeout(() => setIsTransitioning(false), 800);
     }
   }, [isTransitioning, totalGroups]);
 
@@ -160,7 +162,7 @@ const Testimonials: React.FC = () => {
 
           {/* Reviews Grid with Slide Animation */}
           <div 
-            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-500 ease-in-out ${
+            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-800 ease-in-out ${
               isTransitioning 
                 ? slideDirection === 'right' 
                   ? 'transform translate-x-full opacity-0' 
