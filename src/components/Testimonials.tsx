@@ -107,7 +107,7 @@ const Testimonials: React.FC = () => {
 
   // Get current reviews to display with proper cycling
   const getCurrentReviews = () => {
-    const startIndex = (currentGroup * reviewsPerView) % reviews.length;
+    const startIndex = currentGroup * reviewsPerView;
     const reviewsToShow = [];
     
     for (let i = 0; i < reviewsPerView; i++) {
@@ -143,7 +143,7 @@ const Testimonials: React.FC = () => {
             size="icon"
             onClick={goToPrev}
             disabled={isTransitioning}
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 bg-white/80 backdrop-blur-sm border-2 hover:bg-white transition-all duration-300 hover:scale-110 shadow-lg"
+            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-12 z-10 bg-primary text-white border-0 hover:bg-primary/90 transition-all duration-300 hover:scale-110 shadow-lg"
           >
             <ChevronLeft className="h-5 w-5" />
           </Button>
@@ -153,13 +153,21 @@ const Testimonials: React.FC = () => {
             size="icon"
             onClick={goToNext}
             disabled={isTransitioning}
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 bg-white/80 backdrop-blur-sm border-2 hover:bg-white transition-all duration-300 hover:scale-110 shadow-lg"
+            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-12 z-10 bg-primary text-white border-0 hover:bg-primary/90 transition-all duration-300 hover:scale-110 shadow-lg"
           >
             <ChevronRight className="h-5 w-5" />
           </Button>
 
-          {/* Reviews Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Reviews Grid with Slide Animation */}
+          <div 
+            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-500 ease-in-out ${
+              isTransitioning 
+                ? slideDirection === 'right' 
+                  ? 'transform translate-x-full opacity-0' 
+                  : 'transform -translate-x-full opacity-0'
+                : 'transform translate-x-0 opacity-100'
+            }`}
+          >
             {currentReviews.map((review, index) => {
               const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: index * 200 + 200 });
               
@@ -197,7 +205,7 @@ const Testimonials: React.FC = () => {
           </div>
 
           {/* Pagination Dots */}
-          <div className="flex justify-center mt-8 gap-2">
+          <div className="flex justify-center mt-12 mb-4 gap-2">
             {Array.from({ length: totalGroups }, (_, index) => (
               <button
                 key={index}
