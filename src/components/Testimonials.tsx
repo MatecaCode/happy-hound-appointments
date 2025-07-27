@@ -196,11 +196,11 @@ const Testimonials: React.FC = () => {
           <div className="relative overflow-hidden">
             {/* Current Reviews */}
             <div 
-              className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-400 ease-in-out ${
+              className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-800 ease-in-out ${
                 isTransitioning 
                   ? slideDirection === 'right' 
-                    ? 'transform translate-x-full opacity-0' 
-                    : 'transform -translate-x-full opacity-0'
+                    ? 'transform translate-x-full opacity-100' 
+                    : 'transform -translate-x-full opacity-100'
                   : 'transform translate-x-0 opacity-100'
               }`}
             >
@@ -243,7 +243,7 @@ const Testimonials: React.FC = () => {
             {/* Next Reviews (shown during transition) */}
             {isTransitioning && nextReviews.length > 0 && (
               <div 
-                className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-400 ease-in-out ${
+                className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-800 ease-in-out ${
                   slideDirection === 'right' 
                     ? 'transform -translate-x-full opacity-100' 
                     : 'transform translate-x-full opacity-100'
