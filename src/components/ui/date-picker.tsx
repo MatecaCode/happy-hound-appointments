@@ -37,11 +37,13 @@ export function DatePicker({
   const [tempDate, setTempDate] = React.useState<Date | undefined>(date)
   const [inputValue, setInputValue] = React.useState("")
   const [isTyping, setIsTyping] = React.useState(false)
+  const [calendarMonth, setCalendarMonth] = React.useState<Date>(date || new Date())
 
   const handleSelect = (selectedDate: Date | undefined) => {
     setTempDate(selectedDate)
     if (selectedDate) {
       setInputValue(format(selectedDate, "dd/MM/yyyy", { locale: ptBR }))
+      setCalendarMonth(selectedDate)
     }
   }
 
@@ -68,6 +70,7 @@ export function DatePicker({
       const parsedDate = parse(value, "dd/MM/yyyy", new Date())
       if (isValid(parsedDate)) {
         setTempDate(parsedDate)
+        setCalendarMonth(parsedDate)
         setIsTyping(false)
       }
     }
@@ -78,18 +81,38 @@ export function DatePicker({
       const parsedDate = parse(inputValue, "dd/MM/yyyy", new Date())
       if (isValid(parsedDate)) {
         setTempDate(parsedDate)
+        setCalendarMonth(parsedDate)
         setIsTyping(false)
       } else {
         // Reset to current date if invalid
         setInputValue(date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : "")
+        setTempDate(date)
         setIsTyping(false)
       }
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      // Parse the current input value and set it as tempDate
+             if (inputValue) {
+         const parsedDate = parse(inputValue, "dd/MM/yyyy", new Date())
+         if (isValid(parsedDate)) {
+           setTempDate(parsedDate)
+           setCalendarMonth(parsedDate)
+         }
+       }
+      setOpen(true)
     }
   }
 
   React.useEffect(() => {
     setTempDate(date)
     setInputValue(date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : "")
+    if (date) {
+      setCalendarMonth(date)
+    }
   }, [date])
 
   return (
@@ -100,6 +123,7 @@ export function DatePicker({
             value={inputValue}
             onChange={handleInputChange}
             onBlur={handleInputBlur}
+            onKeyDown={handleKeyDown}
             placeholder={placeholder}
             className={cn(
               "pr-10",
@@ -127,8 +151,10 @@ export function DatePicker({
           initialFocus
           fromYear={fromYear}
           toYear={toYear}
-          captionLayout="dropdown-buttons"
           className="pointer-events-auto"
+          month={calendarMonth}
+          onMonthChange={setCalendarMonth}
+          captionLayout="dropdown-buttons"
         />
         <div className="flex gap-2 p-3 pt-0">
           <Button

@@ -6,6 +6,7 @@ import { Heart, Calendar, Dog, Syringe, Cat } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
 
 
 const inaugurationUrl = supabase
@@ -26,12 +27,29 @@ const journalUrl = supabase
 
 
 const About = () => {
+  // Animation hooks
+  const heroAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
+  const historyAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
+  const historyImageAnimation = useScrollAnimation<HTMLDivElement>({ delay: 300 });
+  const valuesAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
+  const teamAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
+  const teamImageAnimation = useScrollAnimation<HTMLDivElement>({ delay: 300 });
+  const todayAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
+  const todayImagesAnimation = useScrollAnimation<HTMLDivElement>({ delay: 300 });
+  const metricsAnimation = useScrollAnimation<HTMLDivElement>({ delay: 400 });
+  const ctaAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
+
   return (
     <Layout>
       {/* Hero Section */}
       <section className="bg-secondary/50 py-16">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
+          <div 
+            ref={heroAnimation.ref}
+            className={`text-center mb-12 ${animationClasses.fadeIn} ${
+              heroAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+            }`}
+          >
             <h1 className="mb-4">Sobre <span className="text-primary">Nós</span></h1>
             <p className="text-muted-foreground max-w-3xl mx-auto">
               Uma Jornada de Amor e Inovação pelos Pets
@@ -44,7 +62,12 @@ const About = () => {
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div>
+            <div 
+              ref={historyAnimation.ref}
+              className={`${animationClasses.fadeIn} ${
+                historyAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+              }`}
+            >
               <h2 className="mb-6">Nossa <span className="text-primary">História</span></h2>
               <p className="text-muted-foreground mb-6">
                 Há mais de 40 anos, trocamos a agitação da capital paulista pela tranquilidade de Atibaia para realizar um sonho: 
@@ -56,11 +79,16 @@ const About = () => {
                 veterinária de Atibaia, projetada do zero para oferecer um centro completo de saúde, estética e comportamento pet.
               </p>
             </div>
-            <div>
+            <div 
+              ref={historyImageAnimation.ref}
+              className={`${animationClasses.slideUp} ${
+                historyImageAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+              }`}
+            >
               <img 
                 src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Inauguration%20Clinic.jpg"
                 alt="Nossa primeira clínica em 1990" 
-                className="rounded-lg shadow-lg h-96 w-full object-cover"
+                className="rounded-lg shadow-lg h-96 w-full object-cover transition-transform duration-500 hover:scale-105"
               />
               <p className="text-sm text-center mt-2 text-muted-foreground">Nossa primeira clínica inaugurada em 1990</p>
             </div>
@@ -71,7 +99,14 @@ const About = () => {
       {/* Pioneiros que Fazem História */}
       <section className="py-16 bg-secondary/30">
         <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-center mb-12">Pioneiros que <span className="text-primary">Fazem História</span></h2>
+          <div 
+            ref={valuesAnimation.ref}
+            className={`text-center mb-12 ${animationClasses.fadeIn} ${
+              valuesAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+            }`}
+          >
+            <h2>Pioneiros que <span className="text-primary">Fazem História</span></h2>
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             <div className="flex gap-6">
@@ -140,7 +175,14 @@ const About = () => {
       {/* O Que Nos Move */}
       <section className="py-16">
         <div className="max-w-7xl mx-auto px-6">
-          <h2 className="text-center mb-12">O Que Nos <span className="text-primary">Move</span></h2>
+          <div 
+            ref={teamAnimation.ref}
+            className={`text-center mb-12 ${animationClasses.fadeIn} ${
+              teamAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+            }`}
+          >
+            <h2>O Que Nos <span className="text-primary">Move</span></h2>
+          </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-white p-8 rounded-lg shadow">
@@ -172,11 +214,16 @@ const About = () => {
             </div>
           </div>
           
-          <div className="mt-12">
+          <div 
+            ref={teamImageAnimation.ref}
+            className={`mt-12 ${animationClasses.slideUp} ${
+              teamImageAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+            }`}
+          >
             <img 
                src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Team.png" 
               alt="Nossa equipe atual" 
-              className="rounded-lg shadow-lg h-96 w-full object-cover object-top"
+              className="rounded-lg shadow-lg h-96 w-full object-cover object-top transition-transform duration-500 hover:scale-105"
             />
             <p className="text-sm text-center mt-2 text-muted-foreground">Nossa equipe de profissionais dedicados</p>
           </div>
@@ -186,7 +233,12 @@ const About = () => {
       {/* Onde Estamos Hoje */}
       <section className="py-20" style={{ backgroundColor: '#FFFCF8' }}>
         <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
+          <div 
+            ref={todayAnimation.ref}
+            className={`text-center mb-12 ${animationClasses.fadeIn} ${
+              todayAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+            }`}
+          >
             <h2 className="mb-4">Onde Estamos <span className="text-primary">Hoje</span></h2>
             <p className="text-muted-foreground max-w-3xl mx-auto">
               Mais de 30 anos de dedicação em Atibaia nos transformaram de uma pequena clínica para um centro veterinário completo. 
@@ -194,49 +246,54 @@ const About = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-            {/* Image Slot 1 - MundiauPet Era */}
+          <div 
+            ref={todayImagesAnimation.ref}
+            className={`grid grid-cols-1 md:grid-cols-3 gap-8 mb-12 ${animationClasses.slideUp} ${
+              todayImagesAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+            }`}
+          >
+            {/* Image Slot 1 - Pioneiros */}
             <div className="space-y-4">
-              <div className="bg-gray-200 rounded-lg shadow-lg h-64 w-full flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <div className="text-4xl mb-2">📸</div>
-                  <p className="text-sm">Imagem da Era MundiauPet</p>
-                  <p className="text-xs text-gray-400">(1990-2010)</p>
-                </div>
+              <div className="rounded-lg shadow-lg h-96 w-full overflow-hidden">
+                <img 
+                  src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Classic.jpg"
+                  alt="Pioneiros em Atibaia-SP - Primeiros anos da clínica"
+                  className="h-full w-full object-cover object-top transition-transform duration-500 hover:scale-105"
+                />
               </div>
               <div className="text-center">
-                <h3 className="font-semibold text-lg mb-2">Era MundiauPet</h3>
+                <h3 className="font-semibold text-lg mb-2">Pioneiros em Atibaia-SP</h3>
                 <p className="text-sm text-muted-foreground">
-                  Nossos primeiros 20 anos em Atibaia, estabelecendo a confiança da comunidade e construindo nossa reputação de excelência.
+                  Os primeiros passos na cidade, estabelecendo as bases do que se tornaria a primeira clínica veterinária completa de Atibaia.
                 </p>
               </div>
             </div>
             
             {/* Image Slot 2 - Transition Period */}
             <div className="space-y-4">
-              <div className="bg-gray-200 rounded-lg shadow-lg h-64 w-full flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <div className="text-4xl mb-2">🏥</div>
-                  <p className="text-sm">Imagem da Transição</p>
-                  <p className="text-xs text-gray-400">(2010-2020)</p>
-                </div>
+              <div className="rounded-lg shadow-lg h-96 w-full overflow-hidden">
+                <img 
+                  src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//MundiauMed.png"
+                  alt="Era MundiauPet - Três décadas de tradição veterinária"
+                  className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+                />
               </div>
               <div className="text-center">
-                <h3 className="font-semibold text-lg mb-2">Período de Crescimento</h3>
+                <h3 className="font-semibold text-lg mb-2">Era MundiauPet</h3>
                 <p className="text-sm text-muted-foreground">
-                  Expansão dos serviços, modernização da infraestrutura e formação de uma equipe multidisciplinar especializada.
+                  Três décadas de dedicação, estabelecendo a confiança da comunidade e construindo nossa reputação de excelência em Atibaia.
                 </p>
               </div>
             </div>
             
             {/* Image Slot 3 - Vettale Era */}
             <div className="space-y-4">
-              <div className="bg-gray-200 rounded-lg shadow-lg h-64 w-full flex items-center justify-center">
-                <div className="text-center text-gray-500">
-                  <div className="text-4xl mb-2">🌟</div>
-                  <p className="text-sm">Imagem da Era Vettale</p>
-                  <p className="text-xs text-gray-400">(2020-Presente)</p>
-                </div>
+              <div className="rounded-lg shadow-lg h-96 w-full overflow-hidden">
+                <img 
+                  src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//NewClinic.png"
+                  alt="Nova Era Vettale - Tecnologia de ponta e tradição"
+                  className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+                />
               </div>
               <div className="text-center">
                 <h3 className="font-semibold text-lg mb-2">Era Vettale</h3>
@@ -248,7 +305,12 @@ const About = () => {
           </div>
           
           {/* Métricas de Impacto */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div 
+            ref={metricsAnimation.ref}
+            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 ${animationClasses.slideUp} ${
+              metricsAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+            }`}
+          >
             <div className="bg-white p-6 rounded-lg shadow text-center">
               <div className="text-3xl font-bold text-primary mb-2">30.000+</div>
               <h3 className="font-semibold text-lg mb-2">Banhos</h3>
@@ -303,7 +365,12 @@ const About = () => {
       
       {/* CTA Section */}
       <section className="py-16 bg-primary text-primary-foreground">
-        <div className="max-w-7xl mx-auto px-6 text-center">
+        <div 
+          ref={ctaAnimation.ref}
+          className={`max-w-7xl mx-auto px-6 text-center ${animationClasses.fadeIn} ${
+            ctaAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+          }`}
+        >
           <h2 className="mb-6">Agende a sua visita</h2>
           <p className="text-primary-foreground/90 max-w-2xl mx-auto mb-8">
             Venha conhecer o Centro Veterinário Completo mais tradicional de Atibaia. Estamos prontos para cuidar do seu pet — 

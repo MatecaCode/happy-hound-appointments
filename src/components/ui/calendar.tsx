@@ -17,30 +17,43 @@ function Calendar({
   showOutsideDays = true,
   ...props
 }: CalendarProps) {
+  const [calendarViewMode, setCalendarViewMode] = React.useState<'days' | 'months' | 'years'>('days');
   // Define an extended type that includes the properties we need
   interface CustomDropdownProps extends DropdownProps {
     currentMonth: Date;
     fromYear?: number;
     toYear?: number;
     goToMonth: (date: Date) => void;
+    onViewModeChange?: (mode: 'days' | 'months' | 'years') => void;
+    viewMode?: 'days' | 'months' | 'years';
   }
   
   function CustomDropdowns(props: CustomDropdownProps) {
-    const { currentMonth, fromYear, toYear } = props;
-    const [viewMode, setViewMode] = React.useState<'days' | 'months' | 'years'>('days');
+    const { currentMonth, fromYear, toYear, onViewModeChange, viewMode: externalViewMode } = props;
+    const [internalViewMode, setInternalViewMode] = React.useState<'days' | 'months' | 'years'>('days');
+    const viewMode = externalViewMode || internalViewMode;
+    
+    const setViewMode = (mode: 'days' | 'months' | 'years') => {
+      if (onViewModeChange) {
+        onViewModeChange(mode);
+      } else {
+        setInternalViewMode(mode);
+      }
+    };
     
     // Check if currentMonth exists before using it
     if (!currentMonth) {
       return null;
     }
     
-    // Years array
+    // Years array - ensure we have a good range
     const years = React.useMemo(() => {
-      if (!fromYear || !toYear) return [];
+      const startYear = fromYear || 1900;
+      const endYear = toYear || new Date().getFullYear() + 10;
       return Array.from(
-        { length: toYear - fromYear + 1 }, 
-        (_, i) => fromYear + i
-      );
+        { length: endYear - startYear + 1 }, 
+        (_, i) => startYear + i
+      ).reverse(); // Show newest years first
     }, [fromYear, toYear]);
     
     // Months array
@@ -74,7 +87,7 @@ function Calendar({
 
     if (viewMode === 'months') {
       return (
-        <div className="p-3">
+        <div className="p-3 w-full" style={{ minHeight: '280px', maxHeight: '320px' }}>
           <div className="flex items-center justify-between mb-4">
             <Button
               variant="ghost"
@@ -93,7 +106,7 @@ function Calendar({
               ← Voltar
             </Button>
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-3 px-2">
             {months.map((month, index) => (
               <Button
                 key={month}
@@ -101,7 +114,7 @@ function Calendar({
                 size="sm"
                 onClick={() => handleMonthSelect(index)}
                 className={cn(
-                  "h-8 text-sm",
+                  "h-10 text-sm font-medium",
                   currentMonth.getMonth() === index && "bg-primary text-primary-foreground"
                 )}
               >
@@ -115,19 +128,19 @@ function Calendar({
 
     if (viewMode === 'years') {
       return (
-        <div className="p-3">
+        <div className="p-3 w-full" style={{ minHeight: '280px', maxHeight: '320px' }}>
           <div className="flex items-center justify-between mb-4">
             <span className="text-sm font-medium">Selecione o ano</span>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setViewMode('months')}
+              onClick={() => setViewMode('days')}
               className="h-8 px-2"
             >
               ← Voltar
             </Button>
           </div>
-          <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto">
+          <div className="grid grid-cols-3 gap-3 px-2 overflow-y-auto" style={{ maxHeight: '220px' }}>
             {years.map((year) => (
               <Button
                 key={year}
@@ -135,7 +148,7 @@ function Calendar({
                 size="sm"
                 onClick={() => handleYearSelect(year)}
                 className={cn(
-                  "h-8 text-sm",
+                  "h-10 text-sm font-medium",
                   currentMonth.getFullYear() === year && "bg-primary text-primary-foreground"
                 )}
               >
@@ -169,6 +182,27 @@ function Calendar({
     );
   }
   
+  // If we're in month or year selection mode, only show that
+  if (calendarViewMode !== 'days') {
+    return (
+      <div className={cn("pointer-events-auto", className)} style={{ minWidth: '280px' }}>
+        <CustomDropdowns 
+          currentMonth={props.month || new Date()}
+          fromYear={props.fromYear}
+          toYear={props.toYear}
+          goToMonth={(date: Date) => {
+            // Use the onMonthChange prop if available
+            if (props.onMonthChange) {
+              props.onMonthChange(date);
+            }
+          }}
+          onViewModeChange={setCalendarViewMode}
+          viewMode={calendarViewMode}
+        />
+      </div>
+    );
+  }
+
   return (
     <DayPicker
       showOutsideDays={showOutsideDays}
@@ -210,7 +244,27 @@ function Calendar({
       components={{
         IconLeft: ({ ..._props }) => <ChevronLeft className="h-4 w-4" />,
         IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
-        Dropdown: (props) => <CustomDropdowns {...props as CustomDropdownProps} />
+        Caption: ({ displayMonth }) => {
+          if (!displayMonth) return null;
+          
+          return (
+            <div className="w-full">
+              <CustomDropdowns 
+                currentMonth={displayMonth}
+                fromYear={props.fromYear}
+                toYear={props.toYear}
+                goToMonth={(date: Date) => {
+                  // Use the onMonthChange prop if available
+                  if (props.onMonthChange) {
+                    props.onMonthChange(date);
+                  }
+                }}
+                onViewModeChange={setCalendarViewMode}
+                viewMode={calendarViewMode}
+              />
+            </div>
+          );
+        }
       }}
       {...props}
     />
