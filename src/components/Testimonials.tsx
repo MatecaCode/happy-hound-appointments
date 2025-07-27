@@ -155,8 +155,16 @@ const Testimonials: React.FC = () => {
   const nextReviews = getNextReviews();
 
   return (
-    <section className="py-16" style={{ backgroundColor: '#FFFCF8' }}>
-      <div className="max-w-7xl mx-auto px-6">
+    <>
+      <style>{`
+        @keyframes slideToCenter {
+          to {
+            transform: translateX(0);
+          }
+        }
+      `}</style>
+      <section className="py-16" style={{ backgroundColor: '#FFFCF8' }}>
+        <div className="max-w-7xl mx-auto px-6">
         <div 
           ref={headerAnimation.ref}
           className={`text-center mb-12 ${animationClasses.fadeIn} ${
@@ -193,15 +201,15 @@ const Testimonials: React.FC = () => {
           </Button>
 
           {/* Reviews Grid with Slide Animation */}
-          <div className="relative overflow-hidden">
+          <div className="relative overflow-hidden min-h-[400px]">
             {/* Current Reviews */}
             <div 
-              className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-600 ease-in-out ${
+              className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-[600ms] ease-in-out ${
                 isTransitioning 
                   ? slideDirection === 'right' 
-                    ? 'transform -translate-x-full opacity-100' 
-                    : 'transform translate-x-full opacity-100'
-                  : 'transform translate-x-0 opacity-100'
+                    ? 'transform -translate-x-full' 
+                    : 'transform translate-x-full'
+                  : 'transform translate-x-0'
               }`}
             >
               {currentReviews.map((review, index) => {
@@ -243,11 +251,13 @@ const Testimonials: React.FC = () => {
             {/* Next Reviews (shown during transition) */}
             {isTransitioning && nextReviews.length > 0 && (
               <div 
-                className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-600 ease-in-out ${
-                  slideDirection === 'right' 
-                    ? 'transform translate-x-full opacity-100' 
-                    : 'transform -translate-x-full opacity-100'
-                }`}
+                className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-[600ms] ease-in-out transform translate-x-0`}
+                style={{
+                  transform: slideDirection === 'right' 
+                    ? 'translateX(100%)' 
+                    : 'translateX(-100%)',
+                  animation: `slideToCenter 600ms ease-in-out forwards`
+                }}
               >
                 {nextReviews.map((review, index) => (
                   <Card 
@@ -305,6 +315,7 @@ const Testimonials: React.FC = () => {
         </div>
       </div>
     </section>
+    </>
   );
 };
 
