@@ -46,6 +46,7 @@ const Testimonials: React.FC = () => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
   const [nextGroup, setNextGroup] = useState<number | null>(null);
+  const [nextVisible, setNextVisible] = useState(false);
   const headerAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
 
   // Calculate how many reviews per view based on screen size
@@ -84,9 +85,16 @@ const Testimonials: React.FC = () => {
         setNextGroup(next);
         setIsTransitioning(true);
         setSlideDirection('right');
+        
+        // Trigger next reviews to slide in after a brief delay
+        setTimeout(() => {
+          setNextVisible(true);
+        }, 10);
+        
         setTimeout(() => {
           setCurrentGroup(next);
           setNextGroup(null);
+          setNextVisible(false);
           setIsTransitioning(false);
         }, 600);
       }
@@ -101,9 +109,16 @@ const Testimonials: React.FC = () => {
       setNextGroup(next);
       setIsTransitioning(true);
       setSlideDirection('right');
+      
+      // Trigger next reviews to slide in after a brief delay
+      setTimeout(() => {
+        setNextVisible(true);
+      }, 10);
+      
       setTimeout(() => {
         setCurrentGroup(next);
         setNextGroup(null);
+        setNextVisible(false);
         setIsTransitioning(false);
       }, 600);
     }
@@ -115,9 +130,16 @@ const Testimonials: React.FC = () => {
       setNextGroup(next);
       setIsTransitioning(true);
       setSlideDirection('left');
+      
+      // Trigger next reviews to slide in after a brief delay
+      setTimeout(() => {
+        setNextVisible(true);
+      }, 10);
+      
       setTimeout(() => {
         setCurrentGroup(next);
         setNextGroup(null);
+        setNextVisible(false);
         setIsTransitioning(false);
       }, 600);
     }
@@ -155,16 +177,8 @@ const Testimonials: React.FC = () => {
   const nextReviews = getNextReviews();
 
   return (
-    <>
-      <style>{`
-        @keyframes slideToCenter {
-          to {
-            transform: translateX(0);
-          }
-        }
-      `}</style>
-      <section className="py-16" style={{ backgroundColor: '#FFFCF8' }}>
-        <div className="max-w-7xl mx-auto px-6">
+    <section className="py-16" style={{ backgroundColor: '#FFFCF8' }}>
+      <div className="max-w-7xl mx-auto px-6">
         <div 
           ref={headerAnimation.ref}
           className={`text-center mb-12 ${animationClasses.fadeIn} ${
@@ -204,12 +218,12 @@ const Testimonials: React.FC = () => {
           <div className="relative overflow-hidden min-h-[400px]">
             {/* Current Reviews */}
             <div 
-              className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-[600ms] ease-in-out ${
+              className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-transform duration-[600ms] ease-in-out ${
                 isTransitioning 
                   ? slideDirection === 'right' 
-                    ? 'transform -translate-x-full' 
-                    : 'transform translate-x-full'
-                  : 'transform translate-x-0'
+                    ? '-translate-x-full' 
+                    : 'translate-x-full'
+                  : 'translate-x-0'
               }`}
             >
               {currentReviews.map((review, index) => {
@@ -251,13 +265,13 @@ const Testimonials: React.FC = () => {
             {/* Next Reviews (shown during transition) */}
             {isTransitioning && nextReviews.length > 0 && (
               <div 
-                className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-all duration-[600ms] ease-in-out transform translate-x-0`}
-                style={{
-                  transform: slideDirection === 'right' 
-                    ? 'translateX(100%)' 
-                    : 'translateX(-100%)',
-                  animation: `slideToCenter 600ms ease-in-out forwards`
-                }}
+                className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-transform duration-[600ms] ease-in-out ${
+                  nextVisible 
+                    ? 'translate-x-0' 
+                    : slideDirection === 'right' 
+                      ? 'translate-x-full' 
+                      : '-translate-x-full'
+                }`}
               >
                 {nextReviews.map((review, index) => (
                   <Card 
@@ -315,7 +329,6 @@ const Testimonials: React.FC = () => {
         </div>
       </div>
     </section>
-    </>
   );
 };
 
