@@ -43,10 +43,8 @@ const reviews: Review[] = [
 
 const Testimonials: React.FC = () => {
   const [currentGroup, setCurrentGroup] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [slideDirection, setSlideDirection] = useState<'left' | 'right'>('right');
-  const [nextGroup, setNextGroup] = useState<number | null>(null);
-  const [nextVisible, setNextVisible] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isSnapping, setIsSnapping] = useState(false);
   const headerAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
 
   // Calculate how many reviews per view based on screen size
@@ -77,80 +75,43 @@ const Testimonials: React.FC = () => {
   // Calculate total groups safely
   const totalGroups = Math.max(1, Math.ceil(reviews.length / reviewsPerView));
 
-  // Unified transition function for all navigation
-  const handleGroupChange = useCallback((next: number, direction: 'left' | 'right') => {
-    if (!isTransitioning && next !== currentGroup) {
-      setSlideDirection(direction);
-      setNextGroup(next);
-      setIsTransitioning(true);
+  // Create duplicated reviews for seamless looping
+  const duplicatedReviews = [...reviews, ...reviews];
 
-      // Trigger next reviews to slide in after a brief delay
+  // Handle manual navigation with pause and snap
+  const handleGroupChange = useCallback((next: number) => {
+    if (!isSnapping && next !== currentGroup) {
+      setIsPaused(true);
+      setIsSnapping(true);
+      setCurrentGroup(next);
+
+      // Resume scrolling after snap
       setTimeout(() => {
-        setNextVisible(true);
-      }, 10);
-
-      // Wait for slide out animation
-      setTimeout(() => {
-        setCurrentGroup(next);
-        setNextGroup(null);
-        setNextVisible(false);
-
-        // Small buffer for smoother feel
-        setTimeout(() => setIsTransitioning(false), 100);
-      }, 900); // transition duration
+        setIsSnapping(false);
+        setIsPaused(false);
+      }, 1500); // Pause for 1.5s to view selected group
     }
-  }, [currentGroup, isTransitioning]);
-
-  // Auto-scroll functionality
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const next = (currentGroup + 1) % totalGroups;
-      handleGroupChange(next, 'right');
-    }, 6200); // 5.6s hold + 600ms animation
-
-    return () => clearInterval(timer);
-  }, [currentGroup, totalGroups, handleGroupChange]);
+  }, [currentGroup, isSnapping]);
 
   const goToNext = useCallback(() => {
     const next = (currentGroup + 1) % totalGroups;
-    handleGroupChange(next, 'right');
+    handleGroupChange(next);
   }, [currentGroup, totalGroups, handleGroupChange]);
 
   const goToPrev = useCallback(() => {
     const next = (currentGroup - 1 + totalGroups) % totalGroups;
-    handleGroupChange(next, 'left');
+    handleGroupChange(next);
   }, [currentGroup, totalGroups, handleGroupChange]);
 
-  // Get current reviews to display with proper cycling
-  const getCurrentReviews = () => {
-    const startIndex = currentGroup * reviewsPerView;
-    const reviewsToShow = [];
-    
-    for (let i = 0; i < reviewsPerView; i++) {
-      const index = (startIndex + i) % reviews.length;
-      reviewsToShow.push(reviews[index]);
+  // Calculate scroll position based on current group
+  const getScrollOffset = () => {
+    if (isSnapping) {
+      // When snapping, position to show the selected group
+      const cardWidth = 100 / reviewsPerView; // Percentage width per card
+      return -(currentGroup * cardWidth * reviewsPerView);
     }
-    
-    return reviewsToShow;
+    return 0; // Let CSS animation handle continuous scroll
   };
-
-  // Get next reviews for smooth transition
-  const getNextReviews = () => {
-    if (nextGroup === null) return [];
-    
-    const startIndex = nextGroup * reviewsPerView;
-    const reviewsToShow = [];
-    
-    for (let i = 0; i < reviewsPerView; i++) {
-      const index = (startIndex + i) % reviews.length;
-      reviewsToShow.push(reviews[index]);
-    }
-    
-    return reviewsToShow;
-  };
-
-  const currentReviews = getCurrentReviews();
-  const nextReviews = getNextReviews();
 
   return (
     <section className="py-16" style={{ backgroundColor: '#FFFCF8' }}>
@@ -174,7 +135,7 @@ const Testimonials: React.FC = () => {
             variant="outline"
             size="icon"
             onClick={goToPrev}
-            disabled={isTransitioning}
+            disabled={isSnapping}
             className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-16 z-20 bg-primary text-white border-0 hover:bg-primary/90 transition-all duration-300 hover:scale-110 shadow-lg w-12 h-12"
           >
             <ChevronLeft className="h-6 w-6" />
@@ -184,7 +145,7 @@ const Testimonials: React.FC = () => {
             variant="outline"
             size="icon"
             onClick={goToNext}
-            disabled={isTransitioning}
+            disabled={isSnapping}
             className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-16 z-20 bg-primary text-white border-0 hover:bg-primary/90 transition-all duration-300 hover:scale-110 shadow-lg w-12 h-12"
           >
             <ChevronRight className="h-6 w-6" />
@@ -286,8 +247,7 @@ const Testimonials: React.FC = () => {
               <button
                 key={index}
                 onClick={() => {
-                  const direction = index > currentGroup ? 'right' : 'left';
-                  handleGroupChange(index, direction);
+                  handleGroupChange(index);
                 }}
                 className={`w-3 h-3 rounded-full transition-all duration-300 ${
                   currentGroup === index 
