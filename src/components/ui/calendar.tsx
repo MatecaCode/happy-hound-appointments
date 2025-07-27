@@ -140,7 +140,30 @@ function Calendar({
               ← Voltar
             </Button>
           </div>
-          <div className="grid grid-cols-3 gap-3 px-2 overflow-y-auto scroll-smooth custom-scrollbar" style={{ maxHeight: '220px' }}>
+          <div 
+            className="grid grid-cols-3 gap-3 px-2 overflow-y-auto scroll-smooth custom-scrollbar" 
+            style={{ maxHeight: '220px' }}
+            onWheel={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const target = e.currentTarget;
+              target.scrollTop += e.deltaY;
+            }}
+            onTouchStart={(e) => {
+              const target = e.currentTarget as HTMLElement;
+              target.dataset.touchStartY = e.touches[0].clientY.toString();
+            }}
+            onTouchMove={(e) => {
+              e.preventDefault();
+              const target = e.currentTarget as HTMLElement;
+              const touchStartY = parseInt(target.dataset.touchStartY || '0');
+              const currentY = e.touches[0].clientY;
+              const deltaY = touchStartY - currentY;
+              
+              target.scrollTop += deltaY;
+              target.dataset.touchStartY = currentY.toString();
+            }}
+          >
             {years.map((year) => (
               <Button
                 key={year}

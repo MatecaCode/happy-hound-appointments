@@ -147,5 +147,17 @@
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--border)) transparent;
   }
+  
+  /* Enhanced mouse wheel scrolling for Select components */
+  [data-radix-select-viewport] {
+    overscroll-behavior: contain;
+    scroll-behavior: smooth;
+  }
+  
+  /* Ensure viewport can scroll */
+  [data-radix-select-viewport] {
+    overflow-y: auto !important;
+    max-height: 300px;
+  }
 }
 
