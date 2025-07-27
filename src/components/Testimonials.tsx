@@ -77,88 +77,49 @@ const Testimonials: React.FC = () => {
   // Calculate total groups safely
   const totalGroups = Math.max(1, Math.ceil(reviews.length / reviewsPerView));
 
+  // Unified transition function for all navigation
+  const handleGroupChange = useCallback((next: number, direction: 'left' | 'right') => {
+    if (!isTransitioning && next !== currentGroup) {
+      setSlideDirection(direction);
+      setNextGroup(next);
+      setIsTransitioning(true);
+
+      // Trigger next reviews to slide in after a brief delay
+      setTimeout(() => {
+        setNextVisible(true);
+      }, 10);
+
+      // Wait for slide out animation
+      setTimeout(() => {
+        setCurrentGroup(next);
+        setNextGroup(null);
+        setNextVisible(false);
+
+        // Small buffer for smoother feel
+        setTimeout(() => setIsTransitioning(false), 100);
+      }, 600); // transition duration
+    }
+  }, [currentGroup, isTransitioning]);
+
   // Auto-scroll functionality
   useEffect(() => {
-    const cycle = setInterval(() => {
-      if (!isTransitioning) {
-        const next = (currentGroup + 1) % totalGroups;
-        setSlideDirection('right');
-        setNextGroup(next);
-        setIsTransitioning(true);
+    const timer = setInterval(() => {
+      const next = (currentGroup + 1) % totalGroups;
+      handleGroupChange(next, 'right');
+    }, 6200); // 5.6s hold + 600ms animation
 
-        // Trigger next reviews to slide in after a brief delay
-        setTimeout(() => {
-          setNextVisible(true);
-        }, 10);
-
-        // Wait for slide out animation
-        setTimeout(() => {
-          setCurrentGroup(next);
-          setNextGroup(null);
-          setNextVisible(false);
-
-          // Small buffer after transition ends
-          setTimeout(() => {
-            setIsTransitioning(false);
-          }, 100); // optional buffer
-        }, 600); // match transition duration
-      }
-    }, 6200); // 5.6s stay + 600ms transition
-
-    return () => clearInterval(cycle);
-  }, [currentGroup, totalGroups, isTransitioning]);
+    return () => clearInterval(timer);
+  }, [currentGroup, totalGroups, handleGroupChange]);
 
   const goToNext = useCallback(() => {
-    if (!isTransitioning) {
-      const next = (currentGroup + 1) % totalGroups;
-      setSlideDirection('right');
-      setNextGroup(next);
-      setIsTransitioning(true);
-      
-      // Trigger next reviews to slide in after a brief delay
-      setTimeout(() => {
-        setNextVisible(true);
-      }, 10);
-      
-      // Wait for slide out animation
-      setTimeout(() => {
-        setCurrentGroup(next);
-        setNextGroup(null);
-        setNextVisible(false);
-
-        // Small buffer after transition ends
-        setTimeout(() => {
-          setIsTransitioning(false);
-        }, 100); // optional buffer
-      }, 600); // match transition duration
-    }
-  }, [isTransitioning, currentGroup, totalGroups]);
+    const next = (currentGroup + 1) % totalGroups;
+    handleGroupChange(next, 'right');
+  }, [currentGroup, totalGroups, handleGroupChange]);
 
   const goToPrev = useCallback(() => {
-    if (!isTransitioning) {
-      const next = (currentGroup - 1 + totalGroups) % totalGroups;
-      setSlideDirection('left');
-      setNextGroup(next);
-      setIsTransitioning(true);
-      
-      // Trigger next reviews to slide in after a brief delay
-      setTimeout(() => {
-        setNextVisible(true);
-      }, 10);
-      
-      // Wait for slide out animation
-      setTimeout(() => {
-        setCurrentGroup(next);
-        setNextGroup(null);
-        setNextVisible(false);
-
-        // Small buffer after transition ends
-        setTimeout(() => {
-          setIsTransitioning(false);
-        }, 100); // optional buffer
-      }, 600); // match transition duration
-    }
-  }, [isTransitioning, currentGroup, totalGroups]);
+    const next = (currentGroup - 1 + totalGroups) % totalGroups;
+    handleGroupChange(next, 'left');
+  }, [currentGroup, totalGroups, handleGroupChange]);
 
   // Get current reviews to display with proper cycling
   const getCurrentReviews = () => {
@@ -325,12 +286,8 @@ const Testimonials: React.FC = () => {
               <button
                 key={index}
                 onClick={() => {
-                  if (!isTransitioning) {
-                    setIsTransitioning(true);
-                    setSlideDirection(index > currentGroup ? 'right' : 'left');
-                    setCurrentGroup(index);
-                    setTimeout(() => setIsTransitioning(false), 500);
-                  }
+                  const direction = index > currentGroup ? 'right' : 'left';
+                  handleGroupChange(index, direction);
                 }}
                 className={`w-3 h-3 rounded-full transition-all duration-300 ${
                   currentGroup === index 
