@@ -79,69 +79,84 @@ const Testimonials: React.FC = () => {
 
   // Auto-scroll functionality
   useEffect(() => {
-    const interval = setInterval(() => {
+    const cycle = setInterval(() => {
       if (!isTransitioning) {
         const next = (currentGroup + 1) % totalGroups;
+        setSlideDirection('right');
         setNextGroup(next);
         setIsTransitioning(true);
-        setSlideDirection('right');
-        
+
         // Trigger next reviews to slide in after a brief delay
         setTimeout(() => {
           setNextVisible(true);
         }, 10);
-        
+
+        // Wait for slide out animation
         setTimeout(() => {
           setCurrentGroup(next);
           setNextGroup(null);
           setNextVisible(false);
-          setIsTransitioning(false);
-        }, 600);
-      }
-    }, 4500); // 4.5 seconds
 
-    return () => clearInterval(interval);
-  }, [isTransitioning, currentGroup, totalGroups]);
+          // Small buffer after transition ends
+          setTimeout(() => {
+            setIsTransitioning(false);
+          }, 100); // optional buffer
+        }, 600); // match transition duration
+      }
+    }, 6200); // 5.6s stay + 600ms transition
+
+    return () => clearInterval(cycle);
+  }, [currentGroup, totalGroups, isTransitioning]);
 
   const goToNext = useCallback(() => {
     if (!isTransitioning) {
       const next = (currentGroup + 1) % totalGroups;
+      setSlideDirection('right');
       setNextGroup(next);
       setIsTransitioning(true);
-      setSlideDirection('right');
       
       // Trigger next reviews to slide in after a brief delay
       setTimeout(() => {
         setNextVisible(true);
       }, 10);
       
+      // Wait for slide out animation
       setTimeout(() => {
         setCurrentGroup(next);
         setNextGroup(null);
         setNextVisible(false);
-        setIsTransitioning(false);
-      }, 600);
+
+        // Small buffer after transition ends
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 100); // optional buffer
+      }, 600); // match transition duration
     }
   }, [isTransitioning, currentGroup, totalGroups]);
 
   const goToPrev = useCallback(() => {
     if (!isTransitioning) {
       const next = (currentGroup - 1 + totalGroups) % totalGroups;
+      setSlideDirection('left');
       setNextGroup(next);
       setIsTransitioning(true);
-      setSlideDirection('left');
       
       // Trigger next reviews to slide in after a brief delay
       setTimeout(() => {
         setNextVisible(true);
       }, 10);
       
+      // Wait for slide out animation
       setTimeout(() => {
         setCurrentGroup(next);
         setNextGroup(null);
         setNextVisible(false);
-        setIsTransitioning(false);
-      }, 600);
+
+        // Small buffer after transition ends
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 100); // optional buffer
+      }, 600); // match transition duration
     }
   }, [isTransitioning, currentGroup, totalGroups]);
 
