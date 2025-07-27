@@ -2,7 +2,8 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { useEffect } from "react";
 import Index from "./pages/Index";
 import Services from "./pages/Services";
 import Book from "./pages/Book";
@@ -38,6 +39,18 @@ import GroomerAvailability from './pages/GroomerAvailability';
 
 const queryClient = new QueryClient();
 
+// ScrollToTop component to handle scroll restoration
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    // Scroll to top when pathname changes
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -45,6 +58,7 @@ function App() {
         <Toaster />
         <BrowserRouter>
           <AuthProvider>
+            <ScrollToTop />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/about" element={<About />} />
@@ -69,8 +83,9 @@ function App() {
               <Route path="/groomer-availability" element={<GroomerAvailability />} />
               <Route path="/vet-calendar" element={<VetCalendar />} />
               <Route path="/staff-dashboard" element={<StaffDashboard />} />
-        <Route path="/staff-availability" element={<StaffAvailability />} />
-        <Route path="/staff-calendar" element={<StaffCalendar />} />
+              <Route path="/staff-availability" element={<StaffAvailability />} />
+              <Route path="/staff-calendar" element={<StaffCalendar />} />
+              
               <Route path="/admin" element={<AdminDashboard />} />
               <Route path="/admin/booking" element={<AdminBookingPage />} />
               <Route path="/admin/availability" element={<AdminAvailabilityManager />} />

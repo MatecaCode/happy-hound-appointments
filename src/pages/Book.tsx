@@ -2,9 +2,79 @@ import React, { useState } from 'react';
 import Layout from '@/components/Layout';
 import AppointmentForm from '@/components/AppointmentForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Link } from 'react-router-dom';
+import { LogIn, AlertCircle } from 'lucide-react';
 
 const Book = () => {
   const [appointmentType, setAppointmentType] = useState<'grooming' | 'veterinary'>('grooming');
+  const { user, loading } = useAuth();
+
+  // Show loading state
+  if (loading) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // Show login prompt if user is not authenticated
+  if (!user) {
+    return (
+      <Layout>
+        {/* Hero */}
+        <section className="bg-secondary/50 py-16">
+          <div className="max-w-7xl mx-auto px-6 text-center">
+            <h1 className="mb-4">
+              Agende um <span className="text-primary">Serviço</span>
+            </h1>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Faça login para agendar serviços para seu pet
+            </p>
+          </div>
+        </section>
+
+        {/* Login Required */}
+        <section className="py-16">
+          <div className="max-w-2xl mx-auto px-6">
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                <div className="space-y-4">
+                  <div>
+                    <p className="font-medium mb-2">
+                      Login necessário para agendar serviços
+                    </p>
+                    <p className="text-sm">
+                      Para agendar um serviço, você precisa estar logado na sua conta.
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <Link to="/login" className="flex items-center gap-2">
+                        <LogIn className="h-4 w-4" />
+                        Fazer Login
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link to="/register">
+                        Criar Conta
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          </div>
+        </section>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -23,16 +93,8 @@ const Book = () => {
       </section>
 
       {/* Booking */}
-      <section className="py-16 relative">
+      <section className="py-16">
         <div className="max-w-7xl mx-auto px-6">
-          {/* Blur overlay */}
-          <div className="absolute inset-0 z-10 backdrop-blur-sm bg-white/40 rounded-xl pointer-events-none" />
-
-          {/* Banner message */}
-          <div className="absolute top-6 left-1/2 z-20 -translate-x-1/2 bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-2 rounded-lg shadow-md">
-            🐶 <strong>Agendamentos em Breve!</strong>
-          </div>
-
           <Tabs
             defaultValue="grooming"
             value={appointmentType}
@@ -55,8 +117,8 @@ const Book = () => {
             </TabsList>
           </Tabs>
 
-          {/* Booking section content (blurred & disabled) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 opacity-40 pointer-events-none">
+          {/* Booking section content */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
             <div className="lg:col-span-2">
               <AppointmentForm key={appointmentType} serviceType={appointmentType} />
             </div>

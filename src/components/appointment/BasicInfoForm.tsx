@@ -6,6 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Pet, Service } from '@/hooks/useAppointmentForm';
 import { usePricing } from '@/hooks/usePricing';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Link } from 'react-router-dom';
+import { PlusCircle, AlertCircle } from 'lucide-react';
 
 interface BasicInfoFormProps {
   userPets: Pet[];
@@ -56,6 +59,43 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
     return sizeMap[size as keyof typeof sizeMap] || size;
   };
 
+  // If no pets are registered, show a prominent message
+  if (userPets.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>1. Informações Básicas</CardTitle>
+          <CardDescription>
+            Selecione seu pet e o serviço desejado
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Alert className="border-orange-200 bg-orange-50">
+            <AlertCircle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              <div className="space-y-4">
+                <div>
+                  <p className="font-medium mb-2">
+                    Você ainda não tem pets cadastrados!
+                  </p>
+                  <p className="text-sm">
+                    Para agendar um serviço, você precisa primeiro cadastrar pelo menos um pet no seu perfil.
+                  </p>
+                </div>
+                <Button asChild className="bg-orange-600 hover:bg-orange-700 text-white">
+                  <Link to="/pets" className="flex items-center gap-2">
+                    <PlusCircle className="h-4 w-4" />
+                    Cadastrar Meu Primeiro Pet
+                  </Link>
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -92,11 +132,6 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
               ))}
             </SelectContent>
           </Select>
-          {userPets.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              Você precisa cadastrar um pet primeiro.
-            </p>
-          )}
         </div>
 
         <div className="space-y-2">
@@ -157,45 +192,26 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
                     <p className="text-xs text-muted-foreground">
                       {pricing.priceSource === 'service_size_fallback' && 'Preço baseado no porte do pet'}
                       {pricing.priceSource === 'service_default' && 'Preço padrão do serviço'}
-                      {pricing.priceSource === 'system_default' && 'Preço padrão do sistema'}
                     </p>
                   )}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  Erro ao calcular preço
-                </p>
+                <p className="text-muted-foreground">Preço não disponível</p>
               )}
             </div>
           </div>
         )}
 
-        {selectedService && !selectedPet && (
-          <div className="p-4 bg-muted rounded-lg">
-            <h4 className="font-medium mb-2">{selectedService.name}</h4>
-            <div className="text-sm space-y-1">
-              {selectedService.default_duration && (
-                <p>Duração: {selectedService.default_duration} minutos</p>
-              )}
-              {selectedService.base_price && (
-                <p className="font-medium text-green-600">
-                  Preço base: R$ {selectedService.base_price}
-                </p>
-              )}
-              <p className="text-xs text-muted-foreground">
-                Selecione um pet para ver o preço personalizado
-              </p>
-            </div>
-          </div>
-        )}
-
-        <Button 
-          onClick={handleNext}
-          disabled={!isNextEnabled}
-          className="w-full"
-        >
-          Continuar
-        </Button>
+        {/* Next Button */}
+        <div className="flex justify-end pt-4">
+          <Button 
+            onClick={handleNext}
+            disabled={!isNextEnabled}
+            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            Próximo
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
