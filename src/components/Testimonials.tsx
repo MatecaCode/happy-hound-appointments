@@ -97,7 +97,7 @@ const Testimonials: React.FC = () => {
 
         // Small buffer for smoother feel
         setTimeout(() => setIsTransitioning(false), 100);
-      }, 600); // transition duration
+      }, 900); // transition duration
     }
   }, [currentGroup, isTransitioning]);
 
@@ -194,7 +194,7 @@ const Testimonials: React.FC = () => {
           <div className="relative overflow-hidden min-h-[400px]">
             {/* Current Reviews */}
             <div 
-              className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-transform duration-[600ms] ease-in-out ${
+              className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-transform duration-[900ms] ease-in-out ${
                 isTransitioning 
                   ? slideDirection === 'right' 
                     ? 'translate-x-full' 
@@ -241,12 +241,12 @@ const Testimonials: React.FC = () => {
             {/* Next Reviews (shown during transition) */}
             {isTransitioning && nextReviews.length > 0 && (
               <div 
-                className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-transform duration-[600ms] ease-in-out ${
+                className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-transform duration-[900ms] ease-in-out ${
                   nextVisible 
                     ? 'translate-x-0' 
                     : slideDirection === 'right' 
-                      ? '-translate-x-full' 
-                      : 'translate-x-full'
+                      ? 'translate-x-full' 
+                      : '-translate-x-full'
                 }`}
               >
                 {nextReviews.map((review, index) => (
