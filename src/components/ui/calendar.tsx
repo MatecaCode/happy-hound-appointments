@@ -140,7 +140,7 @@ function Calendar({
               ← Voltar
             </Button>
           </div>
-          <div className="grid grid-cols-3 gap-3 px-2 overflow-y-auto" style={{ maxHeight: '220px' }}>
+          <div className="grid grid-cols-3 gap-3 px-2 overflow-y-auto scroll-smooth custom-scrollbar" style={{ maxHeight: '220px' }}>
             {years.map((year) => (
               <Button
                 key={year}
