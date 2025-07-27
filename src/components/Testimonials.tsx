@@ -1,8 +1,6 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
 
 interface Review {
@@ -13,38 +11,36 @@ interface Review {
 const reviews: Review[] = [
   {
     author: "Mariana, dona do Thor",
-    text: "A equipe foi super atenciosa desde o primeiro contato. Meu cachorro saiu feliz e cheiroso! Obrigado pelo carinho."
+    text: "A equipe foi super atenciosa desde o primeiro contato. Meu cachorro saiu feliz e cheiroso!"
   },
   {
     author: "Rafael, dono da Lili",
-    text: "Fiquei impressionado com o cuidado no atendimento. Explicaram tudo com calma e mostraram real preocupação com meu gato."
+    text: "Impressionado com o cuidado no atendimento. Explicaram tudo com calma e real preocupação."
   },
   {
     author: "Beatriz, dona do Scooby",
-    text: "Ambiente limpo, equipe gentil e serviço impecável. Já virou a clínica de confiança da nossa família."
+    text: "Ambiente limpo, equipe gentil e serviço impecável. Nossa clínica de confiança."
   },
   {
     author: "Lucas, dono da Bela",
-    text: "Levei minha cadela para tosa e o resultado ficou lindo. Deram atenção até aos detalhes que pedi. Super indico."
+    text: "Levei minha cadela para tosa e o resultado ficou lindo. Atenção aos detalhes que pedi."
   },
   {
     author: "Fernanda, dona do Nino",
-    text: "Foram incríveis no atendimento de emergência. Deram suporte e tranquilidade o tempo todo."
+    text: "Incríveis no atendimento de emergência. Suporte e tranquilidade o tempo todo."
   },
   {
     author: "Caio, dono da Mel",
-    text: "Serviço profissional e ao mesmo tempo acolhedor. A Vettale realmente cuida da história de cada pet."
+    text: "Serviço profissional e acolhedor. A Vettale cuida da história de cada pet."
   },
   {
     author: "Juliana, dona do Max",
-    text: "Pontuais, organizados e com muito carinho pelos animais. O tipo de cuidado que a gente procura faz tempo."
+    text: "Pontuais, organizados e com carinho pelos animais. O cuidado que procuramos."
   }
 ];
 
 const Testimonials: React.FC = () => {
-  const [currentGroup, setCurrentGroup] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [isSnapping, setIsSnapping] = useState(false);
   const headerAnimation = useScrollAnimation<HTMLDivElement>({ delay: 100 });
 
   // Calculate how many reviews per view based on screen size
@@ -64,54 +60,14 @@ const Testimonials: React.FC = () => {
     const handleResize = () => {
       const newReviewsPerView = getReviewsPerView();
       setReviewsPerView(newReviewsPerView);
-      // Reset to first group when changing screen size
-      setCurrentGroup(0);
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Calculate total groups safely
-  const totalGroups = Math.max(1, Math.ceil(reviews.length / reviewsPerView));
-
-  // Create duplicated reviews for seamless looping
-  const duplicatedReviews = [...reviews, ...reviews];
-
-  // Handle manual navigation with pause and snap
-  const handleGroupChange = useCallback((next: number) => {
-    if (!isSnapping && next !== currentGroup) {
-      setIsPaused(true);
-      setIsSnapping(true);
-      setCurrentGroup(next);
-
-      // Resume scrolling after snap
-      setTimeout(() => {
-        setIsSnapping(false);
-        setIsPaused(false);
-      }, 1500); // Pause for 1.5s to view selected group
-    }
-  }, [currentGroup, isSnapping]);
-
-  const goToNext = useCallback(() => {
-    const next = (currentGroup + 1) % totalGroups;
-    handleGroupChange(next);
-  }, [currentGroup, totalGroups, handleGroupChange]);
-
-  const goToPrev = useCallback(() => {
-    const next = (currentGroup - 1 + totalGroups) % totalGroups;
-    handleGroupChange(next);
-  }, [currentGroup, totalGroups, handleGroupChange]);
-
-  // Calculate scroll position based on current group
-  const getScrollOffset = () => {
-    if (isSnapping) {
-      // When snapping, position to show the selected group
-      const cardWidth = 100 / reviewsPerView; // Percentage width per card
-      return -(currentGroup * cardWidth * reviewsPerView);
-    }
-    return 0; // Let CSS animation handle continuous scroll
-  };
+  // Create tripled reviews for seamless looping (no gaps)
+  const duplicatedReviews = [...reviews, ...reviews, ...reviews];
 
   return (
     <section className="py-16" style={{ backgroundColor: '#FFFCF8' }}>
@@ -130,56 +86,40 @@ const Testimonials: React.FC = () => {
         
         {/* Carousel Container */}
         <div className="relative overflow-hidden">
-          {/* Navigation Arrows */}
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={goToPrev}
-            disabled={isSnapping}
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-16 z-20 bg-primary text-white border-0 hover:bg-primary/90 transition-all duration-300 hover:scale-110 shadow-lg w-12 h-12"
-          >
-            <ChevronLeft className="h-6 w-6" />
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={goToNext}
-            disabled={isSnapping}
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-16 z-20 bg-primary text-white border-0 hover:bg-primary/90 transition-all duration-300 hover:scale-110 shadow-lg w-12 h-12"
-          >
-            <ChevronRight className="h-6 w-6" />
-          </Button>
 
-          {/* Reviews Grid with Slide Animation */}
-          <div className="relative overflow-hidden min-h-[400px]">
-            {/* Current Reviews */}
+          {/* Continuous Scroll Container */}
+          <div className="relative overflow-hidden" style={{ minHeight: '240px' }}>
+            <style>{`
+              @keyframes continuousScroll {
+                0% { transform: translateX(0px); }
+                100% { transform: translateX(-${reviews.length * (320 + 32)}px); }
+              }
+            `}</style>
+            
             <div 
-              className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-transform duration-[900ms] ease-in-out ${
-                isTransitioning 
-                  ? slideDirection === 'right' 
-                    ? 'translate-x-full' 
-                    : '-translate-x-full'
-                  : 'translate-x-0'
-              }`}
+              className={`flex gap-8 transition-transform duration-1000 ease-in-out`}
+              style={{
+                animation: !isPaused ? 'continuousScroll 50s linear infinite' : 'none'
+              }}
             >
-              {currentReviews.map((review, index) => {
-                const cardAnimation = useScrollAnimation<HTMLDivElement>({ delay: index * 200 + 200 });
-                
+              {duplicatedReviews.map((review, index) => {
                 return (
-                  <Card 
-                    key={`current-${currentGroup}-${index}-${review.author}`}
-                    ref={cardAnimation.ref}
-                    className={`border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105 ${animationClasses.slideUp} ${
-                      cardAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
-                    }`}
+                  <div 
+                    key={`scroll-${index}-${review.author}`}
+                    className="flex-shrink-0"
                     style={{ 
-                      backgroundColor: index % 2 === 0 ? '#F5EEE5' : '#E9F3E1'
+                      width: reviewsPerView === 1 ? '300px' : reviewsPerView === 2 ? '280px' : '320px'
                     }}
                   >
-                    <CardContent className="pt-6 pb-4">
-                      <div className="space-y-4">
-                        <div className="flex gap-1">
+                    <Card 
+                      className="border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105"
+                      style={{ 
+                        backgroundColor: index % 2 === 0 ? '#F5EEE5' : '#E9F3E1',
+                        height: '200px'
+                      }}
+                    >
+                      <CardContent className="pt-6 pb-4 h-full flex flex-col">
+                        <div className="flex gap-1 mb-3">
                           {[...Array(5)].map((_, i) => (
                             <svg key={i} className="w-5 h-5 text-yellow-400 transition-transform duration-300 group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -187,77 +127,20 @@ const Testimonials: React.FC = () => {
                           ))}
                         </div>
                         
-                        <p className="text-foreground font-medium leading-relaxed">"{review.text}"</p>
+                        <p className="text-foreground text-sm font-medium leading-relaxed flex-grow">"{review.text}"</p>
                         
-                        <div>
-                          <p className="font-semibold text-foreground">{review.author}</p>
+                        <div className="mt-4 mb-2">
+                          <p className="font-semibold text-foreground text-sm">{review.author}</p>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  </div>
                 );
               })}
             </div>
-
-            {/* Next Reviews (shown during transition) */}
-            {isTransitioning && nextReviews.length > 0 && (
-              <div 
-                className={`absolute top-0 left-0 right-0 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 transition-transform duration-[900ms] ease-in-out ${
-                  nextVisible 
-                    ? 'translate-x-0' 
-                    : slideDirection === 'right' 
-                      ? 'translate-x-full' 
-                      : '-translate-x-full'
-                }`}
-              >
-                {nextReviews.map((review, index) => (
-                  <Card 
-                    key={`next-${nextGroup}-${index}-${review.author}`}
-                    className="border-0 shadow-sm hover:shadow-xl transition-all duration-500 group cursor-pointer hover:scale-105"
-                    style={{ 
-                      backgroundColor: index % 2 === 0 ? '#F5EEE5' : '#E9F3E1'
-                    }}
-                  >
-                    <CardContent className="pt-6 pb-4">
-                      <div className="space-y-4">
-                        <div className="flex gap-1">
-                          {[...Array(5)].map((_, i) => (
-                            <svg key={i} className="w-5 h-5 text-yellow-400 transition-transform duration-300 group-hover:scale-110" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                          ))}
-                        </div>
-                        
-                        <p className="text-foreground font-medium leading-relaxed">"{review.text}"</p>
-                        
-                        <div>
-                          <p className="font-semibold text-foreground">{review.author}</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Pagination Dots */}
-          <div className="flex justify-center mt-12 mb-4 gap-2">
-            {Array.from({ length: totalGroups }, (_, index) => (
-              <button
-                key={index}
-                onClick={() => {
-                  handleGroupChange(index);
-                }}
-                className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  currentGroup === index 
-                    ? 'bg-primary scale-125' 
-                    : 'bg-muted hover:bg-primary/50'
-                }`}
-                disabled={isTransitioning}
-              />
-            ))}
-          </div>
+
         </div>
       </div>
     </section>
