@@ -47,23 +47,39 @@ const Navigation = () => {
         return;
       }
       
-      console.log('👤 Checking staff status for user:', user.id);
-      
-      const { data: profile, error } = await supabase
-        .from('staff_profiles')
-        .select('id, photo_url')
+      // Only check staff_profiles for users who are actually staff
+      // Admin users should not be checked against staff_profiles
+      const userRoles = await supabase
+        .from('user_roles')
+        .select('role')
         .eq('user_id', user.id)
         .single();
-
-      console.log('📊 Staff profile query result:', { profile, error });
+      
+      console.log('👤 User roles:', userRoles);
+      
+      // Only proceed with staff profile check if user is actually staff
+      if (userRoles?.data?.role === 'staff') {
+        console.log('👤 Checking staff status for user:', user.id);
         
-      if (profile) {
-        setStaffPhotoUrl(profile.photo_url);
-        console.log('✅ Staff found, photo_url:', profile.photo_url);
-        console.log('🖼️ Navigation setting photo URL:', profile.photo_url);
+        const { data: profile, error } = await supabase
+          .from('staff_profiles')
+          .select('id, photo_url')
+          .eq('user_id', user.id)
+          .single();
+
+        console.log('📊 Staff profile query result:', { profile, error });
+          
+        if (profile) {
+          setStaffPhotoUrl(profile.photo_url);
+          console.log('✅ Staff found, photo_url:', profile.photo_url);
+          console.log('🖼️ Navigation setting photo URL:', profile.photo_url);
+        } else {
+          setStaffPhotoUrl(null);
+          console.log('❌ No staff profile found');
+        }
       } else {
+        console.log('ℹ️ User is not staff, skipping staff profile check');
         setStaffPhotoUrl(null);
-        console.log('❌ No staff profile found');
       }
     };
     
