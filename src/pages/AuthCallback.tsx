@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { adminRegistrationMonitor } from '@/utils/adminRegistrationMonitor';
 
 const AuthCallback = () => {
   const navigate = useNavigate();
@@ -60,30 +61,33 @@ const AuthCallback = () => {
           const code = user?.user_metadata?.admin_registration_code;
           console.log("✅ Admin code found:", code);
           
-          // If code is found, call the RPC and log the result
+          // If code is found, use the monitoring system
           if (code) {
             console.log("🔄 Processing admin registration for user:", user.id);
             console.log("🔄 Admin code:", code);
             
             try {
-              // Call the apply_admin_registration function
-              const { data: result, error } = await supabase.rpc('apply_admin_registration', {
-                p_user_id: user.id,
-                p_code: code
-              });
+              // Use the admin registration monitor for comprehensive handling
+              const success = await adminRegistrationMonitor.monitorAdminRegistration(user.id, code);
               
-              console.log("🔄 RPC result:", result);
-              console.log("🔄 RPC error:", error);
-              
-              if (error) {
-                console.error("❌ Failed to apply admin registration:", error);
-                toast.error(`Erro ao processar registro de administrador: ${error.message}`);
-              } else if (result?.success) {
-                console.log("✅ Successfully applied admin registration:", result);
+              if (success) {
+                console.log("✅ Successfully applied admin registration");
                 toast.success('Registro de administrador processado com sucesso!');
               } else {
-                console.error("❌ Admin registration failed:", result);
-                toast.error(result?.error || 'Erro ao processar registro de administrador.');
+                console.error("❌ Admin registration failed");
+                const status = adminRegistrationMonitor.getStatus();
+                
+                // Show retry button if retryable
+                if (status.retryCount < 3) {
+                  toast.error(`Erro no registro: ${status.error}`, {
+                    action: {
+                      label: 'Tentar Novamente',
+                      onClick: () => adminRegistrationMonitor.retryAdminRegistration(),
+                    },
+                  });
+                } else {
+                  toast.error(`Erro no registro: ${status.error}`);
+                }
               }
             } catch (adminError) {
               console.error("❌ Exception during admin registration:", adminError);
@@ -127,3 +131,4 @@ const AuthCallback = () => {
 };
 
 export default AuthCallback;
+

@@ -22,6 +22,9 @@ interface AuthContextType {
   hasRole: (role: string) => boolean;
   refreshUserRoles: () => Promise<void>;
   forceRefreshUserRoles: () => Promise<void>;
+  isInitialized: boolean;
+  authError: string | null;
+  clearAuthError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +34,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   // Computed role states based on user_roles table
@@ -46,6 +51,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                    isGroomer ? 'groomer' : 
                    isVet ? 'vet' : 
                    isClient ? 'client' : null;
+
+  const clearAuthError = () => {
+    setAuthError(null);
+  };
 
   const fetchUserRoles = async (userId: string) => {
     try {
@@ -65,6 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         console.error('❌ Failed to fetch user roles:', error);
+        setAuthError(`Erro ao buscar roles do usuário: ${error.message}`);
         return ['client']; // Default fallback role
       }
 
@@ -75,6 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return roles;
     } catch (error) {
       console.error('💥 Error fetching user roles:', error);
+      setAuthError('Erro ao buscar roles do usuário');
       return ['client']; // Default fallback role
     }
   };
@@ -93,6 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.log('✅ User roles refreshed:', roles);
     } catch (error) {
       console.error('❌ Error refreshing user roles:', error);
+      setAuthError('Erro ao atualizar roles do usuário');
     }
   };
 
@@ -111,12 +123,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }, 100);
     } catch (error) {
       console.error('❌❌ Error force refreshing user roles:', error);
+      setAuthError('Erro ao forçar atualização de roles');
     }
   };
 
   useEffect(() => {
     let mounted = true;
     let authTimeout: NodeJS.Timeout;
+    let retryCount = 0;
+    const maxRetries = 3;
 
     console.log('🔐 Setting up auth state listener...');
 
@@ -125,6 +140,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (mounted && loading) {
         console.warn('⚠️ Auth timeout reached, setting loading to false');
         setLoading(false);
+        setIsInitialized(true);
+        setAuthError('Timeout ao inicializar autenticação');
       }
     }, 15000); // 15 second timeout
 
@@ -141,6 +158,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setUser(null);
             setUserRoles([]);
             setLoading(false);
+            setIsInitialized(true);
+            setAuthError(`Erro de sessão: ${sessionError.message}`);
           }
           return;
         }
@@ -151,9 +170,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSession(initialSession);
           setUser(initialSession.user);
           
-          // Fetch roles with error handling
+          // Fetch roles with error handling and retry logic
+          const fetchRolesWithRetry = async (attempt: number = 1): Promise<string[]> => {
+            try {
+              const roles = await fetchUserRoles(initialSession.user.id);
+              return roles;
+            } catch (error) {
+              if (attempt < maxRetries) {
+                console.warn(`⚠️ Role fetch attempt ${attempt} failed, retrying...`);
+                await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
+                return fetchRolesWithRetry(attempt + 1);
+              } else {
+                console.error('❌ All role fetch attempts failed');
+                setAuthError('Erro ao buscar roles do usuário após múltiplas tentativas');
+                return ['client']; // Final fallback
+              }
+            }
+          };
+
           try {
-            const roles = await fetchUserRoles(initialSession.user.id);
+            const roles = await fetchRolesWithRetry();
             if (mounted) {
               setUserRoles(roles);
             }
@@ -161,6 +197,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             console.error('❌ Role fetch failed:', roleError);
             if (mounted) {
               setUserRoles(['client']); // Fallback
+              setAuthError('Erro ao buscar roles do usuário');
             }
           }
         } else if (mounted) {
@@ -171,6 +208,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (mounted) {
           setLoading(false);
+          setIsInitialized(true);
         }
 
       } catch (error) {
@@ -180,6 +218,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(null);
           setUserRoles([]);
           setLoading(false);
+          setIsInitialized(true);
+          setAuthError('Erro ao inicializar autenticação');
         }
       }
     };
@@ -196,8 +236,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (session?.user) {
           setSession(session);
           setUser(session.user);
+          setAuthError(null); // Clear any previous errors
           
-          // Fetch roles in background with timeout
+          // Fetch roles in background with timeout and retry
           setTimeout(async () => {
             if (mounted) {
               try {
@@ -209,6 +250,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 console.error('❌ Background role fetch failed:', error);
                 if (mounted) {
                   setUserRoles(['client']);
+                  setAuthError('Erro ao buscar roles em background');
                 }
               }
             }
@@ -217,6 +259,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSession(null);
           setUser(null);
           setUserRoles([]);
+          setAuthError(null);
         }
         
         setLoading(false);
@@ -235,6 +278,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (email: string, password: string) => {
     try {
+      setAuthError(null);
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -246,6 +290,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       navigate('/');
     } catch (error: any) {
       console.error('Sign in error:', error);
+      setAuthError(error.message || 'Erro ao fazer login');
       toast.error(error.message || 'Erro ao fazer login');
       throw error;
     }
@@ -253,6 +298,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signInWithGoogle = async () => {
     try {
+      setAuthError(null);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -263,6 +309,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (error) throw error;
     } catch (error: any) {
       console.error('Google sign in error:', error);
+      setAuthError(error.message || 'Erro ao fazer login com Google');
       toast.error(error.message || 'Erro ao fazer login com Google');
       throw error;
     }
@@ -270,6 +317,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signUp = async (email: string, password: string, name: string, role: string = 'client') => {
     try {
+      setAuthError(null);
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -288,6 +336,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       navigate('/login');
     } catch (error: any) {
       console.error('Sign up error:', error);
+      setAuthError(error.message || 'Erro ao criar conta');
       toast.error(error.message || 'Erro ao criar conta');
       throw error;
     }
@@ -296,6 +345,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     try {
       console.log('🚪 Starting logout process...');
+      setAuthError(null);
       
       // Clear local state immediately to prevent UI issues
       setUser(null);
@@ -336,6 +386,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
     } catch (error: any) {
       console.error('💥 Sign out error:', error);
+      setAuthError(error.message || 'Erro ao fazer logout');
       
       // Even if there's an error, ensure we clear state and redirect
       // This prevents users from being stuck in a broken auth state
@@ -369,6 +420,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         hasRole,
         refreshUserRoles,
         forceRefreshUserRoles,
+        isInitialized,
+        authError,
+        clearAuthError,
       }}
     >
       {children}

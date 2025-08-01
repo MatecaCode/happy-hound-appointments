@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 type AccountType = 'cliente' | 'staff' | 'admin';
 
@@ -20,6 +21,13 @@ interface StaffCapabilities {
   can_bathe: boolean;
   can_groom: boolean;
   can_vet: boolean;
+}
+
+interface RegistrationStatus {
+  isProcessing: boolean;
+  step: string;
+  error: string | null;
+  retryCount: number;
 }
 
 const Register = () => {
@@ -38,8 +46,14 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [locations, setLocations] = useState<any[]>([]);
+  const [registrationStatus, setRegistrationStatus] = useState<RegistrationStatus>({
+    isProcessing: false,
+    step: '',
+    error: null,
+    retryCount: 0,
+  });
   
-  const { signUp, user } = useAuth();
+  const { signUp, user, authError, clearAuthError } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const suggestGroomerRole = location.state?.suggestGroomerRole;
@@ -56,6 +70,11 @@ const Register = () => {
       navigate('/');
     }
   }, [user, navigate]);
+
+  // Clear auth errors when component mounts
+  useEffect(() => {
+    clearAuthError();
+  }, [clearAuthError]);
 
   // Fetch locations for staff selection
   useEffect(() => {
@@ -78,10 +97,18 @@ const Register = () => {
 
   const requiresCode = accountType === 'staff' || accountType === 'admin';
   
-  const validateAndUseRegistrationCode = async () => {
+  const validateAndUseRegistrationCode = async (retryCount: number = 0): Promise<boolean> => {
     if (!requiresCode) return true;
     
     try {
+      setRegistrationStatus(prev => ({
+        ...prev,
+        isProcessing: true,
+        step: 'Validando código de registro...',
+        error: null,
+        retryCount,
+      }));
+
       let isValid = false;
       
       if (accountType === 'admin') {
@@ -93,47 +120,66 @@ const Register = () => {
         
         if (adminError) {
           console.error('Error validating admin code:', adminError);
-          setError('Erro ao validar código de administrador.');
-          return false;
+          throw new Error(`Erro ao validar código de administrador: ${adminError.message}`);
         }
         
         isValid = adminValid;
+        
+        if (!isValid) {
+          throw new Error('Código de administrador inválido ou já utilizado.');
+        }
       } else if (accountType === 'staff') {
-        // Use existing staff validation
+        // For staff, validate the code exists and is unused
         const { data: staffValid, error: staffError } = await supabase.rpc('validate_staff_registration_code', {
-          code_value: registrationCode,
-          account_type_value: 'staff'
+          code_value: registrationCode
         });
         
         if (staffError) {
           console.error('Error validating staff code:', staffError);
-          setError('Erro ao validar código de funcionário.');
-          return false;
+          throw new Error(`Erro ao validar código de funcionário: ${staffError.message}`);
         }
         
         isValid = staffValid;
+        
+        if (!isValid) {
+          throw new Error('Código de funcionário inválido ou já utilizado.');
+        }
       }
-      
-      if (!isValid) {
-        const typeText = accountType === 'admin' ? 'administrador' : 'funcionário';
-        setError(`Código de registro inválido para ${typeText}.`);
-        return false;
-      }
-      
+
+      setRegistrationStatus(prev => ({
+        ...prev,
+        isProcessing: false,
+        step: 'Código validado com sucesso',
+        error: null,
+      }));
+
       return true;
-    } catch (error) {
-      console.error('Exception during code validation:', error);
-      setError('Erro ao validar código de registro.');
+    } catch (error: any) {
+      console.error('Code validation error:', error);
+      
+      setRegistrationStatus(prev => ({
+        ...prev,
+        isProcessing: false,
+        step: 'Falha na validação',
+        error: error.message,
+        retryCount: prev.retryCount + 1,
+      }));
+
+      // Retry logic for network errors
+      if (retryCount < 3 && (error.message?.includes('network') || error.message?.includes('timeout'))) {
+        console.log(`Retrying code validation (attempt ${retryCount + 1})...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        return validateAndUseRegistrationCode(retryCount + 1);
+      }
+
       return false;
     }
   };
-
-  // Remove the markCodeAsUsed function since admin registration is now handled after email confirmation
-
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    clearAuthError();
     
     if (password !== confirmPassword) {
       setError('As senhas não coincidem.');
@@ -160,6 +206,12 @@ const Register = () => {
     }
     
     setIsLoading(true);
+    setRegistrationStatus({
+      isProcessing: true,
+      step: 'Iniciando registro...',
+      error: null,
+      retryCount: 0,
+    });
     
     try {
       // Validate registration code if required
@@ -167,10 +219,16 @@ const Register = () => {
         const isValid = await validateAndUseRegistrationCode();
         if (!isValid) {
           setIsLoading(false);
+          setError(registrationStatus.error || 'Erro ao validar código de registro.');
           return;
         }
       }
       
+      setRegistrationStatus(prev => ({
+        ...prev,
+        step: 'Criando conta...',
+      }));
+
       // Create the user account with appropriate registration code in metadata
       const signUpData: any = {
         name,
@@ -199,6 +257,12 @@ const Register = () => {
 
       if (authError) throw authError;
 
+      setRegistrationStatus(prev => ({
+        ...prev,
+        step: 'Conta criada com sucesso!',
+        isProcessing: false,
+      }));
+
       // For staff accounts: Role assignment and profile creation will be handled automatically by the trigger
       // For admin accounts: Role assignment and profile creation will be handled after email confirmation in AuthCallback
       
@@ -216,9 +280,25 @@ const Register = () => {
         toast.success('Registro realizado! Verifique seu email para confirmar a conta.');
       }
       
+      // Clear any previous errors
+      setError(null);
+      setRegistrationStatus({
+        isProcessing: false,
+        step: '',
+        error: null,
+        retryCount: 0,
+      });
+      
       navigate('/login');
     } catch (error: any) {
       console.error('Registration error:', error);
+      
+      setRegistrationStatus(prev => ({
+        ...prev,
+        isProcessing: false,
+        step: 'Erro no registro',
+        error: error.message,
+      }));
       
       // Provide specific error messages for common auth errors
       if (error.message?.includes('User already registered')) {
@@ -229,6 +309,8 @@ const Register = () => {
         setError('A senha deve ter pelo menos 6 caracteres.');
       } else if (error.message?.includes('Signup is disabled')) {
         setError('Registros estão temporariamente desabilitados.');
+      } else if (error.message?.includes('network') || error.message?.includes('timeout')) {
+        setError('Erro de conexão. Verifique sua internet e tente novamente.');
       } else {
         setError(error.message || 'Erro ao criar conta. Tente novamente.');
       }
@@ -258,6 +340,38 @@ const Register = () => {
             {error && (
               <Alert variant="destructive" className="mb-4">
                 <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* Registration Status Display */}
+            {registrationStatus.isProcessing && (
+              <Alert className="mb-4">
+                <AlertDescription>
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    <span>{registrationStatus.step}</span>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {registrationStatus.error && !registrationStatus.isProcessing && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertDescription>
+                  <div className="flex items-center justify-between">
+                    <span>{registrationStatus.error}</span>
+                    {registrationStatus.retryCount < 3 && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSubmit(new Event('submit') as any)}
+                        className="ml-2"
+                      >
+                        Tentar Novamente
+                      </Button>
+                    )}
+                  </div>
+                </AlertDescription>
               </Alert>
             )}
             
