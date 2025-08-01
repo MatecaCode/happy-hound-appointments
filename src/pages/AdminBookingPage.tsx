@@ -169,45 +169,51 @@ const AdminBookingPage = () => {
     setIsLoading(true);
     
     try {
-      const appointmentData = {
+      // Prepare staff profile IDs array
+      const staffProfileIds = selectedStaff ? [selectedStaff] : [];
+      
+      console.log('Creating admin booking with RPC:', {
         client_id: selectedClient,
         pet_id: selectedPet,
         service_id: selectedService,
-        date: selectedDate.toISOString().split('T')[0],
-        time: selectedTimeSlot,
+        staff_profile_ids: staffProfileIds,
+        booking_date: selectedDate.toISOString().split('T')[0],
+        time_slot: selectedTimeSlot,
         notes: notes || null,
-        status: 'confirmed', // Admin bookings are auto-confirmed
-        service_status: 'not_started',
-        is_admin_override: true
-      };
+        is_override: false
+      });
 
-      console.log('Creating admin appointment:', appointmentData);
+      // Call the new admin booking RPC function
+      const { data, error } = await supabase.rpc('create_booking_admin', {
+        client_id: selectedClient,
+        pet_id: selectedPet,
+        service_id: selectedService,
+        staff_profile_ids: staffProfileIds,
+        booking_date: selectedDate.toISOString().split('T')[0],
+        time_slot: selectedTimeSlot,
+        notes: notes || null,
+        is_override: false
+      });
 
-      const { data: appointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert(appointmentData)
-        .select()
-        .single();
-
-      if (appointmentError) throw appointmentError;
-
-      // If staff is selected, create appointment_staff relationship
-      if (selectedStaff && appointment) {
-        const { error: staffError } = await supabase
-          .from('appointment_staff')
-          .insert({
-            appointment_id: appointment.id,
-            staff_profile_id: selectedStaff,
-            role: 'primary'
-          });
-
-        if (staffError) {
-          console.error('Error linking staff:', staffError);
-          // Continue anyway - appointment was created
-        }
+      if (error) {
+        console.error('RPC Error:', error);
+        throw new Error(error.message);
       }
 
-      toast.success('Agendamento criado com sucesso!');
+      if (!data) {
+        throw new Error('No response from booking function');
+      }
+
+      // Parse the JSON response
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      
+      if (!result.success) {
+        console.error('Booking failed:', result);
+        throw new Error(result.message || 'Unknown booking error');
+      }
+
+      console.log('Booking successful:', result);
+      toast.success(result.message || 'Agendamento criado com sucesso!');
       
       // Reset form
       setSelectedClient('');
