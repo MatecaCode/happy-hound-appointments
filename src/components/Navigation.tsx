@@ -17,7 +17,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 const Navigation = () => {
-  const { user, signOut, userRole, hasRole } = useAuth();
+  const { user, signOut, userRole, hasRole, refreshUserRoles, forceRefreshUserRoles, isAdmin, isClient, isGroomer, isVet, isStaff } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -37,14 +37,12 @@ const Navigation = () => {
   };
 
   // Check if user is staff and get their photo
-  const [isStaff, setIsStaff] = React.useState(false);
   const [staffPhotoUrl, setStaffPhotoUrl] = React.useState<string | null>(null);
   
   React.useEffect(() => {
     const checkStaffStatus = async () => {
       if (!user) {
         console.log('🚫 No user found, clearing staff status');
-        setIsStaff(false);
         setStaffPhotoUrl(null);
         return;
       }
@@ -60,12 +58,10 @@ const Navigation = () => {
       console.log('📊 Staff profile query result:', { profile, error });
         
       if (profile) {
-        setIsStaff(true);
         setStaffPhotoUrl(profile.photo_url);
         console.log('✅ Staff found, photo_url:', profile.photo_url);
         console.log('🖼️ Navigation setting photo URL:', profile.photo_url);
       } else {
-        setIsStaff(false);
         setStaffPhotoUrl(null);
         console.log('❌ No staff profile found');
       }
@@ -247,11 +243,11 @@ const Navigation = () => {
                       </div>
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                      <Link to={isStaff ? "/staff-profile" : "/profile"}>Perfil</Link>
-                    </DropdownMenuItem>
-                    {/* Staff members get dashboard link and can have pets/appointments */}
-                    {(isStaff || hasRole('groomer') || hasRole('vet')) && (
+                                         <DropdownMenuItem asChild>
+                       <Link to={isStaff ? "/staff-profile" : "/profile"}>Perfil</Link>
+                     </DropdownMenuItem>
+                     {/* Staff members get dashboard link and can have pets/appointments */}
+                     {(isStaff || hasRole('groomer') || hasRole('vet')) && (
                       <>
                         <DropdownMenuItem asChild>
                           <Link to="/staff-dashboard">Dashboard</Link>
@@ -270,6 +266,23 @@ const Navigation = () => {
                         </DropdownMenuItem>
                       </>
                     )}
+                    {/* Admin users get admin dashboard */}
+                    {hasRole('admin') && (
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin">Painel Admin</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/availability">Gerenciar Horários</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/booking">Agendar para Clientes</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to="/status">Centro de Status</Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
                     {/* Regular clients get pets and appointments */}
                     {!isStaff && !hasRole('groomer') && !hasRole('vet') && !hasRole('admin') && (
                       <>
@@ -282,6 +295,13 @@ const Navigation = () => {
                       </>
                     )}
                     <DropdownMenuSeparator />
+                    {/* Debug: Add refresh button for testing */}
+                    <DropdownMenuItem onClick={refreshUserRoles}>
+                      🔄 Atualizar Roles
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={forceRefreshUserRoles}>
+                      🔄🔄 Forçar Atualizar Roles
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleLogout}>
                       Sair
                     </DropdownMenuItem>

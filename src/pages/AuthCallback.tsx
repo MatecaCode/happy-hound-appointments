@@ -33,6 +33,51 @@ const AuthCallback = () => {
 
         if (data?.session) {
           console.log("Session found:", data.session);
+          
+          // After confirming email, load the user again
+          const { data: { user } } = await supabase.auth.getUser();
+          console.log("✅ Auth callback user:", user);
+          
+          if (!user) {
+            console.error("No user found after session");
+            toast.error('Usuário não encontrado após autenticação');
+            navigate('/login', { replace: true });
+            return;
+          }
+          
+          // Log the metadata
+          console.log("✅ Metadata:", user?.user_metadata);
+          
+          // Log the admin code
+          const code = user?.user_metadata?.admin_registration_code;
+          console.log("✅ Admin code found:", code);
+          
+          // If code is found, call the RPC and log the result
+          if (code) {
+            console.log("Processing admin registration for user:", user.id);
+            console.log("Admin code:", code);
+            
+            try {
+              const { error } = await supabase.rpc('apply_admin_registration', {
+                p_user_id: user.id,
+                p_code: code
+              });
+              
+              if (error) {
+                console.error("❌ Failed to apply admin registration:", error);
+                toast.error('Erro ao processar registro de administrador. Entre em contato com o suporte.');
+              } else {
+                console.log("✅ Successfully applied admin registration");
+                toast.success('Registro de administrador processado com sucesso!');
+              }
+            } catch (adminError) {
+              console.error("Exception during admin registration:", adminError);
+              toast.error('Erro ao processar registro de administrador.');
+            }
+          } else {
+            console.warn("❌ No admin code found in metadata after redirect");
+          }
+          
           toast.success('Autenticação realizada com sucesso!');
           
           // Use setTimeout to avoid the redirect loop

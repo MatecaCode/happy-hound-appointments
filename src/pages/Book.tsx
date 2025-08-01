@@ -132,11 +132,11 @@ const Book = () => {
                   <ul className="mt-2 space-y-1">
                     <li className="flex justify-between">
                       <span>Segunda - Sexta</span>
-                      <span>9:00 - 17:00</span>
+                      <span>9:00 - 16:00</span>
                     </li>
                     <li className="flex justify-between">
                       <span>Sábado</span>
-                      <span>9:00 - 15:00</span>
+                      <span>9:00 - 12:00</span>
                     </li>
                     <li className="flex justify-between">
                       <span>Domingo</span>
@@ -157,16 +157,14 @@ const Book = () => {
                 <div>
                   <h4 className="font-semibold">Observações para Agendamento</h4>
                   <ul className="mt-2 space-y-2 text-sm">
-                    <li>• Por favor chegue 15 minutos antes do horário marcado</li>
+                    <li>• Por favor chegue 5 minutos antes do horário marcado</li>
                     {appointmentType === 'grooming' ? (
                       <>
-                        <li>• Certifique-se de que seu cachorro fez suas necessidades antes da consulta</li>
                         <li>• Traga a carteira de vacinação na primeira visita</li>
                       </>
                     ) : (
                       <>
                         <li>• Traga a carteira de vacinação e histórico médico, se disponível</li>
-                        <li>• Se for a primeira consulta, deixe seu pet em jejum de 4h</li>
                       </>
                     )}
                     <li>• Cancelamentos requerem aviso com 24 horas de antecedência</li>

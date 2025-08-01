@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface ServiceCardProps {
   title: string;
   description: string;
-  price: string;
+  price?: string;
   icon: React.ReactNode;
   popular?: boolean;
   badge?: string;
@@ -75,7 +75,6 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
           </div>
         </div>
         <CardTitle className="text-xl text-foreground group-hover:text-primary transition-colors duration-300">{title}</CardTitle>
-        <div className="text-2xl font-bold text-primary">{price}</div>
       </CardHeader>
       
       <CardContent>

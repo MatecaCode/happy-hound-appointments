@@ -48,14 +48,12 @@ useEffect(() => {
     {
       title: "Banho & Escovação Básica",
       description: "Banho com carinho, escovação cuidadosa e colônia leve para deixar seu pet renovado e feliz.",
-      price: "R$40",
       icon: <ShowerHead className="h-6 w-6" />,
       backgroundColor: "#FDECE4", // Soft blush/peach
     },
     {
       title: "Consulta Veterinária",
       description: "Avaliação completa da saúde do seu pet com médico veterinário especializado.",
-      price: "R$120",
       icon: <Syringe className="h-6 w-6" />,
       popular: true,
       badge: "Mais Agendado",
@@ -64,7 +62,6 @@ useEffect(() => {
     {
       title: "Vacinação",
       description: "Imunização do seu pet com as principais vacinas necessárias para sua proteção.",
-      price: "A partir de R$80",
       icon: <Heart className="h-6 w-6" />,
       backgroundColor: "#EAF4FB", // Light blue
     },
@@ -74,7 +71,6 @@ useEffect(() => {
     {
       title: "Tosa Completa",
       description: "Tudo do pacote básico mais corte de pelo estilizado conforme sua preferência.",
-      price: "R$60",
       icon: <Scissors className="h-6 w-6" />,
       popular: true,
       badge: "Mais Popular",
@@ -83,14 +79,12 @@ useEffect(() => {
     {
       title: "Pacote Spa Luxo",
       description: "Tosa completa com shampoo especial, condicionador, limpeza de dentes e tratamento de patas.",
-      price: "R$80",
       icon: <Sparkles className="h-6 w-6" />,
       backgroundColor: "#FDECE4",
     },
     {
       title: "Primeira Tosa do Filhote",
       description: "Introdução suave à tosa para filhotes com menos de 6 meses.",
-      price: "R$45",
       icon: <Dog className="h-6 w-6" />,
       backgroundColor: "#EAF4FB",
     }
@@ -158,7 +152,6 @@ useEffect(() => {
                   key={index}
                   title={service.title}
                   description={service.description}
-                  price={service.price}
                   icon={service.icon}
                   popular={service.popular}
                   badge={service.badge}
@@ -199,7 +192,6 @@ useEffect(() => {
                   key={index}
                   title={service.title}
                   description={service.description}
-                  price={service.price}
                   icon={service.icon}
                   popular={service.popular}
                   badge={service.badge}

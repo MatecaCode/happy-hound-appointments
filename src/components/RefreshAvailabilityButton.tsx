@@ -110,7 +110,7 @@ const RefreshAvailabilityButton = () => {
           <p>• Sistema mantém janela rolante de 90 dias</p>
           <p>• Tosadores/Veterinários: 1 agendamento por slot</p>
           <p>• Banhos: 5 animais por slot compartilhado</p>
-          <p>• Horários: 09:00 às 17:00 (slots de 30min)</p>
+          <p>• Horários: 09:00 às 16:00 (Segunda-Sexta) / 09:00 às 12:00 (Sábados)</p>
         </div>
       </CardContent>
     </Card>

@@ -56,11 +56,10 @@ export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
 
       // Service requirements loaded
 
-      // Fetch all active staff
+      // Fetch all available staff (excludes admins)
       const { data: allStaff, error: staffError } = await supabase
-        .from('staff_profiles')
-        .select('id, name, can_groom, can_vet, can_bathe, bio, photo_url, hourly_rate')
-        .eq('active', true);
+        .from('available_staff')
+        .select('id, name, can_groom, can_vet, can_bathe, bio, photo_url, hourly_rate');
 
       if (staffError) {
         console.error('❌ [STAFF_FILTERING] Error fetching staff:', staffError);

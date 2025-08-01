@@ -352,6 +352,13 @@ const Appointments = () => {
                 <span className="text-sm text-muted-foreground">{appointment.notes}</span>
               </div>
             )}
+            {/* General appointment reminder */}
+            <div className="mt-4 p-3 rounded bg-blue-50 border border-blue-200">
+              <span className="block text-blue-900 text-sm font-semibold mb-1">Lembrete:</span>
+              <ul className="list-disc pl-5 text-blue-900 text-sm">
+                <li>Chegar 5 minutos de antecedência</li>
+              </ul>
+            </div>
           </div>
 
           <div className="flex justify-center">

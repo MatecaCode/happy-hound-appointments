@@ -43,7 +43,8 @@ const GroomerSchedule = () => {
 
       // Initialize the schedule with all possible time slots
       const initialSchedule: { [key: string]: AvailabilityStatus } = {};
-      generateClientTimeSlots().forEach(slot => {
+      const isSaturday = selectedDate ? selectedDate.getDay() === 6 : false; // 6 = Saturday
+      generateClientTimeSlots(isSaturday).forEach(slot => {
         initialSchedule[slot] = 'available'; // Default to available
       });
 
@@ -110,28 +111,31 @@ const GroomerSchedule = () => {
                 />
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                {generateClientTimeSlots().map(slot => (
-                  <Button
-                    key={slot}
-                    variant="outline"
-                    className="flex items-center justify-center"
-                    onClick={() => {
-                      const currentStatus = schedule[slot] || 'available';
-                      const newStatus: AvailabilityStatus =
-                        currentStatus === 'available' ? 'unavailable' : 'available';
-                      updateAvailability(slot, newStatus);
-                    }}
-                    disabled={loading}
-                  >
-                    <Clock className="mr-2 h-4 w-4" />
-                    {slot}
-                    {schedule[slot] === 'unavailable' && (
-                      <Badge variant="destructive" className="ml-2">
-                        Unavailable
-                      </Badge>
-                    )}
-                  </Button>
-                ))}
+                {(() => {
+                  const isSaturday = selectedDate ? selectedDate.getDay() === 6 : false; // 6 = Saturday
+                  return generateClientTimeSlots(isSaturday).map(slot => (
+                    <Button
+                      key={slot}
+                      variant="outline"
+                      className="flex items-center justify-center"
+                      onClick={() => {
+                        const currentStatus = schedule[slot] || 'available';
+                        const newStatus: AvailabilityStatus =
+                          currentStatus === 'available' ? 'unavailable' : 'available';
+                        updateAvailability(slot, newStatus);
+                      }}
+                      disabled={loading}
+                    >
+                      <Clock className="mr-2 h-4 w-4" />
+                      {slot}
+                      {schedule[slot] === 'unavailable' && (
+                        <Badge variant="destructive" className="ml-2">
+                          Unavailable
+                        </Badge>
+                      )}
+                    </Button>
+                  ));
+                })()}
               </div>
             </CardContent>
           </Card>

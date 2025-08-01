@@ -82,17 +82,36 @@ const Register = () => {
     if (!requiresCode) return true;
     
     try {
-      const accountTypeValue = accountType; // 'admin' or 'staff'
+      let isValid = false;
       
-      const { data: isValid, error: validateError } = await supabase.rpc('validate_staff_registration_code', {
-        code_value: registrationCode,
-        account_type_value: accountTypeValue
-      });
-      
-      if (validateError) {
-        console.error('Error validating code:', validateError);
-        setError('Erro ao validar código de registro.');
-        return false;
+      if (accountType === 'admin') {
+        // For admin, we only validate the code exists and is unused
+        // The actual processing will happen after email confirmation
+        const { data: adminValid, error: adminError } = await supabase.rpc('validate_admin_registration_code', {
+          code_value: registrationCode
+        });
+        
+        if (adminError) {
+          console.error('Error validating admin code:', adminError);
+          setError('Erro ao validar código de administrador.');
+          return false;
+        }
+        
+        isValid = adminValid;
+      } else if (accountType === 'staff') {
+        // Use existing staff validation
+        const { data: staffValid, error: staffError } = await supabase.rpc('validate_staff_registration_code', {
+          code_value: registrationCode,
+          account_type_value: 'staff'
+        });
+        
+        if (staffError) {
+          console.error('Error validating staff code:', staffError);
+          setError('Erro ao validar código de funcionário.');
+          return false;
+        }
+        
+        isValid = staffValid;
       }
       
       if (!isValid) {
@@ -109,17 +128,7 @@ const Register = () => {
     }
   };
 
-  const markCodeAsUsed = async () => {
-    if (!requiresCode) return;
-    
-    try {
-      await supabase.rpc('mark_staff_code_as_used', {
-        code_value: registrationCode
-      });
-    } catch (error) {
-      console.error('Error marking code as used:', error);
-    }
-  };
+  // Remove the markCodeAsUsed function since admin registration is now handled after email confirmation
 
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -162,27 +171,22 @@ const Register = () => {
         }
       }
       
-      // Determine the role for the signUp function
-      let userRole = 'client';
-      if (accountType === 'admin') {
-        userRole = 'admin';
-      } else if (accountType === 'staff') {
-        userRole = 'staff';
-      }
-      
-      // Create the user account with staff capabilities in metadata
+      // Create the user account with appropriate registration code in metadata
       const signUpData: any = {
         name,
-        role: userRole,
       };
 
-      // Add staff capabilities to metadata if it's a staff account
-      if (accountType === 'staff') {
+      // Use different registration code fields based on account type
+      if (accountType === 'admin') {
+        signUpData.admin_registration_code = registrationCode; // New admin system
+      } else if (accountType === 'staff') {
+        signUpData.registration_code = registrationCode; // Existing staff system
         signUpData.can_groom = staffCapabilities.can_groom;
         signUpData.can_vet = staffCapabilities.can_vet;
         signUpData.can_bathe = staffCapabilities.can_bathe;
         signUpData.location_id = selectedLocation === 'none' ? null : selectedLocation;
       }
+      // Client accounts don't need registration codes
 
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -195,12 +199,8 @@ const Register = () => {
 
       if (authError) throw authError;
 
-      // Staff profile will be created automatically by the handle_new_user trigger
-      
-      // Mark the code as used after successful signup
-      if (requiresCode) {
-        await markCodeAsUsed();
-      }
+      // For staff accounts: Role assignment and profile creation will be handled automatically by the trigger
+      // For admin accounts: Role assignment and profile creation will be handled after email confirmation in AuthCallback
       
       // Show success message based on account type
       if (accountType === 'staff') {

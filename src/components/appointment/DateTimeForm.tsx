@@ -192,48 +192,61 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
         </TabsList>
 
         <TabsContent value="calendar" className="space-y-4 animate-slide-in-right">
-          <div>
-            <Label>Selecione uma data</Label>
-            <Calendar
-              mode="single"
-              selected={date}
-              onSelect={handleDateSelect}
-              locale={ptBR}
-              disabled={isDateDisabled}
-              fromDate={calendarDateRange.fromDate}
-              toDate={calendarDateRange.toDate}
-              fromYear={calendarDateRange.fromDate.getFullYear()}
-              toYear={calendarDateRange.toDate.getFullYear()}
-              captionLayout="dropdown-buttons"
-              className="rounded-md border transition-all duration-200 hover:shadow-md"
-            />
-            {availabilityLoading && (
-              <p className="text-sm text-muted-foreground mt-2 animate-pulse">
-                Carregando disponibilidade para {uniqueSelectedStaff.length} profissionais únicos...
-              </p>
-            )}
-          </div>
+          <div className="rounded-md border transition-all duration-200 hover:shadow-md p-6">
+            <div className="flex gap-6">
+              {/* Calendar Section - Left Side */}
+              <div className="flex-1">
+                <Label className="text-center block mb-4">Selecione uma data</Label>
+                <div className="flex justify-center">
+                  <div className="ml-2"> {/* Added for symmetry */}
+                    <Calendar
+                      mode="single"
+                      selected={date}
+                      onSelect={handleDateSelect}
+                      locale={ptBR}
+                      disabled={isDateDisabled}
+                      fromDate={calendarDateRange.fromDate}
+                      toDate={calendarDateRange.toDate}
+                      fromYear={calendarDateRange.fromDate.getFullYear()}
+                      toYear={calendarDateRange.toDate.getFullYear()}
+                      onMonthChange={(newMonth) => {
+                        console.log('Month changed to:', newMonth);
+                      }}
+                      className="transition-all duration-200" // Removed border and hover
+                    />
+                  </div>
+                </div>
+                {availabilityLoading && (
+                  <p className="text-sm text-muted-foreground mt-2 animate-pulse text-center">
+                    Carregando disponibilidade para {uniqueSelectedStaff.length} profissionais únicos...
+                  </p>
+                )}
+              </div>
 
-          {showTimeSlots && date && (
-            <div className="animate-fade-in">
-              <Label>Horários disponíveis</Label>
-              
-              {isLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin mr-2" />
-                  <span>Carregando horários...</span>
+              {/* Time Slots Section - Right Side */}
+              {showTimeSlots && date && (
+                <div className="flex-1 animate-fade-in">
+                  <Label className="text-center block mb-4">Horários disponíveis</Label>
+                  {isLoading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="w-6 h-6 animate-spin mr-2" />
+                      <span>Carregando horários...</span>
+                    </div>
+                  ) : timeSlots.length > 0 ? (
+                    <div className="mt-2 max-h-80 overflow-y-auto pr-2 time-slots-scroll">
+                      <div className="grid grid-cols-2 gap-2">
+                        {renderTimeSlots()}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground mt-2">
+                      Nenhum horário disponível para esta data com os profissionais selecionados.
+                    </p>
+                  )}
                 </div>
-              ) : timeSlots.length > 0 ? (
-                <div className="grid grid-cols-3 gap-2 mt-2">
-                  {renderTimeSlots()}
-                </div>
-              ) : (
-                <p className="text-muted-foreground mt-2">
-                  Nenhum horário disponível para esta data com os profissionais selecionados.
-                </p>
               )}
             </div>
-          )}
+          </div>
         </TabsContent>
 
         <TabsContent value="next-available" className="space-y-4 animate-slide-in-right">

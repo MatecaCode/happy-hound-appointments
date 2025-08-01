@@ -83,11 +83,10 @@ const AdminBookingPage = () => {
           .order('name');
         setServices(servicesData || []);
 
-        // Load staff
+        // Load available staff (excludes admins)
         const { data: staffData } = await supabase
-          .from('staff_profiles')
+          .from('available_staff')
           .select('id, name, can_groom, can_vet')
-          .eq('active', true)
           .order('name');
         setStaff(staffData || []);
       } catch (error) {
@@ -139,7 +138,7 @@ const AdminBookingPage = () => {
         // Manual slot generation for Phase 1 (since RPC may not exist)
         const slots: TimeSlot[] = [];
         
-        // Generate 30-minute slots from 9:00 to 16:30
+        // Generate 30-minute slots from 9:00 to 16:00 (weekdays) / 12:00 (Saturdays)
         for (let hour = 9; hour < 17; hour++) {
           for (let minute = 0; minute < 60; minute += 30) {
             const timeStr = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;

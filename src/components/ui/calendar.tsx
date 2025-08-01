@@ -3,6 +3,7 @@ import * as React from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { DayPicker, DropdownProps } from "react-day-picker";
 import { format, getYear, differenceInYears } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
@@ -266,28 +267,7 @@ function Calendar({
       }}
       components={{
         IconLeft: ({ ..._props }) => <ChevronLeft className="h-4 w-4" />,
-        IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
-        Caption: ({ displayMonth }) => {
-          if (!displayMonth) return null;
-          
-          return (
-            <div className="w-full">
-              <CustomDropdowns 
-                currentMonth={displayMonth}
-                fromYear={props.fromYear}
-                toYear={props.toYear}
-                goToMonth={(date: Date) => {
-                  // Use the onMonthChange prop if available
-                  if (props.onMonthChange) {
-                    props.onMonthChange(date);
-                  }
-                }}
-                onViewModeChange={setCalendarViewMode}
-                viewMode={calendarViewMode}
-              />
-            </div>
-          );
-        }
+        IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />
       }}
       {...props}
     />

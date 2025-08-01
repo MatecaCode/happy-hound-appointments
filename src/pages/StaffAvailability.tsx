@@ -61,7 +61,8 @@ const StaffAvailability = () => {
 
   const generateClientFacingSlots = () => {
     // Use the 30-minute slots from timeSlotHelpers
-    return generateClientTimeSlots().map(slot => formatTimeSlot(slot));
+    const isSaturday = selectedDate ? selectedDate.getDay() === 6 : false; // 6 = Saturday
+    return generateClientTimeSlots(isSaturday).map(slot => formatTimeSlot(slot));
   };
 
   const fetchAvailability = async () => {
@@ -87,12 +88,14 @@ const StaffAvailability = () => {
       const formattedSlots: TimeSlot[] = clientSlots.map(clientSlot => {
         // For availability management, we assume 30-minute duration for each slot
         const serviceDuration = 30;
+        const isSaturday = selectedDate ? selectedDate.getDay() === 6 : false; // 6 = Saturday
         
         // Check if this 30-minute slot is available
         const isAvailable = isClientSlotAvailable(
           `${clientSlot}:00`, 
           serviceDuration, 
-          availability || []
+          availability || [],
+          isSaturday
         );
 
         return {
@@ -118,7 +121,8 @@ const StaffAvailability = () => {
       const isAvailable = newStatus === 'available';
 
       // Get all 10-minute backend slots for this 30-minute period
-      const backendSlots = getRequiredBackendSlots(`${timeSlot}:00`, 30);
+      const isSaturday = selectedDate ? selectedDate.getDay() === 6 : false; // 6 = Saturday
+      const backendSlots = getRequiredBackendSlots(`${timeSlot}:00`, 30, isSaturday);
 
       // Update all backend slots for this 30-minute period
       const promises = backendSlots.map(backendSlot => 

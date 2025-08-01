@@ -210,7 +210,8 @@ const StaffCalendar: React.FC = () => {
 
   // Availability management functions
   const generateClientFacingSlots = () => {
-    return generateClientTimeSlots().map(slot => formatTimeSlot(slot));
+    const isSaturday = availabilityDate ? availabilityDate.getDay() === 6 : false; // 6 = Saturday
+    return generateClientTimeSlots(isSaturday).map(slot => formatTimeSlot(slot));
   };
 
   const fetchAvailability = async () => {
@@ -232,10 +233,12 @@ const StaffCalendar: React.FC = () => {
       
       const formattedSlots: TimeSlot[] = clientSlots.map(clientSlot => {
         const serviceDuration = 30;
+        const isSaturday = availabilityDate ? availabilityDate.getDay() === 6 : false; // 6 = Saturday
         const isAvailable = isClientSlotAvailable(
           `${clientSlot}:00`, 
           serviceDuration, 
-          availability || []
+          availability || [],
+          isSaturday
         );
 
         return {
@@ -260,7 +263,8 @@ const StaffCalendar: React.FC = () => {
       const dateStr = format(availabilityDate, 'yyyy-MM-dd');
       const isAvailable = newStatus === 'available';
 
-      const backendSlots = getRequiredBackendSlots(`${timeSlot}:00`, 30);
+      const isSaturday = availabilityDate ? availabilityDate.getDay() === 6 : false; // 6 = Saturday
+      const backendSlots = getRequiredBackendSlots(`${timeSlot}:00`, 30, isSaturday);
 
       const promises = backendSlots.map(backendSlot => 
         supabase
@@ -301,10 +305,11 @@ const StaffCalendar: React.FC = () => {
 
     try {
       const dateStr = format(availabilityDate, 'yyyy-MM-dd');
+      const isSaturday = availabilityDate ? availabilityDate.getDay() === 6 : false; // 6 = Saturday
       
       const allBackendSlots: string[] = [];
       timeSlots.forEach(clientSlot => {
-        const backendSlots = getRequiredBackendSlots(`${clientSlot.time}:00`, 30);
+        const backendSlots = getRequiredBackendSlots(`${clientSlot.time}:00`, 30, isSaturday);
         allBackendSlots.push(...backendSlots);
       });
 
@@ -340,10 +345,11 @@ const StaffCalendar: React.FC = () => {
 
     try {
       const dateStr = format(availabilityDate, 'yyyy-MM-dd');
+      const isSaturday = availabilityDate ? availabilityDate.getDay() === 6 : false; // 6 = Saturday
       
       const allBackendSlots: string[] = [];
       timeSlots.forEach(clientSlot => {
-        const backendSlots = getRequiredBackendSlots(`${clientSlot.time}:00`, 30);
+        const backendSlots = getRequiredBackendSlots(`${clientSlot.time}:00`, 30, isSaturday);
         allBackendSlots.push(...backendSlots);
       });
 

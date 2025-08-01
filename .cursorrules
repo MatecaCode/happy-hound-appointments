@@ -1,0 +1,14 @@
+# MCP Configuration for Vettale Project
+# This file configures Model Context Protocol for Cursor
+
+# Database Connection
+# Using Supabase PostgreSQL connection
+# Connection: postgresql://postgres:Vishpapaidoceu@db.ieotixprkfglummoobkb.supabase.co:5432/postgres
+
+# MCP Server Configuration
+# The mcp-config.json file contains the server configuration
+
+# Project Context
+# This is a React/TypeScript pet grooming booking system
+# Uses Supabase for backend, React Router for navigation
+# Key features: appointment booking, staff management, availability tracking 

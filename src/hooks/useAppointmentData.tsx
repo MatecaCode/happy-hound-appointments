@@ -198,7 +198,8 @@ export const useAppointmentData = () => {
         return;
       } else {
         // Generate default time slots for services that don't require staff
-        const defaultSlots = generateClientTimeSlots().map(slot => ({
+        const isSaturday = date.getDay() === 6; // 6 = Saturday
+        const defaultSlots = generateClientTimeSlots(isSaturday).map(slot => ({
           id: slot,
           time: formatTimeSlot(slot),
           available: true
@@ -213,6 +214,7 @@ export const useAppointmentData = () => {
     
     const dateForQuery = format(date, 'yyyy-MM-dd');
     const serviceDuration = selectedService.default_duration || 60;
+    const isSaturday = date.getDay() === 6; // 6 = Saturday
 
     setIsLoading(true);
 
@@ -237,9 +239,10 @@ export const useAppointmentData = () => {
         return;
       }
 
-      // Build availability matrix
+      // Build availability matrix with correct end hour based on day
+      const endHour: number = isSaturday ? 12 : 16; // 12:00 for Saturdays, 16:00 for weekdays
       const all10MinSlots: string[] = [];
-      for (let hour = 9; hour < 17; hour++) {
+      for (let hour = 9; hour < endHour; hour++) {
         for (let minute = 0; minute < 60; minute += 10) {
           const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}:00`;
           all10MinSlots.push(timeString);
@@ -264,14 +267,14 @@ export const useAppointmentData = () => {
       });
 
       // Check each 30-minute slot for availability
-      const clientSlots = generateClientTimeSlots();
+      const clientSlots = generateClientTimeSlots(isSaturday);
       const availableSlots: TimeSlot[] = [];
 
       for (const clientSlot of clientSlots) {
         let isSlotAvailable = true;
 
         // Get all required slots for the full service duration
-        const requiredSlots = getRequiredBackendSlots(clientSlot, serviceDuration);
+        const requiredSlots = getRequiredBackendSlots(clientSlot, serviceDuration, isSaturday);
         
         // Check if ALL selected staff are available for ALL required slots
         for (const staffId of uniqueStaffIds) {
@@ -309,17 +312,18 @@ export const useAppointmentData = () => {
   }, []);
 
   // Helper function to get required backend slots
-  const getRequiredBackendSlots = (startTime: string, durationMinutes: number): string[] => {
+  const getRequiredBackendSlots = (startTime: string, durationMinutes: number, isSaturday: boolean = false): string[] => {
     const slots: string[] = [];
     const [startHour, startMinute] = startTime.split(':').map(Number);
     const startTotalMinutes = startHour * 60 + startMinute;
+    const endHour: number = isSaturday ? 12 : 16; // 12:00 for Saturdays, 16:00 for weekdays
     
     for (let offset = 0; offset < durationMinutes; offset += 10) {
       const slotTotalMinutes = startTotalMinutes + offset;
       const slotHour = Math.floor(slotTotalMinutes / 60);
       const slotMinute = slotTotalMinutes % 60;
       
-      if (slotHour >= 17) break;
+      if (slotHour >= endHour) break;
       
       const timeString = `${slotHour.toString().padStart(2, '0')}:${slotMinute.toString().padStart(2, '0')}:00`;
       slots.push(timeString);

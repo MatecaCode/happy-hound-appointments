@@ -1149,6 +1149,60 @@ export type Database = {
           },
         ]
       }
+      available_staff: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          email: string | null
+          can_groom: boolean | null
+          can_vet: boolean | null
+          can_bathe: boolean | null
+          location_id: string | null
+          active: boolean | null
+          location_name: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          email?: string | null
+          can_groom?: boolean | null
+          can_vet?: boolean | null
+          can_bathe?: boolean | null
+          location_id?: string | null
+          active?: boolean | null
+          location_name?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          email?: string | null
+          can_groom?: boolean | null
+          can_vet?: boolean | null
+          can_bathe?: boolean | null
+          location_id?: string | null
+          active?: boolean | null
+          location_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_profiles_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_registration_codes: {
         Row: {
           account_type: string
@@ -1218,34 +1272,28 @@ export type Database = {
           },
         ]
       }
-      user_roles_legacy: {
+      user_roles: {
         Row: {
-          created_at: string | null
-          id: string
-          location_id: string | null
-          role: string
           user_id: string
+          role: string
+          created_at: string | null
         }
         Insert: {
-          created_at?: string | null
-          id?: string
-          location_id?: string | null
-          role: string
           user_id: string
+          role: string
+          created_at?: string | null
         }
         Update: {
-          created_at?: string | null
-          id?: string
-          location_id?: string | null
-          role?: string
           user_id?: string
+          role?: string
+          created_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "user_roles_location_id_fkey"
-            columns: ["location_id"]
-            isOneToOne: false
-            referencedRelation: "locations"
+            foreignKeyName: "user_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -1267,7 +1315,36 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      available_staff: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          email: string | null
+          can_groom: boolean | null
+          can_vet: boolean | null
+          can_bathe: boolean | null
+          location_id: string | null
+          active: boolean | null
+          location_name: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_profiles_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       atomic_cancel_appointment: {
@@ -1364,6 +1441,14 @@ export type Database = {
       validate_staff_registration_code: {
         Args: { code_value: string; account_type_value: string }
         Returns: boolean
+      }
+      assign_user_role_from_code: {
+        Args: { p_user_id: string; p_registration_code: string }
+        Returns: undefined
+      }
+      get_user_role: {
+        Args: { p_user_id: string }
+        Returns: string
       }
     }
     Enums: {

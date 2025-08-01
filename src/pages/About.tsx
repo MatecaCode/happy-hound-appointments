@@ -71,7 +71,7 @@ const About = () => {
               <h2 className="mb-6">Nossa <span className="text-primary">História</span></h2>
               <p className="text-muted-foreground mb-6">
                 Há mais de 40 anos, trocamos a agitação da capital paulista pela tranquilidade de Atibaia para realizar um sonho: 
-                construir a primeira clínica veterinária da cidade totalmente dedicada ao bem‑estar dos animais. Em 1988 compramos 
+                construir nossa primeira sede própria totalmente dedicada ao bem‑estar dos animais. Em 1988 compramos 
                 o terreno da Rua Lucas, onde inauguramos nossa sede em 1990.
               </p>
               <p className="text-muted-foreground">
@@ -90,7 +90,7 @@ const About = () => {
                 alt="Nossa primeira clínica em 1990" 
                 className="rounded-lg shadow-lg h-96 w-full object-cover transition-transform duration-500 hover:scale-105"
               />
-              <p className="text-sm text-center mt-2 text-muted-foreground">Nossa primeira clínica inaugurada em 1990</p>
+              <p className="text-sm text-center mt-2 text-muted-foreground">Nossa primeira sede própria inaugurada em 1990</p>
             </div>
           </div>
         </div>
@@ -109,12 +109,16 @@ const About = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-            <div className="flex gap-6">
+            <div 
+              className={`flex gap-6 ${animationClasses.slideUp} ${
+                valuesAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+              }`}
+            >
               <div className="flex-shrink-0 mt-1">
                 <Dog className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <h3 className="text-xl font-bold mb-2">Primeiro TaxiDog da cidade</h3>
+                <h3 className="text-xl font-bold mb-2 text-center">Primeiro TaxiDog da cidade</h3>
                 <p className="text-muted-foreground">
                   Quando ninguém falava em transporte pet, já levávamos cães e gatos com segurança — de Fusca, 
                   depois de Fiorino.
@@ -122,12 +126,16 @@ const About = () => {
               </div>
             </div>
             
-            <div className="flex gap-6">
+            <div 
+              className={`flex gap-6 ${animationClasses.slideInRight} ${
+                valuesAnimation.isVisible ? animationClasses.slideInRightActive : animationClasses.slideInRightInactive
+              }`}
+            >
               <div className="flex-shrink-0 mt-1">
                 <Heart className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <h3 className="text-xl font-bold mb-2">Cãominhada e eventos caninos</h3>
+                <h3 className="text-xl font-bold mb-2 text-center">Cãominhada e eventos caninos</h3>
                 <p className="text-muted-foreground">
                   Trouxemos grandes patrocinadores, parceria com Purina Agility e transformamos finais de semana 
                   em programas para toda a família.
@@ -135,12 +143,16 @@ const About = () => {
               </div>
             </div>
             
-            <div className="flex gap-6">
+            <div 
+              className={`flex gap-6 ${animationClasses.slideUp} ${
+                valuesAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+              }`}
+            >
               <div className="flex-shrink-0 mt-1">
                 <Cat className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <h3 className="text-xl font-bold mb-2">Educação e comunidade</h3>
+                <h3 className="text-xl font-bold mb-2 text-center">Educação e comunidade</h3>
                 <p className="text-muted-foreground">
                   Feiras de adoção, ações em escolas e eventos temáticos aproximaram milhares de crianças do 
                   universo pet.
@@ -148,12 +160,16 @@ const About = () => {
               </div>
             </div>
             
-            <div className="flex gap-6">
+            <div 
+              className={`flex gap-6 ${animationClasses.slideInRight} ${
+                valuesAnimation.isVisible ? animationClasses.slideInRightActive : animationClasses.slideInRightInactive
+              }`}
+            >
               <div className="flex-shrink-0 mt-1">
                 <Syringe className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <h3 className="text-xl font-bold mb-2">Serviços premium e medicina integrativa</h3>
+                <h3 className="text-xl font-bold mb-2 text-center">Serviços premium e medicina integrativa</h3>
                 <p className="text-muted-foreground">
                   De check‑ups preventivos a acupuntura, oferecemos especialidades cuidadosamente selecionadas.
                 </p>
@@ -185,29 +201,45 @@ const About = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-white p-8 rounded-lg shadow">
-              <h3 className="text-xl font-bold mb-4">Cuidado nos detalhes</h3>
+            <div 
+              className={`bg-white p-8 rounded-lg shadow ${animationClasses.slideUp} ${
+                teamAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+              }`}
+            >
+              <h3 className="text-xl font-bold mb-4 text-center">Cuidado nos detalhes</h3>
               <p className="text-muted-foreground">
                 Do primeiro atendimento ao banho & tosa com penteados elaborados, sua tranquilidade é a nossa prioridade.
               </p>
             </div>
             
-            <div className="bg-white p-8 rounded-lg shadow">
-              <h3 className="text-xl font-bold mb-4">Customer Success animal</h3>
+            <div 
+              className={`bg-white p-8 rounded-lg shadow ${animationClasses.slideInRight} ${
+                teamAnimation.isVisible ? animationClasses.slideInRightActive : animationClasses.slideInRightInactive
+              }`}
+            >
+              <h3 className="text-xl font-bold mb-4 text-center">Customer Success animal</h3>
               <p className="text-muted-foreground">
                 Acompanhamos cada etapa da jornada de saúde do pet para garantir resultados duradouros.
               </p>
             </div>
             
-            <div className="bg-white p-8 rounded-lg shadow">
-              <h3 className="text-xl font-bold mb-4">Segurança em primeiro lugar</h3>
+            <div 
+              className={`bg-white p-8 rounded-lg shadow ${animationClasses.slideUp} ${
+                teamAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
+              }`}
+            >
+              <h3 className="text-xl font-bold mb-4 text-center">Segurança em primeiro lugar</h3>
               <p className="text-muted-foreground">
                 Infraestrutura, protocolos rigorosos e profissionais experientes asseguram tratamentos de ponta com total confiança.
               </p>
             </div>
             
-            <div className="bg-white p-8 rounded-lg shadow">
-              <h3 className="text-xl font-bold mb-4">Formamos profissionais</h3>
+            <div 
+              className={`bg-white p-8 rounded-lg shadow ${animationClasses.slideInRight} ${
+                teamAnimation.isVisible ? animationClasses.slideInRightActive : animationClasses.slideInRightInactive
+              }`}
+            >
+              <h3 className="text-xl font-bold mb-4 text-center">Formamos profissionais</h3>
               <p className="text-muted-foreground">
                 Muitos talentos que começaram conosco abriram seus próprios negócios, impulsionando o mercado pet local.
               </p>
@@ -241,7 +273,7 @@ const About = () => {
           >
             <h2 className="mb-4">Onde Estamos <span className="text-primary">Hoje</span></h2>
             <p className="text-muted-foreground max-w-3xl mx-auto">
-              Mais de 30 anos de dedicação em Atibaia nos transformaram de uma pequena clínica para um centro veterinário completo. 
+              De 1981 até o momento, 44 anos de dedicação em Atibaia nos transformaram de uma pequena clínica para um centro veterinário completo. 
               Hoje, com tecnologia de ponta e o mesmo carinho de sempre, continuamos a missão dos fundadores.
             </p>
           </div>
@@ -311,32 +343,40 @@ const About = () => {
               metricsAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
             }`}
           >
-            <div className="bg-white p-6 rounded-lg shadow text-center">
-              <div className="text-3xl font-bold text-primary mb-2">30.000+</div>
+            <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
+              <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
+                250.000
+              </div>
               <h3 className="font-semibold text-lg mb-2">Banhos</h3>
               <p className="text-sm text-muted-foreground">
                 Pets felizes e cheirosos que passaram por nossas mãos
               </p>
             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow text-center">
-              <div className="text-3xl font-bold text-primary mb-2">5.000+</div>
-              <h3 className="font-semibold text-lg mb-2">Atendimentos Veterinários</h3>
+            <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
+              <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
+                16.000
+              </div>
+              <h3 className="font-semibold text-lg mb-2">Consultas</h3>
               <p className="text-sm text-muted-foreground">
                 Consultas e cuidados especializados para cada pet
               </p>
             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow text-center">
-              <div className="text-3xl font-bold text-primary mb-2">600+</div>
+            <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
+              <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
+                600+
+              </div>
               <h3 className="font-semibold text-lg mb-2">Cirurgias</h3>
               <p className="text-sm text-muted-foreground">
                 Procedimentos cirúrgicos realizados com excelência
               </p>
             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow text-center">
-              <div className="text-3xl font-bold text-primary mb-2">∞</div>
+            <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
+              <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
+                ∞
+              </div>
               <h3 className="font-semibold text-lg mb-2">Sorrisos Incontáveis</h3>
               <p className="text-sm text-muted-foreground">
                 Momentos de alegria e gratidão que não podem ser medidos
@@ -347,14 +387,14 @@ const About = () => {
           {/* Additional Info Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="bg-white p-8 rounded-lg shadow">
-              <h3 className="text-xl font-bold mb-4">Legado Preservado</h3>
+              <h3 className="text-xl font-bold mb-4 text-center">Legado Preservado</h3>
               <p className="text-muted-foreground">
                 Apesar do crescimento, mantemos viva a essência dos fundadores: cuidado personalizado, atenção aos detalhes e amor pelos animais.
               </p>
             </div>
             
             <div className="bg-white p-8 rounded-lg shadow">
-              <h3 className="text-xl font-bold mb-4">Tecnologia e Carinho</h3>
+              <h3 className="text-xl font-bold mb-4 text-center">Tecnologia e Carinho</h3>
               <p className="text-muted-foreground">
                 Combinamos equipamentos de última geração com o mesmo carinho e atenção que sempre nos caracterizou.
               </p>

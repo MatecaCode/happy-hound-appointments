@@ -11,7 +11,7 @@ import PendingApprovalsSection from '@/components/admin/PendingApprovalsSection'
 import ServiceStatusSection from '@/components/admin/ServiceStatusSection';
 
 const AdminDashboard = () => {
-  const { user, signOut, isAdmin, loading } = useAuth();
+  const { user, signOut, isAdmin, loading, refreshUserRoles, userRoles } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalUsers: 0,
@@ -141,14 +141,24 @@ const AdminDashboard = () => {
                 Bem-vindo, Admin: <span className="font-medium">{user?.email}</span>
               </p>
             </div>
-            <Button 
-              variant="outline" 
-              onClick={handleLogout}
-              className="flex items-center gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              Sair
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                onClick={refreshUserRoles}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Atualizar Roles
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={handleLogout}
+                className="flex items-center gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                Sair
+              </Button>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-4 gap-6 mb-8">
@@ -216,6 +226,33 @@ const AdminDashboard = () => {
           <div className="grid lg:grid-cols-2 gap-6 mb-8">
             <PendingApprovalsSection />
             <ServiceStatusSection />
+          </div>
+
+          {/* Debug Section - Remove after testing */}
+          <div className="mb-8">
+            <Card>
+              <CardHeader>
+                <CardTitle>Debug Info</CardTitle>
+                <CardDescription>
+                  Current user role information (remove after testing)
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p><strong>User ID:</strong> {user?.id}</p>
+                  <p><strong>Email:</strong> {user?.email}</p>
+                  <p><strong>Is Admin:</strong> {isAdmin ? 'Yes' : 'No'}</p>
+                  <p><strong>User Roles:</strong> {JSON.stringify(userRoles)}</p>
+                  <Button 
+                    onClick={refreshUserRoles}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Refresh Roles
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           <div className="grid gap-6">

@@ -20,6 +20,8 @@ interface AuthContextType {
   userRole: string | null;
   userRoles: string[];
   hasRole: (role: string) => boolean;
+  refreshUserRoles: () => Promise<void>;
+  forceRefreshUserRoles: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,7 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
 
       const fetchPromise = supabase
-        .from('user_roles_legacy')
+        .from('user_roles')
         .select('role')
         .eq('user_id', userId);
 
@@ -68,6 +70,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       const roles = data?.map(r => r.role) || ['client'];
       console.log('✅ User roles fetched:', roles);
+      console.log('🔍 Raw data from database:', data);
+      console.log('👤 User ID being queried:', userId);
       return roles;
     } catch (error) {
       console.error('💥 Error fetching user roles:', error);
@@ -77,6 +81,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const hasRole = (role: string) => {
     return userRoles.includes(role);
+  };
+
+  const refreshUserRoles = async () => {
+    if (!user) return;
+    
+    try {
+      console.log('🔄 Manually refreshing user roles for:', user.id);
+      const roles = await fetchUserRoles(user.id);
+      setUserRoles(roles);
+      console.log('✅ User roles refreshed:', roles);
+    } catch (error) {
+      console.error('❌ Error refreshing user roles:', error);
+    }
+  };
+
+  const forceRefreshUserRoles = async () => {
+    if (!user) return;
+    
+    try {
+      console.log('🔄🔄 FORCE refreshing user roles for:', user.id);
+      // Clear current roles first
+      setUserRoles([]);
+      // Wait a bit then fetch fresh
+      setTimeout(async () => {
+        const roles = await fetchUserRoles(user.id);
+        setUserRoles(roles);
+        console.log('✅✅ User roles force refreshed:', roles);
+      }, 100);
+    } catch (error) {
+      console.error('❌❌ Error force refreshing user roles:', error);
+    }
   };
 
   useEffect(() => {
@@ -332,6 +367,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         userRole,
         userRoles,
         hasRole,
+        refreshUserRoles,
+        forceRefreshUserRoles,
       }}
     >
       {children}

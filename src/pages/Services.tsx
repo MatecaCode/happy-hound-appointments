@@ -17,7 +17,6 @@ const Services = () => {
     {
       title: "Banho & Escovação Básica",
       description: "Banho com carinho, escovação cuidadosa e colônia leve para deixar seu pet renovado e feliz.",
-      price: "R$40",
       icon: <ShowerHead className="h-6 w-6" />,
       backgroundColor: "#FDECE4", // Soft blush/peach
       details: [
@@ -32,7 +31,6 @@ const Services = () => {
     {
       title: "Tosa Completa",
       description: "Tudo do pacote básico mais corte de pelo estilizado conforme sua preferência.",
-      price: "R$60",
       icon: <Scissors className="h-6 w-6" />,
       popular: true,
       badge: "Mais Popular",
@@ -48,7 +46,6 @@ const Services = () => {
     {
       title: "Pacote Spa Luxo",
       description: "Tosa completa com shampoo especial, condicionador, limpeza de dentes e tratamento de patas.",
-      price: "R$80",
       icon: <Sparkles className="h-6 w-6" />,
       backgroundColor: "#EAF4FB", // Light blue
       details: [
@@ -63,7 +60,6 @@ const Services = () => {
     {
       title: "Corte de Unhas",
       description: "Serviço rápido de corte de unhas para manter as patas do seu cachorro saudáveis.",
-      price: "R$15",
       icon: <Scissors className="h-6 w-6" />,
       backgroundColor: "#FDECE4",
       details: [
@@ -75,7 +71,6 @@ const Services = () => {
     {
       title: "Limpeza de Dentes",
       description: "Serviço de higiene dental para manter a saúde bucal do seu cachorro.",
-      price: "R$25",
       icon: <Smile className="h-6 w-6" />,
       backgroundColor: "#F5EEE5",
       details: [
@@ -87,7 +82,6 @@ const Services = () => {
     {
       title: "Primeira Tosa do Filhote",
       description: "Introdução suave à tosa para filhotes com menos de 6 meses.",
-      price: "R$45",
       icon: <Dog className="h-6 w-6" />,
       backgroundColor: "#EAF4FB",
       details: [
@@ -104,7 +98,6 @@ const Services = () => {
     {
       title: "Consulta Veterinária",
       description: "Avaliação completa da saúde do seu pet com médico veterinário especializado.",
-      price: "R$120",
       icon: <Syringe className="h-6 w-6" />,
       backgroundColor: "#E9F3E1", // Soft green
       details: [
@@ -118,7 +111,6 @@ const Services = () => {
     {
       title: "Vacinação",
       description: "Imunização do seu pet com as principais vacinas necessárias para sua proteção.",
-      price: "A partir de R$80",
       icon: <Syringe className="h-6 w-6" />,
       popular: true,
       badge: "Mais Agendado",
@@ -134,7 +126,6 @@ const Services = () => {
     {
       title: "Check-up Completo",
       description: "Avaliação completa com exames laboratoriais para garantir a saúde do seu pet.",
-      price: "R$350",
       icon: <Heart className="h-6 w-6" />,
       details: [
         "Consulta veterinária",
@@ -148,7 +139,6 @@ const Services = () => {
     {
       title: "Castração",
       description: "Procedimento cirúrgico para esterilização do seu pet com toda segurança.",
-      price: "A partir de R$300",
       icon: <Syringe className="h-6 w-6" />,
       details: [
         "Avaliação pré-cirúrgica",
@@ -161,7 +151,6 @@ const Services = () => {
     {
       title: "Tratamento Odontológico",
       description: "Cuidados dentários completos para prevenir problemas de saúde bucal.",
-      price: "A partir de R$200",
       icon: <Smile className="h-6 w-6" />,
       details: [
         "Avaliação da saúde bucal",
@@ -174,7 +163,6 @@ const Services = () => {
     {
       title: "Acupuntura Veterinária",
       description: "Tratamento complementar para dor, problemas articulares e outras condições.",
-      price: "R$150 por sessão",
       icon: <Pill className="h-6 w-6" />,
       details: [
         "Avaliação da condição do pet",
@@ -225,7 +213,6 @@ const Services = () => {
                 key={index}
                 title={service.title}
                 description={service.description}
-                price={service.price}
                 icon={service.icon}
                 popular={service.popular}
                 badge={service.badge}
@@ -260,7 +247,6 @@ const Services = () => {
                 key={index}
                 title={service.title}
                 description={service.description}
-                price={service.price}
                 icon={service.icon}
                 popular={service.popular}
                 badge={service.badge}
