@@ -361,18 +361,31 @@ const AdminAppointments = () => {
           </div>
         )}
 
-        {/* 7. Edit Info */}
-        {appointment.edit_info && (
-          <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 mb-4">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-blue-500">✏️</span>
-              <span className="text-xs font-medium text-blue-700">Edição</span>
+                  {/* 7. Edit Info */}
+          {appointment.edit_info && (
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-blue-500">✏️</span>
+                <span className="text-xs font-medium text-blue-700">Edição</span>
+              </div>
+              <p className="text-xs text-blue-600 ml-6">{appointment.edit_info}</p>
             </div>
-            <p className="text-xs text-blue-600 ml-6">{appointment.edit_info}</p>
-          </div>
-        )}
+          )}
+          
+                    {/* 8. Edit History - Show if appointment was edited */}
+          {appointment.is_double_booking && (
+            <div className="p-3 bg-orange-50 rounded-lg border border-orange-200 mb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-orange-500">🔁</span>
+                <span className="text-xs font-medium text-orange-700">Override Aplicado</span>
+              </div>
+              <p className="text-xs text-orange-600 ml-6">
+                Este agendamento foi editado com override - alguns horários já estavam ocupados
+              </p>
+            </div>
+          )}
 
-        {/* 8. Action Buttons - Always at bottom */}
+          {/* 9. Action Buttons - Always at bottom */}
         <div className="flex items-center justify-between pt-4 mt-auto">
           <div className="flex items-center gap-2">
             <AppointmentActions 

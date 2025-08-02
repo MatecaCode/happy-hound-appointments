@@ -188,7 +188,21 @@ const AdminEditBooking = () => {
       }
 
       console.log('✅ [ADMIN_EDIT_BOOKING] Successfully edited booking');
-      toast.success('Agendamento editado com sucesso');
+      
+      // Check if this was an override booking
+      const { data: appointmentData } = await supabase
+        .from('appointments')
+        .select('is_double_booking')
+        .eq('id', appointmentId)
+        .single();
+      
+      if (appointmentData?.is_double_booking) {
+        toast.success('Agendamento editado com sucesso (override aplicado)', {
+          description: 'Alguns horários já estavam ocupados, mas o agendamento foi editado mesmo assim.'
+        });
+      } else {
+        toast.success('Agendamento editado com sucesso');
+      }
       
       // Navigate back to appointments list
       navigate('/admin/appointments');
