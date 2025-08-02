@@ -30,9 +30,16 @@ import AuthCallback from "./pages/AuthCallback";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import AdminDashboard from "./pages/AdminDashboard";
+import AdminActionCenter from "./pages/AdminActionCenter";
+import AdminSettings from "./pages/AdminSettings";
+import AdminLogs from "./pages/AdminLogs";
+import AdminManualBooking from "./pages/AdminManualBooking";
+import AdminAppointments from "./pages/AdminAppointments";
 import StatusCenter from "./pages/StatusCenter";
 import AdminAvailabilityManager from "./pages/AdminAvailabilityManager";
 import AdminBookingPage from "./pages/AdminBookingPage";
+import AdminDebugAvailability from "./pages/AdminDebugAvailability";
+import AdminEditBooking from "./pages/AdminEditBooking";
 import { AuthProvider } from "./hooks/useAuth";
 import TestDataPage from "./pages/TestDataPage";
 import GroomerAvailability from './pages/GroomerAvailability';
@@ -86,7 +93,17 @@ function App() {
               <Route path="/staff-availability" element={<StaffAvailability />} />
               <Route path="/staff-calendar" element={<StaffCalendar />} />
               
+              {/* Admin Routes - 3-Tiered Structure */}
               <Route path="/admin" element={<AdminDashboard />} />
+              <Route path="/admin/actions" element={<AdminActionCenter />} />
+              <Route path="/admin/appointments" element={<AdminAppointments />} />
+              <Route path="/admin/edit-booking/:appointmentId" element={<AdminEditBooking />} />
+              <Route path="/admin/manual-booking" element={<AdminManualBooking />} />
+              <Route path="/admin/settings" element={<AdminSettings />} />
+              <Route path="/admin/logs" element={<AdminLogs />} />
+              <Route path="/admin/debug/availability/:providerId/:date" element={<AdminDebugAvailability />} />
+              
+              {/* Legacy Admin Routes (keeping for compatibility) */}
               <Route path="/admin/booking" element={<AdminBookingPage />} />
               <Route path="/admin/availability" element={<AdminAvailabilityManager />} />
               <Route path="/status" element={<StatusCenter />} />

@@ -57,18 +57,18 @@ const AuthCallback = () => {
           // Log the metadata
           console.log("✅ Metadata:", user?.user_metadata);
           
-          // Log the admin code
-          const code = user?.user_metadata?.admin_registration_code;
-          console.log("✅ Admin code found:", code);
+          // Check for admin registration code
+          const adminCode = user?.user_metadata?.admin_registration_code;
+          console.log("✅ Admin code found:", adminCode);
           
-          // If code is found, use the monitoring system
-          if (code) {
+          // Process admin registration if code is present
+          if (adminCode) {
             console.log("🔄 Processing admin registration for user:", user.id);
-            console.log("🔄 Admin code:", code);
+            console.log("🔄 Admin code:", adminCode);
             
             try {
               // Use the admin registration monitor for comprehensive handling
-              const success = await adminRegistrationMonitor.monitorAdminRegistration(user.id, code);
+              const success = await adminRegistrationMonitor.monitorAdminRegistration(user.id, adminCode);
               
               if (success) {
                 console.log("✅ Successfully applied admin registration");

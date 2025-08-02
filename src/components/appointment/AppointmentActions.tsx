@@ -11,18 +11,38 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { X } from 'lucide-react';
+import { X, CheckCircle, Edit } from 'lucide-react';
 
 interface AppointmentActionsProps {
   appointmentId: string;
   status: string;
   onCancel?: () => void;
+  onConfirm?: () => void;
+  onEdit?: () => void;
+  isAdminOverride?: boolean;
+  currentDate?: Date;
+  currentTime?: string;
+  currentExtraFee?: number;
+  currentNotes?: string;
 }
 
-const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActionsProps) => {
+const AppointmentActions = ({ 
+  appointmentId, 
+  status, 
+  onCancel, 
+  onConfirm, 
+  onEdit,
+  isAdminOverride,
+  currentDate,
+  currentTime,
+  currentExtraFee,
+  currentNotes
+}: AppointmentActionsProps) => {
   const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleCancelAppointment = async () => {
@@ -81,7 +101,8 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
         return;
       }
 
-      if (appointment.status !== 'pending') {
+      // Allow cancellation for pending appointments or admin override appointments
+      if (appointment.status !== 'pending' && !isAdminOverride) {
         toast.error('Apenas agendamentos pendentes podem ser cancelados');
         return;
       }
@@ -132,13 +153,21 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
         }
       });
 
-      // Execute atomic cancellation with full slot reversion
-      await supabase.rpc('atomic_cancel_appointment', {
-        p_appointment_id: appointmentId,
-        p_appointment_date: appointmentDate,
-        p_slots_to_revert: slotsToRevert,
-        p_staff_ids: appointment.appointment_staff.map(s => s.staff_profile_id)
-      });
+      // Use admin-specific cancellation for override bookings, otherwise use standard cancellation
+      if (isAdminOverride) {
+        console.log(`[CANCELLATION] Using admin cancellation for override booking ${appointmentId}`);
+        await supabase.rpc('admin_cancel_appointment', {
+          p_appointment_id: appointmentId
+        });
+      } else {
+        console.log(`[CANCELLATION] Using standard atomic cancellation for regular booking ${appointmentId}`);
+        await supabase.rpc('atomic_cancel_appointment', {
+          p_appointment_id: appointmentId,
+          p_appointment_date: appointmentDate,
+          p_slots_to_revert: slotsToRevert,
+          p_staff_ids: appointment.appointment_staff.map(s => s.staff_profile_id)
+        });
+      }
 
       console.log(`[CANCELLATION] Successfully completed atomic cancellation for appointment ${appointmentId}`);
       
@@ -166,30 +195,120 @@ const AppointmentActions = ({ appointmentId, status, onCancel }: AppointmentActi
     }
   };
 
-  // Only show cancel button for pending appointments
-  if (status !== 'pending') {
+  const handleConfirmAppointment = async () => {
+    setIsLoading(true);
+    try {
+      console.log(`[CONFIRMATION] Starting confirmation for appointment ${appointmentId}`);
+      
+      // Update appointment status to confirmed
+      const { error: updateError } = await supabase
+        .from('appointments')
+        .update({ 
+          status: 'confirmed',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', appointmentId);
+
+      if (updateError) {
+        console.error(`[CONFIRMATION] Failed to confirm appointment:`, updateError);
+        throw new Error(`Failed to confirm appointment: ${updateError.message}`);
+      }
+
+      console.log(`[CONFIRMATION] Successfully confirmed appointment ${appointmentId}`);
+      
+      toast.success('Agendamento confirmado com sucesso');
+      setShowConfirmDialog(false);
+      if (onConfirm) onConfirm();
+
+    } catch (error: any) {
+      console.error('[CONFIRMATION] Error during confirmation:', error);
+      toast.error(`Erro ao confirmar agendamento: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Show buttons for pending appointments, confirmed appointments, or admin override appointments
+  if (status !== 'pending' && status !== 'confirmed' && !isAdminOverride) {
     return null;
   }
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => setShowCancelDialog(true)}
-        className="text-red-600 border-red-200 hover:bg-red-50"
-      >
-        <X className="h-4 w-4 mr-1" />
-        Cancelar
-      </Button>
+      <div className="flex gap-2">
+        {/* Show Confirm button only for pending appointments */}
+        {status === 'pending' && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowConfirmDialog(true)}
+            className="text-green-600 border-green-200 hover:bg-green-50"
+          >
+            <CheckCircle className="h-4 w-4 mr-1" />
+            Confirmar
+          </Button>
+        )}
+        
+        {/* Show Edit button for confirmed appointments */}
+        {status === 'confirmed' && (
+          <Link to={`/admin/edit-booking/${appointmentId}`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+            >
+              <Edit className="h-4 w-4 mr-1" />
+              Editar
+            </Button>
+          </Link>
+        )}
+        
+        {/* Show Cancel button for pending appointments or admin override appointments */}
+        {(status === 'pending' || isAdminOverride) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCancelDialog(true)}
+            className="text-red-600 border-red-200 hover:bg-red-50"
+          >
+            <X className="h-4 w-4 mr-1" />
+            Cancelar
+          </Button>
+        )}
+      </div>
 
+      {/* Confirm Dialog */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Agendamento</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja confirmar este agendamento? O cliente será notificado e o agendamento será marcado como confirmado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmAppointment}
+              disabled={isLoading}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isLoading ? 'Confirmando...' : 'Sim, Confirmar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Cancel Dialog */}
       <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Cancelar Agendamento</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita.
-              Os profissionais selecionados ficarão disponíveis e você pode não conseguir reagendar no mesmo horário.
+              {isAdminOverride 
+                ? 'Tem certeza que deseja cancelar este agendamento de override? Esta ação não pode ser desfeita. Apenas os slots originalmente disponíveis serão revertidos.'
+                : 'Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita. Os profissionais selecionados ficarão disponíveis e você pode não conseguir reagendar no mesmo horário.'
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

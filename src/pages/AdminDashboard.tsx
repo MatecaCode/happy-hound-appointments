@@ -1,329 +1,283 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { RefreshCw, LogOut, Users, Calendar, PawPrint, Clock, Plus } from 'lucide-react';
-import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import Layout from '@/components/Layout';
-import PendingApprovalsSection from '@/components/admin/PendingApprovalsSection';
-import ServiceStatusSection from '@/components/admin/ServiceStatusSection';
+import { toast } from 'sonner';
+import { 
+  Users, 
+  PawPrint, 
+  Calendar, 
+  Clock, 
+  TrendingUp,
+  AlertCircle,
+  CheckCircle,
+  Settings
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
+import AdminLayout from '@/components/AdminLayout';
+
+interface DashboardStats {
+  totalUsers: number;
+  totalPets: number;
+  totalBookings: number;
+  todayServices: number;
+  pendingApprovals: number;
+  serviceFollowUps: number;
+}
 
 const AdminDashboard = () => {
-  const { user, signOut, isAdmin, loading, refreshUserRoles, userRoles } = useAuth();
-  const navigate = useNavigate();
-  const [stats, setStats] = useState({
+  const { user } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({
     totalUsers: 0,
     totalPets: 0,
-    totalAppointments: 0,
-    todayBookedServices: 0
+    totalBookings: 0,
+    todayServices: 0,
+    pendingApprovals: 0,
+    serviceFollowUps: 0,
   });
-  const [loadingStats, setLoadingStats] = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (loading) return;
+    fetchDashboardStats();
+  }, []);
 
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    if (!isAdmin) {
-      toast.error('Acesso negado. Apenas administradores podem acessar esta página.');
-      navigate('/');
-      return;
-    }
-
-    loadStats();
-  }, [user, isAdmin, loading, navigate]);
-
-  const loadStats = async () => {
+  const fetchDashboardStats = async () => {
     try {
-      // Get total users (clients)
-      const { count: usersCount, error: usersError } = await supabase
+      setLoading(true);
+      
+      // Fetch total users
+      const { count: usersCount } = await supabase
         .from('user_roles')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'client');
+        .select('*', { count: 'exact', head: true });
 
-      if (usersError) {
-        console.error('Error fetching users count:', usersError);
-      }
-
-      // Get total pets - fix the query
-      const { count: petsCount, error: petsError } = await supabase
+      // Fetch total pets (assuming pets table exists)
+      const { count: petsCount } = await supabase
         .from('pets')
-        .select('id', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true });
 
-      if (petsError) {
-        console.error('Error fetching pets count:', petsError);
-      }
-
-      // Get total appointments
-      const { count: appointmentsCount, error: appointmentsError } = await supabase
+      // Fetch total appointments
+      const { count: appointmentsCount } = await supabase
         .from('appointments')
         .select('*', { count: 'exact', head: true });
 
-      if (appointmentsError) {
-        console.error('Error fetching appointments count:', appointmentsError);
-      }
-
-      // Get today's booked services
+      // Fetch today's services
       const today = new Date().toISOString().split('T')[0];
-      const { count: todayServicesCount, error: todayServicesError } = await supabase
+      const { count: todayServicesCount } = await supabase
         .from('appointments')
         .select('*', { count: 'exact', head: true })
-        .eq('date', today)
-        .in('status', ['pending', 'confirmed']);
+        .eq('date', today);
 
-      if (todayServicesError) {
-        console.error('Error fetching today services count:', todayServicesError);
-      }
+      // Fetch pending approvals (placeholder)
+      const pendingApprovalsCount = 0; // TODO: Implement when approval system is added
+
+      // Fetch service follow-ups (placeholder)
+      const serviceFollowUpsCount = 0; // TODO: Implement when follow-up system is added
 
       setStats({
         totalUsers: usersCount || 0,
         totalPets: petsCount || 0,
-        totalAppointments: appointmentsCount || 0,
-        todayBookedServices: todayServicesCount || 0
+        totalBookings: appointmentsCount || 0,
+        todayServices: todayServicesCount || 0,
+        pendingApprovals: pendingApprovalsCount,
+        serviceFollowUps: serviceFollowUpsCount,
       });
     } catch (error) {
-      console.error('Error loading stats:', error);
+      console.error('Error fetching dashboard stats:', error);
+      toast.error('Erro ao carregar estatísticas do dashboard');
     } finally {
-      setLoadingStats(false);
+      setLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      console.error('Error logging out:', error);
-    }
-  };
-
-  if (loading) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <RefreshCw className="h-8 w-8 animate-spin mx-auto mb-4" />
-            <p>Verificando permissões...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
-
-  if (!user || !isAdmin) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-red-600 mb-4">Acesso Negado</h1>
-            <p className="text-gray-600 mb-4">Você não tem permissão para acessar esta página.</p>
-            <Button onClick={() => navigate('/')}>
-              Voltar ao Início
-            </Button>
-          </div>
-        </div>
-      </Layout>
-    );
+  if (!user) {
+    return <div>Carregando...</div>;
   }
 
   return (
-    <Layout>
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Painel Administrativo</h1>
-              <p className="text-gray-600 mt-2">
-                Bem-vindo, Admin: <span className="font-medium">{user?.email}</span>
+    <AdminLayout>
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard Administrativo</h1>
+          <p className="text-gray-600 mt-2">Visão geral do sistema e KPIs principais</p>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <Link to="/admin/actions">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Settings className="h-5 w-5" />
+                  Centro de Ações
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  Agendamentos manuais, modificações e cobranças extras
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/admin/settings">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Settings className="h-5 w-5" />
+                  Configurações
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  Staff, serviços, preços e horários de funcionamento
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Link to="/admin/logs">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <AlertCircle className="h-5 w-5" />
+                  Logs de Ações
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-gray-600">
+                  Histórico de ações administrativas
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
+
+        {/* KPIs Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{loading ? '...' : stats.totalUsers}</div>
+              <p className="text-xs text-muted-foreground">
+                Clientes, staff e administradores
               </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                onClick={refreshUserRoles}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Atualizar Roles
-              </Button>
-              <Button 
-                variant="outline" 
-                onClick={handleLogout}
-                className="flex items-center gap-2"
-              >
-                <LogOut className="h-4 w-4" />
-                Sair
-              </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
 
-          <div className="grid md:grid-cols-4 gap-6 mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Usuários
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-blue-600">
-                  {loadingStats ? '...' : stats.totalUsers}
-                </p>
-                <p className="text-sm text-gray-500">Total registrados</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <PawPrint className="h-5 w-5" />
-                  Pets
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-green-600">
-                  {loadingStats ? '...' : stats.totalPets}
-                </p>
-                <p className="text-sm text-gray-500">Cadastrados</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Agendamentos
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-purple-600">
-                  {loadingStats ? '...' : stats.totalAppointments}
-                </p>
-                <p className="text-sm text-gray-500">Total</p>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  Serviços Hoje
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-3xl font-bold text-orange-600">
-                  {loadingStats ? '...' : stats.todayBookedServices}
-                </p>
-                <p className="text-sm text-gray-500">Agendados</p>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total de Pets</CardTitle>
+              <PawPrint className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{loading ? '...' : stats.totalPets}</div>
+              <p className="text-xs text-muted-foreground">
+                Pets cadastrados no sistema
+              </p>
+            </CardContent>
+          </Card>
 
-          <div className="grid lg:grid-cols-2 gap-6 mb-8">
-            <PendingApprovalsSection />
-            <ServiceStatusSection />
-          </div>
-
-          {/* Debug Section - Remove after testing */}
-          <div className="mb-8">
-            <Card>
-              <CardHeader>
-                <CardTitle>Debug Info</CardTitle>
-                <CardDescription>
-                  Current user role information (remove after testing)
-                </CardDescription>
+          <Link to="/admin/appointments">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Agendamentos</CardTitle>
+                <Calendar className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <p><strong>User ID:</strong> {user?.id}</p>
-                  <p><strong>Email:</strong> {user?.email}</p>
-                  <p><strong>Is Admin:</strong> {isAdmin ? 'Yes' : 'No'}</p>
-                  <p><strong>User Roles:</strong> {JSON.stringify(userRoles)}</p>
-                  <Button 
-                    onClick={refreshUserRoles}
-                    variant="outline"
-                    size="sm"
-                  >
-                    Refresh Roles
+                <div className="text-2xl font-bold">{loading ? '...' : stats.totalBookings}</div>
+                <p className="text-xs text-muted-foreground">
+                  Todos os agendamentos realizados
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Serviços Hoje</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{loading ? '...' : stats.todayServices}</div>
+              <p className="text-xs text-muted-foreground">
+                Agendamentos para hoje
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Alerts and Notifications */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Pending Approvals */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-500" />
+                Aprovações Pendentes
+              </CardTitle>
+              <CardDescription>
+                Itens que requerem atenção administrativa
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {stats.pendingApprovals > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Agendamentos pendentes</span>
+                    <Badge variant="destructive">{stats.pendingApprovals}</Badge>
+                  </div>
+                  <Button size="sm" variant="outline">
+                    Ver Detalhes
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              ) : (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="text-sm">Nenhuma aprovação pendente</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-          <div className="grid gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5" />
-                  Gerenciar Disponibilidade
-                </CardTitle>
-                <CardDescription>
-                  Controle completo sobre horários disponíveis por profissional e data
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  onClick={() => navigate('/admin/availability')}
-                  className="w-full sm:w-auto"
-                >
-                  <Clock className="h-4 w-4 mr-2" />
-                  Gerenciar Horários
-                </Button>
-                <p className="text-sm text-gray-500 mt-3">
-                  Edite horários disponíveis por profissional, data e tipo de serviço
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Plus className="h-5 w-5" />
-                  Agendar para Clientes
-                </CardTitle>
-                <CardDescription>
-                  Crie agendamentos em nome dos clientes via telefone ou presencialmente
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  onClick={() => navigate('/admin/book-for-client')}
-                  className="w-full sm:w-auto"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Agendamento
-                </Button>
-                <p className="text-sm text-gray-500 mt-3">
-                  Selecione cliente, pet e serviço para criar agendamentos
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Centro de Status de Serviços</CardTitle>
-                <CardDescription>
-                  Monitoramento de todos os agendamentos em andamento
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button 
-                  onClick={() => navigate('/status-center')}
-                  className="w-full sm:w-auto"
-                >
-                  Acessar Centro de Status
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+          {/* Service Follow-ups */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-blue-500" />
+                Acompanhamentos de Serviços
+              </CardTitle>
+              <CardDescription>
+                Serviços que requerem follow-up
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {stats.serviceFollowUps > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Follow-ups necessários</span>
+                    <Badge variant="secondary">{stats.serviceFollowUps}</Badge>
+                  </div>
+                  <Button size="sm" variant="outline">
+                    Ver Detalhes
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="text-sm">Nenhum follow-up necessário</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </Layout>
+    </AdminLayout>
   );
 };
 

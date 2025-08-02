@@ -13,6 +13,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ptBR } from 'date-fns/locale';
+import { createAdminBooking } from '@/utils/adminBookingUtils';
+import { useNavigate } from 'react-router-dom';
 
 interface Client {
   id: string;
@@ -46,6 +48,7 @@ interface TimeSlot {
 
 const AdminBookingPage = () => {
   const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -169,45 +172,50 @@ const AdminBookingPage = () => {
     setIsLoading(true);
     
     try {
-      const appointmentData = {
-        client_id: selectedClient,
+      // Get client user_id for the admin booking function
+      const client = clients.find(c => c.id === selectedClient);
+      if (!client) {
+        throw new Error('Cliente não encontrado');
+      }
+
+      const service = services.find(s => s.id === selectedService);
+      if (!service) {
+        throw new Error('Serviço não encontrado');
+      }
+
+      const dateStr = selectedDate.toISOString().split('T')[0];
+      const providerIds = selectedStaff ? [selectedStaff] : [];
+
+      console.log('Creating admin appointment with RPC:', {
+        client_user_id: client.user_id,
         pet_id: selectedPet,
         service_id: selectedService,
-        date: selectedDate.toISOString().split('T')[0],
+        provider_ids: providerIds,
+        date: dateStr,
         time: selectedTimeSlot,
         notes: notes || null,
-        status: 'confirmed', // Admin bookings are auto-confirmed
-        service_status: 'not_started',
-        is_admin_override: true
-      };
+        created_by: user?.id
+      });
 
-      console.log('Creating admin appointment:', appointmentData);
+      const result = await createAdminBooking({
+        clientUserId: client.user_id,
+        petId: selectedPet,
+        serviceId: selectedService,
+        providerIds: providerIds,
+        bookingDate: dateStr,
+        timeSlot: selectedTimeSlot,
+        notes: notes || undefined,
+        overrideConflicts: true
+      }, user?.id);
 
-      const { data: appointment, error: appointmentError } = await supabase
-        .from('appointments')
-        .insert(appointmentData)
-        .select()
-        .single();
-
-      if (appointmentError) throw appointmentError;
-
-      // If staff is selected, create appointment_staff relationship
-      if (selectedStaff && appointment) {
-        const { error: staffError } = await supabase
-          .from('appointment_staff')
-          .insert({
-            appointment_id: appointment.id,
-            staff_profile_id: selectedStaff,
-            role: 'primary'
-          });
-
-        if (staffError) {
-          console.error('Error linking staff:', staffError);
-          // Continue anyway - appointment was created
-        }
+      if (!result.success) {
+        throw new Error(result.error?.message || 'Erro ao criar agendamento');
       }
 
       toast.success('Agendamento criado com sucesso!');
+      
+      // Redirect to admin appointments page
+      navigate('/admin/appointments');
       
       // Reset form
       setSelectedClient('');

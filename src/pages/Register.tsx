@@ -114,8 +114,9 @@ const Register = () => {
       if (accountType === 'admin') {
         // For admin, we only validate the code exists and is unused
         // The actual processing will happen after email confirmation
-        const { data: adminValid, error: adminError } = await supabase.rpc('validate_admin_registration_code', {
-          code_value: registrationCode
+        const { data: adminValid, error: adminError } = await supabase.rpc('validate_staff_registration_code', {
+          code_value: registrationCode,
+          account_type_value: 'admin'
         });
         
         if (adminError) {
@@ -131,7 +132,8 @@ const Register = () => {
       } else if (accountType === 'staff') {
         // For staff, validate the code exists and is unused
         const { data: staffValid, error: staffError } = await supabase.rpc('validate_staff_registration_code', {
-          code_value: registrationCode
+          code_value: registrationCode,
+          account_type_value: 'staff'
         });
         
         if (staffError) {
@@ -243,6 +245,13 @@ const Register = () => {
         signUpData.can_vet = staffCapabilities.can_vet;
         signUpData.can_bathe = staffCapabilities.can_bathe;
         signUpData.location_id = selectedLocation === 'none' ? null : selectedLocation;
+        
+        // Debug logging for location handling
+        console.log('📍 Staff registration location data:', {
+          selectedLocation,
+          finalLocationId: signUpData.location_id,
+          hasLocation: !!signUpData.location_id
+        });
       }
       // Client accounts don't need registration codes
 
@@ -264,7 +273,94 @@ const Register = () => {
       }));
 
       // For staff accounts: Role assignment and profile creation will be handled automatically by the trigger
-      // For admin accounts: Role assignment and profile creation will be handled after email confirmation in AuthCallback
+      // For admin accounts: Process immediately after signup since trigger doesn't fire with supabase.auth.signUp()
+      if (accountType === 'admin' && authData.user) {
+        setRegistrationStatus(prev => ({
+          ...prev,
+          step: 'Processando registro de administrador...',
+          isProcessing: true,
+        }));
+
+        try {
+          console.log('🔄 Processing immediate admin registration for user:', authData.user.id);
+          
+          const { data: adminResult, error: adminError } = await supabase.rpc('process_immediate_admin_registration', {
+            p_user_id: authData.user.id
+          });
+
+          if (adminError) {
+            console.error('❌ Admin registration error:', adminError);
+            throw new Error(`Erro ao processar registro de administrador: ${adminError.message}`);
+          }
+
+          if (adminResult && adminResult.success) {
+            console.log('✅ Admin registration successful:', adminResult);
+            setRegistrationStatus(prev => ({
+              ...prev,
+              step: 'Registro de administrador concluído!',
+              isProcessing: false,
+            }));
+          } else {
+            console.error('❌ Admin registration failed:', adminResult);
+            throw new Error(adminResult?.error || 'Erro desconhecido no registro de administrador');
+          }
+        } catch (adminError: any) {
+          console.error('❌ Admin registration error:', adminError);
+          setRegistrationStatus(prev => ({
+            ...prev,
+            step: 'Erro no registro de administrador',
+            error: adminError.message,
+            isProcessing: false,
+          }));
+          // Don't throw here - user was created successfully, just admin processing failed
+        }
+      }
+      
+      // For staff accounts: Process immediately after signup
+      if (accountType === 'staff' && authData.user) {
+        setRegistrationStatus(prev => ({
+          ...prev,
+          step: 'Processando registro de funcionário...',
+          isProcessing: true,
+        }));
+
+        try {
+          console.log('🔄 Processing immediate staff registration for user:', authData.user.id);
+          
+          // Add a small delay to ensure user metadata is fully saved
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          const { data: staffResult, error: staffError } = await supabase.rpc('process_immediate_staff_registration', {
+            p_user_id: authData.user.id
+          });
+
+          if (staffError) {
+            console.error('❌ Staff registration error:', staffError);
+            throw new Error(`Erro ao processar registro de funcionário: ${staffError.message}`);
+          }
+
+          if (staffResult && staffResult.success) {
+            console.log('✅ Staff registration successful:', staffResult);
+            setRegistrationStatus(prev => ({
+              ...prev,
+              step: 'Registro de funcionário concluído!',
+              isProcessing: false,
+            }));
+          } else {
+            console.error('❌ Staff registration failed:', staffResult);
+            throw new Error(staffResult?.error || 'Erro desconhecido no registro de funcionário');
+          }
+        } catch (staffError: any) {
+          console.error('❌ Staff registration error:', staffError);
+          setRegistrationStatus(prev => ({
+            ...prev,
+            step: 'Erro no registro de funcionário',
+            error: staffError.message,
+            isProcessing: false,
+          }));
+          // Don't throw here - user was created successfully, just staff processing failed
+        }
+      }
       
       // Show success message based on account type
       if (accountType === 'staff') {
@@ -273,7 +369,7 @@ const Register = () => {
         if (staffCapabilities.can_groom) capabilities.push('tosa');
         if (staffCapabilities.can_vet) capabilities.push('veterinário');
         
-        toast.success(`Registro realizado! Funções: ${capabilities.join(', ')}. Verifique seu email para confirmar a conta.`);
+        toast.success(`Registro realizado! Funções: ${capabilities.join(', ')}. Perfil e disponibilidade criados automaticamente.`);
       } else if (accountType === 'admin') {
         toast.success('Registro de administrador realizado! Verifique seu email para confirmar a conta.');
       } else {
