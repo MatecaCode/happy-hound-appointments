@@ -79,15 +79,16 @@ const Book = () => {
                       </div>
                     </div>
                     
-                    <div>
-                      <h4 className="font-medium text-gray-800 mb-3">Contato</h4>
-                      <p className="text-sm text-gray-600 mb-2">
-                        Tem dúvidas sobre nossos serviços?
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Ligue para (11) 1234-5678
-                      </p>
-                    </div>
+                                         <div>
+                       <h4 className="font-medium text-gray-800 mb-3">Contato</h4>
+                       <p className="text-sm text-gray-600 mb-2">
+                         Tem dúvidas sobre nossos serviços?
+                       </p>
+                       <div className="text-sm text-gray-600 space-y-1">
+                         <p>Telefone: (11) 1234-5678</p>
+                         <p>WhatsApp: (11) 99637-8518</p>
+                       </div>
+                     </div>
                     
                     <div>
                       <h4 className="font-medium text-gray-800 mb-3">Observações para Agendamento</h4>

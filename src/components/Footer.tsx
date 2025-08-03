@@ -49,8 +49,9 @@ const Footer: React.FC = () => {
             <address className="not-italic">
               <p>Alameda Prof. Lucas Nogueira Garcez, 4245 - Jardim Paulista</p>
               <p>Atibaia - SP, 12947-000, Brazil</p>
-              <p className="mt-2">Email: contato@vettale.com</p>
+              <p className="mt-2">Email: contato@vettale.shop</p>
               <p>Telefone: (11) 2427-2827</p>
+              <p>WhatsApp: (11) 99637-8518</p>
             </address>
           </div>
         </div>
