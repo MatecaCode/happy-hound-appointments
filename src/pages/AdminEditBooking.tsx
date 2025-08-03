@@ -156,17 +156,20 @@ const AdminEditBooking = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedDate || !selectedTime) {
-      toast.error('Por favor, selecione uma data e horário');
+    if (!selectedDate) {
+      toast.error('Por favor, selecione uma data');
       return;
     }
+
+    // Time is optional - if not selected, keep the original time
+    const timeToUse = selectedTime || appointmentDetails?.time;
 
     setIsSaving(true);
     try {
       console.log('🔧 [ADMIN_EDIT_BOOKING] Submitting edit:', {
         appointmentId,
         newDate: selectedDate,
-        newTime: selectedTime,
+        newTime: timeToUse,
         extraFee: parseFloat(extraFee) || 0,
         adminNotes,
         editReason
@@ -175,7 +178,7 @@ const AdminEditBooking = () => {
       const { error } = await supabase.rpc('edit_booking_admin', {
         _appointment_id: appointmentId!,
         _new_date: format(selectedDate, 'yyyy-MM-dd'),
-        _new_time: selectedTime,
+        _new_time: timeToUse,
         _extra_fee: parseFloat(extraFee) || 0,
         _admin_notes: adminNotes || null,
         _edit_reason: editReason || null,
@@ -218,9 +221,11 @@ const AdminEditBooking = () => {
   const hasChanges = () => {
     if (!appointmentDetails) return false;
     
+    const timeToUse = selectedTime || appointmentDetails.time;
+    
     return (
       selectedDate?.getTime() !== new Date(appointmentDetails.date + 'T12:00:00').getTime() ||
-      selectedTime !== appointmentDetails.time ||
+      timeToUse !== appointmentDetails.time ||
       parseFloat(extraFee) !== (appointmentDetails.extra_fee || 0) ||
       adminNotes !== (appointmentDetails.notes || '') ||
       editReason !== ''
@@ -369,12 +374,13 @@ const AdminEditBooking = () => {
 
                   {/* Time Selection */}
                   <div className="space-y-2">
-                    <Label htmlFor="time">Novo Horário</Label>
+                    <Label htmlFor="time">Novo Horário (Opcional)</Label>
                     <Select value={selectedTime} onValueChange={setSelectedTime}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione um horário" />
+                        <SelectValue placeholder="Mantenha o horário atual ou selecione um novo" />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="">Manter horário atual</SelectItem>
                         {isLoadingTimeSlots ? (
                           <SelectItem value="" disabled>Carregando...</SelectItem>
                         ) : (
@@ -386,6 +392,11 @@ const AdminEditBooking = () => {
                         )}
                       </SelectContent>
                     </Select>
+                    {appointmentDetails?.time && (
+                      <p className="text-sm text-gray-500">
+                        Horário atual: {appointmentDetails.time}
+                      </p>
+                    )}
                   </div>
 
                   {/* Extra Fee */}

@@ -141,17 +141,20 @@ const EditBookingDialog = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedDate || !selectedTime) {
-      toast.error('Por favor, selecione uma data e horário');
+    if (!selectedDate) {
+      toast.error('Por favor, selecione uma data');
       return;
     }
+
+    // Time is optional - if not selected, keep the original time
+    const timeToUse = selectedTime || currentTime;
 
     setIsLoading(true);
     try {
       console.log('🔧 [EDIT_BOOKING] Submitting edit:', {
         appointmentId,
         newDate: selectedDate,
-        newTime: selectedTime,
+        newTime: timeToUse,
         extraFee: parseFloat(extraFee) || 0,
         adminNotes,
         editReason
@@ -160,7 +163,7 @@ const EditBookingDialog = ({
       const { error } = await supabase.rpc('edit_booking_admin', {
         _appointment_id: appointmentId,
         _new_date: format(selectedDate, 'yyyy-MM-dd'),
-        _new_time: selectedTime,
+        _new_time: timeToUse,
         _extra_fee: parseFloat(extraFee) || 0,
         _admin_notes: adminNotes || null,
         _edit_reason: editReason || null,
@@ -186,9 +189,11 @@ const EditBookingDialog = ({
   };
 
   const hasChanges = () => {
+    const timeToUse = selectedTime || currentTime;
+    
     return (
       selectedDate?.getTime() !== currentDate.getTime() ||
-      selectedTime !== currentTime ||
+      timeToUse !== currentTime ||
       parseFloat(extraFee) !== currentExtraFee ||
       adminNotes !== '' ||
       editReason !== ''
@@ -263,12 +268,13 @@ const EditBookingDialog = ({
 
           {/* Time Selection */}
           <div className="space-y-2">
-            <Label htmlFor="time">Novo Horário</Label>
+            <Label htmlFor="time">Novo Horário (Opcional)</Label>
             <Select value={selectedTime} onValueChange={setSelectedTime}>
               <SelectTrigger>
-                <SelectValue placeholder="Selecione um horário" />
+                <SelectValue placeholder="Mantenha o horário atual ou selecione um novo" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="">Manter horário atual</SelectItem>
                 {isLoadingTimeSlots ? (
                   <SelectItem value="" disabled>Carregando...</SelectItem>
                 ) : (
@@ -280,6 +286,9 @@ const EditBookingDialog = ({
                 )}
               </SelectContent>
             </Select>
+            <p className="text-sm text-gray-500">
+              Horário atual: {currentTime}
+            </p>
           </div>
 
           {/* Extra Fee */}
