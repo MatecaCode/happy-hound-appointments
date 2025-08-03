@@ -121,7 +121,7 @@ const Book = () => {
                 <Alert className="max-w-md mx-auto border-blue-200 bg-blue-50">
                   <AlertCircle className="h-4 w-4 text-blue-600" />
                   <AlertDescription className="text-blue-800">
-                    <p className="font-medium mb-2">Para agendamentos urgentes:</p>
+                    <p className="font-medium mb-2">Entre em contato:</p>
                     <div className="space-y-1 text-sm">
                       <p>Telefone: (11) 1234-5678</p>
                       <p>WhatsApp: (11) 99637-8518</p>
