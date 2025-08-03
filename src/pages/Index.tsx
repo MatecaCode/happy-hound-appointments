@@ -105,7 +105,7 @@ useEffect(() => {
                   institutionalAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
                 }`}
               >
-                <h2 className="mb-4">Tradição e <span className="text-primary">Inovação</span> desde 1990</h2>
+                <h2 className="mb-4">Tradição e <span className="text-primary">Inovação</span> desde 1981</h2>
                 <p className="text-muted-foreground mb-6">
                   Há mais de 40 anos cuidando de cada história. E sempre com carinho, excelência e dedicação.
                 </p>
