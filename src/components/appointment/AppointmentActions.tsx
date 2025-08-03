@@ -137,22 +137,6 @@ const AppointmentActions = ({
 
       console.log(`[CANCELLATION] Calculated ${slotsToRevert.length} slots to revert:`, slotsToRevert);
 
-      // Log cancellation attempt
-      await supabase.rpc('log_cancellation_debug', {
-        p_appointment_id: appointmentId,
-        p_message: `Starting cancellation: ${slotsToRevert.length} slots for ${appointment.appointment_staff.length} staff`,
-        p_data: {
-          appointment_date: appointmentDate,
-          appointment_time: appointmentTime,
-          service_duration: serviceDuration,
-          slots_to_revert: slotsToRevert,
-          staff_assignments: appointment.appointment_staff.map(s => ({
-            staff_id: s.staff_profile_id,
-            staff_name: (s.staff_profiles as any)?.name
-          }))
-        }
-      });
-
       // Use admin-specific cancellation for override bookings, otherwise use standard cancellation
       if (isAdminOverride) {
         console.log(`[CANCELLATION] Using admin cancellation for override booking ${appointmentId}`);
@@ -177,18 +161,6 @@ const AppointmentActions = ({
 
     } catch (error: any) {
       console.error('[CANCELLATION] Error during cancellation:', error);
-      
-      // Log the error for debugging
-      try {
-        await supabase.rpc('log_cancellation_debug', {
-          p_appointment_id: appointmentId,
-          p_message: `Cancellation failed: ${error.message}`,
-          p_data: { error: error.message, stack: error.stack }
-        });
-      } catch (logError) {
-        console.error('[CANCELLATION] Failed to log error:', logError);
-      }
-      
       toast.error(`Erro ao cancelar agendamento: ${error.message}`);
     } finally {
       setIsLoading(false);

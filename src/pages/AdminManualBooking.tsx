@@ -477,7 +477,7 @@ const AdminManualBooking = () => {
       const staffIds = getStaffIds();
 
       console.log('🔧 [ADMIN_MANUAL_BOOKING] Creating booking with data:', {
-        client_user_id: client.user_id,
+        client_user_id: client.id,
         pet_id: bookingData.petId,
         service_id: bookingData.serviceId,
         provider_ids: staffIds,
@@ -491,7 +491,7 @@ const AdminManualBooking = () => {
       });
 
       const { data: appointmentId, error: bookingError } = await supabase.rpc('create_booking_admin', {
-        _client_user_id: client.user_id,
+        _client_user_id: client.id,
         _pet_id: bookingData.petId,
         _service_id: bookingData.serviceId,
         _provider_ids: staffIds,

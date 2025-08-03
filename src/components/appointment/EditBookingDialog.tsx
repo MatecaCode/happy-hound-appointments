@@ -56,12 +56,12 @@ const EditBookingDialog = ({
   const [isLoading, setIsLoading] = useState(false);
   const [appointmentDetails, setAppointmentDetails] = useState<AppointmentDetails | null>(null);
   
-  // Form state
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(currentDate);
-  const [selectedTime, setSelectedTime] = useState<string>(currentTime);
-  const [extraFee, setExtraFee] = useState<string>(currentExtraFee.toString());
-  const [adminNotes, setAdminNotes] = useState<string>('');
-  const [editReason, setEditReason] = useState<string>('');
+     // Form state
+   const [selectedDate, setSelectedDate] = useState<Date | undefined>(currentDate);
+   const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined);
+   const [extraFee, setExtraFee] = useState<string>(currentExtraFee.toString());
+   const [adminNotes, setAdminNotes] = useState<string>('');
+   const [editReason, setEditReason] = useState<string>('');
   
   // Available time slots
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
@@ -266,30 +266,29 @@ const EditBookingDialog = ({
             </Popover>
           </div>
 
-          {/* Time Selection */}
-          <div className="space-y-2">
-            <Label htmlFor="time">Novo Horário (Opcional)</Label>
-            <Select value={selectedTime} onValueChange={setSelectedTime}>
-              <SelectTrigger>
-                <SelectValue placeholder="Mantenha o horário atual ou selecione um novo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">Manter horário atual</SelectItem>
-                {isLoadingTimeSlots ? (
-                  <SelectItem value="" disabled>Carregando...</SelectItem>
-                ) : (
-                  availableTimeSlots.map((time) => (
-                    <SelectItem key={time} value={time}>
-                      {time}
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-gray-500">
-              Horário atual: {currentTime}
-            </p>
-          </div>
+                     {/* Time Selection */}
+           <div className="space-y-2">
+             <Label htmlFor="time">Novo Horário (Opcional)</Label>
+             <Select value={selectedTime} onValueChange={setSelectedTime}>
+               <SelectTrigger>
+                 <SelectValue placeholder="Mantenha o horário atual ou selecione um novo" />
+               </SelectTrigger>
+               <SelectContent>
+                 {isLoadingTimeSlots ? (
+                   <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                 ) : (
+                   availableTimeSlots.map((time) => (
+                     <SelectItem key={time} value={time}>
+                       {time}
+                     </SelectItem>
+                   ))
+                 )}
+               </SelectContent>
+             </Select>
+             <p className="text-sm text-gray-500">
+               Horário atual: {currentTime}
+             </p>
+           </div>
 
           {/* Extra Fee */}
           <div className="space-y-2">

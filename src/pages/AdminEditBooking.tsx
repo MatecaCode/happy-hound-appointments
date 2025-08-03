@@ -42,7 +42,7 @@ const AdminEditBooking = () => {
   
   // Form state
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [selectedTime, setSelectedTime] = useState<string>('');
+  const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined);
   const [extraFee, setExtraFee] = useState<string>('0');
   const [adminNotes, setAdminNotes] = useState<string>('');
   const [editReason, setEditReason] = useState<string>('');
@@ -108,11 +108,11 @@ const AdminEditBooking = () => {
 
         setAppointmentDetails(details);
         
-        // Pre-populate form fields
-        setSelectedDate(new Date(data.date + 'T12:00:00'));
-        setSelectedTime(data.time);
-        setExtraFee((data.extra_fee || 0).toString());
-        setAdminNotes(data.notes || '');
+                 // Pre-populate form fields
+         setSelectedDate(new Date(data.date + 'T12:00:00'));
+         setSelectedTime(undefined); // Don't pre-select time, let user choose
+         setExtraFee((data.extra_fee || 0).toString());
+         setAdminNotes(data.notes || '');
         
       } catch (error: any) {
         console.error('❌ [ADMIN_EDIT_BOOKING] Error:', error);
@@ -372,32 +372,31 @@ const AdminEditBooking = () => {
                     </Popover>
                   </div>
 
-                  {/* Time Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="time">Novo Horário (Opcional)</Label>
-                    <Select value={selectedTime} onValueChange={setSelectedTime}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Mantenha o horário atual ou selecione um novo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Manter horário atual</SelectItem>
-                        {isLoadingTimeSlots ? (
-                          <SelectItem value="" disabled>Carregando...</SelectItem>
-                        ) : (
-                          availableTimeSlots.map((time) => (
-                            <SelectItem key={time} value={time}>
-                              {time}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    {appointmentDetails?.time && (
-                      <p className="text-sm text-gray-500">
-                        Horário atual: {appointmentDetails.time}
-                      </p>
-                    )}
-                  </div>
+                                     {/* Time Selection */}
+                   <div className="space-y-2">
+                     <Label htmlFor="time">Novo Horário (Opcional)</Label>
+                     <Select value={selectedTime} onValueChange={setSelectedTime}>
+                       <SelectTrigger>
+                         <SelectValue placeholder="Mantenha o horário atual ou selecione um novo" />
+                       </SelectTrigger>
+                       <SelectContent>
+                         {isLoadingTimeSlots ? (
+                           <SelectItem value="loading" disabled>Carregando...</SelectItem>
+                         ) : (
+                           availableTimeSlots.map((time) => (
+                             <SelectItem key={time} value={time}>
+                               {time}
+                             </SelectItem>
+                           ))
+                         )}
+                       </SelectContent>
+                     </Select>
+                     {appointmentDetails?.time && (
+                       <p className="text-sm text-gray-500">
+                         Horário atual: {appointmentDetails.time}
+                       </p>
+                     )}
+                   </div>
 
                   {/* Extra Fee */}
                   <div className="space-y-2">

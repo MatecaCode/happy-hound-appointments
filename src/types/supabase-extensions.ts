@@ -10,14 +10,7 @@ export interface CustomDatabaseFunctions {
     };
     Returns: void;
   };
-  log_cancellation_debug: {
-    Args: {
-      p_appointment_id: string;
-      p_message: string;
-      p_data: any;
-    };
-    Returns: void;
-  };
+
   atomic_cancel_appointment: {
     Args: {
       p_appointment_id: string;
@@ -26,5 +19,23 @@ export interface CustomDatabaseFunctions {
       p_staff_ids: string[];
     };
     Returns: void;
+  };
+
+  create_admin_booking_with_addons: {
+    Args: {
+      _client_user_id: string;
+      _pet_id: string;
+      _service_id: string;
+      _booking_date: string;
+      _time_slot: string;
+      _calculated_price: number;
+      _notes?: string;
+      _provider_ids?: string[];
+      _extra_fee?: number;
+      _extra_fee_reason?: string;
+      _addons?: any[];
+      _created_by?: string;
+    };
+    Returns: string;
   };
 }

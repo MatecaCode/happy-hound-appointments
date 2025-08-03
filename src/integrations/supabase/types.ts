@@ -1356,28 +1356,18 @@ export type Database = {
         }
         Returns: undefined
       }
-      create_booking_atomic: {
-        Args:
-          | {
-              _user_id: string
-              _pet_id: string
-              _service_id: string
-              _provider_ids: string[]
-              _booking_date: string
-              _time_slot: string
-              _notes?: string
-            }
-          | {
-              _user_id: string
-              _pet_id: string
-              _service_id: string
-              _provider_ids: string[]
-              _booking_date: string
-              _time_slot: string
-              _notes?: string
-              _calculated_price?: number
-              _calculated_duration?: number
-            }
+      create_booking_client: {
+        Args: {
+          _client_user_id: string
+          _pet_id: string
+          _service_id: string
+          _provider_ids: string[]
+          _booking_date: string
+          _time_slot: string
+          _notes?: string
+          _calculated_price?: number
+          _calculated_duration?: number
+        }
         Returns: string
       }
       ensure_staff_availability: {

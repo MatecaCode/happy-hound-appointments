@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { ptBR } from 'date-fns/locale';
 import { createAdminBooking } from '@/utils/adminBookingUtils';
 import { useNavigate } from 'react-router-dom';
+import BookingReviewModal from '@/components/admin/BookingReviewModal';
 
 interface Client {
   id: string;
@@ -64,6 +65,8 @@ const AdminBookingPage = () => {
   const [notes, setNotes] = useState('');
   
   const [isLoading, setIsLoading] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewBookingData, setReviewBookingData] = useState<any>(null);
 
   // Load initial data
   useEffect(() => {
@@ -169,53 +172,71 @@ const AdminBookingPage = () => {
       return;
     }
 
+    // Get client and service data
+    const client = clients.find(c => c.id === selectedClient);
+    if (!client) {
+      toast.error('Cliente não encontrado');
+      return;
+    }
+
+    const service = services.find(s => s.id === selectedService);
+    if (!service) {
+      toast.error('Serviço não encontrado');
+      return;
+    }
+
+    const staffMember = staff.find(s => s.id === selectedStaff);
+    const providerIds = selectedStaff ? [selectedStaff] : [];
+
+    // Prepare booking data for review
+    const bookingData = {
+      clientName: client.name,
+      petName: pets.find(p => p.id === selectedPet)?.name || '',
+      serviceName: service.name,
+      servicePrice: service.base_price,
+      date: selectedDate!,
+      time: selectedTimeSlot,
+      staffName: staffMember?.name,
+      notes: notes || undefined,
+      clientUserId: client.id,
+      petId: selectedPet,
+      serviceId: selectedService,
+      providerIds: providerIds
+    };
+
+    setReviewBookingData(bookingData);
+    setShowReviewModal(true);
+  };
+
+  const handleReviewConfirm = async (bookingData: any) => {
     setIsLoading(true);
     
     try {
-      // Get client user_id for the admin booking function
-      const client = clients.find(c => c.id === selectedClient);
-      if (!client) {
-        throw new Error('Cliente não encontrado');
-      }
+      // Calculate total price including addons and extra fee
+      const addonsTotal = bookingData.selectedAddons.reduce((sum: number, addon: any) => 
+        sum + (addon.price * addon.quantity), 0
+      );
+      const totalPrice = bookingData.servicePrice + addonsTotal + bookingData.extraFee;
 
-      const service = services.find(s => s.id === selectedService);
-      if (!service) {
-        throw new Error('Serviço não encontrado');
-      }
-
-      const dateStr = selectedDate.toISOString().split('T')[0];
-      const providerIds = selectedStaff ? [selectedStaff] : [];
-
-      console.log('Creating admin appointment with RPC:', {
-        client_user_id: client.user_id,
-        pet_id: selectedPet,
-        service_id: selectedService,
-        provider_ids: providerIds,
-        date: dateStr,
-        time: selectedTimeSlot,
-        notes: notes || null,
-        created_by: user?.id
+      // Create the appointment with addons
+      const { data: appointmentId, error } = await supabase.rpc('create_admin_booking_with_addons', {
+        _client_user_id: bookingData.clientUserId,
+        _pet_id: bookingData.petId,
+        _service_id: bookingData.serviceId,
+        _booking_date: bookingData.bookingDate,
+        _time_slot: bookingData.timeSlot,
+        _calculated_price: totalPrice,
+        _notes: bookingData.notes,
+        _provider_ids: bookingData.providerIds,
+        _extra_fee: bookingData.extraFee,
+        _extra_fee_reason: bookingData.extraFeeReason,
+        _addons: bookingData.selectedAddons.length > 0 ? bookingData.selectedAddons : null,
+        _created_by: user?.id
       });
 
-      const result = await createAdminBooking({
-        clientUserId: client.user_id,
-        petId: selectedPet,
-        serviceId: selectedService,
-        providerIds: providerIds,
-        bookingDate: dateStr,
-        timeSlot: selectedTimeSlot,
-        notes: notes || undefined,
-        overrideConflicts: true
-      }, user?.id);
-
-      if (!result.success) {
-        throw new Error(result.error?.message || 'Erro ao criar agendamento');
-      }
+      if (error) throw error;
 
       toast.success('Agendamento criado com sucesso!');
-      
-      // Redirect to admin appointments page
-      navigate('/admin/appointments');
       
       // Reset form
       setSelectedClient('');
@@ -225,6 +246,11 @@ const AdminBookingPage = () => {
       setSelectedDate(undefined);
       setSelectedTimeSlot('');
       setNotes('');
+      setShowReviewModal(false);
+      setReviewBookingData(null);
+      
+      // Redirect to admin appointments page
+      navigate('/admin/appointments');
       
     } catch (error: any) {
       console.error('Error creating appointment:', error);
@@ -395,6 +421,20 @@ const AdminBookingPage = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Booking Review Modal */}
+      {reviewBookingData && (
+        <BookingReviewModal
+          isOpen={showReviewModal}
+          onClose={() => {
+            setShowReviewModal(false);
+            setReviewBookingData(null);
+          }}
+          onConfirm={handleReviewConfirm}
+          bookingData={reviewBookingData}
+          isLoading={isLoading}
+        />
+      )}
     </Layout>
   );
 };

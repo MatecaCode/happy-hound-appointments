@@ -312,20 +312,38 @@ const AdminAppointments = () => {
 
         {/* 4. Duration and Price - side by side */}
         <div className="flex items-center gap-2 text-sm mb-4">
-          <div className="flex items-center gap-1">
-            <span className="text-gray-500">⏱</span>
-            <span className="text-xs font-medium text-gray-700">Duração:</span>
-            <span className="text-sm">{appointment.duration || 60} min</span>
-          </div>
-          <span className="text-gray-300">|</span>
-          <div className="flex items-center gap-1">
-            <span className="text-gray-500">💰</span>
-            <span className="text-xs font-medium text-gray-700">Preço:</span>
-            <span className="text-sm font-medium">R$ {(appointment.total_price || 0).toFixed(2)}</span>
-          </div>
+                     <div className="flex items-center gap-1">
+             <span className="text-gray-500">⏱</span>
+             <span className="text-xs font-medium text-gray-700">Duração:</span>
+             <span className="text-sm">{appointment.duration || 60} min</span>
+           </div>
+           <span className="text-gray-300">|</span>
+           <div className="flex items-center gap-1">
+             <span className="text-gray-500">💰</span>
+             <span className="text-xs font-medium text-gray-700">Preço:</span>
+             <span className="text-sm font-medium">R$ {(appointment.total_price || 0).toFixed(2)}</span>
+             {appointment.extra_fee && appointment.extra_fee > 0 && (
+               <span className="text-xs text-orange-600 ml-2 font-medium">
+                 💲 +R$ {appointment.extra_fee.toFixed(2)}
+               </span>
+             )}
+           </div>
         </div>
 
-        {/* 5. Observações - Always show */}
+                 {/* 5. Extra Fee - Show if exists */}
+         {appointment.extra_fee && appointment.extra_fee > 0 && (
+           <div className="mb-4">
+             <div className="flex items-center gap-2 mb-1">
+               <span className="text-orange-500">💲</span>
+               <span className="text-xs font-medium text-orange-700">Taxa Extra:</span>
+             </div>
+             <div className="ml-6">
+               <p className="text-xs text-orange-600 font-medium">R$ {appointment.extra_fee.toFixed(2)}</p>
+             </div>
+           </div>
+         )}
+
+        {/* 6. Observações - Always show */}
         <div className="mb-4">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-gray-500">📝</span>
@@ -340,7 +358,7 @@ const AdminAppointments = () => {
           </div>
         </div>
 
-        {/* 6. Admin Action Badges */}
+        {/* 7. Admin Action Badges */}
         {(appointment.booked_by_admin || appointment.is_admin_override || appointment.is_double_booking) && (
           <div className="flex flex-wrap gap-2 mb-4">
             {appointment.booked_by_admin && (
@@ -361,7 +379,7 @@ const AdminAppointments = () => {
           </div>
         )}
 
-                  {/* 7. Edit Info */}
+                  {/* 8. Edit Info */}
           {appointment.edit_info && (
             <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 mb-4">
               <div className="flex items-center gap-2 mb-1">
@@ -372,7 +390,7 @@ const AdminAppointments = () => {
             </div>
           )}
           
-                    {/* 8. Edit History - Show if appointment was edited */}
+                    {/* 9. Edit History - Show if appointment was edited */}
           {appointment.is_double_booking && (
             <div className="p-3 bg-orange-50 rounded-lg border border-orange-200 mb-4">
               <div className="flex items-center gap-2 mb-1">
@@ -385,21 +403,21 @@ const AdminAppointments = () => {
             </div>
           )}
 
-          {/* 9. Action Buttons - Always at bottom */}
+          {/* 10. Action Buttons - Always at bottom */}
         <div className="flex items-center justify-between pt-4 mt-auto">
           <div className="flex items-center gap-2">
-            <AppointmentActions 
-              appointmentId={appointment.id} 
-              status={appointment.status} 
-              onCancel={refreshAppointments}
-              onConfirm={refreshAppointments}
-              onEdit={refreshAppointments}
-              isAdminOverride={appointment.is_admin_override}
-              currentDate={appointment.date}
-              currentTime={appointment.time}
-              currentExtraFee={appointment.total_price}
-              currentNotes={appointment.notes}
-            />
+                         <AppointmentActions 
+               appointmentId={appointment.id} 
+               status={appointment.status} 
+               onCancel={refreshAppointments}
+               onConfirm={refreshAppointments}
+               onEdit={refreshAppointments}
+               isAdminOverride={appointment.is_admin_override}
+               currentDate={appointment.date}
+               currentTime={appointment.time}
+               currentExtraFee={appointment.extra_fee}
+               currentNotes={appointment.notes}
+             />
           </div>
           
           {/* Debug Link */}
