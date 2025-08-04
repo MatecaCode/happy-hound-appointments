@@ -9,6 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { DatePicker } from '@/components/ui/date-picker';
+import { ClientCombobox } from '@/components/ClientCombobox';
+import { BreedCombobox } from '@/components/BreedCombobox';
 import { toast } from 'sonner';
 import { 
   PawPrint, 
@@ -34,7 +37,10 @@ interface Pet {
   id: string;
   name: string;
   breed: string;
+  breed_id?: string;
+  size?: string;
   age: string;
+  birth_date?: string;
   notes: string;
   created_at: string;
   updated_at: string;
@@ -43,16 +49,24 @@ interface Pet {
   client_email?: string;
 }
 
+interface Breed {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
 interface Client {
   id: string;
   name: string;
-  email: string;
+  email: string | null;
+  user_id: string;
 }
 
 const AdminPets = () => {
   const { user } = useAuth();
   const [pets, setPets] = useState<Pet[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [breeds, setBreeds] = useState<Breed[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [clientFilter, setClientFilter] = useState<string>('all');
@@ -63,15 +77,22 @@ const AdminPets = () => {
   const [formData, setFormData] = useState({
     name: '',
     breed: '',
+    breed_id: '',
+    size: '',
     age: '',
     client_id: '',
-    notes: ''
+    notes: '',
+    birth_date: ''
   });
+  const [birthDate, setBirthDate] = useState<Date | undefined>(undefined);
+  const [selectedClient, setSelectedClient] = useState<Client | undefined>(undefined);
+  const [selectedBreed, setSelectedBreed] = useState<Breed | undefined>(undefined);
 
-  // Load pets and clients
+  // Load pets, clients and breeds
   useEffect(() => {
     fetchPets();
     fetchClients();
+    fetchBreeds();
   }, []);
 
   const fetchPets = async () => {
@@ -81,20 +102,23 @@ const AdminPets = () => {
     try {
       console.log('🔍 [ADMIN_PETS] Fetching pets with client info');
       
-             const { data, error } = await supabase
-         .from('pets')
-         .select(`
-           id,
-           name,
-           breed,
-           age,
-           notes,
-           created_at,
-           updated_at,
-           client_id,
-           clients:client_id (name, email)
-         `)
-         .order('created_at', { ascending: false });
+                                                       const { data, error } = await supabase
+          .from('pets')
+          .select(`
+            id,
+            name,
+            breed,
+            breed_id,
+            size,
+            age,
+            birth_date,
+            notes,
+            created_at,
+            updated_at,
+            client_id,
+            clients:client_id (name, email)
+          `)
+          .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ [ADMIN_PETS] Supabase error:', error);
@@ -103,12 +127,13 @@ const AdminPets = () => {
 
       const petsWithClientInfo = data?.map(pet => ({
         ...pet,
-        client_name: pet.clients?.name,
-        client_email: pet.clients?.email
+        client_name: (pet.clients as any)?.name,
+        client_email: (pet.clients as any)?.email
       })) || [];
 
       setPets(petsWithClientInfo);
       console.log('📊 [ADMIN_PETS] Pets loaded:', petsWithClientInfo);
+      console.log('📊 [ADMIN_PETS] Raw data from database:', data);
     } catch (error) {
       console.error('❌ [ADMIN_PETS] Error fetching pets:', error);
       toast.error('Erro ao carregar pets');
@@ -121,7 +146,7 @@ const AdminPets = () => {
     try {
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, email')
+        .select('id, name, email, user_id')
         .order('name');
 
       if (error) {
@@ -133,6 +158,26 @@ const AdminPets = () => {
     } catch (error) {
       console.error('❌ [ADMIN_PETS] Error fetching clients:', error);
       toast.error('Erro ao carregar clientes');
+    }
+  };
+
+  const fetchBreeds = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('breeds')
+        .select('id, name, active')
+        .eq('active', true)
+        .order('name');
+
+      if (error) {
+        console.error('❌ [ADMIN_PETS] Error fetching breeds:', error);
+        throw error;
+      }
+
+      setBreeds(data || []);
+    } catch (error) {
+      console.error('❌ [ADMIN_PETS] Error fetching breeds:', error);
+      toast.error('Erro ao carregar raças');
     }
   };
 
@@ -154,18 +199,21 @@ const AdminPets = () => {
        return;
      }
 
-     try {
-       const { data: petData, error: petError } = await supabase
-         .from('pets')
-         .insert({
-           name: formData.name,
-           breed: formData.breed,
-           age: formData.age,
-           notes: formData.notes,
-           client_id: formData.client_id
-         })
-         .select()
-         .single();
+           try {
+        const { data: petData, error: petError } = await supabase
+          .from('pets')
+          .insert({
+            name: formData.name,
+            breed: selectedBreed?.name || formData.breed,
+            breed_id: selectedBreed?.id || null,
+            size: formData.size,
+            age: formData.age,
+            birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null,
+            notes: formData.notes,
+            client_id: formData.client_id
+          })
+          .select()
+          .single();
 
       if (petError) {
         console.error('❌ [ADMIN_PETS] Pet creation error:', petError);
@@ -189,17 +237,29 @@ const AdminPets = () => {
        return;
      }
 
+     console.log('🔍 [ADMIN_PETS] Updating pet:', selectedPet.id);
+     console.log('🔍 [ADMIN_PETS] Form data:', formData);
+     console.log('🔍 [ADMIN_PETS] Birth date:', birthDate);
+
      try {
-       const { error } = await supabase
+               const updateData = {
+          name: formData.name,
+          breed: selectedBreed?.name || formData.breed,
+          breed_id: selectedBreed?.id || null,
+          size: formData.size,
+          age: formData.age,
+          birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null,
+          notes: formData.notes,
+          client_id: formData.client_id
+        };
+
+       console.log('🔍 [ADMIN_PETS] Update data:', updateData);
+
+       const { data, error } = await supabase
          .from('pets')
-         .update({
-           name: formData.name,
-           breed: formData.breed,
-           age: formData.age,
-           notes: formData.notes,
-           client_id: formData.client_id
-         })
-         .eq('id', selectedPet.id);
+         .update(updateData)
+         .eq('id', selectedPet.id)
+         .select();
 
       if (error) {
         console.error('❌ [ADMIN_PETS] Update error:', error);
@@ -207,6 +267,7 @@ const AdminPets = () => {
         return;
       }
 
+      console.log('✅ [ADMIN_PETS] Update successful:', data);
       toast.success('Pet atualizado com sucesso');
       setIsEditModalOpen(false);
       setSelectedPet(null);
@@ -239,27 +300,46 @@ const AdminPets = () => {
     }
   };
 
-     const resetForm = () => {
-     setFormData({
-       name: '',
-       breed: '',
-       age: '',
-       client_id: '',
-       notes: ''
-     });
-   };
+       const resetForm = () => {
+    setFormData({
+      name: '',
+      breed: '',
+      breed_id: '',
+      size: '',
+      age: '',
+      client_id: '',
+      notes: '',
+      birth_date: ''
+    });
+    setBirthDate(undefined);
+    setSelectedClient(undefined);
+    setSelectedBreed(undefined);
+  };
 
-     const openEditModal = (pet: Pet) => {
-     setSelectedPet(pet);
-     setFormData({
-       name: pet.name || '',
-       breed: pet.breed || '',
-       age: pet.age || '',
-       client_id: pet.client_id || '',
-       notes: pet.notes || ''
-     });
-     setIsEditModalOpen(true);
-   };
+       const openEditModal = (pet: Pet) => {
+    setSelectedPet(pet);
+    setFormData({
+      name: pet.name || '',
+      breed: pet.breed || '',
+      breed_id: pet.breed_id || '',
+      size: pet.size || '',
+      age: pet.age || '',
+      client_id: pet.client_id || '',
+      notes: pet.notes || '',
+      birth_date: pet.birth_date || ''
+    });
+    setBirthDate(pet.birth_date ? new Date(pet.birth_date) : undefined);
+    
+    // Find and set the selected client
+    const client = clients.find(c => c.id === pet.client_id);
+    setSelectedClient(client);
+    
+    // Find and set the selected breed
+    const breed = breeds.find(b => b.id === pet.breed_id);
+    setSelectedBreed(breed);
+    
+    setIsEditModalOpen(true);
+  };
 
   const formatDate = (dateString: string) => {
     try {
@@ -269,23 +349,49 @@ const AdminPets = () => {
     }
   };
 
-     const getAgeDisplay = (age: string) => {
+     const getAgeDisplay = (age: string, birth_date?: string) => {
+     if (birth_date) {
+       try {
+         const birthDate = new Date(birth_date);
+         const today = new Date();
+         const years = differenceInYears(today, birthDate);
+         const months = differenceInMonths(today, birthDate) % 12;
+         
+         if (years > 0) {
+           return `${years} ano${years > 1 ? 's' : ''}${months > 0 ? ` e ${months} mes${months > 1 ? 'es' : ''}` : ''}`;
+         } else {
+           return `${months} mes${months > 1 ? 'es' : ''}`;
+         }
+       } catch {
+         return age || 'Idade não informada';
+       }
+     }
      if (!age) return 'Idade não informada';
      return age;
    };
 
-     const getBreedIcon = (breed: string) => {
-     if (!breed) return <HelpCircle className="h-4 w-4" />;
-     
-     const breedLower = breed.toLowerCase();
-     if (breedLower.includes('retriever') || breedLower.includes('collie') || breedLower.includes('shepherd')) {
-       return <Dog className="h-4 w-4" />;
-     } else if (breedLower.includes('siamese') || breedLower.includes('persian')) {
-       return <Cat className="h-4 w-4" />;
-     } else {
-       return <HelpCircle className="h-4 w-4" />;
-     }
-   };
+           const getBreedIcon = (breed: string) => {
+      if (!breed) return <HelpCircle className="h-4 w-4" />;
+      
+      const breedLower = breed.toLowerCase();
+      if (breedLower.includes('retriever') || breedLower.includes('collie') || breedLower.includes('shepherd')) {
+        return <Dog className="h-4 w-4" />;
+      } else if (breedLower.includes('siamese') || breedLower.includes('persian')) {
+        return <Cat className="h-4 w-4" />;
+      } else {
+        return <HelpCircle className="h-4 w-4" />;
+      }
+    };
+
+    const getSizeDisplay = (size: string) => {
+      switch (size) {
+        case 'small': return 'Pequeno';
+        case 'medium': return 'Médio';
+        case 'large': return 'Grande';
+        case 'extra_large': return 'Extra Grande';
+        default: return size;
+      }
+    };
 
   if (!user) {
     return <div>Carregando...</div>;
@@ -344,7 +450,12 @@ const AdminPets = () => {
                </SelectContent>
              </Select>
 
-            <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
+            <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
+              setIsCreateModalOpen(open);
+              if (!open) {
+                resetForm();
+              }
+            }}>
               <DialogTrigger asChild>
                 <Button className="flex items-center gap-2">
                   <Plus className="h-4 w-4" />
@@ -374,31 +485,56 @@ const AdminPets = () => {
                        placeholder="Ex: 3 anos"
                      />
                    </div>
-                  <div>
-                    <Label htmlFor="breed">Raça</Label>
-                    <Input
-                      id="breed"
-                      value={formData.breed}
-                      onChange={(e) => setFormData({ ...formData, breed: e.target.value })}
-                      placeholder="Ex: Golden Retriever"
-                    />
-                  </div>
+                                                         <div>
+                      <Label htmlFor="breed">Raça</Label>
+                      <BreedCombobox
+                        breeds={breeds}
+                        onSelect={(breed) => {
+                          setSelectedBreed(breed);
+                          setFormData({ ...formData, breed: breed.name, breed_id: breed.id });
+                        }}
+                        selectedBreed={selectedBreed}
+                        disabled={false}
+                        isLoading={false}
+                      />
+                    </div>
+                                         <div>
+                       <Label htmlFor="size">Tamanho</Label>
+                       <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })}>
+                         <SelectTrigger>
+                           <SelectValue placeholder="Selecione o tamanho" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="small">Pequeno</SelectItem>
+                           <SelectItem value="medium">Médio</SelectItem>
+                           <SelectItem value="large">Grande</SelectItem>
+                           <SelectItem value="extra_large">Extra Grande</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     </div>
                   
-                  <div>
-                    <Label htmlFor="client">Dono *</Label>
-                    <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o dono" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name} ({client.email})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                                     <div>
+                     <Label htmlFor="birth-date">Data de Nascimento</Label>
+                     <DatePicker
+                       date={birthDate}
+                       onSelect={setBirthDate}
+                       placeholder="Selecione a data"
+                     />
+                   </div>
+
+                                     <div>
+                     <Label htmlFor="client">Dono *</Label>
+                     <ClientCombobox
+                       clients={clients}
+                       onSelect={(client) => {
+                         setSelectedClient(client);
+                         setFormData({ ...formData, client_id: client.id });
+                       }}
+                       selectedClient={selectedClient}
+                       disabled={false}
+                       isLoading={false}
+                     />
+                   </div>
                   <div>
                     <Label htmlFor="notes">Notas</Label>
                     <Textarea
@@ -458,10 +594,15 @@ const AdminPets = () => {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <CardTitle className="text-lg">{pet.name}</CardTitle>
-                                             <CardDescription className="flex items-center gap-1 mt-1">
-                         {getBreedIcon(pet.breed)}
-                         {pet.breed || 'Raça não informada'}
-                       </CardDescription>
+                                                                     <CardDescription className="flex items-center gap-1 mt-1">
+                          {getBreedIcon(pet.breed)}
+                          {pet.breed || 'Raça não informada'}
+                                                     {pet.size && (
+                             <Badge variant="outline" className="ml-2 text-xs">
+                               {getSizeDisplay(pet.size)}
+                             </Badge>
+                           )}
+                        </CardDescription>
                     </div>
                     <Badge variant="secondary" className="flex items-center gap-1">
                       <User className="h-3 w-3" />
@@ -470,10 +611,16 @@ const AdminPets = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                                     {pet.age && (
+                                     {(pet.age || pet.birth_date) && (
                      <div className="flex items-center gap-2 text-sm text-gray-600">
                        <Cake className="h-4 w-4" />
-                       Idade: {getAgeDisplay(pet.age)}
+                       Idade: {getAgeDisplay(pet.age, pet.birth_date)}
+                     </div>
+                   )}
+                   {pet.birth_date && (
+                     <div className="flex items-center gap-2 text-sm text-gray-600">
+                       <Calendar className="h-4 w-4" />
+                       Nascimento: {formatDate(pet.birth_date)}
                      </div>
                    )}
                   <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -537,7 +684,13 @@ const AdminPets = () => {
         )}
 
         {/* Edit Modal */}
-        <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <Dialog open={isEditModalOpen} onOpenChange={(open) => {
+          setIsEditModalOpen(open);
+          if (!open) {
+            setSelectedPet(null);
+            resetForm();
+          }
+        }}>
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Editar Pet</DialogTitle>
@@ -561,31 +714,56 @@ const AdminPets = () => {
                    placeholder="Ex: 3 anos"
                  />
                </div>
-              <div>
-                <Label htmlFor="edit-breed">Raça</Label>
-                <Input
-                  id="edit-breed"
-                  value={formData.breed}
-                  onChange={(e) => setFormData({ ...formData, breed: e.target.value })}
-                  placeholder="Ex: Golden Retriever"
-                />
-              </div>
+                                             <div>
+                  <Label htmlFor="edit-breed">Raça</Label>
+                  <BreedCombobox
+                    breeds={breeds}
+                    onSelect={(breed) => {
+                      setSelectedBreed(breed);
+                      setFormData({ ...formData, breed: breed.name, breed_id: breed.id });
+                    }}
+                    selectedBreed={selectedBreed}
+                    disabled={false}
+                    isLoading={false}
+                  />
+                </div>
+                                 <div>
+                   <Label htmlFor="edit-size">Tamanho</Label>
+                   <Select value={formData.size} onValueChange={(value) => setFormData({ ...formData, size: value })}>
+                     <SelectTrigger>
+                       <SelectValue placeholder="Selecione o tamanho" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="small">Pequeno</SelectItem>
+                       <SelectItem value="medium">Médio</SelectItem>
+                       <SelectItem value="large">Grande</SelectItem>
+                       <SelectItem value="extra_large">Extra Grande</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
               
-              <div>
-                <Label htmlFor="edit-client">Dono</Label>
-                <Select value={formData.client_id} onValueChange={(value) => setFormData({ ...formData, client_id: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o dono" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name} ({client.email})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                             <div>
+                 <Label htmlFor="edit-birth-date">Data de Nascimento</Label>
+                 <DatePicker
+                   date={birthDate}
+                   onSelect={setBirthDate}
+                   placeholder="Selecione a data"
+                 />
+               </div>
+
+                             <div>
+                 <Label htmlFor="edit-client">Dono</Label>
+                 <ClientCombobox
+                   clients={clients}
+                   onSelect={(client) => {
+                     setSelectedClient(client);
+                     setFormData({ ...formData, client_id: client.id });
+                   }}
+                   selectedClient={selectedClient}
+                   disabled={false}
+                   isLoading={false}
+                 />
+               </div>
               <div>
                 <Label htmlFor="edit-notes">Notas</Label>
                 <Textarea

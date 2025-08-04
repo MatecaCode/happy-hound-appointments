@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Dog, Clock, CheckCircle, XCircle, Play, AlertCircle, Calendar, User, ArrowLeft, Search, Filter } from 'lucide-react';
+import { Dog, Clock, CheckCircle, XCircle, Play, AlertCircle, Calendar, User, ArrowLeft, Search, Filter, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -36,16 +36,39 @@ interface AppointmentWithDetails {
   booked_by_admin?: boolean;
   is_admin_override?: boolean;
   is_double_booking?: boolean;
+  // ✅ ADD: Add-ons fields
+  addons?: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    price: number;
+    custom_description?: string;
+  }>;
 }
 
 const AdminAppointments = () => {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('all');
+  const [selectedAppointment, setSelectedAppointment] = useState<AppointmentWithDetails | null>(null);
+  const [showAppointmentDetail, setShowAppointmentDetail] = useState(false);
   
+  // Handle appointment parameter from URL
+  useEffect(() => {
+    const appointmentId = searchParams.get('appointment');
+    if (appointmentId && appointments.length > 0) {
+      const appointment = appointments.find(apt => apt.id === appointmentId);
+      if (appointment) {
+        setSelectedAppointment(appointment);
+        setShowAppointmentDetail(true);
+      }
+    }
+  }, [searchParams, appointments]);
+
   // Load all appointments from the database with detailed information
   useEffect(() => {
     const fetchAppointments = async () => {
@@ -55,7 +78,7 @@ const AdminAppointments = () => {
       try {
         console.log('🔍 [ADMIN_APPOINTMENTS] Fetching all appointments');
         
-                 // Get all appointments with related data including staff and client info
+                 // Get all appointments with related data including staff, client info, and add-ons
          const { data, error } = await supabase
            .from('appointments')
            .select(`
@@ -78,6 +101,16 @@ const AdminAppointments = () => {
              clients:client_id (name, email),
              appointment_staff (
                staff_profiles (name)
+             ),
+             appointment_addons (
+               id,
+               quantity,
+               price,
+               custom_description,
+               service_addons (
+                 id,
+                 name
+               )
              )
            `)
            .order('date', { ascending: true });
@@ -99,6 +132,15 @@ const AdminAppointments = () => {
             const staffNames = staffData.map((staff: any) => staff.name);
             const staffIds = staffData.map((staff: any) => staff.id);
 
+            // ✅ ADD: Process add-ons data
+            const addonsData = apt.appointment_addons?.map((addon: any) => ({
+              id: addon.id,
+              name: addon.service_addons?.name || 'Add-on',
+              quantity: addon.quantity,
+              price: addon.price,
+              custom_description: addon.custom_description
+            })).filter((addon: any) => addon.name) || [];
+
             return {
               id: apt.id,
               pet_name: (apt.pets as any)?.name || 'Pet',
@@ -119,6 +161,8 @@ const AdminAppointments = () => {
               booked_by_admin: apt.booked_by_admin || false,
               is_admin_override: apt.is_admin_override || false,
               is_double_booking: apt.is_double_booking || false,
+              // ✅ ADD: Include add-ons in formatted data
+              addons: addonsData,
             };
           });
           
@@ -165,6 +209,16 @@ const AdminAppointments = () => {
             clients:client_id (name, email),
             appointment_staff (
               staff_profiles (name)
+            ),
+            appointment_addons (
+              id,
+              quantity,
+              price,
+              custom_description,
+              service_addons (
+                id,
+                name
+              )
             )
           `)
           .order('date', { ascending: true });
@@ -179,6 +233,15 @@ const AdminAppointments = () => {
               })).filter((staff: any) => staff.name) || [];
               const staffNames = staffData.map((staff: any) => staff.name);
               const staffIds = staffData.map((staff: any) => staff.id);
+
+              // ✅ ADD: Process add-ons data (same as main fetch)
+              const addonsData = apt.appointment_addons?.map((addon: any) => ({
+                id: addon.id,
+                name: addon.service_addons?.name || 'Add-on',
+                quantity: addon.quantity,
+                price: addon.price,
+                custom_description: addon.custom_description
+              })).filter((addon: any) => addon.name) || [];
 
               return {
                 id: apt.id,
@@ -200,6 +263,8 @@ const AdminAppointments = () => {
                 booked_by_admin: apt.booked_by_admin || false,
                 is_admin_override: apt.is_admin_override || false,
                 is_double_booking: apt.is_double_booking || false,
+                // ✅ ADD: Include add-ons in formatted data
+                addons: addonsData,
               };
             });
           
@@ -358,7 +423,36 @@ const AdminAppointments = () => {
             </div>
           </div>
 
-          {/* 7. Admin Action Badges */}
+          {/* 7. Add-ons - Show if exists */}
+          {appointment.addons && appointment.addons.length > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-green-500">➕</span>
+                <span className="text-xs font-medium text-green-700">Add-ons:</span>
+              </div>
+              <div className="ml-6 space-y-1">
+                {appointment.addons.map((addon, index) => (
+                  <div key={addon.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-600">
+                        • {addon.name} (x{addon.quantity})
+                      </span>
+                      {addon.custom_description && (
+                        <span className="text-xs text-gray-500 italic">
+                          - {addon.custom_description}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-medium text-green-600">
+                      R$ {addon.price.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 8. Admin Action Badges */}
           {(appointment.booked_by_admin || appointment.is_admin_override || appointment.is_double_booking) && (
             <div className="flex flex-wrap gap-2 mb-4">
               {appointment.booked_by_admin && (
@@ -379,7 +473,7 @@ const AdminAppointments = () => {
             </div>
           )}
 
-                  {/* 8. Edit Info */}
+                  {/* 9. Edit Info */}
           {appointment.edit_info && (
             <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 mb-4">
               <div className="flex items-center gap-2 mb-1">
@@ -636,6 +730,138 @@ const AdminAppointments = () => {
            </TabsContent>
         </Tabs>
       </div>
+
+      {/* Appointment Detail Modal */}
+      {showAppointmentDetail && selectedAppointment && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Detalhes do Agendamento</h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowAppointmentDetail(false);
+                    setSelectedAppointment(null);
+                    setSearchParams({});
+                  }}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Pet and Service Info */}
+                <div className="border-b pb-4">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedAppointment.pet_name}</h3>
+                  <p className="text-lg text-gray-600">{selectedAppointment.service_name}</p>
+                  <div className="flex items-center gap-4 mt-2">
+                    {getStatusBadge(selectedAppointment.status, selectedAppointment.service_status)}
+                    {getServiceStatusBadge(selectedAppointment.service_status)}
+                  </div>
+                </div>
+
+                {/* Date and Time */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Data</p>
+                      <p className="text-sm text-gray-600">{format(selectedAppointment.date, 'dd/MM/yyyy', { locale: ptBR })}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Horário</p>
+                      <p className="text-sm text-gray-600">{selectedAppointment.time}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Client and Staff */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Cliente</p>
+                      <p className="text-sm text-gray-600">{selectedAppointment.client_name}</p>
+                      {selectedAppointment.client_email && (
+                        <p className="text-xs text-gray-500">{selectedAppointment.client_email}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Dog className="h-5 w-5 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Profissional</p>
+                      <p className="text-sm text-gray-600">{selectedAppointment.staff_names?.[0] || 'Não atribuído'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Duration and Price */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Duração</p>
+                      <p className="text-sm text-gray-600">{selectedAppointment.duration || 60} minutos</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500">💰</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Preço</p>
+                      <p className="text-sm text-gray-600 font-medium">R$ {(selectedAppointment.total_price || 0).toFixed(2)}</p>
+                      {selectedAppointment.extra_fee && selectedAppointment.extra_fee > 0 && (
+                        <p className="text-xs text-orange-600">+ R$ {selectedAppointment.extra_fee.toFixed(2)} taxa extra</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {selectedAppointment.notes && (
+                  <div className="border-t pt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Observações</p>
+                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded">{selectedAppointment.notes}</p>
+                  </div>
+                )}
+
+                {/* Edit Info */}
+                {selectedAppointment.edit_info && (
+                  <div className="border-t pt-4">
+                    <p className="text-sm font-medium text-gray-700 mb-2">Informações de Edição</p>
+                    <p className="text-sm text-gray-600 bg-blue-50 p-3 rounded">{selectedAppointment.edit_info}</p>
+                  </div>
+                )}
+
+                {/* Admin Override Info */}
+                {selectedAppointment.is_admin_override && (
+                  <div className="border-t pt-4">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-5 w-5 text-orange-500" />
+                      <p className="text-sm font-medium text-orange-700">Agendamento com Override Administrativo</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="border-t pt-4">
+                  <AppointmentActions 
+                    appointmentId={selectedAppointment.id}
+                    status={selectedAppointment.status}
+                    onCancel={refreshAppointments}
+                    onConfirm={refreshAppointments}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 };
