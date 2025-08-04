@@ -40,6 +40,9 @@ import AdminAvailabilityManager from "./pages/AdminAvailabilityManager";
 import AdminBookingPage from "./pages/AdminBookingPage";
 import AdminDebugAvailability from "./pages/AdminDebugAvailability";
 import AdminEditBooking from "./pages/AdminEditBooking";
+import AdminClients from "./pages/AdminClients";
+import AdminPets from "./pages/AdminPets";
+import AdminBookingSuccess from "./pages/AdminBookingSuccess";
 import { AuthProvider } from "./hooks/useAuth";
 import TestDataPage from "./pages/TestDataPage";
 import GroomerAvailability from './pages/GroomerAvailability';
@@ -99,7 +102,10 @@ function App() {
               <Route path="/admin/appointments" element={<AdminAppointments />} />
               <Route path="/admin/edit-booking/:appointmentId" element={<AdminEditBooking />} />
               <Route path="/admin/manual-booking" element={<AdminManualBooking />} />
+              <Route path="/admin/booking-success" element={<AdminBookingSuccess />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
+              <Route path="/admin/clients" element={<AdminClients />} />
+              <Route path="/admin/pets" element={<AdminPets />} />
               <Route path="/admin/logs" element={<AdminLogs />} />
               <Route path="/admin/debug/availability/:providerId/:date" element={<AdminDebugAvailability />} />
               

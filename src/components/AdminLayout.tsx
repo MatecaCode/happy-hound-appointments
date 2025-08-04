@@ -7,7 +7,8 @@ import {
   Settings, 
   AlertCircle, 
   LogOut,
-  Home
+  Home,
+  PawPrint
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -69,6 +70,18 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
                   <Button variant="ghost" size="sm">
                     <Settings className="h-4 w-4 mr-2" />
                     Configurações
+                  </Button>
+                </Link>
+                <Link to="/admin/clients">
+                  <Button variant="ghost" size="sm">
+                    <Users className="h-4 w-4 mr-2" />
+                    Clientes
+                  </Button>
+                </Link>
+                <Link to="/admin/pets">
+                  <Button variant="ghost" size="sm">
+                    <PawPrint className="h-4 w-4 mr-2" />
+                    Pets
                   </Button>
                 </Link>
                 <Link to="/admin/logs">

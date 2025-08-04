@@ -476,21 +476,13 @@ const AdminManualBooking = () => {
       const dateStr = format(bookingData.date, 'yyyy-MM-dd');
       const staffIds = getStaffIds();
 
-      console.log('🔧 [ADMIN_MANUAL_BOOKING] Creating booking with data:', {
-        client_user_id: client.id,
-        pet_id: bookingData.petId,
-        service_id: bookingData.serviceId,
-        provider_ids: staffIds,
-        booking_date: dateStr,
-        time_slot: bookingData.timeSlot,
-        notes: bookingData.notes,
-        calculated_price: bookingData.price,
-        calculated_duration: bookingData.duration,
-        created_by: user.id,
-        override_conflicts: isOverride
-      });
+      // 🧠 Split booking logic based on override status
+      const rpcName = isOverride ? 'create_booking_admin_override' : 'create_booking_admin';
+      
+      console.log('🔧 [ADMIN_MANUAL_BOOKING] Using RPC:', rpcName, 'with isOverride:', isOverride);
 
-      const { data: appointmentId, error: bookingError } = await supabase.rpc('create_booking_admin', {
+      // Prepare base booking payload
+      const basePayload = {
         _client_user_id: client.id,
         _pet_id: bookingData.petId,
         _service_id: bookingData.serviceId,
@@ -500,9 +492,38 @@ const AdminManualBooking = () => {
         _notes: bookingData.notes,
         _calculated_price: bookingData.price,
         _calculated_duration: bookingData.duration,
-        _created_by: user.id,
-        _override_conflicts: isOverride
-      });
+        _created_by: user.id
+      };
+
+      let bookingPayload: any;
+
+      // Add override-specific parameters if this is an override booking
+      if (isOverride) {
+        // Get conflicting appointment ID from the conflict detection
+        const conflicts = await checkForConflicts();
+        const conflictingAppointmentId = conflicts?.[0]?.id; // Use 'id' instead of 'appointment_id'
+        
+        bookingPayload = {
+          ...basePayload,
+          _override_on_top_of_appointment_id: conflictingAppointmentId,
+          _admin_notes: `Override confirmado em ${dateStr} às ${finalTimeSlot}`
+        };
+        
+        console.log('🔧 [ADMIN_MANUAL_BOOKING] Override parameters:', {
+          conflictingAppointmentId,
+          adminNotes: bookingPayload._admin_notes
+        });
+      } else {
+        // Add standard booking parameters
+        bookingPayload = {
+          ...basePayload,
+          _override_conflicts: false
+        };
+      }
+
+      console.log('🔧 [ADMIN_MANUAL_BOOKING] Creating booking with payload:', bookingPayload);
+
+      const { data: appointmentId, error: bookingError } = await supabase.rpc(rpcName, bookingPayload);
 
       if (bookingError) {
         console.error('❌ [ADMIN_MANUAL_BOOKING] Booking error:', bookingError);
@@ -511,8 +532,11 @@ const AdminManualBooking = () => {
 
       console.log('✅ [ADMIN_MANUAL_BOOKING] Booking created successfully:', appointmentId);
 
-              toast.success('Agendamento criado com sucesso!');
-        navigate('/admin/appointments');
+      toast.success(isOverride ? 'Agendamento criado com override!' : 'Agendamento criado com sucesso!');
+      // Redirect to add-ons confirmation page
+      navigate('/admin/booking-success', { 
+        state: { appointmentId: appointmentId } 
+      });
     } catch (error: any) {
       console.error('❌ [ADMIN_MANUAL_BOOKING] Error creating booking:', error);
       

@@ -1440,6 +1440,35 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: string
       }
+      edit_booking_admin: {
+        Args: {
+          _appointment_id: string
+          _new_date?: string
+          _new_time?: string
+          _extra_fee?: number
+          _admin_notes?: string
+          _edit_reason?: string
+          _edited_by?: string
+          _force_override?: boolean
+        }
+        Returns: Json
+      }
+      check_edit_conflicts: {
+        Args: {
+          _appointment_id: string
+          _new_date: string
+          _new_time: string
+        }
+        Returns: Json
+      }
+      check_staff_availability_for_edit: {
+        Args: {
+          _appointment_id: string
+          _new_date: string
+          _new_time: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

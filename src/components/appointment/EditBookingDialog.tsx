@@ -66,6 +66,8 @@ const EditBookingDialog = ({
   // Available time slots
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState(false);
+  const [availabilityData, setAvailabilityData] = useState<any>(null);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
 
   // Load appointment details
   useEffect(() => {
@@ -118,11 +120,12 @@ const EditBookingDialog = ({
       
       setIsLoadingTimeSlots(true);
       try {
-        // Generate time slots from 9:00 to 16:00 in 30-minute intervals
+        // Generate time slots from 9:00 to 16:30 in 30-minute intervals
         const slots = [];
         for (let hour = 9; hour <= 16; hour++) {
           for (let minute = 0; minute < 60; minute += 30) {
-            if (hour === 16 && minute > 0) break; // Stop at 16:00
+            // Include 16:30 but not 17:00
+            if (hour === 16 && minute > 30) break;
             const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
             slots.push(timeString);
           }
@@ -138,6 +141,38 @@ const EditBookingDialog = ({
     loadTimeSlots();
   }, [selectedDate]);
 
+  // Check availability when date or time changes
+  useEffect(() => {
+    const checkAvailability = async () => {
+      if (!selectedDate || !selectedTime || !appointmentId) {
+        setAvailabilityData(null);
+        return;
+      }
+
+      setIsCheckingAvailability(true);
+      try {
+        const { data, error } = await supabase.rpc('check_staff_availability_for_edit', {
+          _appointment_id: appointmentId,
+          _new_date: format(selectedDate, 'yyyy-MM-dd'),
+          _new_time: selectedTime
+        });
+
+        if (error) {
+          console.error('Error checking availability:', error);
+          return;
+        }
+
+        setAvailabilityData(data);
+      } catch (error) {
+        console.error('Error checking availability:', error);
+      } finally {
+        setIsCheckingAvailability(false);
+      }
+    };
+
+    checkAvailability();
+  }, [selectedDate, selectedTime, appointmentId]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -148,6 +183,12 @@ const EditBookingDialog = ({
 
     // Time is optional - if not selected, keep the original time
     const timeToUse = selectedTime || currentTime;
+
+    // Validate time format
+    if (timeToUse && !/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(timeToUse)) {
+      toast.error('Formato de horário inválido');
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -160,6 +201,25 @@ const EditBookingDialog = ({
         editReason
       });
 
+      // Check if we have availability data and if there are conflicts
+      let hasConflicts = false;
+      if (availabilityData && !availabilityData.is_fully_available) {
+        hasConflicts = true;
+        
+        // Show warning about override
+        const warningMessage = `⚠️ Atenção: ${availabilityData.unavailable_count} slot(s) já estão ocupados para este horário.\n\n` +
+          `Duração do serviço: ${availabilityData.service_duration} min\n` +
+          `Horário: ${availabilityData.start_time} - ${availabilityData.end_time}\n\n` +
+          `Deseja prosseguir com a edição mesmo assim? (Será criado como override)`;
+        
+        const confirmed = window.confirm(warningMessage);
+        if (!confirmed) {
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Proceed with edit (force override if conflicts were found)
       const { error } = await supabase.rpc('edit_booking_admin', {
         _appointment_id: appointmentId,
         _new_date: format(selectedDate, 'yyyy-MM-dd'),
@@ -167,7 +227,8 @@ const EditBookingDialog = ({
         _extra_fee: parseFloat(extraFee) || 0,
         _admin_notes: adminNotes || null,
         _edit_reason: editReason || null,
-        _edited_by: (await supabase.auth.getUser()).data.user?.id
+        _edited_by: (await supabase.auth.getUser()).data.user?.id,
+        _force_override: hasConflicts
       });
 
       if (error) {
@@ -176,7 +237,16 @@ const EditBookingDialog = ({
       }
 
       console.log('✅ [EDIT_BOOKING] Successfully edited booking');
-      toast.success('Agendamento editado com sucesso');
+      
+      // Show appropriate success message
+      if (hasConflicts) {
+        toast.success('Agendamento editado com sucesso (override aplicado)', {
+          description: 'Alguns horários já estavam ocupados, mas o agendamento foi editado mesmo assim.'
+        });
+      } else {
+        toast.success('Agendamento editado com sucesso');
+      }
+      
       setOpen(false);
       onEditSuccess();
       
@@ -288,6 +358,41 @@ const EditBookingDialog = ({
              <p className="text-sm text-gray-500">
                Horário atual: {currentTime}
              </p>
+             
+             {/* Availability Status */}
+             {selectedTime && availabilityData && (
+               <div className="mt-3 p-3 rounded-lg border">
+                 <div className="flex items-center gap-2 mb-2">
+                   <span className="text-sm font-medium">Status da Disponibilidade:</span>
+                   {isCheckingAvailability ? (
+                     <span className="text-sm text-gray-500">Verificando...</span>
+                   ) : availabilityData.is_fully_available ? (
+                     <span className="text-sm text-green-600 font-medium">✅ Disponível</span>
+                   ) : (
+                     <span className="text-sm text-red-600 font-medium">❌ Parcialmente Ocupado</span>
+                   )}
+                 </div>
+                 
+                 {availabilityData && !isCheckingAvailability && (
+                   <div className="text-xs text-gray-600 space-y-1">
+                     <p>Duração do serviço: {availabilityData.service_duration} min</p>
+                     <p>Horário: {availabilityData.start_time} - {availabilityData.end_time}</p>
+                     <p>Slots disponíveis: {availabilityData.available_slots?.length || 0}/{availabilityData.total_slots}</p>
+                     
+                     {availabilityData.unavailable_count > 0 && (
+                       <div className="mt-2 p-2 bg-red-50 rounded border border-red-200">
+                         <p className="text-red-700 font-medium">
+                           ⚠️ {availabilityData.unavailable_count} slot(s) já ocupado(s)
+                         </p>
+                         <p className="text-red-600 text-xs mt-1">
+                           O agendamento será criado como override se confirmado.
+                         </p>
+                       </div>
+                     )}
+                   </div>
+                 )}
+               </div>
+             )}
            </div>
 
           {/* Extra Fee */}

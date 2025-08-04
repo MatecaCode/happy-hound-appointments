@@ -157,31 +157,35 @@ const AdminDashboard = () => {
 
         {/* KPIs Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loading ? '...' : stats.totalUsers}</div>
-              <p className="text-xs text-muted-foreground">
-                Clientes, staff e administradores
-              </p>
-            </CardContent>
-          </Card>
+          <Link to="/admin/clients">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{loading ? '...' : stats.totalUsers}</div>
+                <p className="text-xs text-muted-foreground">
+                  Clientes, staff e administradores
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total de Pets</CardTitle>
-              <PawPrint className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{loading ? '...' : stats.totalPets}</div>
-              <p className="text-xs text-muted-foreground">
-                Pets cadastrados no sistema
-              </p>
-            </CardContent>
-          </Card>
+          <Link to="/admin/pets">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total de Pets</CardTitle>
+                <PawPrint className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{loading ? '...' : stats.totalPets}</div>
+                <p className="text-xs text-muted-foreground">
+                  Pets cadastrados no sistema
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
 
           <Link to="/admin/appointments">
             <Card className="hover:shadow-lg transition-shadow cursor-pointer">
