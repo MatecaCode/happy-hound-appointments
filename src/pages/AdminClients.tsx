@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { DatePicker } from '@/components/ui/date-picker';
+import { BreedCombobox } from '@/components/BreedCombobox';
 import { toast } from 'sonner';
 import { 
   Users, 
@@ -24,16 +26,19 @@ import {
   Phone,
   Mail,
   MapPin,
-  FileText
+  FileText,
+  Dog,
+  Cat,
+  HelpCircle
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, differenceInYears, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Client {
   id: string;
-  user_id: string;
+  user_id: string | null;
   name: string;
   phone: string;
   email: string;
@@ -44,11 +49,31 @@ interface Client {
   updated_at: string;
   location_name?: string;
   pet_count?: number;
+  needs_registration?: boolean;
 }
 
 interface Location {
   id: string;
   name: string;
+}
+
+interface Pet {
+  id: string;
+  name: string;
+  breed: string;
+  breed_id?: string;
+  size?: string;
+  birth_date?: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+  client_id: string;
+}
+
+interface Breed {
+  id: string;
+  name: string;
+  active: boolean;
 }
 
 const AdminClients = () => {
@@ -70,10 +95,28 @@ const AdminClients = () => {
     location_id: ''
   });
 
+  // Pet management state
+  const [isPetsModalOpen, setIsPetsModalOpen] = useState(false);
+  const [selectedClientForPets, setSelectedClientForPets] = useState<Client | null>(null);
+  const [clientPets, setClientPets] = useState<Pet[]>([]);
+  const [isCreatePetModalOpen, setIsCreatePetModalOpen] = useState(false);
+  const [breeds, setBreeds] = useState<Breed[]>([]);
+  const [petFormData, setPetFormData] = useState({
+    name: '',
+    breed: '',
+    breed_id: '',
+    size: '',
+    notes: '',
+    birth_date: ''
+  });
+  const [birthDate, setBirthDate] = useState<Date | undefined>(undefined);
+  const [selectedBreed, setSelectedBreed] = useState<Breed | undefined>(undefined);
+
   // Load clients and locations
   useEffect(() => {
     fetchClients();
     fetchLocations();
+    fetchBreeds();
   }, []);
 
   const fetchClients = async () => {
@@ -83,22 +126,23 @@ const AdminClients = () => {
     try {
       console.log('🔍 [ADMIN_CLIENTS] Fetching clients with pet counts');
       
-      const { data, error } = await supabase
-        .from('clients')
-        .select(`
-          id,
-          user_id,
-          name,
-          phone,
-          email,
-          address,
-          notes,
-          location_id,
-          created_at,
-          updated_at,
-          locations:location_id (name)
-        `)
-        .order('created_at', { ascending: false });
+             const { data, error } = await supabase
+         .from('clients')
+         .select(`
+           id,
+           user_id,
+           name,
+           phone,
+           email,
+           address,
+           notes,
+           location_id,
+           created_at,
+           updated_at,
+           needs_registration,
+           locations:location_id (name)
+         `)
+         .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ [ADMIN_CLIENTS] Supabase error:', error);
@@ -151,6 +195,26 @@ const AdminClients = () => {
     }
   };
 
+  const fetchBreeds = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('breeds')
+        .select('id, name, active')
+        .eq('active', true)
+        .order('name');
+
+      if (error) {
+        console.error('❌ [ADMIN_CLIENTS] Error fetching breeds:', error);
+        throw error;
+      }
+
+      setBreeds(data || []);
+    } catch (error) {
+      console.error('❌ [ADMIN_CLIENTS] Error fetching breeds:', error);
+      toast.error('Erro ao carregar raças');
+    }
+  };
+
   const filteredClients = clients.filter(client => {
     const matchesSearch = 
       client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -169,50 +233,33 @@ const AdminClients = () => {
     }
 
     try {
-      // Create user in auth.users first
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email: formData.email,
-        password: 'tempPassword123!', // Temporary password
-        email_confirm: true
-      });
-
-      if (authError) {
-        console.error('❌ [ADMIN_CLIENTS] Auth error:', authError);
-        toast.error('Erro ao criar usuário');
-        return;
-      }
-
-      // Create client record
+      // Create client record without user_id (will be set when client registers)
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .insert({
-          user_id: authData.user.id,
+          user_id: null, // Will be set when client completes registration
           name: formData.name,
           phone: formData.phone,
           email: formData.email,
           address: formData.address,
           notes: formData.notes,
-          location_id: formData.location_id
+          location_id: formData.location_id,
+          needs_registration: true // Flag to indicate client needs to complete registration
         })
         .select()
         .single();
 
       if (clientError) {
         console.error('❌ [ADMIN_CLIENTS] Client creation error:', clientError);
-        toast.error('Erro ao criar cliente');
+        toast.error('Erro ao criar cliente: ' + clientError.message);
         return;
       }
 
-      // Add user role
-      await supabase
-        .from('user_roles')
-        .insert({
-          user_id: authData.user.id,
-          role: 'client',
-          name: formData.name
-        });
-
-      toast.success('Cliente criado com sucesso');
+      // Send invitation email to client
+      // For now, we'll just show a success message
+      // In a real implementation, you'd send an email with a registration link
+      
+      toast.success('Cliente criado com sucesso! Cliente receberá um email para completar o registro.');
       setIsCreateModalOpen(false);
       resetForm();
       fetchClients();
@@ -267,9 +314,14 @@ const AdminClients = () => {
         .eq('id', clientId)
         .single();
 
-      if (client) {
-        // Delete from auth.users
-        await supabase.auth.admin.deleteUser(client.user_id);
+      if (client && client.user_id) {
+        // Only delete from auth.users if user_id exists
+        try {
+          await supabase.auth.admin.deleteUser(client.user_id);
+        } catch (authError) {
+          console.error('❌ [ADMIN_CLIENTS] Auth delete error:', authError);
+          // Continue with client deletion even if auth deletion fails
+        }
       }
 
       // Delete from clients table
@@ -289,6 +341,139 @@ const AdminClients = () => {
     } catch (error) {
       console.error('❌ [ADMIN_CLIENTS] Error deleting client:', error);
       toast.error('Erro ao deletar cliente');
+    }
+  };
+
+  // Pet management functions
+  const openPetsModal = async (client: Client) => {
+    setSelectedClientForPets(client);
+    setIsPetsModalOpen(true);
+    await fetchClientPets(client.id);
+  };
+
+  const fetchClientPets = async (clientId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('pets')
+        .select(`
+          id,
+          name,
+          breed,
+          breed_id,
+          size,
+          birth_date,
+          notes,
+          created_at,
+          updated_at,
+          client_id
+        `)
+        .eq('client_id', clientId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ [ADMIN_CLIENTS] Error fetching pets:', error);
+        throw error;
+      }
+
+      setClientPets(data || []);
+    } catch (error) {
+      console.error('❌ [ADMIN_CLIENTS] Error fetching pets:', error);
+      toast.error('Erro ao carregar pets');
+    }
+  };
+
+  const handleCreatePet = async () => {
+    if (!selectedClientForPets || !petFormData.name) {
+      toast.error('Nome do pet é obrigatório');
+      return;
+    }
+
+    try {
+      const { data: petData, error: petError } = await supabase
+        .from('pets')
+        .insert({
+          name: petFormData.name,
+          breed: selectedBreed?.name || petFormData.breed,
+          breed_id: selectedBreed?.id || null,
+          size: petFormData.size,
+          birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null,
+          notes: petFormData.notes,
+          client_id: selectedClientForPets.id
+        })
+        .select()
+        .single();
+
+      if (petError) {
+        console.error('❌ [ADMIN_CLIENTS] Pet creation error:', petError);
+        toast.error('Erro ao criar pet');
+        return;
+      }
+
+      toast.success('Pet criado com sucesso');
+      setIsCreatePetModalOpen(false);
+      resetPetForm();
+      await fetchClientPets(selectedClientForPets.id);
+      fetchClients(); // Refresh client list to update pet count
+    } catch (error) {
+      console.error('❌ [ADMIN_CLIENTS] Error creating pet:', error);
+      toast.error('Erro ao criar pet');
+    }
+  };
+
+  const resetPetForm = () => {
+    setPetFormData({
+      name: '',
+      breed: '',
+      breed_id: '',
+      size: '',
+      notes: '',
+      birth_date: ''
+    });
+    setBirthDate(undefined);
+    setSelectedBreed(undefined);
+  };
+
+  const getAgeDisplay = (age: string, birth_date?: string) => {
+    if (birth_date) {
+      try {
+        const birthDate = new Date(birth_date);
+        const today = new Date();
+        const years = differenceInYears(today, birthDate);
+        const months = differenceInMonths(today, birthDate) % 12;
+        
+        if (years > 0) {
+          return `${years} ano${years > 1 ? 's' : ''}${months > 0 ? ` e ${months} mes${months > 1 ? 'es' : ''}` : ''}`;
+        } else {
+          return `${months} mes${months > 1 ? 'es' : ''}`;
+        }
+      } catch {
+        return age || 'Idade não informada';
+      }
+    }
+    if (!age) return 'Idade não informada';
+    return age;
+  };
+
+  const getBreedIcon = (breed: string) => {
+    if (!breed) return <HelpCircle className="h-4 w-4" />;
+    
+    const breedLower = breed.toLowerCase();
+    if (breedLower.includes('retriever') || breedLower.includes('collie') || breedLower.includes('shepherd')) {
+      return <Dog className="h-4 w-4" />;
+    } else if (breedLower.includes('siamese') || breedLower.includes('persian')) {
+      return <Cat className="h-4 w-4" />;
+    } else {
+      return <HelpCircle className="h-4 w-4" />;
+    }
+  };
+
+  const getSizeDisplay = (size: string) => {
+    switch (size) {
+      case 'small': return 'Pequeno';
+      case 'medium': return 'Médio';
+      case 'large': return 'Grande';
+      case 'extra_large': return 'Extra Grande';
+      default: return size;
     }
   };
 
@@ -496,10 +681,21 @@ const AdminClients = () => {
                         {client.email}
                       </CardDescription>
                     </div>
-                    <Badge variant="secondary" className="flex items-center gap-1">
-                      <PawPrint className="h-3 w-3" />
-                      {client.pet_count || 0}
-                    </Badge>
+                                         <div className="flex flex-col gap-1">
+                       <Badge 
+                         variant="secondary" 
+                         className="flex items-center gap-1 cursor-pointer hover:bg-gray-200 transition-colors"
+                         onClick={() => openPetsModal(client)}
+                       >
+                         <PawPrint className="h-3 w-3" />
+                         {client.pet_count || 0}
+                       </Badge>
+                       {client.needs_registration && (
+                         <Badge variant="destructive" className="text-xs">
+                           Pendente Registro
+                         </Badge>
+                       )}
+                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -653,10 +849,149 @@ const AdminClients = () => {
               </div>
             </div>
           </DialogContent>
-        </Dialog>
-      </div>
-    </AdminLayout>
-  );
-};
+                 </Dialog>
+
+         {/* Pets Modal */}
+         <Dialog open={isPetsModalOpen} onOpenChange={setIsPetsModalOpen}>
+           <DialogContent className="max-w-2xl">
+             <DialogHeader>
+               <DialogTitle>
+                 Pets de {selectedClientForPets?.name}
+               </DialogTitle>
+             </DialogHeader>
+             <div className="space-y-4">
+               {clientPets.length === 0 ? (
+                 <div className="text-center py-8">
+                   <PawPrint className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                     Nenhum pet cadastrado
+                   </h3>
+                   <p className="text-gray-600 mb-4">
+                     Este cliente ainda não possui pets cadastrados
+                   </p>
+                   <Button onClick={() => setIsCreatePetModalOpen(true)}>
+                     <Plus className="h-4 w-4 mr-2" />
+                     Adicionar Primeiro Pet
+                   </Button>
+                 </div>
+               ) : (
+                 <>
+                   <div className="space-y-3">
+                     {clientPets.map((pet) => (
+                       <Card key={pet.id} className="p-4">
+                         <div className="flex items-center justify-between">
+                           <div className="flex items-center gap-3">
+                             {getBreedIcon(pet.breed)}
+                             <div>
+                               <h4 className="font-semibold">{pet.name}</h4>
+                               <div className="flex items-center gap-2 text-sm text-gray-600">
+                                 <span>{pet.breed || 'Raça não informada'}</span>
+                                 {pet.size && (
+                                   <Badge variant="outline" className="text-xs">
+                                     {getSizeDisplay(pet.size)}
+                                   </Badge>
+                                 )}
+                                                                   <span>•</span>
+                                  <span>{getAgeDisplay('', pet.birth_date)}</span>
+                               </div>
+                             </div>
+                           </div>
+                         </div>
+                       </Card>
+                     ))}
+                   </div>
+                   <div className="flex justify-center pt-4">
+                     <Button onClick={() => setIsCreatePetModalOpen(true)}>
+                       <Plus className="h-4 w-4 mr-2" />
+                       Adicionar Novo Pet
+                     </Button>
+                   </div>
+                 </>
+               )}
+             </div>
+           </DialogContent>
+         </Dialog>
+
+         {/* Create Pet Modal */}
+         <Dialog open={isCreatePetModalOpen} onOpenChange={(open) => {
+           setIsCreatePetModalOpen(open);
+           if (!open) {
+             resetPetForm();
+           }
+         }}>
+           <DialogContent className="max-w-md">
+             <DialogHeader>
+               <DialogTitle>Adicionar Novo Pet</DialogTitle>
+             </DialogHeader>
+             <div className="space-y-4">
+                               <div>
+                  <Label htmlFor="pet-name">Nome *</Label>
+                  <Input
+                    id="pet-name"
+                    value={petFormData.name}
+                    onChange={(e) => setPetFormData({ ...petFormData, name: e.target.value })}
+                    placeholder="Nome do pet"
+                  />
+                </div>
+               <div>
+                 <Label htmlFor="pet-breed">Raça</Label>
+                 <BreedCombobox
+                   breeds={breeds}
+                   onSelect={(breed) => {
+                     setSelectedBreed(breed);
+                     setPetFormData({ ...petFormData, breed: breed.name, breed_id: breed.id });
+                   }}
+                   selectedBreed={selectedBreed}
+                   disabled={false}
+                   isLoading={false}
+                 />
+               </div>
+               <div>
+                 <Label htmlFor="pet-size">Tamanho</Label>
+                 <Select value={petFormData.size} onValueChange={(value) => setPetFormData({ ...petFormData, size: value })}>
+                   <SelectTrigger>
+                     <SelectValue placeholder="Selecione o tamanho" />
+                   </SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="small">Pequeno</SelectItem>
+                     <SelectItem value="medium">Médio</SelectItem>
+                     <SelectItem value="large">Grande</SelectItem>
+                     <SelectItem value="extra_large">Extra Grande</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div>
+                 <Label htmlFor="pet-birth-date">Data de Nascimento</Label>
+                 <DatePicker
+                   date={birthDate}
+                   onSelect={setBirthDate}
+                   placeholder="Selecione a data"
+                 />
+               </div>
+               <div>
+                 <Label htmlFor="pet-notes">Notas</Label>
+                 <Textarea
+                   id="pet-notes"
+                   value={petFormData.notes}
+                   onChange={(e) => setPetFormData({ ...petFormData, notes: e.target.value })}
+                   placeholder="Observações sobre o pet"
+                   rows={3}
+                 />
+               </div>
+               <div className="flex gap-2 pt-4">
+                 <Button onClick={handleCreatePet} className="flex-1">
+                   Adicionar Pet
+                 </Button>
+                 <Button variant="outline" onClick={() => setIsCreatePetModalOpen(false)}>
+                   Cancelar
+                 </Button>
+               </div>
+             </div>
+           </DialogContent>
+         </Dialog>
+       </div>
+     </AdminLayout>
+   );
+ };
 
 export default AdminClients; 

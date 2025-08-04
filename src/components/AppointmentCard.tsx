@@ -26,6 +26,14 @@ interface AppointmentCardProps {
     provider?: {
       name: string;
     };
+    // ✅ ADD: Add-ons support
+    addons?: Array<{
+      id: string;
+      name: string;
+      quantity: number;
+      price: number;
+      custom_description?: string;
+    }>;
   };
   onUpdate?: () => void;
 }
@@ -117,6 +125,28 @@ const AppointmentCard = ({ appointment, onUpdate }: AppointmentCardProps) => {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Observações:</p>
               <p className="text-sm">{appointment.notes}</p>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ ADD: Add-ons display */}
+        {appointment.addons && appointment.addons.length > 0 && (
+          <div className="flex items-start space-x-2 pt-2 border-t">
+            <div className="h-4 w-4 text-green-500 mt-0.5">➕</div>
+            <div>
+              <p className="text-sm font-medium text-green-700">Add-ons:</p>
+              <div className="space-y-1">
+                {appointment.addons.map((addon) => (
+                  <div key={addon.id} className="flex items-center justify-between text-sm">
+                    <span className="text-gray-600">
+                      • {addon.name} (x{addon.quantity})
+                    </span>
+                    <span className="text-green-600 font-medium">
+                      R$ {addon.price.toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

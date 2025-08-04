@@ -483,7 +483,7 @@ const AdminManualBooking = () => {
 
       // Prepare base booking payload
       const basePayload = {
-        _client_user_id: client.id,
+        _client_user_id: client.user_id, // Use user_id, not client.id
         _pet_id: bookingData.petId,
         _service_id: bookingData.serviceId,
         _provider_ids: staffIds,
@@ -522,6 +522,13 @@ const AdminManualBooking = () => {
       }
 
       console.log('🔧 [ADMIN_MANUAL_BOOKING] Creating booking with payload:', bookingPayload);
+      console.log('🔧 [ADMIN_MANUAL_BOOKING] Debug info:', {
+        clientId: client.id,
+        clientUserId: client.user_id,
+        staffIds,
+        staffIdsType: typeof staffIds,
+        staffIdsLength: staffIds.length
+      });
 
       const { data: appointmentId, error: bookingError } = await supabase.rpc(rpcName, bookingPayload);
 

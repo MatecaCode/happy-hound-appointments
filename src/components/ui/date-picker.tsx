@@ -95,15 +95,18 @@ export function DatePicker({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      // Parse the current input value and set it as tempDate
-             if (inputValue) {
-         const parsedDate = parse(inputValue, "dd/MM/yyyy", new Date())
-         if (isValid(parsedDate)) {
-           setTempDate(parsedDate)
-           setCalendarMonth(parsedDate)
-         }
-       }
-      setOpen(true)
+      // Parse the current input value and confirm it
+      if (inputValue) {
+        const parsedDate = parse(inputValue, "dd/MM/yyyy", new Date())
+        if (isValid(parsedDate)) {
+          setTempDate(parsedDate)
+          setCalendarMonth(parsedDate)
+          onSelect?.(parsedDate)
+          setInputValue(format(parsedDate, "dd/MM/yyyy", { locale: ptBR }))
+          setOpen(false)
+          setIsTyping(false)
+        }
+      }
     }
   }
 

@@ -9,6 +9,7 @@ import { Textarea } from '../components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { CheckCircle, ArrowLeft, Calendar, User, PawPrint, Clock, DollarSign, Plus } from 'lucide-react';
 import { toast } from '../hooks/use-toast';
+import { useAuth } from '../hooks/useAuth';
 
 interface Appointment {
   id: string;
@@ -29,7 +30,7 @@ interface Appointment {
   };
   appointment_staff: Array<{
     staff_profile: {
-      full_name: string;
+      name: string;
     };
   }>;
 }
@@ -51,6 +52,7 @@ interface AppointmentAddon {
 const AdminBookingSuccess: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const appointmentId = location.state?.appointmentId;
 
   const [appointment, setAppointment] = useState<Appointment | null>(null);
@@ -87,19 +89,32 @@ const AdminBookingSuccess: React.FC = () => {
           total_price,
           notes,
           client:clients!inner(
-            user:users!inner(full_name)
+            id,
+            name,
+            user_id
           ),
           pet:pets!inner(name),
           service:services!inner(name),
           appointment_staff(
-            staff_profile:staff_profiles!inner(full_name)
+            staff_profile:staff_profiles!inner(name)
           )
         `)
         .eq('id', appointmentId)
         .single();
 
       if (error) throw error;
-      setAppointment(data as any);
+      
+      // Transform the data to match the expected interface
+      const transformedData = {
+        ...data,
+        client: {
+          user: {
+            full_name: (data as any).client?.name || 'Cliente não encontrado' // Use client name directly since we don't have user join
+          }
+        }
+      };
+      
+      setAppointment(transformedData as any);
     } catch (error) {
       console.error('Error fetching appointment:', error);
       toast({
@@ -193,14 +208,23 @@ const AdminBookingSuccess: React.FC = () => {
           addon_id: addon.addon_id,
           quantity: addon.quantity,
           custom_description: addon.custom_description,
-          price: addon.price
+          price: addon.price,
+          added_by: user?.id // Add the current user as the one who added the add-on
         }));
+
+        console.log('🔧 [ADMIN_BOOKING_SUCCESS] Inserting add-ons:', addonInserts);
+        console.log('🔧 [ADMIN_BOOKING_SUCCESS] Current user ID:', user?.id);
 
         const { error: addonError } = await supabase
           .from('appointment_addons')
           .insert(addonInserts);
 
-        if (addonError) throw addonError;
+        if (addonError) {
+          console.error('🔧 [ADMIN_BOOKING_SUCCESS] Add-on insertion error:', addonError);
+          throw addonError;
+        }
+        
+        console.log('🔧 [ADMIN_BOOKING_SUCCESS] Add-ons inserted successfully');
       }
 
       toast({
@@ -211,10 +235,10 @@ const AdminBookingSuccess: React.FC = () => {
       // Navigate back to appointments list
       navigate('/admin/appointments');
     } catch (error) {
-      console.error('Error saving add-ons:', error);
+      console.error('🔧 [ADMIN_BOOKING_SUCCESS] Error saving add-ons:', error);
       toast({
         title: "Erro",
-        description: "Erro ao salvar add-ons",
+        description: `Erro ao salvar add-ons: ${error instanceof Error ? error.message : 'Erro desconhecido'}`,
         variant: "destructive",
       });
     } finally {
@@ -259,7 +283,7 @@ const AdminBookingSuccess: React.FC = () => {
   };
 
   const staffNames = appointment.appointment_staff
-    .map(staff => staff.staff_profile?.full_name || 'N/A')
+    .map(staff => staff.staff_profile?.name || 'N/A')
     .join(', ');
 
   return (
