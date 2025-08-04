@@ -1,73 +1,104 @@
-# Welcome to your Lovable project
+# VetTale - Pet Services Booking System
 
-## Project info
+A comprehensive React/TypeScript application for managing pet grooming and veterinary services bookings.
 
-**URL**: https://lovable.dev/projects/9072761b-b51b-463e-bca0-8c49c3d90515
+## Features
 
-## How can I edit this code?
+### Admin Features
+- **Dashboard**: Overview of system statistics and KPIs
+- **Calendar View**: Visual agenda showing today's appointments across all staff
+- **Manual Booking**: Create appointments manually with admin override capabilities
+- **Client Management**: View and manage client information
+- **Pet Management**: Track and manage pet profiles
+- **Settings**: Configure staff, services, prices, and operating hours
+- **Action Logs**: Track administrative actions and changes
 
-There are several ways of editing your application.
+### Staff Features
+- **Staff Dashboard**: Personalized view of daily appointments and statistics
+- **Availability Management**: Set and manage personal availability
+- **Calendar View**: Visual representation of scheduled appointments
+- **Profile Management**: Update personal information and preferences
 
-**Use Lovable**
+### Client Features
+- **Service Booking**: Easy appointment scheduling with real-time availability
+- **Pet Management**: Register and manage multiple pets
+- **Appointment History**: View past and upcoming appointments
+- **Profile Management**: Update personal information
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/9072761b-b51b-463e-bca0-8c49c3d90515) and start prompting.
+## New Feature: Admin Calendar View
 
-Changes made via Lovable will be committed automatically to this repo.
+### Overview
+The Admin Calendar View provides a comprehensive visual agenda showing all services scheduled for today across all staff members.
 
-**Use your preferred IDE**
+### Access
+- Navigate to the Admin Dashboard
+- Click on the "Serviços Hoje" card to access the calendar view
+- Direct URL: `/admin/agenda-hoje`
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Features
+- **Time Grid**: Shows appointments from 08:00 to 18:00 in 30-minute intervals
+- **Staff Columns**: Each staff member with appointments today gets their own column
+- **Appointment Cards**: Color-coded cards showing:
+  - Pet name with service icon
+  - Service name
+  - Client name
+  - Time duration
+- **Real-time Updates**: Refresh button to get latest appointment data
+- **Responsive Design**: Works on desktop and mobile devices
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### Visual Elements
+- **Service Icons**: Different icons for bath, grooming, veterinary services
+- **Color Coding**: 
+  - Blue for bath services
+  - Purple for grooming services  
+  - Red for veterinary services
+  - Gray for other services
+- **Staff Badges**: Shows staff type (Veterinário, Groomer, Banhista)
 
-Follow these steps:
+### Data Source
+The calendar pulls data from the following database tables:
+- `appointments` - Main appointment data
+- `appointment_staff` - Links appointments to staff
+- `staff_profiles` - Staff information and capabilities
+- `services` - Service details
+- `pets` - Pet information
+- `clients` - Client information
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Technology Stack
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- **Frontend**: React 18 + TypeScript
+- **UI Components**: shadcn/ui + Tailwind CSS
+- **Backend**: Supabase (PostgreSQL)
+- **Authentication**: Supabase Auth
+- **Routing**: React Router DOM
+- **State Management**: React Hooks
+- **Notifications**: Sonner
 
-# Step 3: Install the necessary dependencies.
-npm i
+## Getting Started
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Set up environment variables (see `.env.example`)
+4. Start development server: `npm run dev`
 
-**Edit a file directly in GitHub**
+## Database Schema
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+The application uses a comprehensive database schema with the following key tables:
+- `appointments` - Core booking data
+- `staff_profiles` - Staff information and capabilities
+- `clients` - Client information
+- `pets` - Pet profiles
+- `services` - Available services and pricing
+- `appointment_staff` - Many-to-many relationship between appointments and staff
 
-**Use GitHub Codespaces**
+## Contributing
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and linting
+5. Submit a pull request
 
-## What technologies are used for this project?
+## License
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/9072761b-b51b-463e-bca0-8c49c3d90515) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is licensed under the MIT License.

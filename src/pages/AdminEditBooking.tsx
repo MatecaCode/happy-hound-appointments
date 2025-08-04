@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { CalendarIcon, Edit, DollarSign, FileText, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { CalendarIcon, Edit, DollarSign, FileText, ArrowLeft, Loader2, AlertCircle, X, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -31,27 +31,38 @@ interface AppointmentDetails {
   total_price?: number;
 }
 
+interface AvailabilityData {
+  total_slots: number;
+  available_slots: string[];
+  unavailable_slots: string[];
+  unavailable_count: number;
+  is_fully_available: boolean;
+  service_duration: number;
+  start_time: string;
+  end_time: string;
+}
+
 const AdminEditBooking = () => {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const navigate = useNavigate();
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
   const [appointmentDetails, setAppointmentDetails] = useState<AppointmentDetails | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Form state
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
-  const [selectedTime, setSelectedTime] = useState<string | undefined>(undefined);
-  const [extraFee, setExtraFee] = useState<string>('0');
-  const [adminNotes, setAdminNotes] = useState<string>('');
-  const [editReason, setEditReason] = useState<string>('');
-  
-  // Available time slots
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedTime, setSelectedTime] = useState<string>('');
   const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
   const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState(false);
-  const [availabilityData, setAvailabilityData] = useState<any>(null);
-  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [extraFee, setExtraFee] = useState<string>('');
+  const [adminNotes, setAdminNotes] = useState<string>('');
+  const [editReason, setEditReason] = useState<string>('');
+  const [availabilityData, setAvailabilityData] = useState<AvailabilityData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Modal state
+  const [showOverrideModal, setShowOverrideModal] = useState(false);
+  const [pendingEditData, setPendingEditData] = useState<any>(null);
 
   // Load appointment details
   useEffect(() => {
@@ -196,7 +207,6 @@ const AdminEditBooking = () => {
       return;
     }
 
-    // Time is optional - if not selected, keep the original time
     const timeToUse = selectedTime || appointmentDetails?.time;
 
     // Validate time format
@@ -205,45 +215,51 @@ const AdminEditBooking = () => {
       return;
     }
 
-    setIsSaving(true);
-    try {
-      console.log('🔧 [ADMIN_EDIT_BOOKING] Submitting edit:', {
+    // Check if we have availability data and if there are conflicts
+    let hasConflicts = false;
+    if (availabilityData && !availabilityData.is_fully_available) {
+      hasConflicts = true;
+      
+      // Store the edit data and show custom modal instead of window.confirm
+      setPendingEditData({
         appointmentId,
-        newDate: selectedDate,
+        newDate: format(selectedDate, 'yyyy-MM-dd'),
         newTime: timeToUse,
         extraFee: parseFloat(extraFee) || 0,
-        adminNotes,
-        editReason
+        adminNotes: adminNotes || null,
+        editReason: editReason || null,
+        forceOverride: true
       });
+      setShowOverrideModal(true);
+      return;
+    }
 
-      // Check if we have availability data and if there are conflicts
-      let hasConflicts = false;
-      if (availabilityData && !availabilityData.is_fully_available) {
-        hasConflicts = true;
-        
-        // Show warning about override
-        const warningMessage = `⚠️ Atenção: ${availabilityData.unavailable_count} slot(s) já estão ocupados para este horário.\n\n` +
-          `Duração do serviço: ${availabilityData.service_duration} min\n` +
-          `Horário: ${availabilityData.start_time} - ${availabilityData.end_time}\n\n` +
-          `Deseja prosseguir com a edição mesmo assim? (Será criado como override)`;
-        
-        const confirmed = window.confirm(warningMessage);
-        if (!confirmed) {
-          setIsSaving(false);
-          return;
-        }
-      }
+    // No conflicts, proceed directly
+    await performEdit({
+      appointmentId,
+      newDate: format(selectedDate, 'yyyy-MM-dd'),
+      newTime: timeToUse,
+      extraFee: parseFloat(extraFee) || 0,
+      adminNotes: adminNotes || null,
+      editReason: editReason || null,
+      forceOverride: false
+    });
+  };
 
-      // Proceed with edit (force override if conflicts were found)
+  const performEdit = async (editData: any) => {
+    setIsSaving(true);
+    try {
+      console.log('🔧 [ADMIN_EDIT_BOOKING] Submitting edit:', editData);
+
       const { error } = await supabase.rpc('edit_booking_admin', {
-        _appointment_id: appointmentId!,
-        _new_date: format(selectedDate, 'yyyy-MM-dd'),
-        _new_time: timeToUse,
-        _extra_fee: parseFloat(extraFee) || 0,
-        _admin_notes: adminNotes || null,
-        _edit_reason: editReason || null,
+        _appointment_id: editData.appointmentId,
+        _new_date: editData.newDate,
+        _new_time: editData.newTime,
+        _extra_fee: editData.extraFee,
+        _admin_notes: editData.adminNotes,
+        _edit_reason: editData.editReason,
         _edited_by: (await supabase.auth.getUser()).data.user?.id,
-        _force_override: hasConflicts
+        _force_override: editData.forceOverride
       });
 
       if (error) {
@@ -254,7 +270,7 @@ const AdminEditBooking = () => {
       console.log('✅ [ADMIN_EDIT_BOOKING] Successfully edited booking');
       
       // Show appropriate success message
-      if (hasConflicts) {
+      if (editData.forceOverride) {
         toast.success('Agendamento editado com sucesso (override aplicado)', {
           description: 'Alguns horários já estavam ocupados, mas o agendamento foi editado mesmo assim.'
         });
@@ -270,7 +286,21 @@ const AdminEditBooking = () => {
       toast.error(`Erro ao editar agendamento: ${error.message}`);
     } finally {
       setIsSaving(false);
+      setShowOverrideModal(false);
+      setPendingEditData(null);
     }
+  };
+
+  const handleOverrideConfirm = () => {
+    if (pendingEditData) {
+      performEdit(pendingEditData);
+    }
+  };
+
+  const handleOverrideCancel = () => {
+    setShowOverrideModal(false);
+    setPendingEditData(null);
+    setIsSaving(false);
   };
 
   const hasChanges = () => {
@@ -565,6 +595,69 @@ const AdminEditBooking = () => {
           </div>
         </div>
       </div>
+
+      {/* Override Confirmation Modal */}
+      {showOverrideModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-red-500" />
+                Confirmação de Override
+              </h3>
+              <button 
+                onClick={handleOverrideCancel} 
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800 font-medium mb-2">
+                  ⚠️ Atenção: {availabilityData?.unavailable_count || 0} slot(s) já estão ocupados para este horário.
+                </p>
+                
+                {availabilityData && (
+                  <div className="text-xs text-red-700 space-y-1">
+                    <p><strong>Duração do serviço:</strong> {availabilityData.service_duration} min</p>
+                    <p><strong>Horário:</strong> {availabilityData.start_time} - {availabilityData.end_time}</p>
+                    <p><strong>Disponíveis:</strong> {availabilityData.available_slots.length}/{availabilityData.total_slots}</p>
+                  </div>
+                )}
+              </div>
+              
+              <p className="text-sm text-gray-600">
+                Deseja prosseguir com a edição mesmo assim? O agendamento será criado como override.
+              </p>
+            </div>
+            
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={handleOverrideCancel}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleOverrideConfirm}
+                disabled={isSaving}
+                className="flex-1 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isSaving ? (
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Salvando...
+                  </div>
+                ) : (
+                  'Sim, criar override'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 };

@@ -29,7 +29,7 @@ interface AppointmentWithDetails {
   staff_ids?: string[];
   duration?: number;
   total_price?: number;
-  extra_fee?: number;
+  extra_fee?: number | null;
   edit_info?: string;
   client_name?: string;
   client_email?: string;
@@ -112,7 +112,7 @@ const AdminAppointments = () => {
               staff_ids: staffIds,
               duration: apt.duration,
               total_price: apt.total_price,
-              extra_fee: apt.extra_fee || 0,
+              extra_fee: apt.extra_fee !== null && apt.extra_fee !== undefined && apt.extra_fee !== 0 && apt.extra_fee !== "0" ? apt.extra_fee : null,
               edit_info: apt.edit_info,
               client_name: (apt.clients as any)?.name || 'Cliente',
               client_email: (apt.clients as any)?.email || '',
@@ -193,7 +193,7 @@ const AdminAppointments = () => {
                 staff_ids: staffIds,
                 duration: apt.duration,
                 total_price: apt.total_price,
-                extra_fee: apt.extra_fee || 0,
+                extra_fee: apt.extra_fee !== null && apt.extra_fee !== undefined && apt.extra_fee !== 0 && apt.extra_fee !== "0" ? apt.extra_fee : null,
                 edit_info: apt.edit_info,
                 client_name: (apt.clients as any)?.name || 'Cliente',
                 client_email: (apt.clients as any)?.email || '',
@@ -245,139 +245,139 @@ const AdminAppointments = () => {
   };
 
     const AppointmentDetailCard = ({ appointment }: { appointment: AppointmentWithDetails }) => {
-    // Determine card background based on status
-    const getCardBackground = () => {
-      switch (appointment.status) {
-        case 'pending':
-          return 'bg-yellow-50/30 border-yellow-200';
-        case 'confirmed':
-          return 'bg-blue-50/30 border-blue-200';
-        case 'completed':
-          return 'bg-green-50/30 border-green-200';
-        case 'cancelled':
-          return 'bg-red-50/30 border-red-200';
-        default:
-          return 'bg-white border-gray-200';
-      }
-    };
+      // Determine card background based on status
+      const getCardBackground = () => {
+        switch (appointment.status) {
+          case 'pending':
+            return 'bg-yellow-50/30 border-yellow-200';
+          case 'confirmed':
+            return 'bg-blue-50/30 border-blue-200';
+          case 'completed':
+            return 'bg-green-50/30 border-green-200';
+          case 'cancelled':
+            return 'bg-red-50/30 border-red-200';
+          default:
+            return 'bg-white border-gray-200';
+        }
+      };
 
-    // Add orange border for admin overrides
-    const getOverrideBorder = () => {
-      if (appointment.is_admin_override) {
-        return 'border-orange-300';
-      }
-      return '';
-    };
+      // Add orange border for admin overrides
+      const getOverrideBorder = () => {
+        if (appointment.is_admin_override) {
+          return 'border-orange-300';
+        }
+        return '';
+      };
 
-    return (
-      <div className={`border rounded-xl p-6 flex flex-col shadow-md hover:shadow-lg transition-shadow ${getCardBackground()} ${getOverrideBorder()}`}>
-        {/* 1. Pet Name (bold) */}
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <h3 className="text-xl font-bold text-gray-900 mb-1">{appointment.pet_name}</h3>
-            <p className="text-sm text-gray-500">{appointment.service_name}</p>
+      return (
+        <div className={`border rounded-xl p-6 flex flex-col shadow-md hover:shadow-lg transition-shadow ${getCardBackground()} ${getOverrideBorder()}`}>
+          {/* 1. Pet Name (bold) */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex-1">
+              <h3 className="text-xl font-bold text-gray-900 mb-1">{appointment.pet_name}</h3>
+              <p className="text-sm text-gray-500">{appointment.service_name}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {getStatusBadge(appointment.status, appointment.service_status)}
+              {getServiceStatusBadge(appointment.service_status)}
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            {getStatusBadge(appointment.status, appointment.service_status)}
-            {getServiceStatusBadge(appointment.service_status)}
-          </div>
-        </div>
 
-        {/* 2. Date and Time */}
-        <div className="flex items-center gap-4 text-sm mb-4">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500">🗓️</span>
-            <span>{format(appointment.date, 'dd/MM/yyyy', { locale: ptBR })}</span>
+          {/* 2. Date and Time */}
+          <div className="flex items-center gap-4 text-sm mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500">🗓️</span>
+              <span>{format(appointment.date, 'dd/MM/yyyy', { locale: ptBR })}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-gray-500">🕒</span>
+              <span>{appointment.time}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-gray-500">🕒</span>
-            <span>{appointment.time}</span>
-          </div>
-        </div>
 
-        {/* 3. Client and Professional - on same line */}
-        <div className="flex items-center gap-2 text-sm mb-4">
-          <div className="flex items-center gap-1">
-            <span className="text-gray-500">👤</span>
-            <span className="text-xs font-medium text-gray-700">Cliente:</span>
-            <span className="text-sm">{appointment.client_name}</span>
+          {/* 3. Client and Professional - on same line */}
+          <div className="flex items-center gap-2 text-sm mb-4">
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500">👤</span>
+              <span className="text-xs font-medium text-gray-700">Cliente:</span>
+              <span className="text-sm">{appointment.client_name}</span>
+            </div>
+            <span className="text-gray-300">|</span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500">👨‍⚕️</span>
+              <span className="text-xs font-medium text-gray-700">Profissional:</span>
+              <span className="text-sm">{appointment.staff_names?.[0] || 'Não atribuído'}</span>
+            </div>
           </div>
-          <span className="text-gray-300">|</span>
-          <div className="flex items-center gap-1">
-            <span className="text-gray-500">👨‍⚕️</span>
-            <span className="text-xs font-medium text-gray-700">Profissional:</span>
-            <span className="text-sm">{appointment.staff_names?.[0] || 'Não atribuído'}</span>
-          </div>
-        </div>
 
-        {/* 4. Duration and Price - side by side */}
-        <div className="flex items-center gap-2 text-sm mb-4">
-                     <div className="flex items-center gap-1">
-             <span className="text-gray-500">⏱</span>
-             <span className="text-xs font-medium text-gray-700">Duração:</span>
-             <span className="text-sm">{appointment.duration || 60} min</span>
-           </div>
-           <span className="text-gray-300">|</span>
-           <div className="flex items-center gap-1">
-             <span className="text-gray-500">💰</span>
-             <span className="text-xs font-medium text-gray-700">Preço:</span>
-             <span className="text-sm font-medium">R$ {(appointment.total_price || 0).toFixed(2)}</span>
-             {appointment.extra_fee && appointment.extra_fee > 0 && (
-               <span className="text-xs text-orange-600 ml-2 font-medium">
-                 💲 +R$ {appointment.extra_fee.toFixed(2)}
-               </span>
-             )}
-           </div>
-        </div>
-
-                 {/* 5. Extra Fee - Show if exists */}
-         {appointment.extra_fee && appointment.extra_fee > 0 && (
-           <div className="mb-4">
-             <div className="flex items-center gap-2 mb-1">
-               <span className="text-orange-500">💲</span>
-               <span className="text-xs font-medium text-orange-700">Taxa Extra:</span>
-             </div>
-             <div className="ml-6">
-               <p className="text-xs text-orange-600 font-medium">R$ {appointment.extra_fee.toFixed(2)}</p>
-             </div>
-           </div>
-         )}
-
-        {/* 6. Observações - Always show */}
-        <div className="mb-4">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-gray-500">📝</span>
-            <span className="text-xs font-medium text-gray-700">Observações:</span>
+          {/* 4. Duration and Price - side by side */}
+          <div className="flex items-center gap-2 text-sm mb-4">
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500">⏱</span>
+              <span className="text-xs font-medium text-gray-700">Duração:</span>
+              <span className="text-sm">{appointment.duration || 60} min</span>
+            </div>
+            <span className="text-gray-300">|</span>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-500">💰</span>
+              <span className="text-xs font-medium text-gray-700">Preço:</span>
+              <span className="text-sm font-medium">R$ {(appointment.total_price || 0).toFixed(2)}</span>
+              {appointment.extra_fee !== null && appointment.extra_fee !== undefined && appointment.extra_fee > 0 && (
+                <span className="text-xs text-orange-600 ml-2 font-medium">
+                  💲 +R$ {appointment.extra_fee.toFixed(2)}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="ml-6">
-            {appointment.notes ? (
-              <p className="text-xs text-gray-600">{appointment.notes}</p>
-            ) : (
-              <p className="text-xs text-gray-400 italic">Nenhuma observação</p>
-            )}
-          </div>
-        </div>
 
-        {/* 7. Admin Action Badges */}
-        {(appointment.booked_by_admin || appointment.is_admin_override || appointment.is_double_booking) && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {appointment.booked_by_admin && (
-              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
-                Criado por Admin
-              </Badge>
-            )}
-            {appointment.is_admin_override && (
-              <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
-                Override
-              </Badge>
-            )}
-            {appointment.is_double_booking && (
-              <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
-                🚨 Duplo Agendamento
-              </Badge>
-            )}
+          {/* 5. Extra Fee - Show if exists and greater than 0 */}
+          {appointment.extra_fee !== null && appointment.extra_fee !== undefined && appointment.extra_fee > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-orange-500">💲</span>
+                <span className="text-xs font-medium text-orange-700">Taxa Extra:</span>
+              </div>
+              <div className="ml-6">
+                <p className="text-xs text-orange-600 font-medium">R$ {appointment.extra_fee.toFixed(2)}</p>
+              </div>
+            </div>
+          )}
+
+          {/* 6. Observações - Always show */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-gray-500">📝</span>
+              <span className="text-xs font-medium text-gray-700">Observações:</span>
+            </div>
+            <div className="ml-6">
+              {appointment.notes && appointment.notes.trim() ? (
+                <p className="text-xs text-gray-600">{appointment.notes}</p>
+              ) : (
+                <p className="text-xs text-gray-400 italic">Nenhuma observação</p>
+              )}
+            </div>
           </div>
-        )}
+
+          {/* 7. Admin Action Badges */}
+          {(appointment.booked_by_admin || appointment.is_admin_override || appointment.is_double_booking) && (
+            <div className="flex flex-wrap gap-2 mb-4">
+              {appointment.booked_by_admin && (
+                <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                  Criado por Admin
+                </Badge>
+              )}
+              {appointment.is_admin_override && (
+                <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                  Override
+                </Badge>
+              )}
+              {appointment.is_double_booking && (
+                <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-200">
+                  🚨 Duplo Agendamento
+                </Badge>
+              )}
+            </div>
+          )}
 
                   {/* 8. Edit Info */}
           {appointment.edit_info && (

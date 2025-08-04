@@ -15,6 +15,7 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { X, CheckCircle, Edit } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface AppointmentActionsProps {
   appointmentId: string;
@@ -41,6 +42,7 @@ const AppointmentActions = ({
   currentExtraFee,
   currentNotes
 }: AppointmentActionsProps) => {
+  const { user, isAdmin } = useAuth();
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -101,10 +103,13 @@ const AppointmentActions = ({
         return;
       }
 
-      // Allow cancellation for pending appointments or admin override appointments
-      if (appointment.status !== 'pending' && !isAdminOverride) {
-        toast.error('Apenas agendamentos pendentes podem ser cancelados');
-        return;
+      // Admin can cancel any appointment, non-admin users have restrictions
+      if (!isAdmin) {
+        // Allow cancellation for pending appointments or admin override appointments
+        if (appointment.status !== 'pending' && !isAdminOverride) {
+          toast.error('Apenas agendamentos pendentes podem ser cancelados');
+          return;
+        }
       }
 
       const serviceDuration = appointment.duration || (appointment.services as any)?.default_duration || 60;
@@ -201,15 +206,21 @@ const AppointmentActions = ({
   };
 
   // Show buttons for pending appointments, confirmed appointments, or admin override appointments
-  if (status !== 'pending' && status !== 'confirmed' && !isAdminOverride) {
+  // Admin can see actions for all appointments except cancelled ones
+  if (!isAdmin && status !== 'pending' && status !== 'confirmed' && !isAdminOverride) {
+    return null;
+  }
+
+  // Don't show actions for cancelled appointments
+  if (status === 'cancelled') {
     return null;
   }
 
   return (
     <>
       <div className="flex gap-2">
-        {/* Show Confirm button only for pending appointments */}
-        {status === 'pending' && (
+        {/* Show Confirm button only for pending appointments - ADMIN ONLY */}
+        {status === 'pending' && isAdmin && (
           <Button
             variant="outline"
             size="sm"
@@ -221,8 +232,8 @@ const AppointmentActions = ({
           </Button>
         )}
         
-        {/* Show Edit button for confirmed appointments */}
-        {status === 'confirmed' && (
+        {/* Show Edit button for confirmed appointments or admin can edit any non-cancelled appointment */}
+        {(status === 'confirmed' || isAdmin) && status !== 'cancelled' && (
           <Link to={`/admin/edit-booking/${appointmentId}`}>
             <Button
               variant="outline"
@@ -235,8 +246,10 @@ const AppointmentActions = ({
           </Link>
         )}
         
-        {/* Show Cancel button for pending appointments or admin override appointments */}
-        {(status === 'pending' || isAdminOverride) && (
+        {/* Show Cancel button: 
+            - Non-admin: only for pending appointments
+            - Admin: for any appointment (pending, confirmed, completed, override) */}
+        {((!isAdmin && status === 'pending') || isAdmin || isAdminOverride) && status !== 'cancelled' && (
           <Button
             variant="outline"
             size="sm"
@@ -279,6 +292,8 @@ const AppointmentActions = ({
             <AlertDialogDescription>
               {isAdminOverride 
                 ? 'Tem certeza que deseja cancelar este agendamento de override? Esta ação não pode ser desfeita. Apenas os slots originalmente disponíveis serão revertidos.'
+                : isAdmin && status !== 'pending'
+                ? 'Tem certeza que deseja cancelar este agendamento confirmado? Esta ação não pode ser desfeita. Os profissionais selecionados ficarão disponíveis.'
                 : 'Tem certeza que deseja cancelar este agendamento? Esta ação não pode ser desfeita. Os profissionais selecionados ficarão disponíveis e você pode não conseguir reagendar no mesmo horário.'
               }
             </AlertDialogDescription>
