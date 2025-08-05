@@ -34,6 +34,9 @@ interface Service {
   name: string;
   default_duration: number;
   base_price: number;
+  requires_bath?: boolean;
+  requires_grooming?: boolean;
+  requires_vet?: boolean;
 }
 
 interface Staff {
@@ -41,6 +44,7 @@ interface Staff {
   name: string;
   can_groom: boolean;
   can_vet: boolean;
+  can_bathe?: boolean;
 }
 
 interface TimeSlot {
@@ -56,9 +60,12 @@ const AdminBookingPage = () => {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   
+  // Updated state for dual-service support
   const [selectedClient, setSelectedClient] = useState('');
   const [selectedPet, setSelectedPet] = useState('');
-  const [selectedService, setSelectedService] = useState('');
+  const [selectedPrimaryService, setSelectedPrimaryService] = useState('');
+  const [selectedSecondaryService, setSelectedSecondaryService] = useState('');
+  const [showSecondaryServiceDropdown, setShowSecondaryServiceDropdown] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
@@ -81,10 +88,10 @@ const AdminBookingPage = () => {
           .order('name');
         setClients(clientsData || []);
 
-        // Load services
+        // Load services with additional fields for role requirements
         const { data: servicesData } = await supabase
           .from('services')
-          .select('id, name, default_duration, base_price')
+          .select('id, name, default_duration, base_price, requires_bath, requires_grooming, requires_vet')
           .eq('active', true)
           .order('name');
         setServices(servicesData || []);
@@ -92,7 +99,7 @@ const AdminBookingPage = () => {
         // Load available staff (excludes admins)
         const { data: staffData } = await supabase
           .from('available_staff')
-          .select('id, name, can_groom, can_vet')
+          .select('id, name, can_groom, can_vet, can_bathe')
           .order('name');
         setStaff(staffData || []);
       } catch (error) {
@@ -129,9 +136,59 @@ const AdminBookingPage = () => {
     loadPets();
   }, [selectedClient]);
 
+  // Handle primary service selection
+  const handlePrimaryServiceChange = (serviceId: string) => {
+    setSelectedPrimaryService(serviceId);
+    setSelectedSecondaryService(''); // Reset secondary service
+    
+    const service = services.find(s => s.id === serviceId);
+    console.log('🔍 [ADMIN_BOOKING] Selected service:', service);
+    
+    // More robust check for BANHO services
+    const isBanho = service?.name.toLowerCase().includes('banho') || 
+                    service?.name.toLowerCase().includes('bath') ||
+                    service?.name.toLowerCase().includes('banho completo');
+    
+    console.log('🔍 [ADMIN_BOOKING] Is BANHO service:', isBanho);
+    console.log('🔍 [ADMIN_BOOKING] Service name:', service?.name);
+    
+    setShowSecondaryServiceDropdown(isBanho);
+  };
+
+  // Get TOSA services for secondary dropdown
+  const tosaServices = services.filter(service => 
+    service.name.toLowerCase().includes('tosa')
+  );
+
+  console.log('🔍 [ADMIN_BOOKING] Available TOSA services:', tosaServices.map(s => s.name));
+  console.log('🔍 [ADMIN_BOOKING] Show secondary dropdown:', showSecondaryServiceDropdown);
+
+  // Get selected services for calculations
+  const primaryService = services.find(s => s.id === selectedPrimaryService);
+  const secondaryService = services.find(s => s.id === selectedSecondaryService);
+
+  // Calculate total price and duration
+  const totalPrice = (primaryService?.base_price || 0) + (secondaryService?.base_price || 0);
+  const totalDuration = (primaryService?.default_duration || 0) + (secondaryService?.default_duration || 0);
+
+  // Calculate required roles for staff filtering
+  const requiredRoles = {
+    can_bathe: primaryService?.requires_bath || secondaryService?.requires_bath || false,
+    can_groom: primaryService?.requires_grooming || secondaryService?.requires_grooming || false,
+    can_vet: primaryService?.requires_vet || secondaryService?.requires_vet || false
+  };
+
+  // Filter available staff based on combined requirements
+  const availableStaff = staff.filter(member => {
+    if (requiredRoles.can_bathe && !member.can_bathe) return false;
+    if (requiredRoles.can_groom && !member.can_groom) return false;
+    if (requiredRoles.can_vet && !member.can_vet) return false;
+    return true;
+  });
+
   // Load available time slots when date and service change
   useEffect(() => {
-    if (!selectedDate || !selectedService) {
+    if (!selectedDate || !selectedPrimaryService) {
       setAvailableSlots([]);
       return;
     }
@@ -162,12 +219,12 @@ const AdminBookingPage = () => {
     };
 
     loadTimeSlots();
-  }, [selectedDate, selectedService, selectedStaff]);
+  }, [selectedDate, selectedPrimaryService, selectedSecondaryService, selectedStaff]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedClient || !selectedPet || !selectedService || !selectedDate || !selectedTimeSlot) {
+    if (!selectedClient || !selectedPet || !selectedPrimaryService || !selectedDate || !selectedTimeSlot) {
       toast.error('Por favor, preencha todos os campos obrigatórios');
       return;
     }
@@ -179,9 +236,9 @@ const AdminBookingPage = () => {
       return;
     }
 
-    const service = services.find(s => s.id === selectedService);
-    if (!service) {
-      toast.error('Serviço não encontrado');
+    const primaryService = services.find(s => s.id === selectedPrimaryService);
+    if (!primaryService) {
+      toast.error('Serviço primário não encontrado');
       return;
     }
 
@@ -192,15 +249,18 @@ const AdminBookingPage = () => {
     const bookingData = {
       clientName: client.name,
       petName: pets.find(p => p.id === selectedPet)?.name || '',
-      serviceName: service.name,
-      servicePrice: service.base_price,
+      primaryServiceName: primaryService.name,
+      secondaryServiceName: secondaryService?.name || 'Nenhum',
+      totalPrice: totalPrice,
+      totalDuration: totalDuration,
       date: selectedDate!,
       time: selectedTimeSlot,
       staffName: staffMember?.name,
       notes: notes || undefined,
       clientUserId: client.id,
       petId: selectedPet,
-      serviceId: selectedService,
+      primaryServiceId: selectedPrimaryService,
+      secondaryServiceId: selectedSecondaryService || null,
       providerIds: providerIds
     };
 
@@ -216,16 +276,18 @@ const AdminBookingPage = () => {
       const addonsTotal = bookingData.selectedAddons.reduce((sum: number, addon: any) => 
         sum + (addon.price * addon.quantity), 0
       );
-      const totalPrice = bookingData.servicePrice + addonsTotal + bookingData.extraFee;
+      const finalTotalPrice = totalPrice + addonsTotal + bookingData.extraFee;
 
-      // Create the appointment with addons
-      const { data: appointmentId, error } = await supabase.rpc('create_admin_booking_with_addons', {
+      // Create the appointment with dual services
+      const { data: appointmentId, error } = await supabase.rpc('create_admin_booking_with_dual_services', {
         _client_user_id: bookingData.clientUserId,
         _pet_id: bookingData.petId,
-        _service_id: bookingData.serviceId,
+        _primary_service_id: selectedPrimaryService,
+        _secondary_service_id: selectedSecondaryService || null,
         _booking_date: bookingData.bookingDate,
         _time_slot: bookingData.timeSlot,
-        _calculated_price: totalPrice,
+        _calculated_price: finalTotalPrice,
+        _calculated_duration: totalDuration,
         _notes: bookingData.notes,
         _provider_ids: bookingData.providerIds,
         _extra_fee: bookingData.extraFee,
@@ -241,7 +303,9 @@ const AdminBookingPage = () => {
       // Reset form
       setSelectedClient('');
       setSelectedPet('');
-      setSelectedService('');
+      setSelectedPrimaryService('');
+      setSelectedSecondaryService('');
+      setShowSecondaryServiceDropdown(false);
       setSelectedStaff('');
       setSelectedDate(undefined);
       setSelectedTimeSlot('');
@@ -321,8 +385,8 @@ const AdminBookingPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="service">Serviço *</Label>
-                  <Select value={selectedService} onValueChange={setSelectedService}>
+                  <Label htmlFor="primaryService">Serviço Principal *</Label>
+                  <Select value={selectedPrimaryService} onValueChange={handlePrimaryServiceChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um serviço" />
                     </SelectTrigger>
@@ -336,6 +400,35 @@ const AdminBookingPage = () => {
                   </Select>
                 </div>
 
+                {/* Conditional Secondary Service Selection */}
+                {showSecondaryServiceDropdown && (
+                  <div className="space-y-2">
+                    <Label htmlFor="secondaryService">Adicionar Tosa (opcional)</Label>
+                    <Select value={selectedSecondaryService} onValueChange={setSelectedSecondaryService}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma tosa adicional" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Nenhuma tosa adicional</SelectItem>
+                        {tosaServices.map((service) => (
+                          <SelectItem key={service.id} value={service.id}>
+                            {service.name} - R$ {service.base_price}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Debug Section - Remove this after testing */}
+                <div className="md:col-span-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                  <strong>Debug Info:</strong><br/>
+                  Selected Primary: {selectedPrimaryService}<br/>
+                  Show Secondary Dropdown: {showSecondaryServiceDropdown ? 'YES' : 'NO'}<br/>
+                  Primary Service Name: {primaryService?.name}<br/>
+                  Available TOSA Services: {tosaServices.length}
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="staff">Profissional (opcional)</Label>
                   <Select value={selectedStaff} onValueChange={setSelectedStaff}>
@@ -343,7 +436,7 @@ const AdminBookingPage = () => {
                       <SelectValue placeholder="Selecione um profissional" />
                     </SelectTrigger>
                     <SelectContent>
-                      {staff.map((staffMember) => (
+                      {availableStaff.map((staffMember) => (
                         <SelectItem key={staffMember.id} value={staffMember.id}>
                           {staffMember.name}
                         </SelectItem>
@@ -351,6 +444,33 @@ const AdminBookingPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {/* Service Summary */}
+                {(primaryService || secondaryService) && (
+                  <div className="md:col-span-2 p-4 bg-gray-50 rounded-lg">
+                    <h3 className="font-medium text-gray-900 mb-2">Resumo dos Serviços</h3>
+                    <div className="space-y-1 text-sm">
+                      {primaryService && (
+                        <div className="flex justify-between">
+                          <span>{primaryService.name}</span>
+                          <span>R$ {primaryService.base_price} ({primaryService.default_duration} min)</span>
+                        </div>
+                      )}
+                      {secondaryService && (
+                        <div className="flex justify-between">
+                          <span>{secondaryService.name}</span>
+                          <span>R$ {secondaryService.base_price} ({secondaryService.default_duration} min)</span>
+                        </div>
+                      )}
+                      <div className="border-t pt-1 mt-2">
+                        <div className="flex justify-between font-medium">
+                          <span>Total</span>
+                          <span>R$ {totalPrice} ({totalDuration} min)</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">
@@ -412,7 +532,7 @@ const AdminBookingPage = () => {
 
               <Button 
                 type="submit" 
-                disabled={isLoading || !selectedClient || !selectedPet || !selectedService || !selectedDate || !selectedTimeSlot}
+                disabled={isLoading || !selectedClient || !selectedPet || !selectedPrimaryService || !selectedDate || !selectedTimeSlot}
                 className="w-full"
               >
                 {isLoading ? 'Criando...' : 'Criar Agendamento'}

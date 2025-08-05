@@ -56,6 +56,9 @@ interface Service {
   id: string;
   name: string;
   service_type: 'grooming' | 'veterinary';
+  base_price: number | null;
+  default_duration: number | null;
+  description: string | null;
   active: boolean;
 }
 
@@ -66,19 +69,15 @@ const AdminSettings = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('staff');
   
-  // Staff management state
+  // State
   const [staff, setStaff] = useState<StaffProfile[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
-  
-  // Modal states
   const [isCreateStaffModalOpen, setIsCreateStaffModalOpen] = useState(false);
   const [isEditStaffModalOpen, setIsEditStaffModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffProfile | null>(null);
-  
-  // Form states
   const [staffFormData, setStaffFormData] = useState({
     name: '',
     email: '',
@@ -87,9 +86,26 @@ const AdminSettings = () => {
     hourly_rate: 0,
     can_bathe: false,
     can_groom: false,
-    can_vet: false
+    can_vet: false,
+    role: 'staff' as 'staff' | 'admin',
+    assignedServices: [] as string[]
   });
 
+  // Service filter state
+  const [serviceSearchTerm, setServiceSearchTerm] = useState('');
+  const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('all');
+
+  // Filtered services
+  const filteredServices = services.filter(service => {
+    const matchesSearch = 
+      service.name?.toLowerCase().includes(serviceSearchTerm.toLowerCase()) ||
+      service.description?.toLowerCase().includes(serviceSearchTerm.toLowerCase());
+    
+    const matchesType = serviceTypeFilter === 'all' || service.service_type === serviceTypeFilter;
+    
+    return matchesSearch && matchesType;
+  });
+  
   // Load data on component mount
   useEffect(() => {
     if (user) {
@@ -101,6 +117,7 @@ const AdminSettings = () => {
   const fetchStaff = async () => {
     setIsLoading(true);
     try {
+      console.log('🔍 [ADMIN_SETTINGS] Fetching staff...');
       const { data, error } = await supabase
         .from('staff_profiles')
         .select(`
@@ -117,6 +134,7 @@ const AdminSettings = () => {
           created_at,
           updated_at
         `)
+        .eq('active', true)
         .order('name');
 
       if (error) {
@@ -124,31 +142,15 @@ const AdminSettings = () => {
         throw error;
       }
 
-      // Get assigned services for each staff member
-      const staffWithServices = await Promise.all(
-        data?.map(async (staffMember) => {
-                     const { data: serviceData } = await supabase
-             .from('staff_services')
-             .select(`
-               services (
-                 id,
-                 name
-               )
-             `)
-             .eq('staff_profile_id', staffMember.id);
+      console.log('✅ [ADMIN_SETTINGS] Staff data:', data);
 
-           const assignedServices = serviceData?.map(item => {
-             const service = item.services as any;
-             return service?.name;
-           }).filter(Boolean) || [];
-          
-          return {
-            ...staffMember,
-            assigned_services: assignedServices
-          };
-        }) || []
-      );
+      // Add empty assigned_services array for now
+      const staffWithServices = data?.map(staffMember => ({
+        ...staffMember,
+        assigned_services: []
+      })) || [];
 
+      console.log('✅ [ADMIN_SETTINGS] Staff with services:', staffWithServices);
       setStaff(staffWithServices);
     } catch (error) {
       console.error('❌ [ADMIN_SETTINGS] Error fetching staff:', error);
@@ -162,7 +164,7 @@ const AdminSettings = () => {
     try {
       const { data, error } = await supabase
         .from('services')
-        .select('id, name, service_type, active')
+        .select('id, name, service_type, base_price, default_duration, description, active')
         .eq('active', true)
         .order('name');
 
@@ -292,7 +294,9 @@ const AdminSettings = () => {
       hourly_rate: staffMember.hourly_rate || 0,
       can_bathe: staffMember.can_bathe,
       can_groom: staffMember.can_groom,
-      can_vet: staffMember.can_vet
+      can_vet: staffMember.can_vet,
+      role: 'staff',
+      assignedServices: staffMember.assigned_services || []
     });
 
     setIsEditStaffModalOpen(true);
@@ -307,7 +311,9 @@ const AdminSettings = () => {
       hourly_rate: 0,
       can_bathe: false,
       can_groom: false,
-      can_vet: false
+      can_vet: false,
+      role: 'staff',
+      assignedServices: []
     });
   };
 
@@ -342,11 +348,18 @@ const AdminSettings = () => {
       staffMember.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       staffMember.email?.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesRole = roleFilter === 'all' || 
+    const matchesRole = roleFilter === 'all' || roleFilter === '' || 
       (roleFilter === 'grooming' && (staffMember.can_bathe || staffMember.can_groom)) ||
       (roleFilter === 'veterinary' && staffMember.can_vet);
     
     return matchesSearch && matchesRole;
+  });
+
+  console.log('🔍 [ADMIN_SETTINGS] Staff filtering:', {
+    totalStaff: staff.length,
+    searchTerm,
+    roleFilter,
+    filteredCount: filteredStaff.length
   });
 
   if (!user) {
@@ -817,10 +830,40 @@ const AdminSettings = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
+                  {/* Search and Filter Toolbar */}
+                  <div className="flex flex-col md:flex-row gap-4">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        placeholder="Buscar serviços por nome ou descrição..."
+                        value={serviceSearchTerm}
+                        onChange={(e) => setServiceSearchTerm(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    
+                    <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
+                      <SelectTrigger className="w-48">
+                        <Filter className="h-4 w-4 mr-2" />
+                        <SelectValue placeholder="Filtrar por tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos os tipos</SelectItem>
+                        <SelectItem value="grooming">Tosa e Banho</SelectItem>
+                        <SelectItem value="veterinary">Veterinário</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="font-medium">Catálogo de Serviços</h3>
-                      <p className="text-sm text-gray-600">Gerencie serviços e preços</p>
+                      <p className="text-sm text-gray-600">
+                        {filteredServices.length === services.length 
+                          ? `Gerencie serviços e preços (${services.length} serviços)`
+                          : `Mostrando ${filteredServices.length} de ${services.length} serviços`
+                        }
+                      </p>
                     </div>
                     <Button disabled>
                       <Plus className="h-4 w-4 mr-2" />
@@ -828,47 +871,60 @@ const AdminSettings = () => {
                     </Button>
                   </div>
                   
-                  {/* Placeholder Services List */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">Banho Completo</p>
-                        <p className="text-sm text-gray-600">Inclui shampoo, condicionador e secagem</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">R$ 45,00</Badge>
-                        <Button size="sm" variant="outline" disabled>
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                      </div>
+                  {/* Services List */}
+                  {filteredServices.length === 0 ? (
+                    <div className="text-center py-8">
+                      <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        {services.length === 0 ? 'Nenhum serviço encontrado' : 'Nenhum serviço corresponde aos filtros'}
+                      </h3>
+                      <p className="text-gray-600">
+                        {services.length === 0 
+                          ? 'Não há serviços ativos no sistema'
+                          : 'Tente ajustar os filtros de busca'
+                        }
+                      </p>
                     </div>
-                    
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">Tosa Higiênica</p>
-                        <p className="text-sm text-gray-600">Corte de pelos e unhas</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">R$ 60,00</Badge>
-                        <Button size="sm" variant="outline" disabled>
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                      </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {filteredServices.map((service) => (
+                        <div key={service.id} className="flex items-center justify-between p-3 border rounded-lg hover:shadow-sm transition-shadow">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-medium">{service.name}</p>
+                              <Badge variant="outline" className="text-xs">
+                                {getServiceTypeIcon(service.service_type)}
+                                {service.service_type === 'grooming' ? 'Tosa e Banho' : 'Veterinário'}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-gray-600">
+                              {service.description || 'Sem descrição'}
+                            </p>
+                            {service.base_price && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Preço base: R$ {service.base_price.toFixed(2)} • Duração: {service.default_duration || 0} min
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {service.base_price && (
+                              <Badge variant="outline">
+                                R$ {service.base_price.toFixed(2)}
+                              </Badge>
+                            )}
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => navigate(`/admin/services/${service.id}/edit-pricing`)}
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Editar Preços
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">Consulta Veterinária</p>
-                        <p className="text-sm text-gray-600">Exame clínico e orientações</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">R$ 120,00</Badge>
-                        <Button size="sm" variant="outline" disabled>
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

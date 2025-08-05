@@ -69,6 +69,10 @@ const AppointmentCard = ({ appointment, onUpdate }: AppointmentCardProps) => {
     }
   };
 
+  // Calculate total price including add-ons
+  const addonsTotal = appointment.addons?.reduce((sum, addon) => sum + (addon.price || 0), 0) || 0;
+  const finalTotal = appointment.service.price + addonsTotal;
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -153,7 +157,7 @@ const AppointmentCard = ({ appointment, onUpdate }: AppointmentCardProps) => {
         
         <div className="flex justify-between items-center pt-2 border-t">
           <span className="text-sm text-muted-foreground">
-            Preço: R$ {appointment.service.price.toFixed(2)}
+            Preço: R$ {finalTotal.toFixed(2)}
           </span>
         </div>
       </CardContent>

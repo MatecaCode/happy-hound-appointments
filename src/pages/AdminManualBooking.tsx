@@ -120,6 +120,8 @@ const AdminManualBooking = () => {
   // Selected items for comboboxes
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedSecondaryService, setSelectedSecondaryService] = useState<Service | null>(null);
+  const [showSecondaryServiceDropdown, setShowSecondaryServiceDropdown] = useState(false);
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
 
   // Booking form data
@@ -135,7 +137,32 @@ const AdminManualBooking = () => {
     duration: 0
   });
 
-  // Pricing logic
+  // Handle primary service selection
+  const handlePrimaryServiceChange = (service: Service) => {
+    setSelectedService(service);
+    setSelectedSecondaryService(null); // Reset secondary service
+    
+    // Check if this is a BANHO service
+    const isBanho = service.name.toLowerCase().includes('banho');
+    console.log('🔍 [ADMIN_MANUAL_BOOKING] Selected service:', service.name);
+    console.log('🔍 [ADMIN_MANUAL_BOOKING] Is BANHO service:', isBanho);
+    
+    setShowSecondaryServiceDropdown(isBanho);
+    
+    setBookingData(prev => ({ 
+      ...prev, 
+      serviceId: service.id,
+      price: 0,
+      duration: 0
+    }));
+  };
+
+  // Get TOSA services for secondary dropdown
+  const tosaServices = services.filter(service => 
+    service.name.toLowerCase().includes('tosa')
+  );
+
+  // Pricing logic - moved before calculations
   const pricingParams = {
     serviceId: bookingData.serviceId,
     breedId: selectedPet?.breed_id,
@@ -143,16 +170,25 @@ const AdminManualBooking = () => {
   };
   const { pricing } = usePricing(pricingParams);
 
+  // Calculate combined price and duration
+  const primaryServicePrice = selectedService ? (pricing?.price || selectedService.base_price) : 0;
+  const primaryServiceDuration = selectedService ? (pricing?.duration || selectedService.default_duration) : 0;
+  const secondaryServicePrice = selectedSecondaryService?.base_price || 0;
+  const secondaryServiceDuration = selectedSecondaryService?.default_duration || 0;
+
+  const totalPrice = primaryServicePrice + secondaryServicePrice;
+  const totalDuration = primaryServiceDuration + secondaryServiceDuration;
+
   // Update booking data when pricing changes
   useEffect(() => {
     if (pricing && pricing.price > 0 && pricing.duration > 0) {
       setBookingData(prev => ({
         ...prev,
-        price: pricing.price,
-        duration: pricing.duration
+        price: totalPrice, // Use combined price
+        duration: totalDuration // Use combined duration
       }));
     }
-  }, [pricing]);
+  }, [pricing, totalPrice, totalDuration]);
 
   const { fetchAdminTimeSlots, timeSlots: adminTimeSlots, loading: availabilityLoading } = useAdminAvailability();
 
@@ -628,12 +664,24 @@ const AdminManualBooking = () => {
 
   // Get required roles for the selected service
   const getRequiredRoles = () => {
-    if (!selectedService) return [];
     const roles = [];
-    if (selectedService.requires_bath) roles.push('banhista');
-    if (selectedService.requires_grooming) roles.push('tosador');
-    if (selectedService.requires_vet) roles.push('veterinario');
-    return roles;
+    
+    // Check primary service requirements
+    if (selectedService) {
+      if (selectedService.requires_bath) roles.push('banhista');
+      if (selectedService.requires_grooming) roles.push('tosador');
+      if (selectedService.requires_vet) roles.push('veterinario');
+    }
+    
+    // Check secondary service requirements
+    if (selectedSecondaryService) {
+      if (selectedSecondaryService.requires_bath) roles.push('banhista');
+      if (selectedSecondaryService.requires_grooming) roles.push('tosador');
+      if (selectedSecondaryService.requires_vet) roles.push('veterinario');
+    }
+    
+    // Remove duplicates
+    return [...new Set(roles)];
   };
 
   // Get staff members for a specific role
@@ -778,21 +826,33 @@ const AdminManualBooking = () => {
 
               {/* Service Selection */}
               <div className="space-y-2">
-                <Label htmlFor="service-select">Serviço</Label>
+                <Label htmlFor="service-select">Serviço Principal</Label>
                 <ServiceCombobox
                   services={services ?? []}
-                  onSelect={(service) => {
-                    setSelectedService(service);
-                    setBookingData(prev => ({ 
-                      ...prev, 
-                      serviceId: service.id,
-                      price: 0,
-                      duration: 0
-                    }));
-                  }}
+                  onSelect={handlePrimaryServiceChange}
                   selectedService={selectedService}
                 />
               </div>
+
+              {/* Secondary Service Selection (if BANHO is selected) */}
+              {showSecondaryServiceDropdown && (
+                <div className="space-y-2">
+                  <Label htmlFor="secondary-service-select">Serviço Secundário (opcional)</Label>
+                  <ServiceCombobox
+                    services={tosaServices}
+                    onSelect={(service) => {
+                      setSelectedSecondaryService(service);
+                      setBookingData(prev => ({ 
+                        ...prev, 
+                        serviceId: service.id, // This will be updated by handlePrimaryServiceChange
+                        price: 0,
+                        duration: 0
+                      }));
+                    }}
+                    selectedService={selectedSecondaryService}
+                  />
+                </div>
+              )}
 
               {/* Service Information Display */}
               {selectedService && (
@@ -800,17 +860,50 @@ const AdminManualBooking = () => {
                   <h4 className="font-medium mb-3 text-gray-900">Informações do Serviço</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center">
-                      <span className="text-gray-600">Serviço:</span>
+                      <span className="text-gray-600">Serviço Principal:</span>
                       <span className="font-medium text-gray-900 ml-1">{selectedService.name}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-gray-600">Preço:</span>
-                      <span className="font-semibold text-green-600 ml-1">R$ {bookingData.price.toFixed(2)}</span>
+                      <span className="text-gray-600">Preço Principal:</span>
+                      <span className="font-semibold text-green-600 ml-1">R$ {primaryServicePrice.toFixed(2)}</span>
                     </div>
                     <div className="flex items-center">
-                      <span className="text-gray-600">Duração:</span>
-                      <span className="font-semibold text-blue-600 ml-1">{bookingData.duration} minutos</span>
+                      <span className="text-gray-600">Duração Principal:</span>
+                      <span className="font-semibold text-blue-600 ml-1">{primaryServiceDuration} minutos</span>
                     </div>
+                    
+                    {/* Secondary Service Information */}
+                    {selectedSecondaryService && (
+                      <>
+                        <div className="border-t pt-2 mt-2">
+                          <div className="flex items-center">
+                            <span className="text-gray-600">Serviço Secundário:</span>
+                            <span className="font-medium text-gray-900 ml-1">{selectedSecondaryService.name}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <span className="text-gray-600">Preço Secundário:</span>
+                            <span className="font-semibold text-green-600 ml-1">R$ {secondaryServicePrice.toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <span className="text-gray-600">Duração Secundária:</span>
+                            <span className="font-semibold text-blue-600 ml-1">{secondaryServiceDuration} minutos</span>
+                          </div>
+                        </div>
+                        
+                        {/* Combined Total */}
+                        <div className="border-t pt-2 mt-2">
+                          <div className="flex items-center">
+                            <span className="text-gray-600 font-medium">Total Combinado:</span>
+                            <span className="font-semibold text-green-600 ml-1">R$ {totalPrice.toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <span className="text-gray-600">Duração Total:</span>
+                            <span className="font-semibold text-blue-600 ml-1">{totalDuration} minutos</span>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    
                     {selectedService.description && (
                       <div className="text-xs text-gray-500 mt-3 pt-2 border-t border-gray-200">
                         {selectedService.description}
@@ -819,6 +912,15 @@ const AdminManualBooking = () => {
                   </div>
                 </div>
               )}
+
+              {/* Debug Section - Remove this after testing */}
+              <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                <strong>Debug Info:</strong><br/>
+                Selected Service: {selectedService?.name || 'None'}<br/>
+                Show Secondary Dropdown: {showSecondaryServiceDropdown ? 'YES' : 'NO'}<br/>
+                Available TOSA Services: {tosaServices.length}<br/>
+                TOSA Services: {tosaServices.map(s => s.name).join(', ')}
+              </div>
 
               {/* Next Button */}
               <div className="flex justify-end pt-4">
