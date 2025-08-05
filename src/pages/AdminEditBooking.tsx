@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { CalendarIcon, Edit, DollarSign, FileText, ArrowLeft, Loader2, AlertCircle, X, AlertTriangle, Plus } from 'lucide-react';
+import { CalendarIcon, Edit, DollarSign, FileText, ArrowLeft, Loader2, AlertCircle, X, AlertTriangle, Plus, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -56,6 +56,23 @@ interface ServiceAddon {
   applies_to_service_id?: string;
 }
 
+interface ServiceStaffAssignment {
+  service_id: string;
+  service_name: string;
+  service_order: number;
+  staff_profile_id: string | null;
+  staff_name: string | null;
+  role: string | null;
+}
+
+interface StaffMember {
+  id: string;
+  name: string;
+  can_bathe: boolean;
+  can_groom: boolean;
+  can_vet: boolean;
+}
+
 const AdminEditBooking = () => {
   const { appointmentId } = useParams<{ appointmentId: string }>();
   const navigate = useNavigate();
@@ -80,6 +97,11 @@ const AdminEditBooking = () => {
   const [selectedAddon, setSelectedAddon] = useState<string>('none');
   const [isLoadingAddons, setIsLoadingAddons] = useState(false);
   
+  // Service-specific staff state
+  const [serviceStaffAssignments, setServiceStaffAssignments] = useState<ServiceStaffAssignment[]>([]);
+  const [availableStaff, setAvailableStaff] = useState<StaffMember[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(false);
+  
   // Modal state
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const [pendingEditData, setPendingEditData] = useState<any>(null);
@@ -99,61 +121,59 @@ const AdminEditBooking = () => {
         const { data, error } = await supabase
           .from('appointments')
           .select(`
-            id,
-            date,
-            time,
-            extra_fee,
-            notes,
-            duration,
-            status,
-            total_price,
-            service_id,
-            services:service_id (name),
-            pets:pet_id (name),
-            clients:client_id (name)
+            *,
+            pets!inner(name),
+            clients!inner(name)
           `)
           .eq('id', appointmentId)
           .single();
 
         if (error) {
           console.error('❌ [ADMIN_EDIT_BOOKING] Error loading appointment:', error);
-          throw error;
+          setError('Erro ao carregar detalhes do agendamento');
+          setIsLoading(false);
+          return;
         }
 
         if (!data) {
-          throw new Error('Agendamento não encontrado');
+          setError('Agendamento não encontrado');
+          setIsLoading(false);
+          return;
         }
 
-        console.log('✅ [ADMIN_EDIT_BOOKING] Appointment details loaded:', data);
-        
-        const details: AppointmentDetails = {
+        console.log('✅ [ADMIN_EDIT_BOOKING] Appointment loaded:', data);
+
+        const appointmentDetails: AppointmentDetails = {
           id: data.id,
           date: data.date,
           time: data.time,
-          extra_fee: data.extra_fee || 0,
+          extra_fee: data.extra_fee,
           notes: data.notes,
           duration: data.duration,
+          service_name: data.service_name || 'Serviço não especificado',
+          pet_name: data.pets?.name || 'Pet não encontrado',
+          client_name: data.clients?.name || 'Cliente não encontrado',
           status: data.status,
           total_price: data.total_price,
-          service_id: data.service_id,
-          service_name: (data.services as any)?.name,
-          pet_name: (data.pets as any)?.name,
-          client_name: (data.clients as any)?.name
+          service_id: data.service_id
         };
 
-        setAppointmentDetails(details);
-        
-        // Pre-populate form fields
-        setSelectedDate(new Date(data.date + 'T12:00:00'));
-        setSelectedTime(data.time); // Auto-select current time
-        setSelectedDuration(0); // No duration change by default
-        setExtraFee((data.extra_fee || 0).toString());
+        setAppointmentDetails(appointmentDetails);
+        setSelectedDate(new Date(data.date));
+        setSelectedTime(data.time);
+        setSelectedDuration(0);
+        setExtraFee(data.extra_fee?.toString() || '');
         setAdminNotes(data.notes || '');
+
+        // Load service-specific staff assignments
+        await loadServiceStaffAssignments(data.id);
         
-      } catch (error: any) {
-        console.error('❌ [ADMIN_EDIT_BOOKING] Error:', error);
-        setError(error.message || 'Erro ao carregar detalhes do agendamento');
-        toast.error('Erro ao carregar detalhes do agendamento');
+        // Load available staff
+        await loadAvailableStaff();
+
+      } catch (error) {
+        console.error('❌ [ADMIN_EDIT_BOOKING] Unexpected error:', error);
+        setError('Erro inesperado ao carregar detalhes do agendamento');
       } finally {
         setIsLoading(false);
       }
@@ -161,6 +181,117 @@ const AdminEditBooking = () => {
 
     loadAppointmentDetails();
   }, [appointmentId]);
+
+  // Load service-specific staff assignments
+  const loadServiceStaffAssignments = async (appointmentId: string) => {
+    try {
+      console.log('🔍 [ADMIN_EDIT_BOOKING] Loading service staff assignments for:', appointmentId);
+      
+      const { data, error } = await supabase
+        .rpc('get_appointment_service_staff', { _appointment_id: appointmentId });
+
+      if (error) {
+        console.error('❌ [ADMIN_EDIT_BOOKING] Error loading service staff:', error);
+        return;
+      }
+
+      console.log('✅ [ADMIN_EDIT_BOOKING] Service staff assignments loaded:', data);
+      
+      const assignments: ServiceStaffAssignment[] = data.map((item: any) => ({
+        service_id: item.service_id,
+        service_name: item.service_name,
+        service_order: item.service_order,
+        staff_profile_id: item.staff_profile_id,
+        staff_name: item.staff_name,
+        role: item.role
+      }));
+
+      setServiceStaffAssignments(assignments);
+
+    } catch (error) {
+      console.error('❌ [ADMIN_EDIT_BOOKING] Error loading service staff assignments:', error);
+    }
+  };
+
+  // Load available staff
+  const loadAvailableStaff = async () => {
+    try {
+      setIsLoadingStaff(true);
+      console.log('🔍 [ADMIN_EDIT_BOOKING] Loading available staff');
+      
+      const { data, error } = await supabase
+        .from('staff_profiles')
+        .select('id, name, can_bathe, can_groom, can_vet')
+        .eq('active', true)
+        .order('name');
+
+      if (error) {
+        console.error('❌ [ADMIN_EDIT_BOOKING] Error loading staff:', error);
+        return;
+      }
+
+      console.log('✅ [ADMIN_EDIT_BOOKING] Available staff loaded:', data);
+      setAvailableStaff(data);
+
+    } catch (error) {
+      console.error('❌ [ADMIN_EDIT_BOOKING] Error loading available staff:', error);
+    } finally {
+      setIsLoadingStaff(false);
+    }
+  };
+
+  // Update service staff assignment
+  const updateServiceStaff = async (serviceId: string, newStaffId: string | null) => {
+    try {
+      console.log('🔍 [ADMIN_EDIT_BOOKING] Updating staff for service:', serviceId, 'to:', newStaffId);
+      
+      const { data, error } = await supabase
+        .rpc('update_service_staff_assignment', {
+          _appointment_id: appointmentId!,
+          _service_id: serviceId,
+          _new_staff_profile_id: newStaffId,
+          _updated_by: (await supabase.auth.getUser()).data.user?.id
+        });
+
+      if (error) {
+        console.error('❌ [ADMIN_EDIT_BOOKING] Error updating service staff:', error);
+        toast.error('Erro ao atualizar staff do serviço');
+        return false;
+      }
+
+      console.log('✅ [ADMIN_EDIT_BOOKING] Service staff updated successfully');
+      toast.success('Staff do serviço atualizado com sucesso');
+      
+      // Reload service staff assignments
+      await loadServiceStaffAssignments(appointmentId!);
+      
+      return true;
+
+    } catch (error) {
+      console.error('❌ [ADMIN_EDIT_BOOKING] Error updating service staff:', error);
+      toast.error('Erro ao atualizar staff do serviço');
+      return false;
+    }
+  };
+
+  // Handle service staff change
+  const handleServiceStaffChange = async (serviceId: string, newStaffId: string | null) => {
+    const success = await updateServiceStaff(serviceId, newStaffId);
+    if (success) {
+      // Update local state
+      setServiceStaffAssignments(prev => 
+        prev.map(assignment => 
+          assignment.service_id === serviceId 
+            ? { 
+                ...assignment, 
+                staff_profile_id: newStaffId,
+                staff_name: newStaffId ? availableStaff.find(s => s.id === newStaffId)?.name || null : null
+              }
+            : assignment
+        )
+      );
+    }
+  };
 
   // Load service addons
   useEffect(() => {
@@ -731,6 +862,98 @@ const AdminEditBooking = () => {
                       </div>
                     )}
                   </div>
+
+                  {/* Service-Specific Staff Assignment */}
+                  {serviceStaffAssignments.length > 0 && (
+                    <div className="space-y-4">
+                      <Label className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Atribuição de Staff por Serviço
+                      </Label>
+                      
+                      <div className="space-y-3">
+                        {serviceStaffAssignments.map((assignment) => (
+                          <div key={assignment.service_id} className="p-4 border rounded-lg bg-gray-50">
+                            <div className="flex items-center justify-between mb-3">
+                              <div>
+                                <h4 className="font-medium text-gray-900">
+                                  {assignment.service_name}
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  Serviço #{assignment.service_order}
+                                </p>
+                              </div>
+                              {assignment.role && (
+                                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+                                  {assignment.role}
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-gray-700">
+                                Staff Atual: {assignment.staff_name || 'Não atribuído'}
+                              </Label>
+                              
+                              <Select 
+                                value={assignment.staff_profile_id || 'none'} 
+                                onValueChange={(value) => handleServiceStaffChange(
+                                  assignment.service_id, 
+                                  value === 'none' ? null : value
+                                )}
+                                disabled={isLoadingStaff}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione um staff" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">
+                                    Remover atribuição
+                                  </SelectItem>
+                                  {isLoadingStaff ? (
+                                    <SelectItem value="loading" disabled>
+                                      Carregando staff...
+                                    </SelectItem>
+                                  ) : (
+                                    availableStaff.map((staff) => (
+                                      <SelectItem key={staff.id} value={staff.id}>
+                                        {staff.name}
+                                        {assignment.service_name?.toLowerCase().includes('banho') && !staff.can_bathe && (
+                                          <span className="text-red-500 ml-2">(não pode banhar)</span>
+                                        )}
+                                        {assignment.service_name?.toLowerCase().includes('tosa') && !staff.can_groom && (
+                                          <span className="text-red-500 ml-2">(não pode tosar)</span>
+                                        )}
+                                      </SelectItem>
+                                    ))
+                                  )}
+                                </SelectContent>
+                              </Select>
+                              
+                              {assignment.staff_profile_id && (
+                                <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <span>Staff selecionado:</span>
+                                  <span className="font-medium text-gray-900">
+                                    {assignment.staff_name}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded border border-blue-200">
+                        <p className="font-medium text-blue-800 mb-1">ℹ️ Informações sobre atribuição de staff:</p>
+                        <ul className="text-blue-700 space-y-1">
+                          <li>• Cada serviço pode ter um staff diferente</li>
+                          <li>• Staff são filtrados por capacidade (banhista, tosador, etc.)</li>
+                          <li>• Mudanças são aplicadas imediatamente</li>
+                          <li>• Staff anterior é liberado automaticamente</li>
+                        </ul>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Extra Fee */}
                   <div className="space-y-2">

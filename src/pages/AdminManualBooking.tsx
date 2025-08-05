@@ -165,9 +165,13 @@ const AdminManualBooking = () => {
   // Pricing logic - moved before calculations
   const pricingParams = {
     serviceId: bookingData.serviceId,
-    breedId: selectedPet?.breed_id,
+    breedId: selectedPet?.breed, // Use breed name, not breed_id
     size: selectedPet?.size
   };
+  
+  console.log('🔍 [ADMIN_MANUAL_BOOKING] Pricing params:', pricingParams);
+  console.log('🔍 [ADMIN_MANUAL_BOOKING] Selected pet:', selectedPet);
+  
   const { pricing } = usePricing(pricingParams);
 
   // Calculate combined price and duration
@@ -666,8 +670,18 @@ const AdminManualBooking = () => {
   const getRequiredRoles = () => {
     const roles = [];
     
+    console.log('🔍 [ADMIN_MANUAL_BOOKING] Determining required roles...');
+    console.log('🔍 [ADMIN_MANUAL_BOOKING] Selected primary service:', selectedService);
+    console.log('🔍 [ADMIN_MANUAL_BOOKING] Selected secondary service:', selectedSecondaryService);
+    
     // Check primary service requirements
     if (selectedService) {
+      console.log('🔍 [ADMIN_MANUAL_BOOKING] Primary service requirements:', {
+        requires_bath: selectedService.requires_bath,
+        requires_grooming: selectedService.requires_grooming,
+        requires_vet: selectedService.requires_vet
+      });
+      
       if (selectedService.requires_bath) roles.push('banhista');
       if (selectedService.requires_grooming) roles.push('tosador');
       if (selectedService.requires_vet) roles.push('veterinario');
@@ -675,13 +689,22 @@ const AdminManualBooking = () => {
     
     // Check secondary service requirements
     if (selectedSecondaryService) {
+      console.log('🔍 [ADMIN_MANUAL_BOOKING] Secondary service requirements:', {
+        requires_bath: selectedSecondaryService.requires_bath,
+        requires_grooming: selectedSecondaryService.requires_grooming,
+        requires_vet: selectedSecondaryService.requires_vet
+      });
+      
       if (selectedSecondaryService.requires_bath) roles.push('banhista');
       if (selectedSecondaryService.requires_grooming) roles.push('tosador');
       if (selectedSecondaryService.requires_vet) roles.push('veterinario');
     }
     
     // Remove duplicates
-    return [...new Set(roles)];
+    const uniqueRoles = [...new Set(roles)];
+    console.log('🔍 [ADMIN_MANUAL_BOOKING] Final required roles:', uniqueRoles);
+    
+    return uniqueRoles;
   };
 
   // Get staff members for a specific role

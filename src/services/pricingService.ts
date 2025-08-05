@@ -80,9 +80,11 @@ export class PricingService {
 
   private static async getExactMatchPricing(serviceId: string, breedId: string, size: string) {
     try {
+      console.log('🔍 [PRICING] Looking for exact match:', { serviceId, breedId, size });
+      
       const { data, error } = await supabase
         .from('service_pricing')
-        .select('price, duration_override')
+        .select('price, duration_override, service_name, breed, size')
         .eq('service_id', serviceId)
         .eq('breed', breedId)
         .eq('size', size)
@@ -93,6 +95,7 @@ export class PricingService {
         return null;
       }
 
+      console.log('🔍 [PRICING] Exact match result:', data);
       return data;
     } catch (error) {
       console.log('🔍 [PRICING] Error in getExactMatchPricing:', error);
@@ -102,9 +105,11 @@ export class PricingService {
 
   private static async getServiceSizeFallback(serviceId: string, size: string) {
     try {
+      console.log('🔍 [PRICING] Looking for service+size fallback:', { serviceId, size });
+      
       const { data, error } = await supabase
         .from('service_pricing')
-        .select('price, duration_override')
+        .select('price, duration_override, service_name, breed, size')
         .eq('service_id', serviceId)
         .eq('size', size)
         .limit(1)
@@ -115,6 +120,7 @@ export class PricingService {
         return null;
       }
 
+      console.log('🔍 [PRICING] Service+size fallback result:', data);
       return data;
     } catch (error) {
       console.log('🔍 [PRICING] Error in getServiceSizeFallback:', error);
