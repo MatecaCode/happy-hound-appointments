@@ -10,6 +10,14 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import Layout from './Layout';
 
+interface ServiceStaffAssignment {
+  service_name: string;
+  staff_name: string;
+  duration: number;
+  price: number;
+  service_order: number;
+}
+
 interface BookingDetails {
   id: string;
   date: string;
@@ -20,7 +28,7 @@ interface BookingDetails {
   duration: number;
   total_price: number;
   pet_name: string;
-  service_name: string;
+  service_assignments: ServiceStaffAssignment[];
   staff_names: string[];
 }
 
@@ -49,7 +57,16 @@ const BookingSuccess: React.FC = () => {
             pets:pet_id (name),
             services:service_id (name),
             appointment_staff (
+              staff_profile_id,
+              role,
+              service_id,
               staff_profiles (name)
+            ),
+            appointment_services (
+              service_order,
+              price,
+              duration,
+              services (name)
             )
           `)
           .eq('id', appointmentId)
@@ -62,6 +79,48 @@ const BookingSuccess: React.FC = () => {
             as.staff_profiles?.name
           ).filter(Boolean) || [];
 
+          // Create service-staff assignments
+          const serviceAssignments: ServiceStaffAssignment[] = [];
+          
+          if (appointment.appointment_services && appointment.appointment_staff) {
+            // For each service, find the assigned staff
+            appointment.appointment_services.forEach((aps: any) => {
+              const serviceName = (aps.services as any)?.name || 'Serviço';
+              const serviceDuration = aps.duration || 60;
+              const servicePrice = aps.price || 0;
+              const serviceOrder = aps.service_order || 1;
+              
+              // Find staff assigned to this service
+              const assignedStaff = appointment.appointment_staff.find((as: any) => 
+                as.service_id === aps.service_id
+              );
+              
+              const staffName = assignedStaff?.staff_profiles?.name || 'Não atribuído';
+              
+              serviceAssignments.push({
+                service_name: serviceName,
+                staff_name: staffName,
+                duration: serviceDuration,
+                price: servicePrice,
+                service_order: serviceOrder
+              });
+            });
+          }
+          
+          // If no service assignments, create fallback
+          if (serviceAssignments.length === 0) {
+            const primaryServiceName = (appointment.services as any)?.name || 'Serviço';
+            const primaryStaffName = staffNames[0] || 'Não atribuído';
+            
+            serviceAssignments.push({
+              service_name: primaryServiceName,
+              staff_name: primaryStaffName,
+              duration: appointment.duration || 60,
+              price: appointment.total_price || 0,
+              service_order: 1
+            });
+          }
+
           setBooking({
             id: appointment.id,
             date: appointment.date,
@@ -72,7 +131,7 @@ const BookingSuccess: React.FC = () => {
             duration: appointment.duration || 60,
             total_price: appointment.total_price || 0,
             pet_name: (appointment.pets as any)?.name || 'Pet',
-            service_name: (appointment.services as any)?.name || 'Serviço',
+            service_assignments: serviceAssignments,
             staff_names: staffNames
           });
         }
@@ -184,23 +243,45 @@ const BookingSuccess: React.FC = () => {
               {/* Service Info */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="font-semibold mb-3">Detalhes do Serviço</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Serviço:</span>
-                    <span className="font-medium">{booking.service_name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Duração:</span>
-                    <span>{booking.duration} minutos</span>
-                  </div>
-                  {booking.total_price > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Valor:</span>
-                      <span className="font-medium text-green-600">
-                        R$ {booking.total_price.toFixed(2)}
-                      </span>
+                <div className="space-y-4">
+                  {booking.service_assignments.map((assignment, index) => (
+                    <div key={index} className="border-l-4 border-primary pl-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="text-muted-foreground">Serviço {assignment.service_order}:</span>
+                        <span className="font-medium">{assignment.service_name}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Profissional:</span>
+                        <span>{assignment.staff_name}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Duração:</span>
+                        <span>{assignment.duration} minutos</span>
+                      </div>
+                      {assignment.price > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Valor:</span>
+                          <span className="font-medium text-green-600">
+                            R$ {assignment.price.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
+                  
+                  {/* Total Duration */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="flex justify-between font-semibold">
+                      <span>Duração Total:</span>
+                      <span>{booking.duration} minutos</span>
+                    </div>
+                    {booking.total_price > 0 && (
+                      <div className="flex justify-between font-semibold text-green-600">
+                        <span>Valor Total:</span>
+                        <span>R$ {booking.total_price.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

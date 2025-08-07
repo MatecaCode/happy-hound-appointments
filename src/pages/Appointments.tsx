@@ -73,6 +73,10 @@ const Appointments = () => {
             services:service_id (name),
             appointment_staff (
               staff_profiles (name)
+            ),
+            appointment_services (
+              service_order,
+              services (name)
             )
           `)
           .eq('client_id', clientData.id)
@@ -90,10 +94,19 @@ const Appointments = () => {
             // Get all staff names from appointment_staff relationship
             const staffNames = apt.appointment_staff?.map((as: any) => as.staff_profiles?.name).filter(Boolean) || [];
 
+            // Get all service names from appointment_services
+            const serviceNames = apt.appointment_services?.map((aps: any) => 
+              (aps.services as any)?.name
+            ).filter(Boolean) || [];
+            
+            // If no appointment_services, fall back to primary service
+            const allServiceNames = serviceNames.length > 0 ? serviceNames : [(apt.services as any)?.name || 'Serviço'];
+            const serviceName = allServiceNames.join(', ');
+
             return {
               id: apt.id,
               pet_name: (apt.pets as any)?.name || 'Pet',
-              service_name: (apt.services as any)?.name || 'Serviço',
+              service_name: serviceName,
               date: new Date(apt.date + 'T12:00:00'),
               time: apt.time,
               status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
@@ -157,6 +170,10 @@ const Appointments = () => {
           services:service_id (name),
           appointment_staff (
             staff_profiles (name)
+          ),
+          appointment_services (
+            service_order,
+            services (name)
           )
         `)
         .eq('client_id', clientData.id)
@@ -167,26 +184,35 @@ const Appointments = () => {
         throw error;
       }
       
-      if (data) {
-        const formattedData = data.map((apt) => {
-          // Get all staff names from appointment_staff relationship
-          const staffNames = apt.appointment_staff?.map((as: any) => as.staff_profiles?.name).filter(Boolean) || [];
+              if (data) {
+          const formattedData = data.map((apt) => {
+            // Get all staff names from appointment_staff relationship
+            const staffNames = apt.appointment_staff?.map((as: any) => as.staff_profiles?.name).filter(Boolean) || [];
 
-          return {
-            id: apt.id,
-            pet_name: (apt.pets as any)?.name || 'Pet',
-            service_name: (apt.services as any)?.name || 'Serviço',
-            date: new Date(apt.date + 'T12:00:00'),
-            time: apt.time,
-            status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
-            service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
-            notes: apt.notes || undefined,
-            staff_names: staffNames,
-            staff_name: staffNames.length > 0 ? staffNames.join(', ') : undefined,
-            duration: apt.duration || 60,
-            total_price: apt.total_price || 0
-          };
-        });
+            // Get all service names from appointment_services
+            const serviceNames = apt.appointment_services?.map((aps: any) => 
+              (aps.services as any)?.name
+            ).filter(Boolean) || [];
+            
+            // If no appointment_services, fall back to primary service
+            const allServiceNames = serviceNames.length > 0 ? serviceNames : [(apt.services as any)?.name || 'Serviço'];
+            const serviceName = allServiceNames.join(', ');
+
+            return {
+              id: apt.id,
+              pet_name: (apt.pets as any)?.name || 'Pet',
+              service_name: serviceName,
+              date: new Date(apt.date + 'T12:00:00'),
+              time: apt.time,
+              status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
+              service_status: apt.service_status as 'not_started' | 'in_progress' | 'completed' | undefined,
+              notes: apt.notes || undefined,
+              staff_names: staffNames,
+              staff_name: staffNames.length > 0 ? staffNames.join(', ') : undefined,
+              duration: apt.duration || 60,
+              total_price: apt.total_price || 0
+            };
+          });
         
         console.log('✅ [APPOINTMENTS] Refreshed appointments:', formattedData);
         setAppointments(formattedData);

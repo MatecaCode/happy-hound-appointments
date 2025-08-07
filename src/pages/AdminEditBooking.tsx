@@ -46,6 +46,7 @@ interface AvailabilityData {
   service_duration: number;
   start_time: string;
   end_time: string;
+  staff_availability?: any[]; // Added for dual-service availability
 }
 
 interface ServiceAddon {
@@ -101,6 +102,9 @@ const AdminEditBooking = () => {
   const [serviceStaffAssignments, setServiceStaffAssignments] = useState<ServiceStaffAssignment[]>([]);
   const [availableStaff, setAvailableStaff] = useState<StaffMember[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
+  
+  // Pending staff changes (not applied until save)
+  const [pendingStaffChanges, setPendingStaffChanges] = useState<Record<string, string | null>>({});
   
   // Modal state
   const [showOverrideModal, setShowOverrideModal] = useState(false);
@@ -159,7 +163,7 @@ const AdminEditBooking = () => {
         };
 
         setAppointmentDetails(appointmentDetails);
-        setSelectedDate(new Date(data.date));
+        // Don't set selectedDate initially - let user choose if they want to change it
         setSelectedTime(data.time);
         setSelectedDuration(0);
         setExtraFee(data.extra_fee?.toString() || '');
@@ -240,57 +244,65 @@ const AdminEditBooking = () => {
     }
   };
 
-  // Update service staff assignment
-  const updateServiceStaff = async (serviceId: string, newStaffId: string | null) => {
-    try {
-      console.log('🔍 [ADMIN_EDIT_BOOKING] Updating staff for service:', serviceId, 'to:', newStaffId);
-      
-      const { data, error } = await supabase
-        .rpc('update_service_staff_assignment', {
-          _appointment_id: appointmentId!,
-          _service_id: serviceId,
-          _new_staff_profile_id: newStaffId,
-          _updated_by: (await supabase.auth.getUser()).data.user?.id
-        });
-
-      if (error) {
-        console.error('❌ [ADMIN_EDIT_BOOKING] Error updating service staff:', error);
-        toast.error('Erro ao atualizar staff do serviço');
-        return false;
-      }
-
-      console.log('✅ [ADMIN_EDIT_BOOKING] Service staff updated successfully');
-      toast.success('Staff do serviço atualizado com sucesso');
-      
-      // Reload service staff assignments
-      await loadServiceStaffAssignments(appointmentId!);
-      
-      return true;
-
-    } catch (error) {
-      console.error('❌ [ADMIN_EDIT_BOOKING] Error updating service staff:', error);
-      toast.error('Erro ao atualizar staff do serviço');
-      return false;
-    }
+  // Handle service staff change (local only - not applied until save)
+  const handleServiceStaffChange = (serviceId: string, newStaffId: string | null) => {
+    console.log('🔍 [ADMIN_EDIT_BOOKING] Pending staff change for service:', serviceId, 'to:', newStaffId);
+    
+    // Store the change locally
+    setPendingStaffChanges(prev => ({
+      ...prev,
+      [serviceId]: newStaffId
+    }));
   };
 
-  // Handle service staff change
-  const handleServiceStaffChange = async (serviceId: string, newStaffId: string | null) => {
-    const success = await updateServiceStaff(serviceId, newStaffId);
-    if (success) {
-      // Update local state
-      setServiceStaffAssignments(prev => 
-        prev.map(assignment => 
-          assignment.service_id === serviceId 
-            ? { 
-                ...assignment, 
-                staff_profile_id: newStaffId,
-                staff_name: newStaffId ? availableStaff.find(s => s.id === newStaffId)?.name || null : null
-              }
-            : assignment
-        )
-      );
+  // Apply all pending staff changes when form is submitted
+  const applyPendingStaffChanges = async () => {
+    const changes = Object.entries(pendingStaffChanges);
+    if (changes.length === 0) return;
+
+    console.log('🔧 [ADMIN_EDIT_BOOKING] Applying pending staff changes:', changes);
+
+    for (const [serviceId, newStaffId] of changes) {
+      try {
+        const { data, error } = await supabase
+          .rpc('update_service_staff_assignment', {
+            _appointment_id: appointmentId!,
+            _service_id: serviceId,
+            _new_staff_profile_id: newStaffId,
+            _updated_by: (await supabase.auth.getUser()).data.user?.id
+          });
+
+        if (error) {
+          console.error('❌ [ADMIN_EDIT_BOOKING] Error updating service staff:', error);
+          toast.error(`Erro ao atualizar staff do serviço ${serviceId}`);
+          return false;
+        }
+
+        console.log('✅ [ADMIN_EDIT_BOOKING] Service staff updated successfully for service:', serviceId);
+      } catch (error) {
+        console.error('❌ [ADMIN_EDIT_BOOKING] Error updating service staff:', error);
+        toast.error(`Erro ao atualizar staff do serviço ${serviceId}`);
+        return false;
+      }
     }
+
+    // Clear pending changes
+    setPendingStaffChanges({});
+    toast.success('Staff assignments atualizados com sucesso');
+    return true;
+  };
+
+  // Get the effective staff assignment (current + pending changes)
+  const getEffectiveStaffAssignment = (assignment: ServiceStaffAssignment) => {
+    const pendingChange = pendingStaffChanges[assignment.service_id];
+    if (pendingChange !== undefined) {
+      return {
+        ...assignment,
+        staff_profile_id: pendingChange,
+        staff_name: pendingChange ? availableStaff.find(s => s.id === pendingChange)?.name || null : null
+      };
+    }
+    return assignment;
   };
 
   // Load service addons
@@ -366,7 +378,8 @@ const AdminEditBooking = () => {
         const durationToAdd = selectedDuration || 0;
         const totalDuration = currentDuration + durationToAdd;
         
-        const { data, error } = await supabase.rpc('check_staff_availability_for_edit', {
+        // Use the new dual-staff availability function
+        const { data, error } = await supabase.rpc('check_dual_staff_availability_for_edit', {
           _appointment_id: appointmentId,
           _new_date: format(selectedDate, 'yyyy-MM-dd'),
           _new_time: selectedTime,
@@ -497,6 +510,9 @@ const AdminEditBooking = () => {
         }
       }
 
+      // Apply pending staff changes
+      await applyPendingStaffChanges();
+
       console.log('✅ [ADMIN_EDIT_BOOKING] Successfully edited booking');
       
       // Show appropriate success message
@@ -539,13 +555,14 @@ const AdminEditBooking = () => {
     const timeToUse = selectedTime || appointmentDetails.time;
     
     return (
-      selectedDate?.getTime() !== new Date(appointmentDetails.date + 'T12:00:00').getTime() ||
+      (selectedDate && selectedDate.getTime() !== new Date(appointmentDetails.date + 'T12:00:00').getTime()) ||
       timeToUse !== appointmentDetails.time ||
       selectedDuration !== 0 || // Check if any duration is being added
       parseFloat(extraFee) !== (appointmentDetails.extra_fee || 0) ||
       selectedAddon !== 'none' || // Check if addon is selected
       adminNotes !== (appointmentDetails.notes || '') ||
-      editReason !== ''
+      editReason !== '' ||
+      Object.keys(pendingStaffChanges).length > 0 // Check if there are pending staff changes
     );
   };
 
@@ -674,7 +691,7 @@ const AdminEditBooking = () => {
                           )}
                         >
                           <CalendarIcon className="mr-2 h-4 w-4" />
-                          {selectedDate ? format(selectedDate, 'PPP', { locale: ptBR }) : "Selecione uma data"}
+                          {selectedDate ? format(selectedDate, 'PPP', { locale: ptBR }) : "🗓 Nenhuma mudança de data selecionada"}
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
@@ -693,6 +710,17 @@ const AdminEditBooking = () => {
                         />
                       </PopoverContent>
                     </Popover>
+                    {selectedDate && (
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <span>Data atual:</span>
+                        <span className="font-medium text-gray-900">
+                          {format(new Date(appointmentDetails.date), 'PPP', { locale: ptBR })}
+                        </span>
+                        <span className="text-blue-600">
+                          → {format(selectedDate, 'PPP', { locale: ptBR })}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Time Selection */}
@@ -737,6 +765,25 @@ const AdminEditBooking = () => {
                              <p>Duração do serviço: {availabilityData.service_duration} min</p>
                              <p>Horário: {availabilityData.start_time} - {availabilityData.end_time}</p>
                              <p>Slots disponíveis: {availabilityData.available_slots?.length || 0}/{availabilityData.total_slots}</p>
+                             
+                             {/* Show staff availability for dual-service appointments */}
+                             {availabilityData.staff_availability && availabilityData.staff_availability.length > 0 && (
+                               <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                                 <p className="text-blue-700 font-medium mb-1">👥 Disponibilidade dos Staff:</p>
+                                 <div className="space-y-1">
+                                   {availabilityData.staff_availability.map((staff: any, index: number) => (
+                                     <div key={staff.service_id} className="flex items-center justify-between">
+                                       <span className="text-blue-600 text-xs">
+                                         {staff.service_name} ({staff.staff_name || 'Não atribuído'}):
+                                       </span>
+                                       <span className={`text-xs font-medium ${staff.is_available ? 'text-green-600' : 'text-red-600'}`}>
+                                         {staff.is_available ? '✅ Disponível' : '❌ Indisponível'}
+                                       </span>
+                                     </div>
+                                   ))}
+                                 </div>
+                               </div>
+                             )}
                              
                              {/* Show same booking indicator */}
                              {availabilityData.is_same_booking && (
@@ -872,75 +919,85 @@ const AdminEditBooking = () => {
                       </Label>
                       
                       <div className="space-y-3">
-                        {serviceStaffAssignments.map((assignment) => (
-                          <div key={assignment.service_id} className="p-4 border rounded-lg bg-gray-50">
-                            <div className="flex items-center justify-between mb-3">
-                              <div>
-                                <h4 className="font-medium text-gray-900">
-                                  {assignment.service_name}
-                                </h4>
-                                <p className="text-sm text-gray-600">
-                                  Serviço #{assignment.service_order}
-                                </p>
-                              </div>
-                              {assignment.role && (
-                                <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                                  {assignment.role}
-                                </span>
-                              )}
-                            </div>
-                            
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium text-gray-700">
-                                Staff Atual: {assignment.staff_name || 'Não atribuído'}
-                              </Label>
-                              
-                              <Select 
-                                value={assignment.staff_profile_id || 'none'} 
-                                onValueChange={(value) => handleServiceStaffChange(
-                                  assignment.service_id, 
-                                  value === 'none' ? null : value
-                                )}
-                                disabled={isLoadingStaff}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Selecione um staff" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="none">
-                                    Remover atribuição
-                                  </SelectItem>
-                                  {isLoadingStaff ? (
-                                    <SelectItem value="loading" disabled>
-                                      Carregando staff...
-                                    </SelectItem>
-                                  ) : (
-                                    availableStaff.map((staff) => (
-                                      <SelectItem key={staff.id} value={staff.id}>
-                                        {staff.name}
-                                        {assignment.service_name?.toLowerCase().includes('banho') && !staff.can_bathe && (
-                                          <span className="text-red-500 ml-2">(não pode banhar)</span>
-                                        )}
-                                        {assignment.service_name?.toLowerCase().includes('tosa') && !staff.can_groom && (
-                                          <span className="text-red-500 ml-2">(não pode tosar)</span>
-                                        )}
-                                      </SelectItem>
-                                    ))
+                        {serviceStaffAssignments.map((assignment) => {
+                          const effectiveAssignment = getEffectiveStaffAssignment(assignment);
+                          const hasPendingChange = pendingStaffChanges[assignment.service_id] !== undefined;
+                          
+                          return (
+                            <div key={assignment.service_id} className={`p-4 border rounded-lg ${hasPendingChange ? 'bg-yellow-50 border-yellow-200' : 'bg-gray-50'}`}>
+                              <div className="flex items-center justify-between mb-3">
+                                <div>
+                                  <h4 className="font-medium text-gray-900">
+                                    {assignment.service_name}
+                                  </h4>
+                                  <p className="text-sm text-gray-600">
+                                    Serviço #{assignment.service_order}
+                                  </p>
+                                  {hasPendingChange && (
+                                    <p className="text-xs text-yellow-700 font-medium mt-1">
+                                      ⚠️ Alteração pendente
+                                    </p>
                                   )}
-                                </SelectContent>
-                              </Select>
-                              
-                              {assignment.staff_profile_id && (
-                                <div className="flex items-center gap-2 text-sm text-gray-600">
-                                  <span>Staff selecionado:</span>
-                                  <span className="font-medium text-gray-900">
-                                    {assignment.staff_name}
-                                  </span>
                                 </div>
-                              )}
+                                {effectiveAssignment.role && (
+                                  <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
+                                    {effectiveAssignment.role}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium text-gray-700">
+                                  Staff Atual: {effectiveAssignment.staff_name || 'Não atribuído'}
+                                </Label>
+                                
+                                <Select 
+                                  value={effectiveAssignment.staff_profile_id || 'none'} 
+                                  onValueChange={(value) => handleServiceStaffChange(
+                                    assignment.service_id, 
+                                    value === 'none' ? null : value
+                                  )}
+                                  disabled={isLoadingStaff}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Selecione um staff" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">
+                                      Remover atribuição
+                                    </SelectItem>
+                                    {isLoadingStaff ? (
+                                      <SelectItem value="loading" disabled>
+                                        Carregando staff...
+                                      </SelectItem>
+                                    ) : (
+                                      availableStaff.map((staff) => (
+                                        <SelectItem key={staff.id} value={staff.id}>
+                                          {staff.name}
+                                          {assignment.service_name?.toLowerCase().includes('banho') && !staff.can_bathe && (
+                                            <span className="text-red-500 ml-2">(não pode banhar)</span>
+                                          )}
+                                          {assignment.service_name?.toLowerCase().includes('tosa') && !staff.can_groom && (
+                                            <span className="text-red-500 ml-2">(não pode tosar)</span>
+                                          )}
+                                        </SelectItem>
+                                      ))
+                                    )}
+                                  </SelectContent>
+                                </Select>
+                                
+                                {effectiveAssignment.staff_profile_id && (
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <span>Staff selecionado:</span>
+                                    <span className="font-medium text-gray-900">
+                                      {effectiveAssignment.staff_name}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                       
                       <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded border border-blue-200">
@@ -948,7 +1005,7 @@ const AdminEditBooking = () => {
                         <ul className="text-blue-700 space-y-1">
                           <li>• Cada serviço pode ter um staff diferente</li>
                           <li>• Staff são filtrados por capacidade (banhista, tosador, etc.)</li>
-                          <li>• Mudanças são aplicadas imediatamente</li>
+                          <li>• Mudanças são aplicadas apenas ao salvar</li>
                           <li>• Staff anterior é liberado automaticamente</li>
                         </ul>
                       </div>

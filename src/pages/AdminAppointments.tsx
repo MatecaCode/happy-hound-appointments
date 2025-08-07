@@ -44,6 +44,13 @@ interface AppointmentWithDetails {
     price: number;
     custom_description?: string;
   }>;
+  // ✅ ADD: Include service-specific staff assignments
+  service_staff?: Array<{
+    service_id: string;
+    service_name: string;
+    staff_name: string;
+    role: string;
+  }>;
 }
 
 const AdminAppointments = () => {
@@ -100,7 +107,15 @@ const AdminAppointments = () => {
              services:service_id (name),
              clients:client_id (name, email),
              appointment_staff (
+               staff_profile_id,
+               role,
+               service_id,
                staff_profiles (name)
+             ),
+             appointment_services (
+               service_id,
+               service_order,
+               services (name)
              ),
              appointment_addons (
                id,
@@ -132,6 +147,18 @@ const AdminAppointments = () => {
             const staffNames = staffData.map((staff: any) => staff.name);
             const staffIds = staffData.map((staff: any) => staff.id);
 
+            // ✅ ADD: Process service-specific staff assignments
+            const serviceStaffData = apt.appointment_staff?.map((as: any) => {
+              const serviceInfo = apt.appointment_services?.find((aps: any) => aps.service_id === as.service_id);
+              const serviceName = (serviceInfo?.services as any)?.name || 'Serviço';
+              return {
+                service_id: as.service_id,
+                service_name: serviceName,
+                staff_name: as.staff_profiles?.name || 'Não atribuído',
+                role: as.role || 'primary'
+              };
+            }).filter((staff: any) => staff.staff_name !== 'Não atribuído') || [];
+
             // ✅ ADD: Process add-ons data
             const addonsData = apt.appointment_addons?.map((addon: any) => ({
               id: addon.id,
@@ -141,10 +168,18 @@ const AdminAppointments = () => {
               custom_description: addon.custom_description
             })).filter((addon: any) => addon.name) || [];
 
+            // ✅ ADD: Process all services from appointment_services
+            const allServiceNames = apt.appointment_services?.map((aps: any) => 
+              (aps.services as any)?.name
+            ).filter(Boolean) || [];
+            
+            // If no appointment_services, fall back to primary service
+            const serviceName = allServiceNames.length > 0 ? allServiceNames.join(', ') : ((apt.services as any)?.name || 'Serviço');
+
             return {
               id: apt.id,
               pet_name: (apt.pets as any)?.name || 'Pet',
-              service_name: (apt.services as any)?.name || 'Serviço',
+              service_name: serviceName,
               date: new Date(apt.date + 'T12:00:00'),
               time: apt.time,
               status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
@@ -163,6 +198,8 @@ const AdminAppointments = () => {
               is_double_booking: apt.is_double_booking || false,
               // ✅ ADD: Include add-ons in formatted data
               addons: addonsData,
+              // ✅ ADD: Include service-specific staff assignments
+              service_staff: serviceStaffData,
             };
           });
           
@@ -208,7 +245,15 @@ const AdminAppointments = () => {
             services:service_id (name),
             clients:client_id (name, email),
             appointment_staff (
+              staff_profile_id,
+              role,
+              service_id,
               staff_profiles (name)
+            ),
+            appointment_services (
+              service_id,
+              service_order,
+              services (name)
             ),
             appointment_addons (
               id,
@@ -234,6 +279,26 @@ const AdminAppointments = () => {
               const staffNames = staffData.map((staff: any) => staff.name);
               const staffIds = staffData.map((staff: any) => staff.id);
 
+              // ✅ ADD: Process service-specific staff assignments (same as main fetch)
+              const serviceStaffData = apt.appointment_staff?.map((as: any) => {
+                const serviceInfo = apt.appointment_services?.find((aps: any) => aps.service_id === as.service_id);
+                const serviceName = (serviceInfo?.services as any)?.name || 'Serviço';
+                return {
+                  service_id: as.service_id,
+                  service_name: serviceName,
+                  staff_name: as.staff_profiles?.name || 'Não atribuído',
+                  role: as.role || 'primary'
+                };
+              }).filter((staff: any) => staff.staff_name !== 'Não atribuído') || [];
+
+              // ✅ ADD: Process all services from appointment_services (same as main fetch)
+              const allServiceNames = apt.appointment_services?.map((aps: any) => 
+                (aps.services as any)?.name
+              ).filter(Boolean) || [];
+              
+              // If no appointment_services, fall back to primary service
+              const serviceName = allServiceNames.length > 0 ? allServiceNames.join(', ') : ((apt.services as any)?.name || 'Serviço');
+
               // ✅ ADD: Process add-ons data (same as main fetch)
               const addonsData = apt.appointment_addons?.map((addon: any) => ({
                 id: addon.id,
@@ -246,7 +311,7 @@ const AdminAppointments = () => {
               return {
                 id: apt.id,
                 pet_name: (apt.pets as any)?.name || 'Pet',
-                service_name: (apt.services as any)?.name || 'Serviço',
+                service_name: serviceName,
                 date: new Date(apt.date + 'T12:00:00'),
                 time: apt.time,
                 status: apt.status as 'pending' | 'confirmed' | 'completed' | 'cancelled',
@@ -265,6 +330,8 @@ const AdminAppointments = () => {
                 is_double_booking: apt.is_double_booking || false,
                 // ✅ ADD: Include add-ons in formatted data
                 addons: addonsData,
+                // ✅ ADD: Include service-specific staff assignments
+                service_staff: serviceStaffData,
               };
             });
           
@@ -371,7 +438,7 @@ const AdminAppointments = () => {
             <div className="flex items-center gap-1">
               <span className="text-gray-500">👨‍⚕️</span>
               <span className="text-xs font-medium text-gray-700">Profissional:</span>
-              <span className="text-sm">{appointment.staff_names?.[0] || 'Não atribuído'}</span>
+              <span className="text-sm">{appointment.staff_names && appointment.staff_names.length > 0 ? appointment.staff_names.join(', ') : 'Não atribuído'}</span>
             </div>
           </div>
 
@@ -796,7 +863,7 @@ const AdminAppointments = () => {
                     <Dog className="h-5 w-5 text-gray-500" />
                     <div>
                       <p className="text-sm font-medium text-gray-700">Profissional</p>
-                      <p className="text-sm text-gray-600">{selectedAppointment.staff_names?.[0] || 'Não atribuído'}</p>
+                      <p className="text-sm text-gray-600">{selectedAppointment.staff_names && selectedAppointment.staff_names.length > 0 ? selectedAppointment.staff_names.join(', ') : 'Não atribuído'}</p>
                     </div>
                   </div>
                 </div>

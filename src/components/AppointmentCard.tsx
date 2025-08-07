@@ -34,6 +34,13 @@ interface AppointmentCardProps {
       price: number;
       custom_description?: string;
     }>;
+    // ✅ ADD: Service-specific staff assignments
+    service_staff?: Array<{
+      service_id: string;
+      service_name: string;
+      staff_name: string;
+      role: string;
+    }>;
   };
   onUpdate?: () => void;
 }
@@ -115,12 +122,32 @@ const AppointmentCard = ({ appointment, onUpdate }: AppointmentCardProps) => {
             </span>
           </div>
           
-          {appointment.provider && (
+          {/* Staff Assignment Display */}
+          {appointment.service_staff && appointment.service_staff.length > 0 ? (
+            <div className="flex items-start space-x-2">
+              <User className="h-4 w-4 text-muted-foreground mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground">Profissionais:</p>
+                <div className="space-y-1 mt-1">
+                  {appointment.service_staff.map((staff, index) => (
+                    <div key={staff.service_id} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">
+                        • {staff.service_name}: {staff.staff_name}
+                      </span>
+                      <span className="text-xs text-blue-600 font-medium">
+                        {staff.role}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : appointment.provider ? (
             <div className="flex items-center space-x-2">
               <User className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm">{appointment.provider.name}</span>
             </div>
-          )}
+          ) : null}
         </div>
         
         {appointment.notes && (

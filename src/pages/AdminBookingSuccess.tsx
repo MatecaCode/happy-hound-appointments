@@ -11,12 +11,21 @@ import { CheckCircle, ArrowLeft, Calendar, User, PawPrint, Clock, DollarSign, Pl
 import { toast } from '../hooks/use-toast';
 import { useAuth } from '../hooks/useAuth';
 
+interface ServiceStaffAssignment {
+  service_name: string;
+  staff_name: string;
+  duration: number;
+  price: number;
+  service_order: number;
+}
+
 interface Appointment {
   id: string;
   date: string;
   time: string;
   total_price: number;
   notes?: string;
+  duration: number;
   client: {
     user: {
       full_name: string;
@@ -33,6 +42,7 @@ interface Appointment {
       name: string;
     };
   }>;
+  service_assignments: ServiceStaffAssignment[];
 }
 
 interface ServiceAddon {
@@ -88,6 +98,7 @@ const AdminBookingSuccess: React.FC = () => {
           time,
           total_price,
           notes,
+          duration,
           client:clients!inner(
             id,
             name,
@@ -96,7 +107,14 @@ const AdminBookingSuccess: React.FC = () => {
           pet:pets!inner(name),
           service:services!inner(name),
           appointment_staff(
-            staff_profile:staff_profiles!inner(name)
+            staff_profile:staff_profiles!inner(name),
+            service_id
+          ),
+          appointment_services(
+            service_order,
+            price,
+            duration,
+            services(name)
           )
         `)
         .eq('id', appointmentId)
@@ -104,14 +122,60 @@ const AdminBookingSuccess: React.FC = () => {
 
       if (error) throw error;
       
+      // Create service-staff assignments
+      const serviceAssignments: ServiceStaffAssignment[] = [];
+      
+      if ((data as any).appointment_services && (data as any).appointment_staff) {
+        // For each service, find the assigned staff
+        (data as any).appointment_services.forEach((aps: any) => {
+          const serviceName = (aps.services as any)?.name || 'Serviço';
+          const serviceDuration = aps.duration || 60;
+          const servicePrice = aps.price || 0;
+          const serviceOrder = aps.service_order || 1;
+          
+          // Find staff assigned to this service
+          const assignedStaff = (data as any).appointment_staff.find((as: any) => 
+            as.service_id === aps.service_id
+          );
+          
+          const staffName = assignedStaff?.staff_profile?.name || 'Não atribuído';
+          
+          serviceAssignments.push({
+            service_name: serviceName,
+            staff_name: staffName,
+            duration: serviceDuration,
+            price: servicePrice,
+            service_order: serviceOrder
+          });
+        });
+      }
+      
+      // If no service assignments, create fallback
+      if (serviceAssignments.length === 0) {
+        const primaryServiceName = (data as any).service?.name || 'Serviço';
+        const primaryStaffName = (data as any).appointment_staff?.[0]?.staff_profile?.name || 'Não atribuído';
+        
+        serviceAssignments.push({
+          service_name: primaryServiceName,
+          staff_name: primaryStaffName,
+          duration: (data as any).duration || 60,
+          price: (data as any).total_price || 0,
+          service_order: 1
+        });
+      }
+
       // Transform the data to match the expected interface
       const transformedData = {
         ...data,
+        service: {
+          name: serviceAssignments.map(sa => sa.service_name).join(', ')
+        },
         client: {
           user: {
-            full_name: (data as any).client?.name || 'Cliente não encontrado' // Use client name directly since we don't have user join
+            full_name: (data as any).client?.name || 'Cliente não encontrado'
           }
-        }
+        },
+        service_assignments: serviceAssignments
       };
       
       setAppointment(transformedData as any);
@@ -282,9 +346,12 @@ const AdminBookingSuccess: React.FC = () => {
     return timeString.substring(0, 5);
   };
 
-  const staffNames = appointment.appointment_staff
-    .map(staff => staff.staff_profile?.name || 'N/A')
-    .join(', ');
+  const staffNames = appointment.appointment_staff && appointment.appointment_staff.length > 0
+    ? appointment.appointment_staff
+        .map(staff => staff.staff_profile?.name || 'N/A')
+        .filter(name => name !== 'N/A')
+        .join(', ')
+    : 'Não atribuído';
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -334,16 +401,48 @@ const AdminBookingSuccess: React.FC = () => {
                 <span className="font-medium">Cliente:</span>
                 <span>{appointment.client.user.full_name}</span>
               </div>
-              <div className="flex items-center space-x-3">
-                <Calendar className="h-4 w-4 text-gray-500" />
-                <span className="font-medium">Serviço:</span>
-                <span>{appointment.service.name}</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <User className="h-4 w-4 text-gray-500" />
-                <span className="font-medium">Profissional:</span>
-                <span>{staffNames}</span>
-              </div>
+              {/* Service Assignments */}
+              {appointment.service_assignments && appointment.service_assignments.length > 0 ? (
+                appointment.service_assignments.map((assignment, index) => (
+                  <div key={index} className="border-l-4 border-blue-500 pl-3 space-y-2">
+                    <div className="flex items-center space-x-3">
+                      <Calendar className="h-4 w-4 text-gray-500" />
+                      <span className="font-medium">Serviço {assignment.service_order}:</span>
+                      <span>{assignment.service_name}</span>
+                    </div>
+                    <div className="flex items-center space-x-3 ml-7">
+                      <User className="h-4 w-4 text-gray-500" />
+                      <span className="font-medium">Profissional:</span>
+                      <span>{assignment.staff_name}</span>
+                    </div>
+                    <div className="flex items-center space-x-3 ml-7">
+                      <Clock className="h-4 w-4 text-gray-500" />
+                      <span className="font-medium">Duração:</span>
+                      <span>{assignment.duration} minutos</span>
+                    </div>
+                    {assignment.price > 0 && (
+                      <div className="flex items-center space-x-3 ml-7">
+                        <DollarSign className="h-4 w-4 text-gray-500" />
+                        <span className="font-medium">Valor:</span>
+                        <span>R$ {assignment.price.toFixed(2)}</span>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div className="flex items-center space-x-3">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <span className="font-medium">Serviço:</span>
+                    <span>{appointment.service.name}</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <User className="h-4 w-4 text-gray-500" />
+                    <span className="font-medium">Profissional:</span>
+                    <span>{staffNames}</span>
+                  </div>
+                </>
+              )}
               <div className="flex items-center space-x-3">
                 <Calendar className="h-4 w-4 text-gray-500" />
                 <span className="font-medium">Data:</span>

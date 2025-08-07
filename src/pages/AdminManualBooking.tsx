@@ -516,49 +516,73 @@ const AdminManualBooking = () => {
       const dateStr = format(bookingData.date, 'yyyy-MM-dd');
       const staffIds = getStaffIds();
 
-      // 🧠 Split booking logic based on override status
-      const rpcName = isOverride ? 'create_booking_admin_override' : 'create_booking_admin';
-      
-      console.log('🔧 [ADMIN_MANUAL_BOOKING] Using RPC:', rpcName, 'with isOverride:', isOverride);
-
-      // Prepare base booking payload
-      const basePayload = {
-        _client_user_id: client.user_id, // Use user_id, not client.id
-        _pet_id: bookingData.petId,
-        _service_id: bookingData.serviceId,
-        _provider_ids: staffIds,
-        _booking_date: dateStr,
-        _time_slot: finalTimeSlot,
-        _notes: bookingData.notes,
-        _calculated_price: bookingData.price,
-        _calculated_duration: bookingData.duration,
-        _created_by: user.id
-      };
-
+      // 🧠 Split booking logic based on override status and dual services
+      let rpcName: string;
       let bookingPayload: any;
 
-      // Add override-specific parameters if this is an override booking
-      if (isOverride) {
-        // Get conflicting appointment ID from the conflict detection
-        const conflicts = await checkForConflicts();
-        const conflictingAppointmentId = conflicts?.[0]?.id; // Use 'id' instead of 'appointment_id'
+      // Check if we have a secondary service (dual-service booking)
+      const hasSecondaryService = selectedSecondaryService !== null;
+      
+      if (hasSecondaryService) {
+        // Use the new dual-service function
+        rpcName = 'create_admin_booking_with_dual_services';
+        console.log('🔧 [ADMIN_MANUAL_BOOKING] Using dual-service RPC:', rpcName);
         
         bookingPayload = {
-          ...basePayload,
-          _override_on_top_of_appointment_id: conflictingAppointmentId,
-          _admin_notes: `Override confirmado em ${dateStr} às ${finalTimeSlot}`
+          _client_user_id: client.user_id,
+          _pet_id: bookingData.petId,
+          _primary_service_id: bookingData.serviceId,
+          _booking_date: dateStr,
+          _time_slot: finalTimeSlot,
+          _secondary_service_id: selectedSecondaryService.id,
+          _calculated_price: bookingData.price,
+          _calculated_duration: bookingData.duration,
+          _notes: bookingData.notes,
+          _provider_ids: staffIds,
+          _created_by: user.id
         };
-        
-        console.log('🔧 [ADMIN_MANUAL_BOOKING] Override parameters:', {
-          conflictingAppointmentId,
-          adminNotes: bookingPayload._admin_notes
-        });
       } else {
-        // Add standard booking parameters
-        bookingPayload = {
-          ...basePayload,
-          _override_conflicts: false
+        // Use the standard single-service function
+        rpcName = isOverride ? 'create_booking_admin_override' : 'create_booking_admin';
+        console.log('🔧 [ADMIN_MANUAL_BOOKING] Using single-service RPC:', rpcName, 'with isOverride:', isOverride);
+
+                // Prepare base booking payload
+        const basePayload = {
+          _client_user_id: client.user_id, // Use user_id, not client.id
+          _pet_id: bookingData.petId,
+          _service_id: bookingData.serviceId,
+          _provider_ids: staffIds,
+          _booking_date: dateStr,
+          _time_slot: finalTimeSlot,
+          _notes: bookingData.notes,
+          _calculated_price: bookingData.price,
+          _calculated_duration: bookingData.duration,
+          _created_by: user.id
         };
+
+        // Add override-specific parameters if this is an override booking
+        if (isOverride) {
+          // Get conflicting appointment ID from the conflict detection
+          const conflicts = await checkForConflicts();
+          const conflictingAppointmentId = conflicts?.[0]?.id; // Use 'id' instead of 'appointment_id'
+          
+          bookingPayload = {
+            ...basePayload,
+            _override_on_top_of_appointment_id: conflictingAppointmentId,
+            _admin_notes: `Override confirmado em ${dateStr} às ${finalTimeSlot}`
+          };
+          
+          console.log('🔧 [ADMIN_MANUAL_BOOKING] Override parameters:', {
+            conflictingAppointmentId,
+            adminNotes: bookingPayload._admin_notes
+          });
+        } else {
+          // Add standard booking parameters
+          bookingPayload = {
+            ...basePayload,
+            _override_conflicts: false
+          };
+                }
       }
 
       console.log('🔧 [ADMIN_MANUAL_BOOKING] Creating booking with payload:', bookingPayload);
