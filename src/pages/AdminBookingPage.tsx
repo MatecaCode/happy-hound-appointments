@@ -16,6 +16,7 @@ import { ptBR } from 'date-fns/locale';
 import { createAdminBooking } from '@/utils/adminBookingUtils';
 import { useNavigate } from 'react-router-dom';
 import BookingReviewModal from '@/components/admin/BookingReviewModal';
+import { AlertCircle } from 'lucide-react';
 
 interface Client {
   id: string;
@@ -54,6 +55,10 @@ interface TimeSlot {
 const AdminBookingPage = () => {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
+  
+  console.log('🔍 [ADMIN_BOOKING] Component initialized');
+  console.log('🔍 [ADMIN_BOOKING] User:', user?.email);
+  console.log('🔍 [ADMIN_BOOKING] Is Admin:', isAdmin);
   const [clients, setClients] = useState<Client[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -74,18 +79,32 @@ const AdminBookingPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewBookingData, setReviewBookingData] = useState<any>(null);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   // Load initial data
   useEffect(() => {
     if (!isAdmin) return;
     
+    console.log('🔍 [ADMIN_BOOKING] Loading initial data...');
+    
     const loadData = async () => {
+      setIsDataLoading(true);
+      setDataError(null);
       try {
         // Load clients
-        const { data: clientsData } = await supabase
+        const { data: clientsData, error: clientsError } = await supabase
           .from('clients')
           .select('id, name, user_id')
           .order('name');
+        
+        if (clientsError) {
+          console.error('Error loading clients:', clientsError);
+          toast.error('Erro ao carregar clientes');
+          return;
+        }
+        
+        console.log('🔍 [ADMIN_BOOKING] Loaded clients:', clientsData);
         setClients(clientsData || []);
 
         // Load services with additional fields for role requirements
@@ -102,9 +121,17 @@ const AdminBookingPage = () => {
           .select('id, name, can_groom, can_vet, can_bathe')
           .order('name');
         setStaff(staffData || []);
+        
+        console.log('🔍 [ADMIN_BOOKING] Initial data loaded successfully');
+        console.log('🔍 [ADMIN_BOOKING] Clients:', clientsData?.length || 0);
+        console.log('🔍 [ADMIN_BOOKING] Services:', servicesData?.length || 0);
+        console.log('🔍 [ADMIN_BOOKING] Staff:', staffData?.length || 0);
       } catch (error) {
         console.error('Error loading data:', error);
+        setDataError('Erro ao carregar dados');
         toast.error('Erro ao carregar dados');
+      } finally {
+        setIsDataLoading(false);
       }
     };
 
@@ -120,12 +147,21 @@ const AdminBookingPage = () => {
 
     const loadPets = async () => {
       try {
-        const { data: petsData } = await supabase
+        console.log('🔍 [ADMIN_BOOKING] Loading pets for client:', selectedClient);
+        const { data: petsData, error: petsError } = await supabase
           .from('pets')
           .select('id, name, breed')
           .eq('client_id', selectedClient)
           .eq('active', true)
           .order('name');
+        
+        if (petsError) {
+          console.error('Error loading pets:', petsError);
+          toast.error('Erro ao carregar pets');
+          return;
+        }
+        
+        console.log('🔍 [ADMIN_BOOKING] Loaded pets:', petsData);
         setPets(petsData || []);
       } catch (error) {
         console.error('Error loading pets:', error);
@@ -325,6 +361,7 @@ const AdminBookingPage = () => {
   };
 
   if (!isAdmin) {
+    console.log('🔍 [ADMIN_BOOKING] Access denied - user is not admin');
     return (
       <Layout>
         <div className="max-w-4xl mx-auto px-6 py-16">
@@ -350,11 +387,34 @@ const AdminBookingPage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {isDataLoading && (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-2 text-gray-600">Carregando dados...</p>
+              </div>
+            )}
+            
+            {dataError && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                  <p className="text-red-700">{dataError}</p>
+                </div>
+              </div>
+            )}
+            
+            {!isDataLoading && !dataError && (
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="client">Cliente *</Label>
-                  <Select value={selectedClient} onValueChange={setSelectedClient}>
+                  <Select 
+                    value={selectedClient} 
+                    onValueChange={(value) => {
+                      console.log('🔍 [ADMIN_BOOKING] Client selected:', value);
+                      setSelectedClient(value);
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um cliente" />
                     </SelectTrigger>
@@ -366,11 +426,24 @@ const AdminBookingPage = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  {clients.length === 0 && (
+                    <p className="text-sm text-red-600">Nenhum cliente encontrado</p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Clientes carregados: {clients.length} | Cliente selecionado: {selectedClient || 'Nenhum'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="pet">Pet *</Label>
-                  <Select value={selectedPet} onValueChange={setSelectedPet} disabled={!selectedClient}>
+                  <Select 
+                    value={selectedPet} 
+                    onValueChange={(value) => {
+                      console.log('🔍 [ADMIN_BOOKING] Pet selected:', value);
+                      setSelectedPet(value);
+                    }}
+                    disabled={!selectedClient}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Selecione um pet" />
                     </SelectTrigger>
@@ -382,6 +455,12 @@ const AdminBookingPage = () => {
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedClient && pets.length === 0 && (
+                    <p className="text-sm text-red-600">Nenhum pet encontrado para este cliente</p>
+                  )}
+                  <p className="text-xs text-gray-500">
+                    Pets carregados: {pets.length} | Pet selecionado: {selectedPet || 'Nenhum'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -538,6 +617,7 @@ const AdminBookingPage = () => {
                 {isLoading ? 'Criando...' : 'Criar Agendamento'}
               </Button>
             </form>
+            )}
           </CardContent>
         </Card>
       </div>

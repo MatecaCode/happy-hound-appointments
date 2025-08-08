@@ -595,19 +595,38 @@ const AdminAppointments = () => {
 
   // Filter appointments based on search and filters
   const filteredAppointments = appointments.filter(appointment => {
-    const matchesSearch = searchTerm === '' || 
-      appointment.pet_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.service_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      appointment.staff_names?.some(name => name.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter;
-    
-    const matchesDate = dateFilter === 'all' || 
-      (dateFilter === 'today' && format(appointment.date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')) ||
-      (dateFilter === 'week' && appointment.date >= new Date() && appointment.date <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
-    
-    return matchesSearch && matchesStatus && matchesDate;
+    try {
+      const matchesSearch = searchTerm === '' || 
+        appointment.pet_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        appointment.service_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        appointment.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        appointment.staff_names?.some(name => name.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      const matchesStatus = statusFilter === 'all' || appointment.status === statusFilter;
+      
+      let matchesDate = true;
+      if (dateFilter !== 'all') {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        if (dateFilter === 'today') {
+          const appointmentDate = new Date(appointment.date);
+          appointmentDate.setHours(0, 0, 0, 0);
+          matchesDate = appointmentDate.getTime() === today.getTime();
+        } else if (dateFilter === 'week') {
+          const appointmentDate = new Date(appointment.date);
+          const endOfWeek = new Date(today);
+          endOfWeek.setDate(today.getDate() + 7);
+          
+          matchesDate = appointmentDate >= today && appointmentDate <= endOfWeek;
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesDate;
+    } catch (error) {
+      console.error('Error filtering appointment:', error, appointment);
+      return false; // Exclude problematic appointments
+    }
   });
 
   const pendingAppointments = filteredAppointments.filter(apt => apt.status === 'pending');
