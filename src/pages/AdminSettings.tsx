@@ -212,7 +212,47 @@ const AdminSettings = () => {
 
       
 
-      toast.success('Staff criado com sucesso');
+      // Generate invite and send email via Edge Function
+      try {
+        // First create the code on the server (also done inside the edge fn if omitted)
+        const { data: inviteCode, error: codeError } = await supabase.rpc('create_staff_invite_code', {
+          p_email: staffFormData.email,
+          p_notes: `Admin invite for ${staffFormData.email}`
+        });
+
+        if (codeError) {
+          console.warn('[ADMIN_SETTINGS] Invite code error:', codeError.message);
+        }
+
+        // Send email invitation via Edge Function
+        console.log('✅ [ADMIN_SETTINGS] Staff created successfully');
+        console.log('📧 [ADMIN_SETTINGS] Invite code generated:', inviteCode);
+        console.log('📧 [ADMIN_SETTINGS] Sending email to:', staffFormData.email);
+        
+        try {
+          const { data: emailData, error: emailError } = await supabase.functions.invoke('send-staff-invite', {
+            body: { 
+              email: staffFormData.email, 
+              name: staffFormData.name,
+              code: inviteCode || undefined 
+            },
+          });
+
+          if (emailError) {
+            console.error('❌ [ADMIN_SETTINGS] Email sending error:', emailError);
+            toast.success(`Staff criado com sucesso! Código de convite: ${inviteCode} (Email não enviado)`);
+          } else {
+            console.log('✅ [ADMIN_SETTINGS] Email sent successfully:', emailData);
+            toast.success(`Staff criado com sucesso! Email enviado para ${staffFormData.email}`);
+          }
+        } catch (emailError) {
+          console.error('❌ [ADMIN_SETTINGS] Email sending failed:', emailError);
+          toast.success(`Staff criado com sucesso! Código de convite: ${inviteCode} (Email não enviado)`);
+        }
+      } catch (e) {
+        console.warn('[ADMIN_SETTINGS] Invite email failed:', e);
+        toast.success('Staff criado com sucesso');
+      }
       setIsCreateStaffModalOpen(false);
       resetStaffForm();
       fetchStaff();

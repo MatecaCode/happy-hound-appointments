@@ -10,13 +10,19 @@ import {
   PawPrint, 
   Calendar, 
   Clock, 
-  TrendingUp,
   AlertCircle,
   CheckCircle,
-  Settings
+  Settings,
+  DollarSign,
+  UserCheck,
+  TrendingUp,
+  Activity,
+  Zap
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AdminLayout from '@/components/AdminLayout';
+import QuickStatsCard from '@/components/admin/QuickStatsCard';
+import ActionCard from '@/components/admin/ActionCard';
 
 interface DashboardStats {
   totalUsers: number;
@@ -24,7 +30,9 @@ interface DashboardStats {
   totalBookings: number;
   todayServices: number;
   pendingApprovals: number;
-  serviceFollowUps: number;
+  staffOnDuty: number;
+  revenueToday: number;
+  pendingCancellations: number;
 }
 
 const AdminDashboard = () => {
@@ -35,7 +43,9 @@ const AdminDashboard = () => {
     totalBookings: 0,
     todayServices: 0,
     pendingApprovals: 0,
-    serviceFollowUps: 0,
+    staffOnDuty: 0,
+    revenueToday: 0,
+    pendingCancellations: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +62,7 @@ const AdminDashboard = () => {
         .from('user_roles')
         .select('*', { count: 'exact', head: true });
 
-      // Fetch total pets (assuming pets table exists)
+      // Fetch total pets
       const { count: petsCount } = await supabase
         .from('pets')
         .select('*', { count: 'exact', head: true });
@@ -69,19 +79,43 @@ const AdminDashboard = () => {
         .select('*', { count: 'exact', head: true })
         .eq('date', today);
 
-      // Fetch pending approvals (placeholder)
-      const pendingApprovalsCount = 0; // TODO: Implement when approval system is added
+      // Fetch pending approvals
+      const { count: pendingApprovalsCount } = await supabase
+        .from('appointments')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
 
-      // Fetch service follow-ups (placeholder)
-      const serviceFollowUpsCount = 0; // TODO: Implement when follow-up system is added
+      // Fetch staff on duty (staff with availability today)
+      const { count: staffOnDutyCount } = await supabase
+        .from('staff_availability')
+        .select('*', { count: 'exact', head: true })
+        .eq('date', today)
+        .eq('available', true);
+
+      // Fetch revenue today (sum of total_price for today's appointments)
+      const { data: todayAppointments } = await supabase
+        .from('appointments')
+        .select('total_price')
+        .eq('date', today)
+        .eq('status', 'confirmed');
+      
+      const revenueToday = todayAppointments?.reduce((sum, apt) => sum + (apt.total_price || 0), 0) || 0;
+
+      // Fetch pending cancellations
+      const { count: pendingCancellationsCount } = await supabase
+        .from('appointments')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'cancelled');
 
       setStats({
         totalUsers: usersCount || 0,
         totalPets: petsCount || 0,
         totalBookings: appointmentsCount || 0,
         todayServices: todayServicesCount || 0,
-        pendingApprovals: pendingApprovalsCount,
-        serviceFollowUps: serviceFollowUpsCount,
+        pendingApprovals: pendingApprovalsCount || 0,
+        staffOnDuty: staffOnDutyCount || 0,
+        revenueToday,
+        pendingCancellations: pendingCancellationsCount || 0,
       });
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
@@ -92,195 +126,202 @@ const AdminDashboard = () => {
   };
 
   if (!user) {
-    return <div>Carregando...</div>;
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-blue mx-auto mb-4"></div>
+        <p className="text-gray-600">Carregando...</p>
+      </div>
+    </div>;
   }
 
   return (
     <AdminLayout>
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard Administrativo</h1>
-          <p className="text-gray-600 mt-2">Visão geral do sistema e KPIs principais</p>
-        </div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-6">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Dashboard Administrativo</h1>
+            <p className="text-sm font-medium text-gray-600">Visão geral do sistema e KPIs principais</p>
+          </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Link to="/admin/actions">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+          {/* Quick Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <QuickStatsCard
+              title="Agendamentos Hoje"
+              value={stats.todayServices}
+              icon={<Calendar className="h-6 w-6" />}
+              iconBgColor="bg-brand-blue/10"
+              iconColor="text-brand-blue"
+              href="/admin/agenda-hoje"
+              loading={loading}
+            />
+            
+            <QuickStatsCard
+              title="Aprovações Pendentes"
+              value={stats.pendingApprovals}
+              icon={<AlertCircle className="h-6 w-6" />}
+              iconBgColor="bg-orange-100"
+              iconColor="text-orange-600"
+              href="/admin/actions"
+              loading={loading}
+            />
+            
+            <QuickStatsCard
+              title="Staff em Serviço"
+              value={stats.staffOnDuty}
+              icon={<UserCheck className="h-6 w-6" />}
+              iconBgColor="bg-green-100"
+              iconColor="text-green-600"
+              href="/admin/staff-availability"
+              loading={loading}
+            />
+            
+            <QuickStatsCard
+              title="Receita Hoje"
+              value={`R$ ${stats.revenueToday.toFixed(2)}`}
+              icon={<DollarSign className="h-6 w-6" />}
+              iconBgColor="bg-brand-gold/10"
+              iconColor="text-brand-gold"
+              href="/admin/reports"
+              loading={loading}
+            />
+          </div>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <ActionCard
+              title="Centro de Ações"
+              description="Agendamentos manuais, modificações e cobranças extras"
+              icon={<Settings className="h-5 w-5" />}
+              iconBgColor="bg-brand-blue/10"
+              iconColor="text-brand-blue"
+              href="/admin/actions"
+            />
+            
+            <ActionCard
+              title="Configurações"
+              description="Staff, serviços, preços e horários de funcionamento"
+              icon={<Settings className="h-5 w-5" />}
+              iconBgColor="bg-brand-sage/10"
+              iconColor="text-brand-sage"
+              href="/admin/settings"
+            />
+            
+            <ActionCard
+              title="Logs de Ações"
+              description="Histórico de ações administrativas"
+              icon={<Activity className="h-5 w-5" />}
+              iconBgColor="bg-gray-100"
+              iconColor="text-gray-600"
+              href="/admin/logs"
+            />
+          </div>
+
+          {/* KPIs Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <Link to="/admin/clients">
+              <Card className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide text-gray-500">Total de Usuários</CardTitle>
+                  <Users className="h-5 w-5 text-gray-400" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.totalUsers}</div>
+                  <p className="text-xs font-medium text-gray-500 mt-1">
+                    Clientes, staff e administradores
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link to="/admin/pets">
+              <Card className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide text-gray-500">Total de Pets</CardTitle>
+                  <PawPrint className="h-5 w-5 text-gray-400" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.totalPets}</div>
+                  <p className="text-xs font-medium text-gray-500 mt-1">
+                    Pets cadastrados no sistema
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link to="/admin/appointments">
+              <Card className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide text-gray-500">Total de Agendamentos</CardTitle>
+                  <Calendar className="h-5 w-5 text-gray-400" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.totalBookings}</div>
+                  <p className="text-xs font-medium text-gray-500 mt-1">
+                    Todos os agendamentos realizados
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+
+            <Link to="/admin/agenda-hoje">
+              <Card className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border-0">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide text-gray-500">Serviços Hoje</CardTitle>
+                  <Clock className="h-5 w-5 text-gray-400" />
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.todayServices}</div>
+                  <p className="text-xs font-medium text-gray-500 mt-1">
+                    Agendamentos para hoje
+                  </p>
+                </CardContent>
+              </Card>
+            </Link>
+          </div>
+
+          {/* Pending Approvals Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="bg-white rounded-xl shadow-sm border-0">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Settings className="h-5 w-5" />
-                  Centro de Ações
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  Agendamentos manuais, modificações e cobranças extras
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/admin/settings">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Settings className="h-5 w-5" />
-                  Configurações
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  Staff, serviços, preços e horários de funcionamento
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/admin/logs">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <AlertCircle className="h-5 w-5" />
-                  Logs de Ações
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  Histórico de ações administrativas
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        {/* KPIs Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Link to="/admin/clients">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total de Usuários</CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{loading ? '...' : stats.totalUsers}</div>
-                <p className="text-xs text-muted-foreground">
-                  Clientes, staff e administradores
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/admin/pets">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total de Pets</CardTitle>
-                <PawPrint className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{loading ? '...' : stats.totalPets}</div>
-                <p className="text-xs text-muted-foreground">
-                  Pets cadastrados no sistema
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/admin/appointments">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total de Agendamentos</CardTitle>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{loading ? '...' : stats.totalBookings}</div>
-                <p className="text-xs text-muted-foreground">
-                  Todos os agendamentos realizados
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/admin/agenda-hoje">
-            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Serviços Hoje</CardTitle>
-                <Clock className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{loading ? '...' : stats.todayServices}</div>
-                <p className="text-xs text-muted-foreground">
-                  Agendamentos para hoje
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-
-        {/* Alerts and Notifications */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Pending Approvals */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="h-5 w-5 text-orange-500" />
-                Aprovações Pendentes
-              </CardTitle>
-              <CardDescription>
-                Itens que requerem atenção administrativa
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {stats.pendingApprovals > 0 ? (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Agendamentos pendentes</span>
-                    <Badge variant="destructive">{stats.pendingApprovals}</Badge>
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                      <AlertCircle className="h-5 w-5 text-orange-600" />
+                    </div>
+                    <span className="text-lg font-semibold text-gray-900">Aprovações Pendentes</span>
                   </div>
-                  <Button size="sm" variant="outline">
-                    Ver Detalhes
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="text-sm">Nenhuma aprovação pendente</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Service Follow-ups */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-blue-500" />
-                Acompanhamentos de Serviços
-              </CardTitle>
-              <CardDescription>
-                Serviços que requerem follow-up
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {stats.serviceFollowUps > 0 ? (
-                <div className="space-y-3">
+                  {stats.pendingApprovals > 0 && (
+                    <Badge variant="destructive" className="text-lg px-3 py-1 bg-red-100 text-red-800 border-red-200">
+                      {stats.pendingApprovals}
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription className="text-sm font-medium text-gray-600">
+                  Itens que requerem atenção administrativa
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {stats.pendingApprovals > 0 ? (
                   <div className="flex items-center justify-between">
-                    <span className="text-sm">Follow-ups necessários</span>
-                    <Badge variant="secondary">{stats.serviceFollowUps}</Badge>
+                    <span className="text-sm font-medium text-gray-600">
+                      {stats.pendingApprovals} agendamento(s) aguardando aprovação
+                    </span>
+                    <Link to="/admin/actions">
+                      <Button size="sm" variant="outline" className="border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white">
+                        Gerenciar
+                      </Button>
+                    </Link>
                   </div>
-                  <Button size="sm" variant="outline">
-                    Ver Detalhes
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="text-sm">Nenhum follow-up necessário</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                ) : (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="text-sm font-medium">Nenhuma aprovação pendente</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </AdminLayout>

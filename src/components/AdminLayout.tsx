@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { 
   Users, 
@@ -8,17 +8,40 @@ import {
   AlertCircle, 
   LogOut,
   Home,
-  PawPrint
+  PawPrint,
+  Calendar,
+  UserCheck,
+  BarChart3,
+  Menu,
+  X,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
+interface NavItem {
+  title: string;
+  href: string;
+  icon: React.ReactNode;
+  badge?: number;
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { user, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<string[]>(['appointments', 'staff', 'clients']);
 
   // Redirect if not admin
   React.useEffect(() => {
@@ -27,13 +50,61 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     }
   }, [user, isAdmin, navigate]);
 
+  const toggleSection = (sectionTitle: string) => {
+    setExpandedSections(prev => 
+      prev.includes(sectionTitle) 
+        ? prev.filter(s => s !== sectionTitle)
+        : [...prev, sectionTitle]
+    );
+  };
+
+  const navigationSections: NavSection[] = [
+    {
+      title: 'Appointments',
+      items: [
+        { title: 'Dashboard', href: '/admin', icon: <Home className="h-5 w-5" /> },
+        { title: 'View Appointments', href: '/admin/appointments', icon: <Calendar className="h-5 w-5" /> },
+        { title: 'Create Appointment', href: '/admin/actions', icon: <AlertCircle className="h-5 w-5" /> },
+        { title: 'Today\'s Agenda', href: '/admin/agenda-hoje', icon: <Calendar className="h-5 w-5" /> },
+      ]
+    },
+    {
+      title: 'Staff Management',
+      items: [
+        { title: 'View Staff', href: '/admin/staff', icon: <Users className="h-5 w-5" /> },
+        { title: 'Availability Manager', href: '/admin/staff-availability', icon: <UserCheck className="h-5 w-5" /> },
+        { title: 'Staff Calendar', href: '/admin/staff-calendar', icon: <Calendar className="h-5 w-5" /> },
+      ]
+    },
+    {
+      title: 'Clients & Pets',
+      items: [
+        { title: 'View Clients', href: '/admin/clients', icon: <Users className="h-5 w-5" /> },
+        { title: 'View Pets', href: '/admin/pets', icon: <PawPrint className="h-5 w-5" /> },
+      ]
+    },
+    {
+      title: 'Reports',
+      items: [
+        { title: 'Reports', href: '/admin/reports', icon: <BarChart3 className="h-5 w-5" /> },
+        { title: 'Audit Logs', href: '/admin/logs', icon: <AlertCircle className="h-5 w-5" /> },
+      ]
+    },
+    {
+      title: 'Settings',
+      items: [
+        { title: 'System Settings', href: '/admin/settings', icon: <Settings className="h-5 w-5" /> },
+      ]
+    }
+  ];
+
   if (!user || !isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600 mb-4">Acesso Negado</h1>
           <p className="text-gray-600 mb-4">Você não tem permissão para acessar esta área.</p>
-          <Button onClick={() => navigate('/')}>
+          <Button onClick={() => navigate('/')} className="bg-brand-blue hover:bg-brand-dark-blue">
             Voltar ao Início
           </Button>
         </div>
@@ -41,82 +112,134 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     );
   }
 
+  const isActiveLink = (href: string) => {
+    if (href === '/admin') {
+      return location.pathname === '/admin';
+    }
+    return location.pathname.startsWith(href);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Admin Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4">
+      {/* Mobile Header */}
+      <header className="lg:hidden bg-white shadow-sm border-b">
+        <div className="px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <Link to="/admin" className="flex items-center gap-2 text-xl font-bold text-gray-900">
-                <Home className="h-6 w-6" />
-                Admin Panel
-              </Link>
-              
-              {/* Admin Navigation */}
-              <nav className="hidden md:flex items-center gap-4">
-                <Link to="/admin">
-                  <Button variant="ghost" size="sm">
-                    Dashboard
-                  </Button>
-                </Link>
-                <Link to="/admin/actions">
-                  <Button variant="ghost" size="sm">
-                    <AlertCircle className="h-4 w-4 mr-2" />
-                    Ações
-                  </Button>
-                </Link>
-                <Link to="/admin/settings">
-                  <Button variant="ghost" size="sm">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Configurações
-                  </Button>
-                </Link>
-                <Link to="/admin/clients">
-                  <Button variant="ghost" size="sm">
-                    <Users className="h-4 w-4 mr-2" />
-                    Clientes
-                  </Button>
-                </Link>
-                <Link to="/admin/pets">
-                  <Button variant="ghost" size="sm">
-                    <PawPrint className="h-4 w-4 mr-2" />
-                    Pets
-                  </Button>
-                </Link>
-                <Link to="/admin/logs">
-                  <Button variant="ghost" size="sm">
-                    <AlertCircle className="h-4 w-4 mr-2" />
-                    Logs
-                  </Button>
-                </Link>
-              </nav>
-            </div>
+            <Link to="/admin" className="flex items-center gap-2 text-xl font-bold text-gray-900">
+              <Home className="h-6 w-6 text-brand-blue" />
+              <span>VetTale Admin</span>
+            </Link>
             
-            <div className="flex items-center gap-4">
-              <div className="text-sm text-gray-600">
-                <span className="font-medium">{user.email}</span>
-                <span className="mx-2">•</span>
-                <span className="text-blue-600">Admin</span>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => signOut()}
-                className="flex items-center gap-2"
-              >
-                <LogOut className="h-4 w-4" />
-                Sair
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden"
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="flex-1">
-        {children}
-      </main>
+      <div className="flex">
+        {/* Sidebar Navigation */}
+        <aside className={cn(
+          "fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0",
+          mobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+          {/* Desktop Header */}
+          <div className="hidden lg:block px-6 py-6 border-b border-gray-200">
+            <Link to="/admin" className="flex items-center gap-3 text-xl font-bold text-gray-900">
+              <div className="h-10 w-10 bg-brand-blue/10 rounded-xl flex items-center justify-center">
+                <Home className="h-6 w-6 text-brand-blue" />
+              </div>
+              <span>VetTale Admin</span>
+            </Link>
+          </div>
+
+          {/* Navigation */}
+          <nav className="px-4 py-6 space-y-6">
+            {navigationSections.map((section) => (
+              <div key={section.title} className="space-y-2">
+                <button
+                  onClick={() => toggleSection(section.title)}
+                  className="flex items-center justify-between w-full px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <span className="uppercase tracking-wide">{section.title}</span>
+                  {expandedSections.includes(section.title) ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+                
+                {expandedSections.includes(section.title) && (
+                  <div className="ml-4 space-y-1">
+                    {section.items.map((item) => (
+                      <Link
+                        key={item.href}
+                        to={item.href}
+                        className={cn(
+                          "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                          isActiveLink(item.href)
+                            ? "bg-brand-blue text-white shadow-sm"
+                            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                        )}
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        {item.icon}
+                        <span>{item.title}</span>
+                        {item.badge && (
+                          <span className="ml-auto bg-red-100 text-red-800 text-xs font-medium px-2 py-1 rounded-full">
+                            {item.badge}
+                          </span>
+                        )}
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </nav>
+
+          {/* User Info */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 bg-brand-blue/10 rounded-lg flex items-center justify-center">
+                  <Users className="h-4 w-4 text-brand-blue" />
+                </div>
+                <div className="text-sm">
+                  <p className="font-medium text-gray-900 truncate">{user.email}</p>
+                  <p className="text-xs text-brand-blue font-medium">Administrator</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => signOut()}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </aside>
+
+        {/* Mobile Overlay */}
+        {mobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* Main Content */}
+        <main className="flex-1 lg:ml-0">
+          {children}
+        </main>
+      </div>
     </div>
   );
 };
