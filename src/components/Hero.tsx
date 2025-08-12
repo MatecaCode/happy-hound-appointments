@@ -13,7 +13,7 @@ const Hero = () => {
   const imageAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
 
   return (
-    <section className="relative bg-gradient-to-br from-primary/5 to-secondary/10 py-20" style={{ backgroundColor: '#FFFCF8' }}>
+    <section className="relative bg-gradient-to-br from-brand-primary/5 to-brand-secondary/10 py-20" style={{ backgroundColor: '#FFFCF8' }}>
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-8">
@@ -24,7 +24,7 @@ const Hero = () => {
                   titleAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
                 }`}
               >
-                Cuidado Completo para seu <span className="text-primary">Pet</span>
+                Cuidado Completo para seu <span className="text-brand-primary">Pet</span>
               </h1>
               <p 
                 ref={subtitleAnimation.ref}
@@ -54,15 +54,15 @@ const Hero = () => {
               }`}
             >
               <div className="flex items-center gap-2 group">
-                <Calendar className="h-5 w-5 text-primary transition-transform duration-300 group-hover:scale-110" />
+                <Calendar className="h-5 w-5 text-brand-primary transition-transform duration-300 group-hover:scale-110" />
                 <span className="text-sm">Agendamento Online</span>
               </div>
               <div className="flex items-center gap-2 group">
-                <Heart className="h-5 w-5 text-primary transition-transform duration-300 group-hover:scale-110" />
+                <Heart className="h-5 w-5 text-brand-primary transition-transform duration-300 group-hover:scale-110" />
                 <span className="text-sm">Cuidado Personalizado</span>
               </div>
               <div className="flex items-center gap-2 group">
-                <Shield className="h-5 w-5 text-primary transition-transform duration-300 group-hover:scale-110" />
+                <Shield className="h-5 w-5 text-brand-primary transition-transform duration-300 group-hover:scale-110" />
                 <span className="text-sm">Segurança Total</span>
               </div>
             </div>

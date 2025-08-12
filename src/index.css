@@ -1,4 +1,150 @@
 
+/* === Brand Headline Font === */
+@font-face {
+  font-family: "Pogonia";
+  src: url("/fonts/Pogonia-Thin.otf") format("opentype");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pogonia";
+  src: url("/fonts/Pogonia-ExtraLight.otf") format("opentype");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pogonia";
+  src: url("/fonts/Pogonia-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pogonia";
+  src: url("/fonts/Pogonia-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pogonia";
+  src: url("/fonts/Pogonia-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pogonia";
+  src: url("/fonts/Pogonia-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pogonia";
+  src: url("/fonts/Pogonia-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pogonia";
+  src: url("/fonts/Pogonia-ExtraBold.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pogonia";
+  src: url("/fonts/Pogonia-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Fallback alias if runtime reports 'Pagonia' instead of 'Pogonia' */
+@font-face {
+  font-family: "Pagonia";
+  src: url("/fonts/Pogonia-Thin.otf") format("opentype");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pagonia";
+  src: url("/fonts/Pogonia-ExtraLight.otf") format("opentype");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pagonia";
+  src: url("/fonts/Pogonia-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pagonia";
+  src: url("/fonts/Pogonia-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pagonia";
+  src: url("/fonts/Pogonia-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pagonia";
+  src: url("/fonts/Pogonia-Semibold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pagonia";
+  src: url("/fonts/Pogonia-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pagonia";
+  src: url("/fonts/Pogonia-ExtraBold.otf") format("opentype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Pagonia";
+  src: url("/fonts/Pogonia-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -95,9 +241,22 @@
     font-family: 'Nunito', system-ui, sans-serif;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-bold tracking-tight;
-    font-family: 'Quicksand', system-ui, sans-serif;
+  h1, h2 {
+    @apply font-heading tracking-tight;
+    font-weight: 900; /* Black */
+    letter-spacing: -0.01em;
+  }
+
+  h3, h4 {
+    @apply font-heading tracking-tight;
+    font-weight: 700; /* Bold */
+    letter-spacing: -0.005em;
+  }
+
+  h5, h6 {
+    @apply font-heading tracking-tight;
+    font-weight: 600; /* Semibold */
+    letter-spacing: -0.002em;
   }
 
   h1 {
@@ -110,6 +269,17 @@
   
   h3 {
     @apply text-2xl sm:text-3xl;
+  }
+
+  /* Brand link and focus styles */
+  a {
+    @apply text-brand-primary underline-offset-4;
+  }
+  a:hover { 
+    @apply underline; 
+  }
+  :focus-visible { 
+    @apply outline-none ring-2 ring-brand-primary; 
   }
 }
 

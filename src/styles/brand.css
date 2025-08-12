@@ -1,0 +1,21 @@
+/* Auto-generated from brand-tokens.json */
+:root {
+  --brand-primary: 43 112 178;
+  --brand-primaryforeground: 255 255 255;
+  --brand-secondary: 107 174 219;
+  --brand-secondaryforeground: 255 255 255;
+  --brand-accent: 231 240 255;
+  --brand-accentforeground: 43 112 178;
+  --brand-neutral: 26 70 112;
+  --brand-muted: 241 245 249;
+  --brand-mutedforeground: 51 65 85;
+  --brand-warning: 232 183 75;
+  --brand-danger: 220 38 38;
+  --brand-success: 143 191 159;
+}
+
+/* Optional dark mode adjustments */
+.dark {
+  --brand-muted: 30 41 59;
+  --brand-muted-foreground: 203 213 225;
+}

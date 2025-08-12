@@ -148,7 +148,7 @@ const Navigation = () => {
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2">
               <img src="/lovable-uploads/6e31bc13-c687-4ceb-87a4-29955094f30f.png" alt="Vettale" className="h-8 w-8" />
-              <span className="text-xl font-bold text-primary">Vettale</span>
+                              <span className="text-xl font-bold text-brand-primary">Vettale</span>
             </Link>
           </div>
 

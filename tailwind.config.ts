@@ -64,6 +64,19 @@ export default {
 					ring: 'hsl(var(--sidebar-ring))'
 				},
 				brand: {
+					primary:   "rgb(var(--brand-primary) / <alpha-value>)",
+					primaryFg: "rgb(var(--brand-primaryforeground) / <alpha-value>)",
+					secondary: "rgb(var(--brand-secondary) / <alpha-value>)",
+					secondaryFg:"rgb(var(--brand-secondaryforeground) / <alpha-value>)",
+					accent:    "rgb(var(--brand-accent) / <alpha-value>)",
+					accentFg:  "rgb(var(--brand-accentforeground) / <alpha-value>)",
+					muted:     "rgb(var(--brand-muted) / <alpha-value>)",
+					mutedFg:   "rgb(var(--brand-mutedforeground) / <alpha-value>)",
+					neutral:   "rgb(var(--brand-neutral) / <alpha-value>)",
+					warning:   "rgb(var(--brand-warning) / <alpha-value>)",
+					danger:    "rgb(var(--brand-danger) / <alpha-value>)",
+					success:   "rgb(var(--brand-success) / <alpha-value>)",
+					// Legacy colors for backward compatibility
 					blue: '#2B70B2',
 					'light-blue': '#6BAEDB',
 					'dark-blue': '#1A4670',
@@ -105,7 +118,12 @@ export default {
 				'accordion-up': 'accordion-up 0.2s ease-out',
 				'bounce-slow': 'bounce-slow 3s ease-in-out infinite',
 			},
+			ringColor: ({ theme }) => ({
+				DEFAULT: theme("colors.brand.primary"),
+			}),
 			fontFamily: {
+				heading: ["Pogonia", "Pagonia", "ui-sans-serif", "system-ui", "sans-serif"],
+				body: ["Nunito", "ui-sans-serif", "system-ui", "sans-serif"],
 				nunito: ['Nunito', 'system-ui', 'sans-serif'],
 				quicksand: ['Quicksand', 'system-ui', 'sans-serif'],
 			}

@@ -10,7 +10,7 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <Dog className="h-6 w-6 text-primary" />
+              <Dog className="h-6 w-6 text-brand-primary" />
               <span className="text-xl font-bold">Vettale</span>
             </div>
             <p className="text-sm">
@@ -22,22 +22,22 @@ const Footer: React.FC = () => {
             <h4 className="font-semibold text-lg mb-4">Links Rápidos</h4>
             <ul className="space-y-2">
               <li>
-                <Link to="/" className="hover:text-primary transition-colors">
+                <Link to="/" className="hover:text-brand-primary transition-colors">
                   Início
                 </Link>
               </li>
               <li>
-                <Link to="/services" className="hover:text-primary transition-colors">
+                <Link to="/services" className="hover:text-brand-primary transition-colors">
                   Serviços
                 </Link>
               </li>
               <li>
-                <Link to="/appointments" className="hover:text-primary transition-colors">
+                <Link to="/appointments" className="hover:text-brand-primary transition-colors">
                   Meus Agendamentos
                 </Link>
               </li>
               <li>
-                <Link to="/book" className="hover:text-primary transition-colors">
+                <Link to="/book" className="hover:text-brand-primary transition-colors">
                   Agendar Consulta
                 </Link>
               </li>

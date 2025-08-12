@@ -1,0 +1,16 @@
+{
+  "brand": {
+    "primary": "#2B70B2",
+    "primaryForeground": "#FFFFFF",
+    "secondary": "#6BAEDB",
+    "secondaryForeground": "#FFFFFF",
+    "accent": "#E7F0FF",
+    "accentForeground": "#2B70B2",
+    "neutral": "#1A4670",
+    "muted": "#F1F5F9",
+    "mutedForeground": "#334155",
+    "warning": "#E8B74B",
+    "danger": "#DC2626",
+    "success": "#8FBF9F"
+  }
+}

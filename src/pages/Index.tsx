@@ -105,7 +105,7 @@ useEffect(() => {
                   institutionalAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
                 }`}
               >
-                <h2 className="mb-4">Tradição e <span className="text-primary">Inovação</span> desde 1981</h2>
+                <h2 className="mb-4">Tradição e <span className="text-brand-primary">Inovação</span> desde 1981</h2>
                 <p className="text-muted-foreground mb-6">
                   Há mais de 40 anos cuidando de cada história. E sempre com carinho, excelência e dedicação.
                 </p>
@@ -140,7 +140,7 @@ useEffect(() => {
                 servicesHeaderAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
               }`}
             >
-              <h2 className="mb-4">Nossos <span className="text-primary">Serviços</span> Principais</h2>
+              <h2 className="mb-4">Nossos <span className="text-brand-primary">Serviços</span> Principais</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Oferecemos uma variedade de serviços veterinários e de estética para manter seu pet saudável e bonito.
               </p>
@@ -180,7 +180,7 @@ useEffect(() => {
                 banhoTosaHeaderAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
               }`}
             >
-              <h2 className="mb-4">Banho & <span className="text-primary">Tosa</span> Especializada</h2>
+              <h2 className="mb-4">Banho & <span className="text-brand-primary">Tosa</span> Especializada</h2>
               <p className="text-muted-foreground max-w-2xl mx-auto">
                 Cuidamos da beleza e higiene do seu pet com carinho, produtos de qualidade e técnicas profissionais.
               </p>
@@ -206,7 +206,7 @@ useEffect(() => {
         <Testimonials />
         
         {/* CTA Section */}
-        <section className="py-20 bg-primary text-primary-foreground">
+        <section className="py-20 bg-brand-primary text-brand-primaryFg">
           <div className="max-w-7xl mx-auto px-6 text-center">
             <div 
               ref={ctaAnimation.ref}
@@ -220,12 +220,12 @@ useEffect(() => {
               
               <h2 className="mb-6">Pronto para Cuidar da Saúde do Seu Pet?</h2>
               
-              <p className="text-primary-foreground/90 max-w-2xl mx-auto mb-8">
+              <p className="text-brand-primaryFg/90 max-w-2xl mx-auto mb-8">
                 Porque cada pet tem uma história. E a gente cuida de todas elas com amor e excelência.
               </p>
               
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" className="bg-white text-primary hover:bg-white/90 transition-all duration-300 hover:shadow-lg hover:scale-105" asChild>
+                <Button size="lg" className="bg-white text-brand-primary hover:bg-white/90 transition-all duration-300 hover:shadow-lg hover:scale-105" asChild>
                   <Link to="/book">Agendar Consulta</Link>
                 </Button>
                 <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white/10 transition-all duration-300 hover:shadow-lg" asChild>

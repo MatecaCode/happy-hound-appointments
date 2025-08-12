@@ -50,7 +50,7 @@ const About = () => {
               heroAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-            <h1 className="mb-4">Sobre <span className="text-primary">Nós</span></h1>
+                          <h1 className="mb-4">Sobre <span className="text-brand-primary">Nós</span></h1>
             <p className="text-muted-foreground max-w-3xl mx-auto">
               Uma Jornada de Amor e Inovação pelos Pets
             </p>
@@ -68,7 +68,7 @@ const About = () => {
                 historyAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
               }`}
             >
-              <h2 className="mb-6">Nossa <span className="text-primary">História</span></h2>
+              <h2 className="mb-6">Nossa <span className="text-brand-primary">História</span></h2>
               <p className="text-muted-foreground mb-6">
                 Há mais de 40 anos, trocamos a agitação da capital paulista pela tranquilidade de Atibaia para realizar um sonho: 
                 construir nossa primeira sede própria totalmente dedicada ao bem‑estar dos animais. Em 1988 compramos 
@@ -105,7 +105,7 @@ const About = () => {
               valuesAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-            <h2>Pioneiros que <span className="text-primary">Fazem História</span></h2>
+                            <h2>Pioneiros que <span className="text-brand-primary">Fazem História</span></h2>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -115,7 +115,7 @@ const About = () => {
               }`}
             >
               <div className="flex-shrink-0 mt-1">
-                <Dog className="h-8 w-8 text-primary" />
+                                  <Dog className="h-8 w-8 text-brand-primary" />
               </div>
               <div>
                 <h3 className="text-xl font-bold mb-2 text-center">Primeiro TaxiDog da cidade</h3>
@@ -132,7 +132,7 @@ const About = () => {
               }`}
             >
               <div className="flex-shrink-0 mt-1">
-                <Heart className="h-8 w-8 text-primary" />
+                                  <Heart className="h-8 w-8 text-brand-primary" />
               </div>
               <div>
                 <h3 className="text-xl font-bold mb-2 text-center">Cãominhada e eventos caninos</h3>
@@ -149,7 +149,7 @@ const About = () => {
               }`}
             >
               <div className="flex-shrink-0 mt-1">
-                <Cat className="h-8 w-8 text-primary" />
+                                  <Cat className="h-8 w-8 text-brand-primary" />
               </div>
               <div>
                 <h3 className="text-xl font-bold mb-2 text-center">Educação e comunidade</h3>
@@ -166,7 +166,7 @@ const About = () => {
               }`}
             >
               <div className="flex-shrink-0 mt-1">
-                <Syringe className="h-8 w-8 text-primary" />
+                                  <Syringe className="h-8 w-8 text-brand-primary" />
               </div>
               <div>
                 <h3 className="text-xl font-bold mb-2 text-center">Serviços premium e medicina integrativa</h3>
@@ -197,7 +197,7 @@ const About = () => {
               teamAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-            <h2>O Que Nos <span className="text-primary">Move</span></h2>
+                            <h2>O Que Nos <span className="text-brand-primary">Move</span></h2>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -271,7 +271,7 @@ const About = () => {
               todayAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-            <h2 className="mb-4">Onde Estamos <span className="text-primary">Hoje</span></h2>
+                            <h2 className="mb-4">Onde Estamos <span className="text-brand-primary">Hoje</span></h2>
             <p className="text-muted-foreground max-w-3xl mx-auto">
               De 1981 até o momento, 44 anos de dedicação em Atibaia nos transformaram de uma pequena clínica para um centro veterinário completo. 
               Hoje, com tecnologia de ponta e o mesmo carinho de sempre, continuamos a missão dos fundadores.
@@ -404,7 +404,7 @@ const About = () => {
       </section>
       
       {/* CTA Section */}
-      <section className="py-16 bg-primary text-primary-foreground">
+              <section className="py-16 bg-brand-primary text-brand-primaryFg">
         <div 
           ref={ctaAnimation.ref}
           className={`max-w-7xl mx-auto px-6 text-center ${animationClasses.fadeIn} ${
@@ -412,7 +412,7 @@ const About = () => {
           }`}
         >
           <h2 className="mb-6">Agende a sua visita</h2>
-          <p className="text-primary-foreground/90 max-w-2xl mx-auto mb-8">
+                      <p className="text-brand-primaryFg/90 max-w-2xl mx-auto mb-8">
             Venha conhecer o Centro Veterinário Completo mais tradicional de Atibaia. Estamos prontos para cuidar do seu pet — 
             com a experiência de quem entende e o carinho de quem ama.
           </p>

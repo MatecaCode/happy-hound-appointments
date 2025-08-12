@@ -8,7 +8,8 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "apply-brand": "node scripts/apply-brand.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
