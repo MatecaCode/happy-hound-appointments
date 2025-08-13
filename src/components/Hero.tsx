@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, Heart, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
+import { Container, Stack } from '@/components/primitives';
 
 const Hero = () => {
   const titleAnimation = useScrollAnimation<HTMLHeadingElement>({ delay: 100 });
@@ -13,11 +14,11 @@ const Hero = () => {
   const imageAnimation = useScrollAnimation<HTMLDivElement>({ delay: 200 });
 
   return (
-    <section className="relative bg-gradient-to-br from-brand-primary/5 to-brand-secondary/10 py-20" style={{ backgroundColor: '#FFFCF8' }}>
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          <div className="space-y-8">
-            <div className="space-y-4">
+    <section className="relative bg-gradient-to-br from-brand-primary/5 to-brand-secondary/10 py-16 md:py-24" style={{ backgroundColor: '#FFFCF8' }}>
+      <Container>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-12 items-center">
+          <Stack gap="8">
+            <Stack gap="4">
               <h1 
                 ref={titleAnimation.ref}
                 className={`text-4xl md:text-6xl font-bold leading-tight ${animationClasses.fadeIn} ${
@@ -34,7 +35,7 @@ const Hero = () => {
               >
                 Cuidamos com carinho da saúde, beleza e bem-estar do seu pet — em cada fase da vida.
               </p>
-            </div>
+            </Stack>
             
             <div 
               ref={buttonAnimation.ref}
@@ -42,14 +43,14 @@ const Hero = () => {
                 buttonAnimation.isVisible ? animationClasses.scaleInActive : animationClasses.scaleInInactive
               }`}
             >
-              <Button size="lg" asChild className="bg-primary text-white hover:bg-primary/90 transition-all duration-300 hover:shadow-lg hover:scale-105">
+              <Button size="lg" asChild className="hover:scale-105">
                 <Link to="/book">Agendar Consulta</Link>
               </Button>
             </div>
             
             <div 
               ref={featuresAnimation.ref}
-              className={`flex items-center gap-8 pt-8 ${animationClasses.slideUp} ${
+              className={`flex items-center gap-3 md:gap-4 pt-8 ${animationClasses.slideUp} ${
                 featuresAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
               }`}
             >
@@ -66,7 +67,7 @@ const Hero = () => {
                 <span className="text-sm">Segurança Total</span>
               </div>
             </div>
-          </div>
+          </Stack>
           
           <div 
             ref={imageAnimation.ref}
@@ -74,15 +75,19 @@ const Hero = () => {
               imageAnimation.isVisible ? animationClasses.slideInRightActive : animationClasses.slideInRightInactive
             }`}
           >
-            <img 
-              src="/lovable-uploads/58d1d3ba-3aac-4831-819e-db278e404d9d.png" 
-              alt="Cachorro corgi feliz com patinhas levantadas em ambiente acolhedor" 
-              className="rounded-lg shadow-2xl w-full h-[500px] object-cover transition-transform duration-500 hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-lg"></div>
+            <div className="aspect-[16/9] md:aspect-[4/3] sm:aspect-square rounded-lg shadow-2xl overflow-hidden">
+              <img 
+                src="/lovable-uploads/58d1d3ba-3aac-4831-819e-db278e404d9d.png" 
+                alt="Ambiente acolhedor da Vettale - Clínica moderna com pets felizes e equipe dedicada" 
+                loading="lazy" 
+                decoding="async" 
+                className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent rounded-lg"></div>
+            </div>
           </div>
         </div>
-      </div>
+      </Container>
     </section>
   );
 };

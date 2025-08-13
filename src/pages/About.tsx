@@ -7,24 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useScrollAnimation, animationClasses } from '@/hooks/useScrollAnimation';
-
-
-const inaugurationUrl = supabase
-  .storage
-  .from('websitecontent')
-  .getPublicUrl('Inauguration Clinic.jpg').data.publicUrl;
-
-const caminhadaUrl = supabase
-  .storage
-  .from('websitecontent')
-  .getPublicUrl('Dog Minhada com pessoas.jpg').data.publicUrl;
-
-const journalUrl = supabase
-  .storage
-  .from('websitecontent')
-  .getPublicUrl('PinkClinic.jpg').data.publicUrl;
-
-
+import { Container, Stack } from '@/components/primitives';
 
 const About = () => {
   // Animation hooks
@@ -42,25 +25,25 @@ const About = () => {
   return (
     <Layout>
       {/* Hero Section */}
-      <section className="bg-secondary/50 py-16">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="bg-secondary/50 py-16 md:py-24">
+        <Container>
           <div 
             ref={heroAnimation.ref}
             className={`text-center mb-12 ${animationClasses.fadeIn} ${
               heroAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-                          <h1 className="mb-4">Sobre <span className="text-brand-primary">Nós</span></h1>
+            <h1 className="mb-4">Sobre <span className="text-brand-primary">Nós</span></h1>
             <p className="text-muted-foreground max-w-3xl mx-auto">
               Uma Jornada de Amor e Inovação pelos Pets
             </p>
           </div>
-        </div>
+        </Container>
       </section>
       
       {/* Nossa História */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="py-16 md:py-24">
+        <Container>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
             <div 
               ref={historyAnimation.ref}
@@ -85,27 +68,31 @@ const About = () => {
                 historyImageAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
               }`}
             >
-              <img 
-                src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Inauguration%20Clinic.jpg"
-                alt="Nossa primeira clínica em 1990" 
-                className="rounded-lg shadow-lg h-96 w-full object-cover transition-transform duration-500 hover:scale-105"
-              />
+              <div className="aspect-[4/3] md:aspect-[3/2] sm:aspect-square rounded-lg shadow-lg overflow-hidden">
+                <img 
+                  src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Inauguration%20Clinic.jpg"
+                  alt="Nossa primeira clínica em 1990 - Inauguração da sede própria da Vettale" 
+                  loading="lazy" 
+                  decoding="async" 
+                  className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                />
+              </div>
               <p className="text-sm text-center mt-2 text-muted-foreground">Nossa primeira sede própria inaugurada em 1990</p>
             </div>
           </div>
-        </div>
+        </Container>
       </section>
       
       {/* Pioneiros que Fazem História */}
-      <section className="py-16 bg-secondary/30">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="bg-secondary/30 py-16 md:py-24">
+        <Container>
           <div 
             ref={valuesAnimation.ref}
             className={`text-center mb-12 ${animationClasses.fadeIn} ${
               valuesAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-                            <h2>Pioneiros que <span className="text-brand-primary">Fazem História</span></h2>
+            <h2>Pioneiros que <span className="text-brand-primary">Fazem História</span></h2>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -115,7 +102,7 @@ const About = () => {
               }`}
             >
               <div className="flex-shrink-0 mt-1">
-                                  <Dog className="h-8 w-8 text-brand-primary" />
+                <Dog className="h-8 w-8 text-brand-primary" />
               </div>
               <div>
                 <h3 className="text-xl font-bold mb-2 text-center">Primeiro TaxiDog da cidade</h3>
@@ -132,7 +119,7 @@ const About = () => {
               }`}
             >
               <div className="flex-shrink-0 mt-1">
-                                  <Heart className="h-8 w-8 text-brand-primary" />
+                <Heart className="h-8 w-8 text-brand-primary" />
               </div>
               <div>
                 <h3 className="text-xl font-bold mb-2 text-center">Cãominhada e eventos caninos</h3>
@@ -149,7 +136,7 @@ const About = () => {
               }`}
             >
               <div className="flex-shrink-0 mt-1">
-                                  <Cat className="h-8 w-8 text-brand-primary" />
+                <Cat className="h-8 w-8 text-brand-primary" />
               </div>
               <div>
                 <h3 className="text-xl font-bold mb-2 text-center">Educação e comunidade</h3>
@@ -166,7 +153,7 @@ const About = () => {
               }`}
             >
               <div className="flex-shrink-0 mt-1">
-                                  <Syringe className="h-8 w-8 text-brand-primary" />
+                <Syringe className="h-8 w-8 text-brand-primary" />
               </div>
               <div>
                 <h3 className="text-xl font-bold mb-2 text-center">Serviços premium e medicina integrativa</h3>
@@ -178,26 +165,30 @@ const About = () => {
           </div>
           
           <div className="mt-12">
-            <img 
-              src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Dog%20Minhada%20com%20pessoas.jpg"
-              alt="Eventos da Cãominhada" 
-              className="rounded-lg shadow-lg h-96 w-full object-cover"
-            />
+            <div className="aspect-[4/3] md:aspect-[3/2] sm:aspect-square rounded-lg shadow-lg overflow-hidden">
+              <img 
+                src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Dog%20Minhada%20com%20pessoas.jpg"
+                alt="Eventos da Cãominhada - Comunidade unida em prol dos pets" 
+                loading="lazy" 
+                decoding="async" 
+                className="w-full h-full object-cover"
+              />
+            </div>
             <p className="text-sm text-center mt-2 text-muted-foreground">Nossa 2ª Cãominhada (1995): um encontro inesquecível que uniu famílias, espalhou sorrisos e arrecadou fundos para cães em situação de risco 🐶</p>
           </div>
-        </div>
+        </Container>
       </section>
       
       {/* O Que Nos Move */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="py-16 md:py-24">
+        <Container>
           <div 
             ref={teamAnimation.ref}
             className={`text-center mb-12 ${animationClasses.fadeIn} ${
               teamAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-                            <h2>O Que Nos <span className="text-brand-primary">Move</span></h2>
+            <h2>O Que Nos <span className="text-brand-primary">Move</span></h2>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -252,26 +243,30 @@ const About = () => {
               teamImageAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
             }`}
           >
-            <img 
-               src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Team.png" 
-              alt="Nossa equipe atual" 
-              className="rounded-lg shadow-lg h-96 w-full object-cover object-top transition-transform duration-500 hover:scale-105"
-            />
+            <div className="aspect-[4/3] md:aspect-[3/2] sm:aspect-square rounded-lg shadow-lg overflow-hidden">
+              <img 
+                src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Team.png" 
+                alt="Nossa equipe atual - Profissionais dedicados da Vettale" 
+                loading="lazy" 
+                decoding="async" 
+                className="w-full h-full object-cover object-top transition-transform duration-500 hover:scale-105"
+              />
+            </div>
             <p className="text-sm text-center mt-2 text-muted-foreground">Nossa equipe de profissionais dedicados</p>
           </div>
-        </div>
+        </Container>
       </section>
       
       {/* Onde Estamos Hoje */}
-      <section className="py-20" style={{ backgroundColor: '#FFFCF8' }}>
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="py-16 md:py-24" style={{ backgroundColor: '#FFFCF8' }}>
+        <Container>
           <div 
             ref={todayAnimation.ref}
             className={`text-center mb-12 ${animationClasses.fadeIn} ${
               todayAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-                            <h2 className="mb-4">Onde Estamos <span className="text-brand-primary">Hoje</span></h2>
+            <h2 className="mb-4">Onde Estamos <span className="text-brand-primary">Hoje</span></h2>
             <p className="text-muted-foreground max-w-3xl mx-auto">
               De 1981 até o momento, 44 anos de dedicação em Atibaia nos transformaram de uma pequena clínica para um centro veterinário completo. 
               Hoje, com tecnologia de ponta e o mesmo carinho de sempre, continuamos a missão dos fundadores.
@@ -286,10 +281,12 @@ const About = () => {
           >
             {/* Image Slot 1 - Pioneiros */}
             <div className="space-y-4">
-              <div className="rounded-lg shadow-lg h-96 w-full overflow-hidden">
+              <div className="aspect-[4/3] md:aspect-[3/2] sm:aspect-square rounded-lg shadow-lg overflow-hidden">
                 <img 
                   src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Classic.jpg"
                   alt="Pioneiros em Atibaia-SP - Primeiros anos da clínica"
+                  loading="lazy" 
+                  decoding="async" 
                   className="h-full w-full object-cover object-top transition-transform duration-500 hover:scale-105"
                 />
               </div>
@@ -303,10 +300,12 @@ const About = () => {
             
             {/* Image Slot 2 - Transition Period */}
             <div className="space-y-4">
-              <div className="rounded-lg shadow-lg h-96 w-full overflow-hidden">
+              <div className="aspect-[4/3] md:aspect-[3/2] sm:aspect-square rounded-lg shadow-lg overflow-hidden">
                 <img 
                   src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//MundiauMed.png"
                   alt="Era MundiauPet - Três décadas de tradição veterinária"
+                  loading="lazy" 
+                  decoding="async" 
                   className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
                 />
               </div>
@@ -318,22 +317,24 @@ const About = () => {
               </div>
             </div>
             
-            {/* Image Slot 3 - Vettale Era */}
-            <div className="space-y-4">
-              <div className="rounded-lg shadow-lg h-96 w-full overflow-hidden">
-                <img 
-                  src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//NewClinic.png"
-                  alt="Nova Era Vettale - Tecnologia de ponta e tradição"
-                  className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
-                />
-              </div>
-              <div className="text-center">
-                <h3 className="font-semibold text-lg mb-2">Era Vettale</h3>
-                <p className="text-sm text-muted-foreground">
-                  Nova identidade, tecnologia avançada e compromisso renovado com a excelência em cuidados veterinários.
-                </p>
-              </div>
-            </div>
+                         {/* Image Slot 3 - Vettale Era */}
+             <div className="space-y-4 blur-sm">
+               <div className="aspect-[4/3] md:aspect-[3/2] sm:aspect-square rounded-lg shadow-lg overflow-hidden">
+                 <img 
+                   src="https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//NewClinic.png"
+                   alt="Nova Era Vettale - Tecnologia de ponta e tradição"
+                   loading="lazy" 
+                   decoding="async" 
+                   className="h-full w-full object-cover transition-transform duration-500 hover:scale-105"
+                 />
+               </div>
+               <div className="text-center">
+                 <h3 className="font-semibold text-lg mb-2">Era Vettale</h3>
+                 <p className="text-sm text-muted-foreground">
+                   Nova identidade, tecnologia avançada e compromisso renovado com a excelência em cuidados veterinários.
+                 </p>
+               </div>
+             </div>
           </div>
           
           {/* Métricas de Impacto */}
@@ -343,45 +344,45 @@ const About = () => {
               metricsAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
             }`}
           >
-            <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
-              <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
-                250.000
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Banhos</h3>
-              <p className="text-sm text-muted-foreground">
-                Pets felizes e cheirosos que passaram por nossas mãos
-              </p>
-            </div>
+                         <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
+               <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
+                 +250.000
+               </div>
+               <h3 className="font-semibold text-lg mb-2">Banhos</h3>
+               <p className="text-sm text-muted-foreground">
+                 Pets felizes e cheirosos que passaram por nossas mãos
+               </p>
+             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
-              <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
-                16.000
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Consultas</h3>
-              <p className="text-sm text-muted-foreground">
-                Consultas e cuidados especializados para cada pet
-              </p>
-            </div>
+                         <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
+               <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
+                 +16.000
+               </div>
+               <h3 className="font-semibold text-lg mb-2">Consultas</h3>
+               <p className="text-sm text-muted-foreground">
+                 Consultas e cuidados especializados para cada pet
+               </p>
+             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
-              <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
-                600+
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Cirurgias</h3>
-              <p className="text-sm text-muted-foreground">
-                Procedimentos cirúrgicos realizados com excelência
-              </p>
-            </div>
+                         <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
+               <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
+                 +600
+               </div>
+               <h3 className="font-semibold text-lg mb-2">Cirurgias</h3>
+               <p className="text-sm text-muted-foreground">
+                 Procedimentos cirúrgicos realizados com excelência
+               </p>
+             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
-              <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
-                ∞
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Sorrisos Incontáveis</h3>
-              <p className="text-sm text-muted-foreground">
-                Momentos de alegria e gratidão que não podem ser medidos
-              </p>
-            </div>
+                         <div className="bg-white p-6 rounded-lg shadow text-center group hover:shadow-xl hover:-translate-y-2 transition-all duration-500 cursor-pointer relative overflow-hidden">
+               <div className="text-3xl font-bold text-primary mb-2 group-hover:scale-110 transition-transform duration-300">
+                 ∞
+               </div>
+               <h3 className="font-semibold text-lg mb-2">Sorrisos Incontáveis</h3>
+               <p className="text-sm text-muted-foreground">
+                 Momentos de alegria e gratidão que não podem ser medidos
+               </p>
+             </div>
           </div>
           
           {/* Additional Info Section */}
@@ -400,34 +401,36 @@ const About = () => {
               </p>
             </div>
           </div>
-        </div>
+        </Container>
       </section>
       
       {/* CTA Section */}
-              <section className="py-16 bg-brand-primary text-brand-primaryFg">
-        <div 
-          ref={ctaAnimation.ref}
-          className={`max-w-7xl mx-auto px-6 text-center ${animationClasses.fadeIn} ${
-            ctaAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
-          }`}
-        >
-          <h2 className="mb-6">Agende a sua visita</h2>
-                      <p className="text-brand-primaryFg/90 max-w-2xl mx-auto mb-8">
-            Venha conhecer o Centro Veterinário Completo mais tradicional de Atibaia. Estamos prontos para cuidar do seu pet — 
-            com a experiência de quem entende e o carinho de quem ama.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/book">
-              <Button size="lg" variant="secondary">Agendar Consulta</Button>
-            </Link>
-            <Link to="/services">
-              <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white/20">
-                Conhecer Serviços
-              </Button>
-            </Link>
+      <section className="bg-brand-primary text-brand-primaryFg py-16 md:py-24">
+        <Container>
+          <div 
+            ref={ctaAnimation.ref}
+            className={`text-center ${animationClasses.fadeIn} ${
+              ctaAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+            }`}
+          >
+            <h2 className="mb-6">Agende a sua visita</h2>
+            <p className="text-brand-primaryFg/90 max-w-2xl mx-auto mb-8">
+              Venha conhecer o Centro Veterinário Completo mais tradicional de Atibaia. Estamos prontos para cuidar do seu pet — 
+              com a experiência de quem entende e o carinho de quem ama.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link to="/book">
+                <Button size="lg" variant="secondary">Agendar Consulta</Button>
+              </Link>
+              <Link to="/services">
+                <Button size="lg" variant="outline" className="bg-transparent border-white text-white hover:bg-white/20">
+                  Conhecer Serviços
+                </Button>
+              </Link>
+            </div>
           </div>
-        </div>
+        </Container>
       </section>
     </Layout>
   );

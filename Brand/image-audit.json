@@ -1,0 +1,77 @@
+{
+  "timestamp": "2025-08-12T20:23:51.172Z",
+  "totalImages": 9,
+  "images": [
+    {
+      "path": "src\\components\\Hero.tsx",
+      "component": "Hero.tsx",
+      "usage": "img tag",
+      "type": "img",
+      "src": "/lovable-uploads/58d1d3ba-3aac-4831-819e-db278e404d9d.png",
+      "alt": "Cachorro corgi feliz com patinhas levantadas em ambiente acolhedor"
+    },
+    {
+      "path": "src\\components\\Navigation.tsx",
+      "component": "Navigation.tsx",
+      "usage": "img tag",
+      "type": "img",
+      "src": "/lovable-uploads/6e31bc13-c687-4ceb-87a4-29955094f30f.png",
+      "alt": "Vettale"
+    },
+    {
+      "path": "src\\components\\Testimonials.tsx",
+      "component": "Testimonials.tsx",
+      "usage": "inline SVG",
+      "type": "svg",
+      "src": "inline"
+    },
+    {
+      "path": "src\\pages\\About.tsx",
+      "component": "About.tsx",
+      "usage": "img tag",
+      "type": "img",
+      "src": "https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Inauguration%20Clinic.jpg",
+      "alt": "Nossa primeira clínica em 1990"
+    },
+    {
+      "path": "src\\pages\\About.tsx",
+      "component": "About.tsx",
+      "usage": "img tag",
+      "type": "img",
+      "src": "https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Dog%20Minhada%20com%20pessoas.jpg",
+      "alt": "Eventos da Cãominhada"
+    },
+    {
+      "path": "src\\pages\\About.tsx",
+      "component": "About.tsx",
+      "usage": "img tag",
+      "type": "img",
+      "src": "https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Team.png",
+      "alt": "Nossa equipe atual"
+    },
+    {
+      "path": "src\\pages\\About.tsx",
+      "component": "About.tsx",
+      "usage": "img tag",
+      "type": "img",
+      "src": "https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//Classic.jpg",
+      "alt": "Pioneiros em Atibaia-SP - Primeiros anos da clínica"
+    },
+    {
+      "path": "src\\pages\\About.tsx",
+      "component": "About.tsx",
+      "usage": "img tag",
+      "type": "img",
+      "src": "https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//MundiauMed.png",
+      "alt": "Era MundiauPet - Três décadas de tradição veterinária"
+    },
+    {
+      "path": "src\\pages\\About.tsx",
+      "component": "About.tsx",
+      "usage": "img tag",
+      "type": "img",
+      "src": "https://ieotixprkfglummoobkb.supabase.co/storage/v1/object/public/websitecontent//NewClinic.png",
+      "alt": "Nova Era Vettale - Tecnologia de ponta e tradição"
+    }
+  ]
+}

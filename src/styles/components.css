@@ -1,22 +1,32 @@
 @tailwind components;
 
 @layer components {
+  .btn {
+    @apply inline-flex items-center justify-center font-medium rounded-xl px-5 py-2.5 transition duration-250;
+  }
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2
-           bg-brand-primary text-brand-primaryFg
-           hover:opacity-90 focus-visible:outline-none focus-visible:ring-2
-           focus-visible:ring-brand-primary disabled:opacity-50 transition;
+    @apply btn bg-brand-primary text-brand-primaryFg shadow-sm hover:shadow-md hover:opacity-90 
+           focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-primary 
+           active:translate-y-[0.5px] disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2
-           bg-brand-secondary text-brand-secondaryFg
-           hover:opacity-90 focus-visible:outline-none focus-visible:ring-2
-           focus-visible:ring-brand-secondary disabled:opacity-50 transition;
+    @apply btn bg-brand-secondary text-brand-secondaryFg shadow-sm hover:shadow-md hover:opacity-90 
+           focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-secondary 
+           active:translate-y-[0.5px] disabled:opacity-50 disabled:pointer-events-none;
   }
   .btn-ghost {
-    @apply inline-flex items-center justify-center rounded-xl px-4 py-2
-           bg-transparent text-brand-primary
-           hover:bg-brand-accent/40 focus-visible:ring-2 focus-visible:ring-brand-primary transition;
+    @apply btn bg-transparent text-brand-primary hover:bg-brand-accent/40 
+           focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-primary;
+  }
+  .btn-outline {
+    @apply btn border border-brand-primary text-brand-primary hover:bg-brand-accent/30 
+           focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-brand-primary;
+  }
+  .btn-disabled {
+    @apply opacity-50 pointer-events-none;
+  }
+  .btn-icon {
+    @apply inline-flex items-center gap-2;
   }
   .surface-accent {
     @apply bg-brand-accent text-brand-accentFg;

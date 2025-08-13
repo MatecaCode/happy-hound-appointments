@@ -147,7 +147,12 @@ const Navigation = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link to="/" className="flex items-center space-x-2">
-              <img src="/lovable-uploads/6e31bc13-c687-4ceb-87a4-29955094f30f.png" alt="Vettale" className="h-8 w-8" />
+                              <img 
+                  src="/lovable-uploads/6e31bc13-c687-4ceb-87a4-29955094f30f.png" 
+                  alt="Vettale - Clínica Veterinária" 
+                  className="h-8 w-8" 
+                  loading="eager"
+                />
                               <span className="text-xl font-bold text-brand-primary">Vettale</span>
             </Link>
           </div>
@@ -167,7 +172,7 @@ const Navigation = () => {
                         handleSmoothScroll(item.scrollTo!);
                       }
                     }}
-                    className="text-gray-700 hover:text-primary hover:font-medium px-3 py-2 text-sm font-medium transition-all duration-300 relative group"
+                    className="text-gray-700 hover:text-primary hover:font-medium px-3 py-2 text-sm font-medium transition-all duration-300 relative group no-underline hover:no-underline"
                   >
                     {item.name}
                     <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full group-hover:left-0"></span>
@@ -176,7 +181,7 @@ const Navigation = () => {
                   <Link
                     key={item.name}
                     to={item.href}
-                    className="text-gray-700 hover:text-primary hover:font-medium px-3 py-2 text-sm font-medium transition-all duration-300 relative group"
+                    className="text-gray-700 hover:text-primary hover:font-medium px-3 py-2 text-sm font-medium transition-all duration-300 relative group no-underline hover:no-underline"
                   >
                     {item.name}
                     <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full group-hover:left-0"></span>
@@ -194,7 +199,7 @@ const Navigation = () => {
                 {hasRole('admin') && (
                   <Link
                     to="/admin"
-                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
+                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors no-underline hover:no-underline"
                   >
                     Admin
                   </Link>
@@ -203,7 +208,7 @@ const Navigation = () => {
                 {hasRole('vet') && (
                   <Link
                     to="/vet-calendar"
-                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
+                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors no-underline hover:no-underline"
                   >
                     Calendário
                   </Link>
@@ -212,7 +217,7 @@ const Navigation = () => {
                 {(hasRole('admin') || hasRole('groomer') || hasRole('vet')) && (
                   <Link
                     to="/status-center"
-                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
+                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors no-underline hover:no-underline"
                   >
                     Status
                   </Link>

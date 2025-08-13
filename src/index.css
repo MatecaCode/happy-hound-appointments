@@ -273,10 +273,10 @@
 
   /* Brand link and focus styles */
   a {
-    @apply text-brand-primary underline-offset-4;
+    @apply text-brand-primary underline-offset-4 no-underline;
   }
   a:hover { 
-    @apply underline; 
+    @apply no-underline; 
   }
   :focus-visible { 
     @apply outline-none ring-2 ring-brand-primary; 
