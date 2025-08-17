@@ -49,6 +49,7 @@ import EditServicePricing from "./pages/EditServicePricing";
 import { AuthProvider } from "./hooks/useAuth";
 import TestDataPage from "./pages/TestDataPage";
 import GroomerAvailability from './pages/GroomerAvailability';
+import PetFormPage from './pages/PetFormPage';
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,8 @@ function App() {
               <Route path="/booking-success" element={<BookingSuccess />} />
               <Route path="/appointments" element={<Appointments />} />
               <Route path="/pets" element={<Pets />} />
+              <Route path="/pets/new" element={<PetFormPage />} />
+              <Route path="/pets/edit/:petId" element={<PetFormPage />} />
               <Route path="/shop" element={<Shop />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/profile" element={<Profile />} />

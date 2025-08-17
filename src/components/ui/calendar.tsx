@@ -19,6 +19,13 @@ function Calendar({
   ...props
 }: CalendarProps) {
   const [calendarViewMode, setCalendarViewMode] = React.useState<'days' | 'months' | 'years'>('days');
+  
+  // Months array
+  const months = React.useMemo(() => [
+    "Janeiro", "Fevereiro", "Março", "Abril", 
+    "Maio", "Junho", "Julho", "Agosto", 
+    "Setembro", "Outubro", "Novembro", "Dezembro"
+  ], []);
   // Define an extended type that includes the properties we need
   interface CustomDropdownProps extends DropdownProps {
     currentMonth: Date;
@@ -267,7 +274,57 @@ function Calendar({
       }}
       components={{
         IconLeft: ({ ..._props }) => <ChevronLeft className="h-4 w-4" />,
-        IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />
+        IconRight: ({ ..._props }) => <ChevronRight className="h-4 w-4" />,
+        Caption: ({ displayMonth, ...captionProps }) => (
+          <div className="flex justify-center pt-1 relative items-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute left-1 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+              onClick={() => {
+                const newMonth = new Date(displayMonth);
+                newMonth.setMonth(displayMonth.getMonth() - 1);
+                if (props.onMonthChange) {
+                  props.onMonthChange(newMonth);
+                }
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="flex space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCalendarViewMode('months')}
+                className="h-8 px-3 font-medium hover:bg-accent"
+              >
+                {months[displayMonth.getMonth()]}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setCalendarViewMode('years')}
+                className="h-8 px-3 font-medium hover:bg-accent"
+              >
+                {displayMonth.getFullYear()}
+              </Button>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute right-1 h-7 w-7 bg-transparent p-0 opacity-50 hover:opacity-100"
+              onClick={() => {
+                const newMonth = new Date(displayMonth);
+                newMonth.setMonth(displayMonth.getMonth() + 1);
+                if (props.onMonthChange) {
+                  props.onMonthChange(newMonth);
+                }
+              }}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )
       }}
       {...props}
     />

@@ -17,7 +17,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar"
 
 const Navigation = () => {
-  const { user, signOut, userRole, hasRole, refreshUserRoles, forceRefreshUserRoles, isAdmin, isClient, isGroomer, isVet, isStaff } = useAuth();
+  const { user, signOut, userRole, hasRole, isAdmin, isClient, isGroomer, isVet, isStaff } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
@@ -146,14 +146,13 @@ const Navigation = () => {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2">
-                              <img 
-                  src="/lovable-uploads/6e31bc13-c687-4ceb-87a4-29955094f30f.png" 
-                  alt="Vettale - Clínica Veterinária" 
-                  className="h-8 w-8" 
-                  loading="eager"
-                />
-                              <span className="text-xl font-bold text-brand-primary">Vettale</span>
+            <Link to="/" className="flex items-center">
+              <img 
+                src="/vettale-logo-azul.svg" 
+                alt="Vettale - Centro Veterinário" 
+                className="h-10" 
+                loading="eager"
+              />
             </Link>
           </div>
 
@@ -315,17 +314,10 @@ const Navigation = () => {
                         </DropdownMenuItem>
                       </>
                     )}
-                    <DropdownMenuSeparator />
-                    {/* Debug: Add refresh button for testing */}
-                    <DropdownMenuItem onClick={refreshUserRoles}>
-                      🔄 Atualizar Roles
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={forceRefreshUserRoles}>
-                      🔄🔄 Forçar Atualizar Roles
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleLogout}>
-                      Sair
-                    </DropdownMenuItem>
+                                         <DropdownMenuSeparator />
+                     <DropdownMenuItem onClick={handleLogout}>
+                       Sair
+                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>

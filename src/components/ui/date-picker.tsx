@@ -3,6 +3,7 @@ import * as React from "react"
 import { format, parse, isValid } from "date-fns"
 import { CalendarIcon } from "lucide-react"
 import { ptBR } from "date-fns/locale"
+import { toast } from "sonner"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -105,6 +106,13 @@ export function DatePicker({
           setInputValue(format(parsedDate, "dd/MM/yyyy", { locale: ptBR }))
           setOpen(false)
           setIsTyping(false)
+        } else {
+          // Show error for invalid date
+          toast.error('Data inválida. Use o formato DD/MM/AAAA')
+          // Reset to current date if invalid
+          setInputValue(date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : "")
+          setTempDate(date)
+          setIsTyping(false)
         }
       }
     }
@@ -157,7 +165,7 @@ export function DatePicker({
           className="pointer-events-auto"
           month={calendarMonth}
           onMonthChange={setCalendarMonth}
-          captionLayout="dropdown-buttons"
+          captionLayout="buttons"
         />
         <div className="flex gap-2 p-3 pt-0">
           <Button
