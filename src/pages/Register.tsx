@@ -114,8 +114,11 @@ const Register = () => {
       if (accountType === 'admin') {
         // For admin, we only validate the code exists and is unused
         // The actual processing will happen after email confirmation
+        const trimmedCode = registrationCode.trim();
+        console.log('🔍 Validating admin code:', { original: registrationCode, trimmed: trimmedCode });
+        
         const { data: adminValid, error: adminError } = await supabase.rpc('validate_admin_registration_code', {
-          code_value: registrationCode
+          code_value: trimmedCode
         });
         
         if (adminError) {
@@ -123,6 +126,7 @@ const Register = () => {
           throw new Error(`Erro ao validar código de administrador: ${adminError.message}`);
         }
         
+        console.log('🔍 Admin validation result:', adminValid);
         isValid = adminValid;
         
         if (!isValid) {
@@ -130,8 +134,11 @@ const Register = () => {
         }
       } else if (accountType === 'staff') {
         // For staff, validate the code exists and is unused
+        const trimmedCode = registrationCode.trim();
+        console.log('🔍 Validating staff code:', { original: registrationCode, trimmed: trimmedCode });
+        
         const { data: staffValid, error: staffError } = await supabase.rpc('validate_staff_registration_code', {
-          code_value: registrationCode,
+          code_value: trimmedCode,
           account_type_value: 'staff'
         });
         
@@ -140,6 +147,7 @@ const Register = () => {
           throw new Error(`Erro ao validar código de funcionário: ${staffError.message}`);
         }
         
+        console.log('🔍 Staff validation result:', staffValid);
         isValid = staffValid;
         
         if (!isValid) {
