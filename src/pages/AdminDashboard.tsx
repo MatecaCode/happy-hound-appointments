@@ -72,12 +72,13 @@ const AdminDashboard = () => {
         .from('appointments')
         .select('*', { count: 'exact', head: true });
 
-      // Fetch today's services
+      // Fetch today's services (excluding cancelled)
       const today = new Date().toISOString().split('T')[0];
       const { count: todayServicesCount } = await supabase
         .from('appointments')
         .select('*', { count: 'exact', head: true })
-        .eq('date', today);
+        .eq('date', today)
+        .neq('status', 'cancelled');
 
       // Fetch pending approvals
       const { count: pendingApprovalsCount } = await supabase
@@ -85,12 +86,15 @@ const AdminDashboard = () => {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
 
-      // Fetch staff on duty (staff with availability today)
-      const { count: staffOnDutyCount } = await supabase
-        .from('staff_availability')
-        .select('*', { count: 'exact', head: true })
+      // Fetch staff on duty (staff with active appointments today)
+      const { data: staffWithAppointments } = await supabase
+        .from('appointments')
+        .select('staff_id')
         .eq('date', today)
-        .eq('available', true);
+        .neq('status', 'cancelled')
+        .not('staff_id', 'is', null);
+      
+      const uniqueStaffOnDuty = new Set(staffWithAppointments?.map(apt => apt.staff_id)).size;
 
       // Fetch revenue today (sum of total_price for today's appointments)
       const { data: todayAppointments } = await supabase
@@ -113,7 +117,7 @@ const AdminDashboard = () => {
         totalBookings: appointmentsCount || 0,
         todayServices: todayServicesCount || 0,
         pendingApprovals: pendingApprovalsCount || 0,
-        staffOnDuty: staffOnDutyCount || 0,
+        staffOnDuty: uniqueStaffOnDuty || 0,
         revenueToday,
         pendingCancellations: pendingCancellationsCount || 0,
       });

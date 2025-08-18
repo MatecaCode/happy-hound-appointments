@@ -422,7 +422,9 @@ const AdminAgendaHoje = () => {
             <div className="overflow-x-auto">
               <div className="min-w-max">
                 {/* Staff Headers */}
-                <div className="grid grid-cols-[120px_repeat(auto-fit,minmax(200px,1fr))] border-b">
+                <div className="grid border-b" style={{ 
+                  gridTemplateColumns: `120px repeat(${staffColumns.length}, minmax(200px, 1fr))` 
+                }}>
                   <div className="p-4 font-semibold text-gray-700 bg-gray-50">
                     Horário
                   </div>
@@ -437,7 +439,9 @@ const AdminAgendaHoje = () => {
                 </div>
 
                 {/* Time Slots */}
-                <div className="grid grid-cols-[120px_repeat(auto-fit,minmax(200px,1fr))]">
+                <div className="grid" style={{ 
+                  gridTemplateColumns: `120px repeat(${staffColumns.length}, minmax(200px, 1fr))` 
+                }}>
                   {timeSlots.map((timeSlot, timeIndex) => (
                     <React.Fragment key={timeSlot}>
                       {/* Time Label */}
