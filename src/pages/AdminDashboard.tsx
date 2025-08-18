@@ -182,7 +182,7 @@ const AdminDashboard = () => {
               icon={<DollarSign className="h-6 w-6" />}
               iconBgColor="bg-brand-gold/10"
               iconColor="text-brand-gold"
-              href="/admin/reports"
+              href="/admin/appointments"
               loading={loading}
             />
           </div>

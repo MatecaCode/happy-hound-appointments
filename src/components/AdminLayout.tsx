@@ -64,16 +64,16 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       items: [
         { title: 'Dashboard', href: '/admin', icon: <Home className="h-5 w-5" /> },
         { title: 'View Appointments', href: '/admin/appointments', icon: <Calendar className="h-5 w-5" /> },
-        { title: 'Create Appointment', href: '/admin/actions', icon: <AlertCircle className="h-5 w-5" /> },
+        { title: 'Action Center', href: '/admin/actions', icon: <AlertCircle className="h-5 w-5" /> },
         { title: 'Today\'s Agenda', href: '/admin/agenda-hoje', icon: <Calendar className="h-5 w-5" /> },
+        { title: 'Manual Booking', href: '/admin/manual-booking', icon: <Calendar className="h-5 w-5" /> },
       ]
     },
     {
       title: 'Staff Management',
       items: [
-        { title: 'View Staff', href: '/admin/staff', icon: <Users className="h-5 w-5" /> },
-        { title: 'Availability Manager', href: '/admin/staff-availability', icon: <UserCheck className="h-5 w-5" /> },
-        { title: 'Staff Calendar', href: '/admin/staff-calendar', icon: <Calendar className="h-5 w-5" /> },
+        { title: 'Availability Manager', href: '/admin/availability', icon: <UserCheck className="h-5 w-5" /> },
+        { title: 'Staff Availability', href: '/admin/staff-availability', icon: <UserCheck className="h-5 w-5" /> },
       ]
     },
     {
@@ -84,15 +84,9 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       ]
     },
     {
-      title: 'Reports',
+      title: 'System',
       items: [
-        { title: 'Reports', href: '/admin/reports', icon: <BarChart3 className="h-5 w-5" /> },
         { title: 'Audit Logs', href: '/admin/logs', icon: <AlertCircle className="h-5 w-5" /> },
-      ]
-    },
-    {
-      title: 'Settings',
-      items: [
         { title: 'System Settings', href: '/admin/settings', icon: <Settings className="h-5 w-5" /> },
       ]
     }

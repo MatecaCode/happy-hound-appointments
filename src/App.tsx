@@ -112,6 +112,7 @@ function App() {
               <Route path="/admin/settings" element={<AdminSettings />} />
               <Route path="/admin/services/:serviceId/edit-pricing" element={<EditServicePricing />} />
               <Route path="/admin/staff/:id/availability" element={<AdminStaffAvailability />} />
+              <Route path="/admin/staff-availability" element={<AdminStaffAvailability />} />
               <Route path="/admin/clients" element={<AdminClients />} />
               <Route path="/admin/pets" element={<AdminPets />} />
               <Route path="/admin/logs" element={<AdminLogs />} />
