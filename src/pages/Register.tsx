@@ -114,9 +114,8 @@ const Register = () => {
       if (accountType === 'admin') {
         // For admin, we only validate the code exists and is unused
         // The actual processing will happen after email confirmation
-        const { data: adminValid, error: adminError } = await supabase.rpc('validate_staff_registration_code', {
-          code_value: registrationCode,
-          account_type_value: 'admin'
+        const { data: adminValid, error: adminError } = await supabase.rpc('validate_admin_registration_code', {
+          code_value: registrationCode
         });
         
         if (adminError) {
