@@ -150,7 +150,7 @@ const Navigation = () => {
               <img 
                 src="/vettale-logo-azul.svg" 
                 alt="Vettale - Centro Veterinário" 
-                className="h-10" 
+                className="h-14" 
                 loading="eager"
               />
             </Link>
