@@ -16,7 +16,9 @@ import { ptBR } from 'date-fns/locale';
 import { createAdminBooking } from '@/utils/adminBookingUtils';
 import { useNavigate } from 'react-router-dom';
 import BookingReviewModal from '@/components/admin/BookingReviewModal';
+import BookingDiagnostics from '@/components/admin/BookingDiagnostics';
 import { AlertCircle } from 'lucide-react';
+import browserCompatibility from '@/utils/browserCompatibility';
 
 interface Client {
   id: string;
@@ -82,6 +84,42 @@ const AdminBookingPage = () => {
   const [isDataLoading, setIsDataLoading] = useState(true);
   const [dataError, setDataError] = useState<string | null>(null);
 
+  // Global error handler for unhandled errors
+  useEffect(() => {
+    // Initialize browser compatibility
+    browserCompatibility.logCompatibilityReport();
+    browserCompatibility.applyFallbacks();
+
+    const handleUnhandledError = (event: ErrorEvent) => {
+      console.error('🚨 [ADMIN_BOOKING] Unhandled error caught:', {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: event.error,
+        browserInfo: browserCompatibility.getBrowserInfo()
+      });
+      toast.error('Erro inesperado detectado. Verifique o console para mais detalhes.');
+    };
+
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('🚨 [ADMIN_BOOKING] Unhandled promise rejection:', {
+        reason: event.reason,
+        promise: event.promise,
+        browserInfo: browserCompatibility.getBrowserInfo()
+      });
+      toast.error('Erro de promessa não tratada. Verifique o console para mais detalhes.');
+    };
+
+    window.addEventListener('error', handleUnhandledError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleUnhandledError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, []);
+
   // Load initial data
   useEffect(() => {
     if (!isAdmin) return;
@@ -117,8 +155,9 @@ const AdminBookingPage = () => {
 
         // Load available staff (excludes admins)
         const { data: staffData } = await supabase
-          .from('available_staff')
+          .from('staff_profiles')
           .select('id, name, can_groom, can_vet, can_bathe')
+          .eq('active', true)
           .order('name');
         setStaff(staffData || []);
         
@@ -174,21 +213,50 @@ const AdminBookingPage = () => {
 
   // Handle primary service selection
   const handlePrimaryServiceChange = (serviceId: string) => {
-    setSelectedPrimaryService(serviceId);
-    setSelectedSecondaryService(''); // Reset secondary service
-    
-    const service = services.find(s => s.id === serviceId);
-    console.log('🔍 [ADMIN_BOOKING] Selected service:', service);
-    
-    // More robust check for BANHO services
-    const isBanho = service?.name.toLowerCase().includes('banho') || 
-                    service?.name.toLowerCase().includes('bath') ||
-                    service?.name.toLowerCase().includes('banho completo');
-    
-    console.log('🔍 [ADMIN_BOOKING] Is BANHO service:', isBanho);
-    console.log('🔍 [ADMIN_BOOKING] Service name:', service?.name);
-    
-    setShowSecondaryServiceDropdown(isBanho);
+    try {
+      console.log('🔍 [ADMIN_BOOKING] Service selection started:', serviceId);
+      console.log('🔍 [ADMIN_BOOKING] Available services count:', services.length);
+      console.log('🔍 [ADMIN_BOOKING] Services:', services.map(s => ({ id: s.id, name: s.name })));
+      
+      setSelectedPrimaryService(serviceId);
+      setSelectedSecondaryService(''); // Reset secondary service
+      
+      const service = services.find(s => s.id === serviceId);
+      console.log('🔍 [ADMIN_BOOKING] Selected service:', service);
+      
+      if (!service) {
+        console.error('🔍 [ADMIN_BOOKING] Service not found for ID:', serviceId);
+        toast.error(`Serviço não encontrado: ${serviceId}`);
+        return;
+      }
+      
+      // More robust check for BANHO services
+      const isBanho = service.name.toLowerCase().includes('banho') || 
+                      service.name.toLowerCase().includes('bath') ||
+                      service.name.toLowerCase().includes('banho completo');
+      
+      console.log('🔍 [ADMIN_BOOKING] Is BANHO service:', isBanho);
+      console.log('🔍 [ADMIN_BOOKING] Service name:', service.name);
+      console.log('🔍 [ADMIN_BOOKING] Service requirements:', {
+        requires_bath: service.requires_bath,
+        requires_grooming: service.requires_grooming,
+        requires_vet: service.requires_vet
+      });
+      
+      setShowSecondaryServiceDropdown(isBanho);
+      
+      console.log('🔍 [ADMIN_BOOKING] Service selection completed successfully');
+    } catch (error) {
+      console.error('🔍 [ADMIN_BOOKING] Error in service selection:', error);
+      console.error('🔍 [ADMIN_BOOKING] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('🔍 [ADMIN_BOOKING] Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown',
+        serviceId,
+        servicesLength: services.length
+      });
+      toast.error('Erro ao selecionar serviço');
+    }
   };
 
   // Get TOSA services for secondary dropdown
@@ -209,17 +277,65 @@ const AdminBookingPage = () => {
 
   // Calculate required roles for staff filtering
   const requiredRoles = {
-    can_bathe: primaryService?.requires_bath || secondaryService?.requires_bath || false,
-    can_groom: primaryService?.requires_grooming || secondaryService?.requires_grooming || false,
-    can_vet: primaryService?.requires_vet || secondaryService?.requires_vet || false
+    can_bathe: (primaryService?.requires_bath || false) || (secondaryService?.requires_bath || false),
+    can_groom: (primaryService?.requires_grooming || false) || (secondaryService?.requires_grooming || false),
+    can_vet: (primaryService?.requires_vet || false) || (secondaryService?.requires_vet || false)
   };
 
   // Filter available staff based on combined requirements
   const availableStaff = staff.filter(member => {
-    if (requiredRoles.can_bathe && !member.can_bathe) return false;
-    if (requiredRoles.can_groom && !member.can_groom) return false;
-    if (requiredRoles.can_vet && !member.can_vet) return false;
-    return true;
+    try {
+      // Safety check for member properties
+      if (!member) {
+        console.warn('🔍 [ADMIN_BOOKING] Staff member is null/undefined');
+        return false;
+      }
+      
+      // Log each staff member being filtered
+      console.log('🔍 [ADMIN_BOOKING] Filtering staff member:', {
+        id: member.id,
+        name: member.name,
+        can_bathe: member.can_bathe,
+        can_groom: member.can_groom,
+        can_vet: member.can_vet,
+        requiredRoles
+      });
+      
+      if (requiredRoles.can_bathe && !member.can_bathe) {
+        console.log('🔍 [ADMIN_BOOKING] Staff member excluded - requires bath but cannot bathe:', member.name);
+        return false;
+      }
+      if (requiredRoles.can_groom && !member.can_groom) {
+        console.log('🔍 [ADMIN_BOOKING] Staff member excluded - requires grooming but cannot groom:', member.name);
+        return false;
+      }
+      if (requiredRoles.can_vet && !member.can_vet) {
+        console.log('🔍 [ADMIN_BOOKING] Staff member excluded - requires vet but cannot vet:', member.name);
+        return false;
+      }
+      
+      console.log('🔍 [ADMIN_BOOKING] Staff member included:', member.name);
+      return true;
+    } catch (error) {
+      console.error('🔍 [ADMIN_BOOKING] Error filtering staff member:', error, member);
+      return false;
+    }
+  });
+
+  // Debug logging for staff filtering
+  console.log('🔍 [ADMIN_BOOKING] Staff filtering debug:', {
+    totalStaff: staff.length,
+    availableStaff: availableStaff.length,
+    requiredRoles,
+    primaryService: primaryService?.name,
+    secondaryService: secondaryService?.name,
+    staffDetails: staff.map(s => ({
+      id: s.id,
+      name: s.name,
+      can_bathe: s.can_bathe,
+      can_groom: s.can_groom,
+      can_vet: s.can_vet
+    }))
   });
 
   // Load available time slots when date and service change
@@ -260,48 +376,59 @@ const AdminBookingPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedClient || !selectedPet || !selectedPrimaryService || !selectedDate || !selectedTimeSlot) {
-      toast.error('Por favor, preencha todos os campos obrigatórios');
-      return;
+    try {
+      console.log('🔍 [ADMIN_BOOKING] Form submission started');
+      
+      if (!selectedClient || !selectedPet || !selectedPrimaryService || !selectedDate || !selectedTimeSlot) {
+        toast.error('Por favor, preencha todos os campos obrigatórios');
+        return;
+      }
+
+      // Get client and service data
+      const client = clients.find(c => c.id === selectedClient);
+      if (!client) {
+        console.error('🔍 [ADMIN_BOOKING] Client not found:', selectedClient);
+        toast.error('Cliente não encontrado');
+        return;
+      }
+
+      const primaryService = services.find(s => s.id === selectedPrimaryService);
+      if (!primaryService) {
+        console.error('🔍 [ADMIN_BOOKING] Primary service not found:', selectedPrimaryService);
+        toast.error('Serviço primário não encontrado');
+        return;
+      }
+
+      const staffMember = staff.find(s => s.id === selectedStaff);
+      const providerIds = selectedStaff ? [selectedStaff] : [];
+      
+      console.log('🔍 [ADMIN_BOOKING] Form validation passed');
+
+      // Prepare booking data for review
+      const bookingData = {
+        clientName: client.name,
+        petName: pets.find(p => p.id === selectedPet)?.name || '',
+        primaryServiceName: primaryService.name,
+        secondaryServiceName: secondaryService?.name || 'Nenhum',
+        totalPrice: totalPrice,
+        totalDuration: totalDuration,
+        date: selectedDate!,
+        time: selectedTimeSlot,
+        staffName: staffMember?.name,
+        notes: notes || undefined,
+        clientUserId: client.id,
+        petId: selectedPet,
+        primaryServiceId: selectedPrimaryService,
+        secondaryServiceId: selectedSecondaryService || null,
+        providerIds: providerIds
+      };
+
+      setReviewBookingData(bookingData);
+      setShowReviewModal(true);
+    } catch (error) {
+      console.error('🔍 [ADMIN_BOOKING] Error in form submission:', error);
+      toast.error('Erro ao processar formulário');
     }
-
-    // Get client and service data
-    const client = clients.find(c => c.id === selectedClient);
-    if (!client) {
-      toast.error('Cliente não encontrado');
-      return;
-    }
-
-    const primaryService = services.find(s => s.id === selectedPrimaryService);
-    if (!primaryService) {
-      toast.error('Serviço primário não encontrado');
-      return;
-    }
-
-    const staffMember = staff.find(s => s.id === selectedStaff);
-    const providerIds = selectedStaff ? [selectedStaff] : [];
-
-    // Prepare booking data for review
-    const bookingData = {
-      clientName: client.name,
-      petName: pets.find(p => p.id === selectedPet)?.name || '',
-      primaryServiceName: primaryService.name,
-      secondaryServiceName: secondaryService?.name || 'Nenhum',
-      totalPrice: totalPrice,
-      totalDuration: totalDuration,
-      date: selectedDate!,
-      time: selectedTimeSlot,
-      staffName: staffMember?.name,
-      notes: notes || undefined,
-      clientUserId: client.id,
-      petId: selectedPet,
-      primaryServiceId: selectedPrimaryService,
-      secondaryServiceId: selectedSecondaryService || null,
-      providerIds: providerIds
-    };
-
-    setReviewBookingData(bookingData);
-    setShowReviewModal(true);
   };
 
   const handleReviewConfirm = async (bookingData: any) => {
@@ -319,16 +446,16 @@ const AdminBookingPage = () => {
         _client_user_id: bookingData.clientUserId,
         _pet_id: bookingData.petId,
         _primary_service_id: selectedPrimaryService,
-        _booking_date: bookingData.bookingDate,
-        _time_slot: bookingData.timeSlot,
+        _booking_date: bookingData.date.toISOString().split('T')[0],
+        _time_slot: bookingData.time,
         _secondary_service_id: selectedSecondaryService || null,
         _calculated_price: finalTotalPrice,
         _calculated_duration: totalDuration,
         _notes: bookingData.notes,
         _provider_ids: bookingData.providerIds,
-        _extra_fee: bookingData.extraFee,
-        _extra_fee_reason: bookingData.extraFeeReason,
-        _addons: bookingData.selectedAddons.length > 0 ? bookingData.selectedAddons : null,
+        _extra_fee: bookingData.extraFee || 0,
+        _extra_fee_reason: bookingData.extraFeeReason || null,
+        _addons: bookingData.selectedAddons?.length > 0 ? bookingData.selectedAddons : null,
         _created_by: user?.id
       });
 
@@ -499,13 +626,16 @@ const AdminBookingPage = () => {
                   </div>
                 )}
 
-                {/* Debug Section - Remove this after testing */}
-                <div className="md:col-span-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                  <strong>Debug Info:</strong><br/>
-                  Selected Primary: {selectedPrimaryService}<br/>
-                  Show Secondary Dropdown: {showSecondaryServiceDropdown ? 'YES' : 'NO'}<br/>
-                  Primary Service Name: {primaryService?.name}<br/>
-                  Available TOSA Services: {tosaServices.length}
+                {/* Diagnostic Component */}
+                <div className="md:col-span-2">
+                  <BookingDiagnostics
+                    services={services}
+                    staff={staff}
+                    selectedPrimaryService={selectedPrimaryService}
+                    selectedSecondaryService={selectedSecondaryService}
+                    availableStaff={availableStaff}
+                    requiredRoles={requiredRoles}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -515,13 +645,24 @@ const AdminBookingPage = () => {
                       <SelectValue placeholder="Selecione um profissional" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availableStaff.map((staffMember) => (
-                        <SelectItem key={staffMember.id} value={staffMember.id}>
-                          {staffMember.name}
+                      {availableStaff.length > 0 ? (
+                        availableStaff.map((staffMember) => (
+                          <SelectItem key={staffMember.id} value={staffMember.id}>
+                            {staffMember.name}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="" disabled>
+                          Nenhum profissional disponível para este serviço
                         </SelectItem>
-                      ))}
+                      )}
                     </SelectContent>
                   </Select>
+                  {availableStaff.length === 0 && selectedPrimaryService && (
+                    <p className="text-sm text-amber-600">
+                      Nenhum profissional disponível para este serviço. O agendamento será criado sem profissional específico.
+                    </p>
+                  )}
                 </div>
 
                 {/* Service Summary */}

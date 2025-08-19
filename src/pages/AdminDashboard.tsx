@@ -88,13 +88,18 @@ const AdminDashboard = () => {
 
       // Fetch staff on duty (staff with active appointments today)
       const { data: staffWithAppointments } = await supabase
-        .from('appointments')
-        .select('staff_id')
-        .eq('date', today)
-        .neq('status', 'cancelled')
-        .not('staff_id', 'is', null);
+        .from('appointment_staff')
+        .select(`
+          staff_profile_id,
+          appointments!inner(
+            date,
+            status
+          )
+        `)
+        .eq('appointments.date', today)
+        .neq('appointments.status', 'cancelled');
       
-      const uniqueStaffOnDuty = new Set(staffWithAppointments?.map(apt => apt.staff_id)).size;
+      const uniqueStaffOnDuty = new Set(staffWithAppointments?.map(apt => apt.staff_profile_id)).size;
 
       // Fetch revenue today (sum of total_price for today's appointments)
       const { data: todayAppointments } = await supabase
@@ -176,7 +181,6 @@ const AdminDashboard = () => {
               icon={<UserCheck className="h-6 w-6" />}
               iconBgColor="bg-green-100"
               iconColor="text-green-600"
-              href="/admin/staff-availability"
               loading={loading}
             />
             
@@ -222,7 +226,7 @@ const AdminDashboard = () => {
           </div>
 
           {/* KPIs Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <Link to="/admin/clients">
               <Card className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border-0">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -248,36 +252,6 @@ const AdminDashboard = () => {
                   <div className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.totalPets}</div>
                   <p className="text-xs font-medium text-gray-500 mt-1">
                     Pets cadastrados no sistema
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link to="/admin/appointments">
-              <Card className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border-0">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-semibold uppercase tracking-wide text-gray-500">Total de Agendamentos</CardTitle>
-                  <Calendar className="h-5 w-5 text-gray-400" />
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.totalBookings}</div>
-                  <p className="text-xs font-medium text-gray-500 mt-1">
-                    Todos os agendamentos realizados
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link to="/admin/agenda-hoje">
-              <Card className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border-0">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-semibold uppercase tracking-wide text-gray-500">Serviços Hoje</CardTitle>
-                  <Clock className="h-5 w-5 text-gray-400" />
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-2xl font-bold text-gray-900">{loading ? '...' : stats.todayServices}</div>
-                  <p className="text-xs font-medium text-gray-500 mt-1">
-                    Agendamentos para hoje
                   </p>
                 </CardContent>
               </Card>

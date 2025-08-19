@@ -9,7 +9,7 @@ interface QuickStatsCardProps {
   icon: React.ReactNode;
   iconBgColor: string;
   iconColor: string;
-  href: string;
+  href?: string;
   loading?: boolean;
   className?: string;
 }
@@ -24,32 +24,37 @@ const QuickStatsCard: React.FC<QuickStatsCardProps> = ({
   loading = false,
   className
 }) => {
-  return (
-    <Link to={href}>
-      <Card className={cn(
-        "bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer border-0",
-        className
-      )}>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-1">
-                {title}
-              </p>
-              <p className="text-3xl font-bold text-gray-900">
-                {loading ? '...' : value}
-              </p>
-            </div>
-            <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center", iconBgColor)}>
-              <div className={iconColor}>
-                {icon}
-              </div>
+  const CardContent = (
+    <Card className={cn(
+      "bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 border-0",
+      href ? "cursor-pointer" : "",
+      className
+    )}>
+      <div className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-gray-500 mb-1">
+              {title}
+            </p>
+            <p className="text-3xl font-bold text-gray-900">
+              {loading ? '...' : value}
+            </p>
+          </div>
+          <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center", iconBgColor)}>
+            <div className={iconColor}>
+              {icon}
             </div>
           </div>
-        </CardContent>
-      </Card>
-    </Link>
+        </div>
+      </div>
+    </Card>
   );
+
+  if (href) {
+    return <Link to={href}>{CardContent}</Link>;
+  }
+
+  return CardContent;
 };
 
 export default QuickStatsCard;
