@@ -19,6 +19,7 @@ import BookingReviewModal from '@/components/admin/BookingReviewModal';
 import BookingDiagnostics from '@/components/admin/BookingDiagnostics';
 import { AlertCircle } from 'lucide-react';
 import browserCompatibility from '@/utils/browserCompatibility';
+import { initializeChromeCompatibility } from '@/utils/chromePolyfills';
 
 interface Client {
   id: string;
@@ -86,9 +87,10 @@ const AdminBookingPage = () => {
 
   // Global error handler for unhandled errors
   useEffect(() => {
-    // Initialize browser compatibility
+    // Initialize browser compatibility and Chrome polyfills
     browserCompatibility.logCompatibilityReport();
     browserCompatibility.applyFallbacks();
+    initializeChromeCompatibility();
 
     const handleUnhandledError = (event: ErrorEvent) => {
       console.error('🚨 [ADMIN_BOOKING] Unhandled error caught:', {
@@ -216,7 +218,12 @@ const AdminBookingPage = () => {
     try {
       console.log('🔍 [ADMIN_BOOKING] Service selection started:', serviceId);
       console.log('🔍 [ADMIN_BOOKING] Available services count:', services.length);
-      console.log('🔍 [ADMIN_BOOKING] Services:', services.map(s => ({ id: s.id, name: s.name })));
+      const serviceList = [];
+      for (let i = 0; i < services.length; i++) {
+        const s = services[i];
+        serviceList.push({ id: s.id, name: s.name });
+      }
+      console.log('🔍 [ADMIN_BOOKING] Services:', serviceList);
       
       setSelectedPrimaryService(serviceId);
       setSelectedSecondaryService(''); // Reset secondary service
@@ -260,11 +267,19 @@ const AdminBookingPage = () => {
   };
 
   // Get TOSA services for secondary dropdown
-  const tosaServices = services.filter(service => 
-    service.name.toLowerCase().includes('tosa')
-  );
+  const tosaServices = [];
+  for (let i = 0; i < services.length; i++) {
+    const service = services[i];
+    if (service.name.toLowerCase().indexOf('tosa') !== -1) {
+      tosaServices.push(service);
+    }
+  }
 
-  console.log('🔍 [ADMIN_BOOKING] Available TOSA services:', tosaServices.map(s => s.name));
+  const tosaServiceNames = [];
+  for (let i = 0; i < tosaServices.length; i++) {
+    tosaServiceNames.push(tosaServices[i].name);
+  }
+  console.log('🔍 [ADMIN_BOOKING] Available TOSA services:', tosaServiceNames);
   console.log('🔍 [ADMIN_BOOKING] Show secondary dropdown:', showSecondaryServiceDropdown);
 
   // Get selected services for calculations
@@ -272,23 +287,37 @@ const AdminBookingPage = () => {
   const secondaryService = services.find(s => s.id === selectedSecondaryService);
 
   // Calculate total price and duration
-  const totalPrice = (primaryService?.base_price || 0) + (secondaryService?.base_price || 0);
-  const totalDuration = (primaryService?.default_duration || 0) + (secondaryService?.default_duration || 0);
+  const primaryPrice = primaryService && primaryService.base_price ? primaryService.base_price : 0;
+  const secondaryPrice = secondaryService && secondaryService.base_price ? secondaryService.base_price : 0;
+  const totalPrice = primaryPrice + secondaryPrice;
+  
+  const primaryDuration = primaryService && primaryService.default_duration ? primaryService.default_duration : 0;
+  const secondaryDuration = secondaryService && secondaryService.default_duration ? secondaryService.default_duration : 0;
+  const totalDuration = primaryDuration + secondaryDuration;
 
   // Calculate required roles for staff filtering
+  const primaryBath = primaryService && primaryService.requires_bath ? primaryService.requires_bath : false;
+  const secondaryBath = secondaryService && secondaryService.requires_bath ? secondaryService.requires_bath : false;
+  const primaryGroom = primaryService && primaryService.requires_grooming ? primaryService.requires_grooming : false;
+  const secondaryGroom = secondaryService && secondaryService.requires_grooming ? secondaryService.requires_grooming : false;
+  const primaryVet = primaryService && primaryService.requires_vet ? primaryService.requires_vet : false;
+  const secondaryVet = secondaryService && secondaryService.requires_vet ? secondaryService.requires_vet : false;
+  
   const requiredRoles = {
-    can_bathe: (primaryService?.requires_bath || false) || (secondaryService?.requires_bath || false),
-    can_groom: (primaryService?.requires_grooming || false) || (secondaryService?.requires_grooming || false),
-    can_vet: (primaryService?.requires_vet || false) || (secondaryService?.requires_vet || false)
+    can_bathe: primaryBath || secondaryBath,
+    can_groom: primaryGroom || secondaryGroom,
+    can_vet: primaryVet || secondaryVet
   };
 
   // Filter available staff based on combined requirements
-  const availableStaff = staff.filter(member => {
+  const availableStaff = [];
+  for (let i = 0; i < staff.length; i++) {
+    const member = staff[i];
     try {
       // Safety check for member properties
       if (!member) {
         console.warn('🔍 [ADMIN_BOOKING] Staff member is null/undefined');
-        return false;
+        continue;
       }
       
       // Log each staff member being filtered
@@ -298,44 +327,50 @@ const AdminBookingPage = () => {
         can_bathe: member.can_bathe,
         can_groom: member.can_groom,
         can_vet: member.can_vet,
-        requiredRoles
+        requiredRoles: requiredRoles
       });
       
       if (requiredRoles.can_bathe && !member.can_bathe) {
         console.log('🔍 [ADMIN_BOOKING] Staff member excluded - requires bath but cannot bathe:', member.name);
-        return false;
+        continue;
       }
       if (requiredRoles.can_groom && !member.can_groom) {
         console.log('🔍 [ADMIN_BOOKING] Staff member excluded - requires grooming but cannot groom:', member.name);
-        return false;
+        continue;
       }
       if (requiredRoles.can_vet && !member.can_vet) {
         console.log('🔍 [ADMIN_BOOKING] Staff member excluded - requires vet but cannot vet:', member.name);
-        return false;
+        continue;
       }
       
       console.log('🔍 [ADMIN_BOOKING] Staff member included:', member.name);
-      return true;
+      availableStaff.push(member);
     } catch (error) {
       console.error('🔍 [ADMIN_BOOKING] Error filtering staff member:', error, member);
-      return false;
+      continue;
     }
-  });
+  }
 
   // Debug logging for staff filtering
-  console.log('🔍 [ADMIN_BOOKING] Staff filtering debug:', {
-    totalStaff: staff.length,
-    availableStaff: availableStaff.length,
-    requiredRoles,
-    primaryService: primaryService?.name,
-    secondaryService: secondaryService?.name,
-    staffDetails: staff.map(s => ({
+  const staffDetails = [];
+  for (let i = 0; i < staff.length; i++) {
+    const s = staff[i];
+    staffDetails.push({
       id: s.id,
       name: s.name,
       can_bathe: s.can_bathe,
       can_groom: s.can_groom,
       can_vet: s.can_vet
-    }))
+    });
+  }
+  
+  console.log('🔍 [ADMIN_BOOKING] Staff filtering debug:', {
+    totalStaff: staff.length,
+    availableStaff: availableStaff.length,
+    requiredRoles: requiredRoles,
+    primaryService: primaryService ? primaryService.name : null,
+    secondaryService: secondaryService ? secondaryService.name : null,
+    staffDetails: staffDetails
   });
 
   // Load available time slots when date and service change
@@ -378,43 +413,97 @@ const AdminBookingPage = () => {
     
     try {
       console.log('🔍 [ADMIN_BOOKING] Form submission started');
+      console.log('🔍 [ADMIN_BOOKING] Browser info:', browserCompatibility.getBrowserInfo());
       
-      if (!selectedClient || !selectedPet || !selectedPrimaryService || !selectedDate || !selectedTimeSlot) {
-        toast.error('Por favor, preencha todos os campos obrigatórios');
+      // Validate required fields
+      if (!selectedClient) {
+        toast.error('Por favor, selecione um cliente');
+        return;
+      }
+      if (!selectedPet) {
+        toast.error('Por favor, selecione um pet');
+        return;
+      }
+      if (!selectedPrimaryService) {
+        toast.error('Por favor, selecione um serviço');
+        return;
+      }
+      if (!selectedDate) {
+        toast.error('Por favor, selecione uma data');
+        return;
+      }
+      if (!selectedTimeSlot) {
+        toast.error('Por favor, selecione um horário');
         return;
       }
 
       // Get client and service data
-      const client = clients.find(c => c.id === selectedClient);
+      let client = null;
+      for (let i = 0; i < clients.length; i++) {
+        if (clients[i].id === selectedClient) {
+          client = clients[i];
+          break;
+        }
+      }
       if (!client) {
         console.error('🔍 [ADMIN_BOOKING] Client not found:', selectedClient);
         toast.error('Cliente não encontrado');
         return;
       }
 
-      const primaryService = services.find(s => s.id === selectedPrimaryService);
+      let primaryService = null;
+      for (let i = 0; i < services.length; i++) {
+        if (services[i].id === selectedPrimaryService) {
+          primaryService = services[i];
+          break;
+        }
+      }
       if (!primaryService) {
         console.error('🔍 [ADMIN_BOOKING] Primary service not found:', selectedPrimaryService);
         toast.error('Serviço primário não encontrado');
         return;
       }
 
-      const staffMember = staff.find(s => s.id === selectedStaff);
+      let staffMember = null;
+      for (let i = 0; i < staff.length; i++) {
+        if (staff[i].id === selectedStaff) {
+          staffMember = staff[i];
+          break;
+        }
+      }
       const providerIds = selectedStaff ? [selectedStaff] : [];
       
       console.log('🔍 [ADMIN_BOOKING] Form validation passed');
 
       // Prepare booking data for review
+      let petName = '';
+      for (let i = 0; i < pets.length; i++) {
+        if (pets[i].id === selectedPet) {
+          petName = pets[i].name;
+          break;
+        }
+      }
+      
+      let secondaryServiceName = 'Nenhum';
+      if (secondaryService) {
+        secondaryServiceName = secondaryService.name;
+      }
+      
+      let staffName = null;
+      if (staffMember) {
+        staffName = staffMember.name;
+      }
+      
       const bookingData = {
         clientName: client.name,
-        petName: pets.find(p => p.id === selectedPet)?.name || '',
+        petName: petName,
         primaryServiceName: primaryService.name,
-        secondaryServiceName: secondaryService?.name || 'Nenhum',
+        secondaryServiceName: secondaryServiceName,
         totalPrice: totalPrice,
         totalDuration: totalDuration,
-        date: selectedDate!,
+        date: selectedDate,
         time: selectedTimeSlot,
-        staffName: staffMember?.name,
+        staffName: staffName,
         notes: notes || undefined,
         clientUserId: client.id,
         petId: selectedPet,
@@ -436,12 +525,31 @@ const AdminBookingPage = () => {
     
     try {
       // Calculate total price including addons and extra fee
-      const addonsTotal = bookingData.selectedAddons.reduce((sum: number, addon: any) => 
-        sum + (addon.price * addon.quantity), 0
-      );
-      const finalTotalPrice = totalPrice + addonsTotal + bookingData.extraFee;
+      let addonsTotal = 0;
+      if (bookingData.selectedAddons && bookingData.selectedAddons.length > 0) {
+        for (let i = 0; i < bookingData.selectedAddons.length; i++) {
+          const addon = bookingData.selectedAddons[i];
+          addonsTotal = addonsTotal + (addon.price * addon.quantity);
+        }
+      }
+      const finalTotalPrice = totalPrice + addonsTotal + (bookingData.extraFee || 0);
 
       // Create the appointment with dual services
+      let addonsParam = null;
+      if (bookingData.selectedAddons && bookingData.selectedAddons.length > 0) {
+        addonsParam = bookingData.selectedAddons;
+      }
+      
+      let extraFeeReasonParam = null;
+      if (bookingData.extraFeeReason) {
+        extraFeeReasonParam = bookingData.extraFeeReason;
+      }
+      
+      let userIdParam = null;
+      if (user && user.id) {
+        userIdParam = user.id;
+      }
+      
       const { data: appointmentId, error } = await supabase.rpc('create_admin_booking_with_dual_services', {
         _client_user_id: bookingData.clientUserId,
         _pet_id: bookingData.petId,
@@ -454,9 +562,9 @@ const AdminBookingPage = () => {
         _notes: bookingData.notes,
         _provider_ids: bookingData.providerIds,
         _extra_fee: bookingData.extraFee || 0,
-        _extra_fee_reason: bookingData.extraFeeReason || null,
-        _addons: bookingData.selectedAddons?.length > 0 ? bookingData.selectedAddons : null,
-        _created_by: user?.id
+        _extra_fee_reason: extraFeeReasonParam,
+        _addons: addonsParam,
+        _created_by: userIdParam
       });
 
       if (error) throw error;
