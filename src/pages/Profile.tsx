@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { DatePicker } from '@/components/ui/date-picker';
+import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
 import { Save, Edit, X, Loader2, User, Mail, Calendar, Phone, MapPin, FileText, Shield, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -428,13 +428,10 @@ const Profile = () => {
                     <Label className="text-sm font-medium text-gray-700">Data de Nascimento</Label>
                   </div>
                   {isEditing ? (
-                    <DatePicker
-                      date={birthDate}
-                      onSelect={setBirthDate}
-                      placeholder="Selecione sua data de nascimento"
+                    <PetDobPicker
+                      value={birthDate}
+                      onChange={setBirthDate}
                       className="w-full h-12 border-gray-200 focus:border-purple-500 focus:ring-purple-500 transition-all duration-200"
-                      fromYear={1900}
-                      toYear={new Date().getFullYear()}
                     />
                   ) : (
                     <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">

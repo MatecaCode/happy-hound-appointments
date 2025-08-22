@@ -1,0 +1,26 @@
+/* Admin Booking Calendar - Isolated Styles */
+
+.bookingCalendar {
+  /* Admin-specific calendar container */
+}
+
+.bookingCalendar .rdp-day_disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.bookingCalendar .rdp-nav_button {
+  pointer-events: auto;
+}
+
+.bookingCalendar .rdp-caption_label {
+  /* No dropdowns - static text only */
+  pointer-events: none;
+}
+
+/* Ensure past dates are visually distinct */
+.bookingCalendar .rdp-day_disabled {
+  background-color: #f3f4f6;
+  color: #9ca3af;
+}

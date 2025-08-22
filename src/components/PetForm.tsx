@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
-import { DatePicker } from '@/components/ui/date-picker';
+import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -159,13 +159,10 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
 
         <div>
           <Label>Data de Nascimento</Label>
-          <DatePicker
-            date={birthDate}
-            onSelect={setBirthDate}
-            placeholder="Selecione a data"
+          <PetDobPicker
+            value={birthDate}
+            onChange={setBirthDate}
             className="w-full"
-            fromYear={2000}
-            toYear={new Date().getFullYear()}
           />
         </div>
       </div>

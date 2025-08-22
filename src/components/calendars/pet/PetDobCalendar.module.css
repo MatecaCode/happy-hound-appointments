@@ -1,0 +1,21 @@
+/* Pet Date of Birth Calendar - Isolated Styles */
+
+.petDobCalendar {
+  /* Pet-specific calendar container */
+}
+
+.petDobCalendar .rdp-day_disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.petDobCalendar .rdp-nav_button {
+  pointer-events: auto;
+}
+
+/* Ensure future dates are visually distinct */
+.petDobCalendar .rdp-day_disabled {
+  background-color: #fef2f2;
+  color: #dc2626;
+}

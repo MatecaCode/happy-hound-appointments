@@ -7,12 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar } from '@/components/ui/calendar';
+import { BookingCalendar } from '@/components/calendars/admin/BookingCalendar';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { ptBR } from 'date-fns/locale';
+
 import { createAdminBooking } from '@/utils/adminBookingUtils';
 import { useNavigate } from 'react-router-dom';
 import BookingReviewModal from '@/components/admin/BookingReviewModal';
@@ -55,6 +55,11 @@ interface TimeSlot {
   time_slot: string;
 }
 
+interface AvailabilitySummary {
+  date: string;
+  has_availability: boolean;
+}
+
 const AdminBookingPage = () => {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
@@ -67,6 +72,8 @@ const AdminBookingPage = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
+  const [availabilitySummary, setAvailabilitySummary] = useState<AvailabilitySummary[]>([]);
+  const [isLoadingAvailability, setIsLoadingAvailability] = useState(false);
   
   // Updated state for dual-service support
   const [selectedClient, setSelectedClient] = useState('');
@@ -78,6 +85,11 @@ const AdminBookingPage = () => {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState('');
   const [notes, setNotes] = useState('');
+  
+  // New state for staff profile IDs array and month tracking
+  const [staffProfileIds, setStaffProfileIds] = useState<string[]>([]);
+  const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
+  const [enabledDates, setEnabledDates] = useState<Set<string>>(new Set());
   
   const [isLoading, setIsLoading] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -408,6 +420,144 @@ const AdminBookingPage = () => {
     loadTimeSlots();
   }, [selectedDate, selectedPrimaryService, selectedSecondaryService, selectedStaff]);
 
+  // Fetch availability summary for selected staff
+  const fetchAvailabilitySummary = async (staffIds: string[], monthStart: Date, monthEnd: Date) => {
+    if (!staffIds || staffIds.length === 0) {
+      setAvailabilitySummary([]);
+      setEnabledDates(new Set());
+      return;
+    }
+
+    try {
+      setIsLoadingAvailability(true);
+      
+      console.log('🔍 [ADMIN_BOOKING] Fetching availability for staff:', staffIds);
+      console.log('🔍 [ADMIN_BOOKING] Date range:', monthStart.toISOString().split('T')[0], 'to', monthEnd.toISOString().split('T')[0]);
+      
+      const { data, error } = await supabase.rpc('get_staff_availability_summary', {
+        _staff_profile_ids: staffIds,
+        _start_date: monthStart.toISOString().split('T')[0],
+        _end_date: monthEnd.toISOString().split('T')[0]
+      });
+
+      if (error) {
+        console.error('🔍 [ADMIN_BOOKING] Error fetching availability:', error);
+        toast.error('Erro ao carregar disponibilidade');
+        return;
+      }
+
+      console.log('🔍 [ADMIN_BOOKING] Availability data received:', data);
+      setAvailabilitySummary(data || []);
+      
+      // Build enabled dates set
+      const enabledSet = new Set<string>();
+      if (data) {
+        data.forEach(item => {
+          if (item.has_availability) {
+            enabledSet.add(item.date);
+          }
+        });
+      }
+      setEnabledDates(enabledSet);
+      
+      // Log the tuple as requested
+      console.log('🔍 [ADMIN_BOOKING] Availability tuple:', {
+        staffProfileIds: staffIds,
+        monthStart: monthStart.toISOString().split('T')[0],
+        monthEnd: monthEnd.toISOString().split('T')[0],
+        enabledCount: enabledSet.size
+      });
+    } catch (error) {
+      console.error('🔍 [ADMIN_BOOKING] Error in fetchAvailabilitySummary:', error);
+      toast.error('Erro ao carregar disponibilidade');
+    } finally {
+      setIsLoadingAvailability(false);
+    }
+  };
+
+  // Effect to fetch availability when staff selection or month changes
+  useEffect(() => {
+    console.log('🔍 [ADMIN_BOOKING] Month changed to:', visibleMonth.toISOString().split('T')[0]);
+    
+    // Calculate month start and end based on visibleMonth
+    const monthStart = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), 1);
+    const monthEnd = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0);
+    
+    if (staffProfileIds.length > 0) {
+      fetchAvailabilitySummary(staffProfileIds, monthStart, monthEnd);
+    } else {
+      setAvailabilitySummary([]);
+      setEnabledDates(new Set());
+    }
+  }, [staffProfileIds, visibleMonth]);
+
+  // Effect to sync selectedStaff with staffProfileIds array
+  useEffect(() => {
+    if (selectedStaff) {
+      setStaffProfileIds([selectedStaff]);
+      console.log('🔍 [ADMIN_BOOKING] Staff profile IDs updated:', [selectedStaff]);
+    } else {
+      setStaffProfileIds([]);
+    }
+  }, [selectedStaff]);
+
+  // Safety reset: normalize past dates on mount
+  useEffect(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate && selectedDate < today) {
+      console.log('🔍 [ADMIN_BOOKING] Resetting past selected date:', selectedDate);
+      setSelectedDate(undefined);
+    }
+  }, [selectedDate]);
+
+  // Handle month change from calendar
+  const handleMonthChange = (newMonth: Date) => {
+    console.log('🔍 [ADMIN_BOOKING] Calendar month change requested:', newMonth.toISOString().split('T')[0]);
+    setVisibleMonth(newMonth);
+  };
+
+  // Compute availability predicate for staff
+  const isEnabledDate = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Basic constraints: no past dates, no Sundays
+    if (date < today || date.getDay() === 0) {
+      return false;
+    }
+    
+    // If no staff selected, allow all future dates
+    if (staffProfileIds.length === 0) {
+      return true;
+    }
+    
+    // Check availability from enabled dates set
+    const dateStr = date.toISOString().split('T')[0];
+    return enabledDates.has(dateStr);
+  };
+
+  // Compute disabled predicate for calendar (inverted logic)
+  const isDisabledDate = (date: Date) => {
+    const d0 = new Date(date);
+    d0.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Disable past dates
+    if (d0 < today) return true;
+    
+    // Disable Sundays
+    if (d0.getDay() === 0) return true;
+    
+    // If no staff selected, allow all future dates
+    if (staffProfileIds.length === 0) return false;
+    
+    // Disable dates without availability
+    const dateStr = d0.toISOString().split('T')[0];
+    return !enabledDates.has(dateStr);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -471,7 +621,7 @@ const AdminBookingPage = () => {
           break;
         }
       }
-      const providerIds = selectedStaff ? [selectedStaff] : [];
+      const providerIds = staffProfileIds;
       
       console.log('🔍 [ADMIN_BOOKING] Form validation passed');
 
@@ -802,19 +952,61 @@ const AdminBookingPage = () => {
               </div>
 
               <div className="space-y-4">
-                <Label>Data do Agendamento *</Label>
-                <Calendar
-                  mode="single"
+                <div className="flex items-center justify-between">
+                  <Label>Data do Agendamento *</Label>
+                  {staffProfileIds.length > 0 ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                      {isLoadingAvailability ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                          <span>Carregando disponibilidade...</span>
+                        </>
+                      ) : (
+                        <span>
+                          {enabledDates.size > 0 
+                            ? `${enabledDates.size} dias disponíveis`
+                            : 'Nenhum dia disponível'
+                          }
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-gray-500">
+                      Selecione o(s) profissional(is) no passo anterior para ver os dias disponíveis.
+                    </div>
+                  )}
+                </div>
+                <BookingCalendar
                   selected={selectedDate}
                   onSelect={setSelectedDate}
-                  locale={ptBR}
-                  disabled={(date) => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    return date < today || date.getDay() === 0; // Disable past dates and Sundays
-                  }}
+                  disabled={isDisabledDate}
+                  visibleMonth={visibleMonth}
+                  onMonthChange={handleMonthChange}
                   className="rounded-md border w-fit"
                 />
+                {staffProfileIds.length > 0 && availabilitySummary.length > 0 && (
+                  <div className="text-xs text-gray-500">
+                    <p>Dias com disponibilidade: {availabilitySummary.filter(a => a.has_availability).length}</p>
+                    <p>Dias sem disponibilidade: {availabilitySummary.filter(a => !a.has_availability).length}</p>
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-blue-600">Debug: Ver detalhes da disponibilidade</summary>
+                      <div className="mt-1 p-2 bg-gray-100 rounded text-xs">
+                        <p>Staff Profile IDs: {staffProfileIds.join(', ')}</p>
+                        <p>Total de dias carregados: {availabilitySummary.length}</p>
+                        <p>Primeiros 5 dias com disponibilidade:</p>
+                                                 <ul className="ml-4">
+                           {availabilitySummary
+                             .filter(a => a.has_availability)
+                             .slice(0, 5)
+                             .map((a, i) => (
+                               <li key={i}>{a.date} - Disponível</li>
+                             ))
+                           }
+                         </ul>
+                      </div>
+                    </details>
+                  </div>
+                )}
               </div>
 
               {selectedDate && (

@@ -166,6 +166,8 @@ export function DatePicker({
           month={calendarMonth}
           onMonthChange={setCalendarMonth}
           captionLayout="buttons"
+          viewMode="days"
+          onViewModeChange={() => {}} // Prevent view mode changes in date picker
         />
         <div className="flex gap-2 p-3 pt-0">
           <Button

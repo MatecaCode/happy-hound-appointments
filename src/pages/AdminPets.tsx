@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { DatePicker } from '@/components/ui/date-picker';
+import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
 import { ClientCombobox } from '@/components/ClientCombobox';
 import { BreedCombobox } from '@/components/BreedCombobox';
 import { toast } from 'sonner';
@@ -515,10 +515,9 @@ const AdminPets = () => {
                   
                                      <div>
                      <Label htmlFor="birth-date">Data de Nascimento</Label>
-                     <DatePicker
-                       date={birthDate}
-                       onSelect={setBirthDate}
-                       placeholder="Selecione a data"
+                     <PetDobPicker
+                       value={birthDate}
+                       onChange={setBirthDate}
                      />
                    </div>
 
@@ -744,10 +743,9 @@ const AdminPets = () => {
               
                              <div>
                  <Label htmlFor="edit-birth-date">Data de Nascimento</Label>
-                 <DatePicker
-                   date={birthDate}
-                   onSelect={setBirthDate}
-                   placeholder="Selecione a data"
+                 <PetDobPicker
+                   value={birthDate}
+                   onChange={setBirthDate}
                  />
                </div>
 

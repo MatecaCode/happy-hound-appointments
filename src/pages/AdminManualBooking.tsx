@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ClientCombobox } from '@/components/ClientCombobox';
 import { ServiceCombobox } from '@/components/ServiceCombobox';
-import { Calendar } from '@/components/ui/calendar';
+import { BookingCalendar } from '@/components/calendars/admin/BookingCalendar';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -123,6 +123,29 @@ const AdminManualBooking = () => {
   const [selectedSecondaryService, setSelectedSecondaryService] = useState<Service | null>(null);
   const [showSecondaryServiceDropdown, setShowSecondaryServiceDropdown] = useState(false);
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
+  const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
+
+  // Handle month change from calendar
+  const handleMonthChange = (newMonth: Date) => {
+    console.log('🔍 [ADMIN_MANUAL_BOOKING] Calendar month change requested:', newMonth.toISOString().split('T')[0]);
+    setVisibleMonth(newMonth);
+  };
+
+  // Disable date logic for booking calendar
+  const isDisabledDate = (date: Date) => {
+    const d0 = new Date(date);
+    d0.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Disable past dates
+    if (d0 < today) return true;
+    
+    // Disable Sundays
+    if (d0.getDay() === 0) return true;
+    
+    return false;
+  };
 
   // Booking form data
   const [bookingData, setBookingData] = useState<BookingData>({
@@ -529,7 +552,11 @@ const AdminManualBooking = () => {
         console.log('🔧 [ADMIN_MANUAL_BOOKING] Using dual-service RPC:', rpcName);
         
         bookingPayload = {
-          _client_user_id: client.user_id,
+          // Use _client_id for unclaimed admin-created clients, _client_user_id for claimed clients
+          ...(client.user_id 
+            ? { _client_user_id: client.user_id }    // Claimed client
+            : { _client_id: client.id }              // Unclaimed admin-created client
+          ),
           _pet_id: bookingData.petId,
           _primary_service_id: bookingData.serviceId,
           _booking_date: dateStr,
@@ -548,7 +575,11 @@ const AdminManualBooking = () => {
 
                 // Prepare base booking payload
         const basePayload = {
-          _client_user_id: client.user_id, // Use user_id, not client.id
+          // Use _client_id for unclaimed admin-created clients, _client_user_id for claimed clients
+          ...(client.user_id 
+            ? { _client_user_id: client.user_id }    // Claimed client
+            : { _client_id: client.id }              // Unclaimed admin-created client
+          ),
           _pet_id: bookingData.petId,
           _service_id: bookingData.serviceId,
           _provider_ids: staffIds,
@@ -1074,17 +1105,13 @@ const AdminManualBooking = () => {
               {/* Date Selection */}
               <div className="space-y-2">
                 <Label>Data</Label>
-                                 <Calendar
-                   mode="single"
+                                 <BookingCalendar
                    selected={bookingData.date}
                    onSelect={(date) => setBookingData(prev => ({ ...prev, date }))}
-                   locale={ptBR}
-                   className="rounded-md border"
-                   disabled={(date) => {
-                     // Disable Sundays
-                     const isSunday = date.getDay() === 0;
-                     return isSunday;
-                   }}
+                   visibleMonth={visibleMonth}
+                   onMonthChange={handleMonthChange}
+                   disabled={isDisabledDate}
+                   className="rounded-md border w-fit"
                  />
               </div>
 

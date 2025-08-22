@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
-import { DatePicker } from '@/components/ui/date-picker';
+import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useBreeds } from '@/hooks/useBreeds';
@@ -242,13 +242,10 @@ const PetFormPage = () => {
                {/* Birth Date */}
                <div className="space-y-2">
                  <Label className="text-base font-medium">Data de Nascimento</Label>
-                 <DatePicker
-                   date={birthDate}
-                   onSelect={setBirthDate}
-                   placeholder="Selecione a data"
+                 <PetDobPicker
+                   value={birthDate}
+                   onChange={setBirthDate}
                    className="w-full h-12"
-                   fromYear={2000}
-                   toYear={new Date().getFullYear()}
                  />
                </div>
 
