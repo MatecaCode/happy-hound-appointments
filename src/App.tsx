@@ -50,6 +50,7 @@ import { AuthProvider } from "./hooks/useAuth";
 import TestDataPage from "./pages/TestDataPage";
 import GroomerAvailability from './pages/GroomerAvailability';
 import PetFormPage from './pages/PetFormPage';
+import Claim from "./pages/Claim";
 
 const queryClient = new QueryClient();
 
@@ -92,6 +93,7 @@ function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/confirmation" element={<Confirmation />} />
+              <Route path="/claim" element={<Claim />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/groomer-dashboard" element={<GroomerDashboard />} />
               <Route path="/groomer-calendar" element={<GroomerCalendar />} />

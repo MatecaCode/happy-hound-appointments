@@ -29,7 +29,9 @@ import {
   FileText,
   Dog,
   Cat,
-  HelpCircle
+  HelpCircle,
+  Send,
+  CheckCircle
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -47,6 +49,10 @@ interface Client {
   location_id: string;
   created_at: string;
   updated_at: string;
+  admin_created: boolean;
+  created_by: string | null;
+  claim_invited_at: string | null;
+  claimed_at: string | null;
   location_name?: string;
   pet_count?: number;
   needs_registration?: boolean;
@@ -126,23 +132,27 @@ const AdminClients = () => {
     try {
       console.log('🔍 [ADMIN_CLIENTS] Fetching clients with pet counts');
       
-             const { data, error } = await supabase
-         .from('clients')
-         .select(`
-           id,
-           user_id,
-           name,
-           phone,
-           email,
-           address,
-           notes,
-           location_id,
-           created_at,
-           updated_at,
-           needs_registration,
-           locations:location_id (name)
-         `)
-         .order('created_at', { ascending: false });
+                   const { data, error } = await supabase
+        .from('clients')
+        .select(`
+          id,
+          user_id,
+          name,
+          phone,
+          email,
+          address,
+          notes,
+          location_id,
+          created_at,
+          updated_at,
+          admin_created,
+          created_by,
+          claim_invited_at,
+          claimed_at,
+          needs_registration,
+          locations:location_id (name)
+        `)
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('❌ [ADMIN_CLIENTS] Supabase error:', error);
@@ -244,6 +254,8 @@ const AdminClients = () => {
           address: formData.address,
           notes: formData.notes,
           location_id: formData.location_id,
+          admin_created: true,
+          created_by: user.id,
           needs_registration: true // Flag to indicate client needs to complete registration
         })
         .select()
@@ -255,11 +267,31 @@ const AdminClients = () => {
         return;
       }
 
-      // Send invitation email to client
-      // For now, we'll just show a success message
-      // In a real implementation, you'd send an email with a registration link
-      
-      toast.success('Cliente criado com sucesso! Cliente receberá um email para completar o registro.');
+      // Send invitation email using Edge Function
+      try {
+        const { data: inviteResult, error: inviteError } = await supabase.functions.invoke(
+          'send-client-invite',
+          {
+            body: {
+              email: clientData.email,
+              client_id: clientData.id
+            }
+          }
+        );
+
+        if (inviteError) {
+          console.error('❌ [ADMIN_CLIENTS] Invite error:', inviteError);
+          toast.error('Cliente criado mas falha ao enviar convite: ' + inviteError.message);
+        } else if (inviteResult?.status === 'invited') {
+          toast.success('Cliente criado com sucesso! Convite enviado para ' + clientData.email);
+        } else {
+          toast.success('Cliente criado com sucesso! Convite será enviado separadamente.');
+        }
+      } catch (inviteError) {
+        console.error('❌ [ADMIN_CLIENTS] Invite function error:', inviteError);
+        toast.success('Cliente criado com sucesso! Convite será enviado manualmente.');
+      }
+
       setIsCreateModalOpen(false);
       resetForm();
       fetchClients();
@@ -342,6 +374,98 @@ const AdminClients = () => {
       console.error('❌ [ADMIN_CLIENTS] Error deleting client:', error);
       toast.error('Erro ao deletar cliente');
     }
+  };
+
+  const handleSendClaimEmail = async (client: Client) => {
+    if (!client.admin_created || client.claimed_at) {
+      toast.error('Este cliente não é elegível para reivindicação de conta');
+      return;
+    }
+
+    try {
+      // Use Edge Function to send invite
+      const { data: inviteResult, error: inviteError } = await supabase.functions.invoke(
+        'send-client-invite',
+        {
+          body: {
+            email: client.email,
+            client_id: client.id
+          }
+        }
+      );
+
+      if (inviteError) {
+        console.error('❌ [ADMIN_CLIENTS] Invite error:', inviteError);
+        toast.error('Erro ao enviar convite: ' + inviteError.message);
+        return;
+      }
+
+      if (inviteResult?.status === 'invited') {
+        toast.success(`Convite enviado para ${client.email}`);
+        fetchClients(); // Refresh to show updated claim_invited_at
+      } else {
+        toast.error('Erro inesperado ao enviar convite');
+      }
+    } catch (error) {
+      console.error('❌ [ADMIN_CLIENTS] Error sending claim email:', error);
+      toast.error('Erro ao enviar convite');
+    }
+  };
+
+  const handleBulkSendClaimEmails = async () => {
+    // Filter for eligible clients (admin-created, unclaimed, not yet invited)
+    const eligibleClients = clients.filter(client => 
+      client.admin_created && !client.claimed_at && !client.claim_invited_at
+    );
+
+    if (eligibleClients.length === 0) {
+      toast.error('Nenhum cliente elegível para reivindicação de conta (sem convites pendentes)');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Enviar convites para ${eligibleClients.length} clientes? Esta ação será feita um por vez.`
+    );
+
+    if (!confirmed) return;
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    // Process each client individually using the same Edge Function
+    for (const client of eligibleClients) {
+      try {
+        const { data: inviteResult, error: inviteError } = await supabase.functions.invoke(
+          'send-client-invite',
+          {
+            body: {
+              email: client.email,
+              client_id: client.id
+            }
+          }
+        );
+
+        if (inviteError || inviteResult?.status !== 'invited') {
+          console.error(`❌ [ADMIN_CLIENTS] Bulk invite error for ${client.email}:`, inviteError);
+          errorCount++;
+        } else {
+          successCount++;
+        }
+      } catch (error) {
+        console.error(`❌ [ADMIN_CLIENTS] Bulk invite error for ${client.email}:`, error);
+        errorCount++;
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`${successCount} convites enviados com sucesso`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} convites falharam`);
+    }
+
+    // Refresh client list to show updated invite statuses
+    fetchClients();
   };
 
   // Pet management functions
@@ -553,6 +677,16 @@ const AdminClients = () => {
               </SelectContent>
             </Select>
 
+            <Button
+              onClick={handleBulkSendClaimEmails}
+              variant="outline"
+              className="flex items-center gap-2"
+              disabled={clients.filter(c => c.admin_created && !c.user_id && !c.claim_invited_at).length === 0}
+            >
+              <Send className="h-4 w-4" />
+              Envio em Lote ({clients.filter(c => c.admin_created && !c.user_id && !c.claim_invited_at).length})
+            </Button>
+
             <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
               <DialogTrigger asChild>
                 <Button className="flex items-center gap-2">
@@ -690,7 +824,24 @@ const AdminClients = () => {
                          <PawPrint className="h-3 w-3" />
                          {client.pet_count || 0}
                        </Badge>
-                       {client.needs_registration && (
+                                             {client.admin_created && client.claimed_at && (
+                        <Badge variant="default" className="text-xs bg-green-600">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Conta Vinculada
+                        </Badge>
+                      )}
+                      {client.admin_created && client.claim_invited_at && !client.claimed_at && (
+                        <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
+                          <Send className="h-3 w-3 mr-1" />
+                          Convite Enviado
+                        </Badge>
+                      )}
+                      {client.admin_created && !client.claim_invited_at && !client.claimed_at && (
+                        <Badge variant="destructive" className="text-xs">
+                          Aguarda Convite
+                        </Badge>
+                      )}
+                       {client.needs_registration && !client.admin_created && (
                          <Badge variant="destructive" className="text-xs">
                            Pendente Registro
                          </Badge>
@@ -738,6 +889,19 @@ const AdminClients = () => {
                       <Edit className="h-3 w-3 mr-1" />
                       Editar
                     </Button>
+                    
+                    {client.admin_created && !client.claimed_at && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleSendClaimEmail(client)}
+                        className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300"
+                        title={client.claim_invited_at ? 'Reenviar convite' : 'Enviar convite'}
+                      >
+                        <Send className="h-3 w-3" />
+                      </Button>
+                    )}
+                    
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
