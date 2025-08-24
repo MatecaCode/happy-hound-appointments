@@ -378,6 +378,31 @@ export type Database = {
           phone: string | null
           updated_at: string | null
           user_id: string
+          // Client Profile 2.0 fields
+          is_whatsapp: boolean | null
+          preferred_channel_id: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          preferred_staff_profile_id: string | null
+          accessibility_notes: string | null
+          general_notes: string | null
+          marketing_source_id: string | null
+          marketing_source_other: string | null
+          profile_completion_score: number | null
+          first_visit_setup_at: string | null
+          last_nudge_dismissed_at: string | null
+          // Consent cache fields
+          consent_tos: boolean | null
+          consent_privacy: boolean | null
+          consent_reminders: boolean | null
+          consent_marketing_email: boolean | null
+          consent_marketing_sms: boolean | null
+          consent_marketing_whatsapp: boolean | null
+          // Admin/claim fields (from previous migrations)
+          admin_created: boolean | null
+          claimed_at: string | null
+          claim_invited_at: string | null
+          birth_date: string | null
         }
         Insert: {
           address?: string | null
@@ -390,6 +415,31 @@ export type Database = {
           phone?: string | null
           updated_at?: string | null
           user_id: string
+          // Client Profile 2.0 fields
+          is_whatsapp?: boolean | null
+          preferred_channel_id?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          preferred_staff_profile_id?: string | null
+          accessibility_notes?: string | null
+          general_notes?: string | null
+          marketing_source_id?: string | null
+          marketing_source_other?: string | null
+          profile_completion_score?: number | null
+          first_visit_setup_at?: string | null
+          last_nudge_dismissed_at?: string | null
+          // Consent cache fields
+          consent_tos?: boolean | null
+          consent_privacy?: boolean | null
+          consent_reminders?: boolean | null
+          consent_marketing_email?: boolean | null
+          consent_marketing_sms?: boolean | null
+          consent_marketing_whatsapp?: boolean | null
+          // Admin/claim fields
+          admin_created?: boolean | null
+          claimed_at?: string | null
+          claim_invited_at?: string | null
+          birth_date?: string | null
         }
         Update: {
           address?: string | null
@@ -402,6 +452,31 @@ export type Database = {
           phone?: string | null
           updated_at?: string | null
           user_id?: string
+          // Client Profile 2.0 fields
+          is_whatsapp?: boolean | null
+          preferred_channel_id?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          preferred_staff_profile_id?: string | null
+          accessibility_notes?: string | null
+          general_notes?: string | null
+          marketing_source_id?: string | null
+          marketing_source_other?: string | null
+          profile_completion_score?: number | null
+          first_visit_setup_at?: string | null
+          last_nudge_dismissed_at?: string | null
+          // Consent cache fields
+          consent_tos?: boolean | null
+          consent_privacy?: boolean | null
+          consent_reminders?: boolean | null
+          consent_marketing_email?: boolean | null
+          consent_marketing_sms?: boolean | null
+          consent_marketing_whatsapp?: boolean | null
+          // Admin/claim fields
+          admin_created?: boolean | null
+          claimed_at?: string | null
+          claim_invited_at?: string | null
+          birth_date?: string | null
         }
         Relationships: [
           {
@@ -409,6 +484,27 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_preferred_channel_id_fkey"
+            columns: ["preferred_channel_id"]
+            isOneToOne: false
+            referencedRelation: "contact_channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_preferred_staff_profile_id_fkey"
+            columns: ["preferred_staff_profile_id"]
+            isOneToOne: false
+            referencedRelation: "staff_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "clients_marketing_source_id_fkey"
+            columns: ["marketing_source_id"]
+            isOneToOne: false
+            referencedRelation: "marketing_sources"
             referencedColumns: ["id"]
           },
         ]
@@ -440,6 +536,116 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+        }
+        Relationships: []
+      }
+      client_consents: {
+        Row: {
+          id: string
+          client_id: string
+          type: string
+          granted: boolean
+          channel_code: string | null
+          version: string
+          ip_address: string | null
+          user_agent: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          type: string
+          granted: boolean
+          channel_code?: string | null
+          version?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          type?: string
+          granted?: boolean
+          channel_code?: string | null
+          version?: string
+          ip_address?: string | null
+          user_agent?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_client_consents_client_id"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      contact_channels: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          description: string | null
+          active: boolean
+          display_order: number | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          description?: string | null
+          active?: boolean
+          display_order?: number | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          code?: string
+          name?: string
+          description?: string | null
+          active?: boolean
+          display_order?: number | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      marketing_sources: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          description: string | null
+          active: boolean
+          display_order: number | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          description?: string | null
+          active?: boolean
+          display_order?: number | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          code?: string
+          name?: string
+          description?: string | null
+          active?: boolean
+          display_order?: number | null
+          created_at?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }

@@ -339,40 +339,53 @@ const AdminClients = () => {
 
   const handleDeleteClient = async (clientId: string) => {
     try {
-      // First, get the user_id to delete from auth
-      const { data: client } = await supabase
-        .from('clients')
-        .select('user_id')
-        .eq('id', clientId)
-        .single();
+      console.log('🗑️ [ADMIN_CLIENTS] Starting comprehensive client deletion:', clientId);
+      
+      // Use the comprehensive deletion function to clean up all related data
+      const { data: deletionResult, error: rpcError } = await supabase
+        .rpc('delete_client_completely', { _client_id: clientId });
 
-      if (client && client.user_id) {
-        // Only delete from auth.users if user_id exists
-        try {
-          await supabase.auth.admin.deleteUser(client.user_id);
-        } catch (authError) {
-          console.error('❌ [ADMIN_CLIENTS] Auth delete error:', authError);
-          // Continue with client deletion even if auth deletion fails
-        }
-      }
-
-      // Delete from clients table
-      const { error } = await supabase
-        .from('clients')
-        .delete()
-        .eq('id', clientId);
-
-      if (error) {
-        console.error('❌ [ADMIN_CLIENTS] Delete error:', error);
-        toast.error('Erro ao deletar cliente');
+      if (rpcError) {
+        console.error('❌ [ADMIN_CLIENTS] RPC delete error:', rpcError);
+        toast.error('Erro ao deletar cliente: ' + rpcError.message);
         return;
       }
 
-      toast.success('Cliente deletado com sucesso');
+      if (!deletionResult?.success) {
+        console.error('❌ [ADMIN_CLIENTS] Delete failed:', deletionResult);
+        toast.error('Erro ao deletar cliente: ' + (deletionResult?.error || 'Unknown error'));
+        return;
+      }
+
+      // Handle auth.users deletion if needed (requires service role)
+      if (deletionResult.user_id) {
+        try {
+          console.log('🗑️ [ADMIN_CLIENTS] Deleting auth user:', deletionResult.user_id);
+          await supabase.auth.admin.deleteUser(deletionResult.user_id);
+          console.log('✅ [ADMIN_CLIENTS] Auth user deleted successfully');
+        } catch (authError) {
+          console.error('❌ [ADMIN_CLIENTS] Auth delete error:', authError);
+          // Don't fail the entire operation if auth deletion fails
+          toast.warning('Cliente deletado, mas erro ao remover conta de autenticação');
+        }
+      }
+
+      // Log successful cleanup summary
+      const summary = deletionResult.cleanup_summary;
+      console.log('🎉 [ADMIN_CLIENTS] Deletion completed:', {
+        client: deletionResult.client_email,
+        appointments: summary.appointments_deleted,
+        pets: summary.pets_deleted,
+        userRoles: summary.user_roles_deleted,
+        clientRecord: summary.client_deleted
+      });
+
+      toast.success(`Cliente "${deletionResult.client_name}" deletado completamente!`);
       fetchClients();
+      
     } catch (error) {
-      console.error('❌ [ADMIN_CLIENTS] Error deleting client:', error);
-      toast.error('Erro ao deletar cliente');
+      console.error('❌ [ADMIN_CLIENTS] Unexpected error deleting client:', error);
+      toast.error('Erro inesperado ao deletar cliente');
     }
   };
 
