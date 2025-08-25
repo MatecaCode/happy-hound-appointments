@@ -222,8 +222,195 @@ follow_ups:
 •	Add lightweight E2E happy-path (admin: select staff → choose enabled day → pick slot → create appointment).
 •	Document guardrail: _client_id only for admin-created clients (admin_created = true, user_id IS NULL); else _client_user_id.
 [/LOG_UPDATE]
+[LOG_UPDATE]
+date: 2025-08-24
+by: GPT-5 Thinking
+area: Prompting Framework / Change Management
+change_summary:
+- Added "SILO SCOPE" rule for all Cursor prompts: focus strictly on the current problem and code surface.
+- Removed cross-domain guardrails from focused prompts (e.g., no staff/availability mentions in client-only tasks).
+- Introduced STOP-ON-SCOPE-DRIFT: Cursor must pause and request approval before touching out-of-scope areas.
+- Standardized LOG access: Cursor must read /Context/Vettale-LOG.md; it must NOT write/update the LOG.
+- Reaffirmed minimal-diff principle: no refactors outside scope; small, testable changes only.
 
+rationale:
+- Reduce assistant confusion and accidental edits by keeping each PR tightly scoped.
+- Ensure the LOG remains the single source of truth while staying human-controlled.
+- Prevent ripple impacts across modules (e.g., staff/availability) during client-only changes.
+
+touch_points:
+- docs: /Context/Vettale-LOG.md (process rules added)
+- prompts: All future Cursor prompts should append a SILO SCOPE block
+- code: no code changes in this update
+
+tests:
+- Process change only; verified by using the SILO SCOPE add-on in current “client claim invite” work.
+
+status: staging outcome: pass
+
+[/LOG_UPDATE]
+[LOG_UPDATE]
+date: 2025-08-24
+by: GPT-5 Thinking
+area: Auth / Clients / Claim Flow + Edge Function + Admin UI badges
+
+change_summary:
+- Implemented invite→claim flow for admin-created clients (email invite + correct linking moment).
+- Replaced INSERT-based linkage with confirmation-based linkage: link client ⇢ auth.user **after** `email_confirmed_at` is set.
+- Added/used `claim_invited_at` and `claimed_at` timestamps to drive UI states (not `user_id`).
+- Created Edge Function `send-client-invite` using Supabase Admin API; added CORS headers for browser calls.
+- Wired Admin UI to call the function on create and via a “Send/Resend Invite” action; updated card badges.
+- Standardized redirect target via `CLAIM_REDIRECT` env (local vs prod).
+- Finalized invite email template using Supabase magic link placeholder.
+
+rationale:
+- Supabase `inviteUserByEmail` creates an `auth.users` row immediately (unconfirmed). Our old INSERT trigger linked too early, showing “Conta vinculada” before the user confirmed. Moving linkage to the **email-confirmed** moment fixes status accuracy and prevents premature association.
+- CORS headers unblock Admin UI → Edge Function calls without server-side proxies.
+- Timestamps (`claim_invited_at`, `claimed_at`) give clear, auditable state transitions.
+
+touch_points:
+- code:
+  - `supabase/functions/send-client-invite/index.ts` (invite + CORS + `CLAIM_REDIRECT`)
+  - Admin UI (clients list/card): invoke function on create and on “send invite”; badge logic keyed to timestamps
+  - Email templates (Supabase Auth → Invite User): CTA uses `{{ .ConfirmationURL }}` (or `{{ .ActionURL }}` per project setting)
+- db:
+  - Dropped old trigger: `trg_link_client_on_auth_signup` (INSERT on `auth.users`)
+  - New function: `public.link_client_when_email_confirmed()` (SECURITY DEFINER)
+  - New trigger: `trg_link_client_on_email_confirmed` (AFTER UPDATE OF `email_confirmed_at` on `auth.users`)
+  - Columns (idempotent confirm): `public.clients.claim_invited_at timestamptz`, `public.clients.claimed_at timestamptz`
+  - (Optional/no-op if present) `citext` for `public.clients.email`
+
+tests:
+- Create admin client (`admin_created=true`, `user_id=NULL`, email set) → Edge Function sends invite; `claim_invited_at` set; UI shows **Convite Enviado**.
+- Supabase Auth shows user “Waiting for verification”; `public.clients.user_id` remains NULL.
+- Click invite → confirm email → trigger runs; `public.clients.user_id` now set; `claimed_at` stamped; UI flips to **Conta Vinculada**.
+- Re-send invite on the same client returns success without duplicate side effects.
+- Browser preflight no longer fails (CORS headers present).
+- Redirect verified:
+  - local: `CLAIM_REDIRECT=http://localhost:8080/claim`
+  - prod: `CLAIM_REDIRECT=https://vettale.shop/claim`
+
+status: staging  outcome: pass
+[/LOG_UPDATE]
+[LOG_UPDATE]
+date: 2025-08-24
+by: GPT-5 Thinking
+area: Prompting Framework / Cursor Memories & Rules
+
+change_summary:
+- Installed evergreen Cursor Memories to reduce prompt boilerplate.
+- Kept only high-signal rules: LOG-first, SILO scope discipline, Role isolation (Client vs Staff vs Admin), Admin booking guardrail, Naming (“staff_profile_id”, never “provider”), DB-first invariants, Secrets server-side, Timezone.
+
+rationale:
+- Make prompts concise while enforcing architectural guardrails and scope isolation.
+
+touch_points:
+- docs/process: Cursor → Memories (8 short entries)
+- repo prompting: future tasks use tiny “TASK + SILO” prompts; Cursor reads `/Context/Vettale-LOG.md` before coding.
+
+tests:
+- Used new memories in the current “client invite/claim” work; Cursor stayed within scope; diffs were minimal.
+
+status: staging  outcome: pass
+follow_ups:
+- Add `/docs/prompting.md` with examples of SILO prompts (optional).
+- Review memories quarterly; keep them short and role-separated.
+[/LOG_UPDATE]
+Problem: Self-registration wasn't populating clients table properlyRoot Cause: Trigger function missing admin_created and claimed_at fieldsSolution: Updated handle_unified_registration() function + cleaned up existing dataResult: ✅ Client records now immediately populated when users click "Registrar"
+🔧 Key Technical Details:
+•	Migration: fix_client_registration_claimed_at applied
+•	Database: Updated public.handle_unified_registration() trigger
+•	Data Cleanup: Fixed 5+ existing incomplete client records
+•	Admin Flows: ✅ Preserved (no conflicts)
+•	Timezone: ✅ America/Sao_Paulo compliance maintained
+📊 Verification:
+•	✅ Self-registration creates complete client records immediately
+•	✅ Admin-created clients still work via separate flow
+•	✅ All existing clients now have complete data
+•	✅ No security or business logic compromised
+
+[/LOG_UPDATE]
+
+[LOG_UPDATE]
+date: 2025-08-24
+by: Matheus (via Cursor)
+area: Client Profile 2.0 — DB, RPCs, Micro-Wizard, UX polish
+change_summary:
+- DB (clients): added nullable fields phone, is_whatsapp, preferred_channel, emergency_contact_name, emergency_contact_phone,
+  preferred_staff_profile_id (FK), accessibility_notes, general_notes, marketing_source_code, marketing_source_other,
+  profile_completion_score, first_visit_setup_at, last_nudge_dismissed_at, birth_date; index on preferred_staff_profile_id.
+- DB (consents): created public.client_consents (append-only, LGPD), RLS (client read/insert own; no update/delete), helpful indexes.
+- RPCs/SQL: f_client_profile_progress(); client_get_profile_progress(); client_update_profile() with
+  first-write-wins for marketing_source_* + p_birth_date; client_needs_first_visit_setup(); client_log_consent();
+  client_mark_first_visit_setup(); client_get_consent_snapshot().
+- RLS: confirmed owner-only UPDATE on public.clients; consents policies enforced; functions SECURITY INVOKER.
+- Wizard: 4-step micro-wizard (skippable) with Step 1 contact (+ required preferred_channel & marketing_source),
+  Step 2 required ToS/Privacy/Reminders (consents logged), Step 3 emergency contact, Step 4 preferences + finalize (stamps first_visit_setup_at).
+- Profile UI: left card read-only (email/type/registration + consent snapshot + read-only "Como nos conheceu");
+  right card editable sections ("Contato" and "Preferências"); BR phone mask; constants for channels & marketing;
+  progress bar driven by server; banner hides on edit and remains hidden ≥80%.
+- UX polish: default to view mode; “Rascunho restaurado” only on unsaved edit restore; hide “Completude do Perfil” when 100%;
+  preferred_channel persisted reliably; birth date added (optional, not counted in score).
+rationale:
+- Reduce signup friction; collect operationally critical data progressively; ensure LGPD-compliant consent logging;
+  keep admin-centric integrity (immutable attribution) and clean UX.
+touch_points:
+- db: public.clients (columns, index), public.client_consents (table/indexes/policies),
+  functions: f_client_profile_progress, client_get_profile_progress, client_update_profile, client_needs_first_visit_setup,
+  client_log_consent, client_mark_first_visit_setup, client_get_consent_snapshot.
+- ui: Profile.tsx (sections, progress, banner, consent snapshot, birth date, draft logic),
+  ClientMicroWizard.tsx (steps, masking, required consents, marketing source),
+  Navigation fix (remove render loop), shared constants for preferred channel & marketing.
+tests:
+- DB: verified columns exist; policies enforced; RPCs callable; consents append; profile score recomputes.
+- UI/E2E: phone mask; wizard saves partials; Step 2 blocks until all 3 consents; “Como nos conheceu” set once & read-only;
+  preferred_channel counted (no lingering “pending”); progress refreshes from server; completeness card hidden at 100%;
+  draft toast only on unsaved restore; console clean (no PGRST202/404).
+status: staging outcome: pass
+follow_ups:
+- Authorized Pickups CRUD (behind flag), quiet_hours model/enforcement, admin report of latest consents,
+  birthday communications (human + pet), move constants to lookups when ready, analytics dashboards for marketing sources & wizard drop-offs.
+[/LOG_UPDATE]
+
+[LOG_UPDATE]
+date: 2025-08-24
+by: GPT-5 Thinking
+area: Client Pets UI (PADS) / WhatsApp CTA / Typography
+
+change_summary:
+- Prepared Cursor prompt to apply the Pagonia font family consistently across client UI (incl. profile dropdown and Pets pages).
+- Prepared Cursor prompt to keep the branded background on the **Add/Edit Pet** screens (no gray fallback), via a reusable background wrapper.
+- Defined required fields for Pet Create/Edit: **Nome do Pet, Raça, Data de Nascimento, Porte** with client-side validation (future birth dates blocked; submit disabled when invalid).
+- Delivered WhatsApp CTA fix: bypass `wa.me` and use direct links (mobile deep link or `web.whatsapp.com`/`api.whatsapp.com`) with `encodeURIComponent` to preserve the prefilled message.
+- Removed Bitly preview in proposed solution (no shorteners). User decision afterward: adopt **rebrand.ly/VettaleWhats** for now.
+- Proposed first-party click tracking (GA4 event + Supabase `cta_clicks` table + Edge Function); deferred by user for later.
+
+rationale:
+- Brand consistency (Pagonia) and cohesive visuals across Pets flows.
+- Ensuring Pet core data exists for future booking/pricing logic.
+- Prevent loss of the prefilled WhatsApp message caused by `wa.me` + intermediaries.
+- User wants lightweight click tracking without building backend right now.
+
+touch_points:
+- code (planned/updated): global CSS & tailwind font mapping; Pets list + Pet form component; small `BrandBackground` wrapper; WhatsApp helper (`utils/whatsapp.ts`) and CTA buttons.
+- db: none (tracking table/Edge Function proposed but not implemented).
+
+tests:
+- Verify Pagonia renders on Meus Pets, Add/Edit Pet, and profile dropdown.
+- Navigate Meus Pets → Add/Edit Pet: background matches landing (no gray).
+- Attempt Pet save with any required field empty or birth date in future → blocked with inline PT-BR errors.
+- Fill all required fields → save succeeds.
+- WhatsApp CTA on desktop opens **web.whatsapp.com** with message prefilled; on mobile opens app or falls back to `api.whatsapp.com` with message prefilled.
+
+status: staging  outcome: pending QA (user chose rebrand.ly link; typography + PADS updates queued via Cursor prompts)
+
+follow_ups:
+- If keeping rebrand.ly, set destination to **`https://api.whatsapp.com/send?phone=5511996378518&text=<ENCODED_MSG>`** to preserve the message and avoid previews (some shorteners inject interstitials).
+- When ready, implement the first-party click tracking (GA4 + Supabase `cta_clicks` + Edge Function) to replace shorteners.
+- After QA passes, update status to production and mark outcome pass.
+[/LOG_UPDATE]
 ________________________________________
 
 End of document.
+
 

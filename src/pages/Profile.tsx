@@ -13,6 +13,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
 import ClientMicroWizard from '@/components/ClientMicroWizard';
 import SmartNudgesBanner from '@/components/SmartNudges';
+import PhoneInputBR from '@/components/inputs/PhoneInputBR';
+import { DateInputBR } from '@/components/inputs/DateInputBR';
 import { 
   Save, Edit, X, Loader2, User, Mail, Calendar, Phone, MapPin, 
   FileText, Shield, Sparkles, MessageSquare, AlertCircle, Heart,
@@ -24,6 +26,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 import { Tables } from '@/integrations/supabase/types';
+import { PREFERRED_CONTACT_OPTIONS, MARKETING_SOURCE_OPTIONS } from '@/constants/profile';
 
 type ClientData = Tables<'clients'>;
 
@@ -69,21 +72,37 @@ const Profile = () => {
   const [roleLoading, setRoleLoading] = useState(true);
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [birthDate, setBirthDate] = useState<Date | undefined>();
   const [isVisible, setIsVisible] = useState(false);
 
-  // Client Profile 2.0 state
+    // Client Profile 2.0 state
   const [profileProgress, setProfileProgress] = useState<ProfileProgress>({ percent_complete: 0, missing_fields: [] });
   const [showMicroWizard, setShowMicroWizard] = useState(false);
   const [needsFirstVisitSetup, setNeedsFirstVisitSetup] = useState(false);
+   
+  // UX improvements state
+  const [showNudgeBanner, setShowNudgeBanner] = useState(true);
+  
+  // Consent snapshot state
+  const [consentSnapshot, setConsentSnapshot] = useState({
+    tos: false,
+    privacy: false,
+    reminders: false,
+    reminders_channel: null as string | null,
+    latest_at: null as string | null
+  });
   
   // Lookup data
   const [contactChannels, setContactChannels] = useState<ContactChannel[]>([]);
   const [marketingSources, setMarketingSources] = useState<MarketingSource[]>([]);
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
   const [clinics, setClinics] = useState<Clinic[]>([]);
+
+  // Draft persistence key
+  const DRAFT_KEY = `profileDraft:${user?.id}`;
 
   // Extended form data for Client Profile 2.0
   const [formData, setFormData] = useState({
@@ -110,20 +129,151 @@ const Profile = () => {
     consent_reminders: false
   });
 
+  // Client-side progress calculator (fallback when server data not available)
+  // Used only when server RPC data is not yet loaded
+  const calculateClientProgress = React.useCallback((): { percent_complete: number; missing_fields: string[] } => {
+    const fields = [
+      { key: 'name', value: formData.name, label: 'nome' },
+      { key: 'email', value: user?.email, label: 'email' },
+      { key: 'phone', value: formData.phone, label: 'telefone' },
+      { key: 'preferred_channel', value: formData.preferred_channel_code, label: 'canal preferido' },
+      { key: 'emergency_name', value: formData.emergency_contact_name, label: 'contato de emergência' },
+      { key: 'emergency_phone', value: formData.emergency_contact_phone, label: 'telefone de emergência' }
+    ];
+
+    const completedFields = fields.filter(field => {
+      if (field.key === 'preferred_channel') {
+        // "none" counts as completed for preferred channel
+        return field.value && (field.value.trim() !== '' || field.value === 'none');
+      }
+      return field.value && field.value.trim() !== '';
+    });
+    const missingFields = fields.filter(field => {
+      if (field.key === 'preferred_channel') {
+        return !field.value || (field.value.trim() === '' && field.value !== 'none');
+      }
+      return !field.value || field.value.trim() === '';
+    }).map(f => f.label);
+    
+    const percentComplete = Math.round((completedFields.length / fields.length) * 100);
+    
+    return {
+      percent_complete: percentComplete,
+      missing_fields: missingFields
+    };
+  }, [formData, user?.email]);
+
+  // Update progress whenever form data changes (client-side fallback)
+  useEffect(() => {
+    // Only use client-side calculation if we don't have server data yet
+    if (profileProgress.percent_complete === 0) {
+      const progress = calculateClientProgress();
+      setProfileProgress(progress);
+    }
+  }, [calculateClientProgress, profileProgress.percent_complete]);
+
+  // Draft persistence management
+  useEffect(() => {
+    if (isEditing) {
+      // Save draft to localStorage only when editing
+      const draft = {
+        formData,
+        isEditing: true,
+        updatedAt: new Date().toISOString()
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } else {
+      // When not editing, remove any existing draft
+      localStorage.removeItem(DRAFT_KEY);
+    }
+  }, [isEditing, formData, DRAFT_KEY]);
+
+  // Load draft on mount if it exists and is less than 10 minutes old
   useEffect(() => {
     if (user) {
-      fetchUserRole();
-      fetchClientData();
-      loadLookupData();
-      checkFirstVisitSetup();
+      const savedDraft = localStorage.getItem(DRAFT_KEY);
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft);
+          const draftAge = Date.now() - new Date(draft.updatedAt).getTime();
+          const tenMinutes = 10 * 60 * 1000; // 10 minutes in milliseconds
+          
+          if (draftAge <= tenMinutes) {
+            // Only restore if the draft was saved while editing
+            if (draft.isEditing) {
+              setFormData(draft.formData);
+              setIsEditing(true);
+              setDraftRestored(true);
+              toast.success('Rascunho restaurado');
+            } else {
+              // Draft was saved in view mode, just remove it
+              localStorage.removeItem(DRAFT_KEY);
+            }
+          } else {
+            // Draft is too old, remove it
+            localStorage.removeItem(DRAFT_KEY);
+          }
+        } catch (error) {
+          console.error('Error parsing saved draft:', error);
+          localStorage.removeItem(DRAFT_KEY);
+        }
+      }
     }
-  }, [user]);
+  }, [user, DRAFT_KEY]);
+
+  // Save draft on unmount only if editing
+  useEffect(() => {
+    return () => {
+      if (isEditing && user) {
+        const draft = {
+          formData,
+          isEditing: true,
+          updatedAt: new Date().toISOString()
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      }
+    };
+  }, [isEditing, formData, user, DRAFT_KEY]);
+
+     useEffect(() => {
+     if (user) {
+       fetchUserRole();
+       fetchClientData();
+       loadLookupData();
+       checkFirstVisitSetup();
+       loadProfileProgress(); // Load server-side progress
+       loadConsentSnapshot(); // Load consent snapshot
+     }
+   }, [user]);
 
   useEffect(() => {
     // Animate in the content
     const timer = setTimeout(() => setIsVisible(true), 100);
     return () => clearTimeout(timer);
   }, []);
+
+  // Add keyboard handler for escape key to close micro-wizard
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showMicroWizard) {
+        console.log('Escape key pressed, closing micro-wizard...');
+        handleMicroWizardClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showMicroWizard]);
+
+  // Cleanup micro-wizard state on unmount
+  useEffect(() => {
+    return () => {
+      if (showMicroWizard) {
+        console.log('Component unmounting, closing micro-wizard...');
+        setShowMicroWizard(false);
+      }
+    };
+  }, [showMicroWizard]);
 
   const fetchUserRole = async () => {
     if (!user) return;
@@ -209,12 +359,12 @@ const Profile = () => {
       });
 
       // Set birth date if available
-      if ((data as any).birth_date) {
-        setBirthDate(new Date((data as any).birth_date));
+      if (data?.birth_date) {
+        setBirthDate(new Date(data.birth_date));
       }
 
       // Load progress
-      await loadProfileProgress();
+      // await loadProfileProgress(); // This line is now handled by the client-side progress calculator
       
     } catch (error) {
       console.error('Error in fetchClientData:', error);
@@ -226,33 +376,7 @@ const Profile = () => {
 
   const loadLookupData = async () => {
     try {
-      // Load contact channels
-      const { data: channels, error: channelError } = await supabase
-        .from('contact_channels')
-        .select('id, code, name, description')
-        .eq('active', true)
-        .order('display_order');
-      
-      if (channelError) {
-        console.error('Error loading contact channels:', channelError);
-      } else {
-        setContactChannels(channels || []);
-      }
-      
-      // Load marketing sources
-      const { data: sources, error: sourceError } = await supabase
-        .from('marketing_sources')
-        .select('id, code, name, description')
-        .eq('active', true)
-        .order('display_order');
-      
-      if (sourceError) {
-        console.error('Error loading marketing sources:', sourceError);
-      } else {
-        setMarketingSources(sources || []);
-      }
-      
-      // Load staff profiles
+      // Load staff profiles (only this exists in DB for now)
       const { data: staff, error: staffError } = await supabase
         .from('staff_profiles')
         .select('id, name, email, can_groom, can_vet, can_bathe')
@@ -303,6 +427,29 @@ const Profile = () => {
     }
   };
 
+  const loadConsentSnapshot = async () => {
+    try {
+      const { data, error } = await supabase.rpc('client_get_consent_snapshot');
+      
+      if (error) {
+        console.error('Error loading consent snapshot:', error);
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        setConsentSnapshot({
+          tos: data[0].tos || false,
+          privacy: data[0].privacy || false,
+          reminders: data[0].reminders || false,
+          reminders_channel: data[0].reminders_channel,
+          latest_at: data[0].latest_at
+        });
+      }
+    } catch (error) {
+      console.error('Error in loadConsentSnapshot:', error);
+    }
+  };
+
   const checkFirstVisitSetup = async () => {
     try {
       const { data, error } = await supabase.rpc('client_needs_first_visit_setup');
@@ -313,9 +460,12 @@ const Profile = () => {
       }
       
       setNeedsFirstVisitSetup(data || false);
-      if (data) {
+      if (data && !showMicroWizard) {
         // Show micro-wizard after a short delay for better UX
-        setTimeout(() => setShowMicroWizard(true), 1000);
+        setTimeout(() => {
+          console.log('Showing micro-wizard...');
+          setShowMicroWizard(true);
+        }, 1000);
       }
     } catch (error) {
       console.error('Error in checkFirstVisitSetup:', error);
@@ -328,19 +478,20 @@ const Profile = () => {
     try {
       setIsSaving(true);
       
-      // Use new client_update_profile RPC
-      const { error } = await supabase.rpc('client_update_profile', {
-        p_phone: formData.phone || null,
-        p_is_whatsapp: formData.is_whatsapp,
-        p_preferred_channel_code: formData.preferred_channel_code || null,
-        p_emergency_contact_name: formData.emergency_contact_name || null,
-        p_emergency_contact_phone: formData.emergency_contact_phone || null,
-        p_preferred_staff_profile_id: formData.preferred_staff_profile_id || null,
-        p_marketing_source_code: formData.marketing_source_code || null,
-        p_marketing_source_other: formData.marketing_source_other || null,
-        p_accessibility_notes: formData.accessibility_notes || null,
-        p_general_notes: formData.general_notes || null
-      });
+                    // Use new client_update_profile RPC
+        const { error } = await supabase.rpc('client_update_profile', {
+          p_phone: formData.phone || null,
+          p_is_whatsapp: formData.is_whatsapp,
+          p_preferred_channel_code: formData.preferred_channel_code || 'telefone', // Always save preferred channel
+          p_emergency_contact_name: formData.emergency_contact_name || null,
+          p_emergency_contact_phone: formData.emergency_contact_phone || null,
+          p_preferred_staff_profile_id: formData.preferred_staff_profile_id || null,
+          p_marketing_source_code: formData.marketing_source_code || null,
+          p_marketing_source_other: formData.marketing_source_other || null,
+          p_accessibility_notes: formData.accessibility_notes || null,
+          p_general_notes: formData.general_notes || null,
+          p_birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null
+        });
 
       if (error) {
         console.error('Error updating client data:', error);
@@ -348,24 +499,25 @@ const Profile = () => {
         return;
       }
 
-      // Update birth_date separately (not in RPC)
-      if (birthDate) {
-        const { error: birthError } = await supabase
-          .from('clients')
-          .update({ birth_date: format(birthDate, 'yyyy-MM-dd') })
-          .eq('user_id', user.id);
-
-        if (birthError) {
-          console.error('Error updating birth date:', birthError);
-          toast.error('Erro ao salvar data de nascimento');
-          return;
-        }
-      }
-
-      toast.success('Perfil atualizado com sucesso!');
-      setIsEditing(false);
       
-      // Refresh client data and progress
+
+      // Refresh progress from server
+      await loadProfileProgress();
+      
+      // Check if we should keep banner hidden based on new progress
+      const { data: progressData } = await supabase.rpc('client_get_profile_progress');
+      if (progressData && progressData.length > 0 && progressData[0].percent_complete >= 80) {
+        setShowNudgeBanner(false); // Keep banner hidden if profile is well complete
+      }
+      
+             toast.success('Perfil salvo');
+       setIsEditing(false);
+       setDraftRestored(false);
+       
+       // Clear any saved draft on successful save
+       localStorage.removeItem(DRAFT_KEY);
+      
+      // Refresh client data
       await fetchClientData();
       
     } catch (error) {
@@ -400,62 +552,111 @@ const Profile = () => {
         consent_reminders: clientData.consent_reminders || false
       });
       
-      if ((clientData as any).birth_date) {
-        setBirthDate(new Date((clientData as any).birth_date));
+      if (clientData?.birth_date) {
+        setBirthDate(new Date(clientData.birth_date));
       } else {
         setBirthDate(undefined);
       }
     }
     setIsEditing(false);
+    
+    // Only show banner again if progress is still low
+    if (profileProgress.percent_complete < 80) {
+      setShowNudgeBanner(true);
+    }
+    
+         // Clear any saved draft
+     localStorage.removeItem(DRAFT_KEY);
+     setDraftRestored(false);
+  };
+
+  const handleCompletarAgora = () => {
+    setIsEditing(true);
+    setShowNudgeBanner(false); // Hide banner when entering edit mode
+    toast.success('Edição habilitada — complete seu perfil.');
+    
+    // Focus the first missing field (typically phone)
+    setTimeout(() => {
+      const phoneInput = document.querySelector('input[type="tel"]') as HTMLInputElement;
+      if (phoneInput) {
+        phoneInput.focus();
+      }
+    }, 100);
+    
+    // Scroll right card into view with highlight
+    setTimeout(() => {
+      const rightCard = document.querySelector('[data-right-card]');
+      if (rightCard) {
+        rightCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        rightCard.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
+        setTimeout(() => {
+          rightCard.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
+        }, 1000);
+      }
+    }, 200);
   };
 
   const handleMicroWizardComplete = async () => {
+    console.log('Completing micro-wizard...');
     setShowMicroWizard(false);
     setNeedsFirstVisitSetup(false);
     
     // Refresh data after wizard completion
     await fetchClientData();
+    await loadConsentSnapshot(); // Refresh consent snapshot
+    await loadProfileProgress(); // Refresh progress
     toast.success('Configuração inicial concluída!');
   };
 
-  const renderProgressMeter = () => {
-    const progressColor = 
-      profileProgress.percent_complete >= 80 ? 'bg-green-500' :
-      profileProgress.percent_complete >= 60 ? 'bg-yellow-500' :
-      'bg-red-500';
-
-    return (
-      <Card className="mb-6 border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-purple-50/50">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="w-5 h-5 text-blue-600" />
-              <h3 className="font-semibold text-gray-800">Completude do Perfil</h3>
-            </div>
-            <Badge variant={profileProgress.percent_complete >= 80 ? 'default' : 'secondary'}>
-              {profileProgress.percent_complete}% completo
-            </Badge>
-          </div>
-          
-          <Progress value={profileProgress.percent_complete} className="h-2 mb-2" />
-          
-          {profileProgress.percent_complete < 100 && profileProgress.missing_fields.length > 0 && (
-            <p className="text-sm text-gray-600">
-              <AlertCircle className="w-4 h-4 inline mr-1" />
-              Campos pendentes: {profileProgress.missing_fields.join(', ')}
-            </p>
-          )}
-          
-          {profileProgress.percent_complete >= 80 && (
-            <p className="text-sm text-green-600">
-              <CheckCircle className="w-4 h-4 inline mr-1" />
-              Seu perfil está bem completo!
-            </p>
-          )}
-        </CardContent>
-      </Card>
-    );
+  const handleMicroWizardClose = () => {
+    console.log('Closing micro-wizard...');
+    setShowMicroWizard(false);
+    // Don't reset needsFirstVisitSetup here - let the user complete it later
   };
+
+     const renderProgressMeter = () => {
+     // Hide progress section when profile is 100% complete
+     if (profileProgress.percent_complete === 100) {
+       return null;
+     }
+
+     const progressColor = 
+       profileProgress.percent_complete >= 80 ? 'bg-green-500' :
+       profileProgress.percent_complete >= 60 ? 'bg-yellow-500' :
+       'bg-red-500';
+
+     return (
+       <Card className="mb-6 border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-purple-50/50">
+         <CardContent className="p-4">
+           <div className="flex items-center justify-between mb-3">
+             <div className="flex items-center space-x-2">
+               <TrendingUp className="w-5 h-5 text-blue-600" />
+               <h3 className="font-semibold text-gray-800">Completude do Perfil</h3>
+             </div>
+             <Badge variant={profileProgress.percent_complete >= 80 ? 'default' : 'secondary'}>
+               {isLoading ? 'Carregando...' : `${profileProgress.percent_complete}% completo`}
+             </Badge>
+           </div>
+           
+           <Progress value={profileProgress.percent_complete} className="h-2 mb-2" />
+           
+           {profileProgress.percent_complete < 100 && profileProgress.missing_fields.length > 0 && (
+             <p className="text-sm text-gray-600">
+               <AlertCircle className="w-4 h-4 inline mr-1" />
+               Campos pendentes: {profileProgress.missing_fields.join(', ')}
+             </p>
+           )}
+           
+           {profileProgress.percent_complete >= 80 && (
+             <p className="text-sm text-green-600">
+               <CheckCircle className="w-4 h-4 inline mr-1" />
+               Seu perfil está bem completo!
+             </p>
+           )}
+         </CardContent>
+       </Card>
+     );
+   };
 
   // Redirect staff users to StaffProfile
   if (isStaff) {
@@ -469,6 +670,11 @@ const Profile = () => {
           <div className="text-center space-y-6">
             <div className="animate-spin rounded-full h-12 w-12 border-3 border-[#6BAEDB] border-t-[#2B70B2] mx-auto"></div>
             <p className="text-lg font-medium text-[#1A4670]">Carregando perfil...</p>
+            <p className="text-sm text-gray-500">
+              {loading && 'Verificando autenticação...'}
+              {roleLoading && 'Carregando permissões...'}
+              {isLoading && 'Carregando dados...'}
+            </p>
           </div>
         </div>
       </Layout>
@@ -523,14 +729,16 @@ const Profile = () => {
           </div>
 
           {/* Smart Nudges Banner */}
-          <div className={`transition-all duration-1000 delay-350 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
-            <SmartNudgesBanner
-              profileProgress={profileProgress}
-              lastDismissedAt={clientData?.last_nudge_dismissed_at}
-              onRefreshProgress={loadProfileProgress}
-              className="mb-6"
-            />
-          </div>
+          {showNudgeBanner && (
+            <div className={`transition-all duration-1000 delay-350 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
+              <SmartNudgesBanner
+                profileProgress={profileProgress}
+                lastDismissedAt={clientData?.last_nudge_dismissed_at}
+                onRefreshProgress={loadProfileProgress}
+                className="mb-6"
+              />
+            </div>
+          )}
 
           {/* Cards Grid */}
           <div className={`grid grid-cols-1 xl:grid-cols-2 gap-8 transition-all duration-1000 delay-400 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}>
@@ -549,20 +757,6 @@ const Profile = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* Email */}
-                <div>
-                  <div className="flex items-center space-x-3 mb-2">
-                    <Mail className="w-4 h-4 text-[#2B70B2]" />
-                    <Label className="text-sm font-medium text-[#1A4670]">Email</Label>
-                  </div>
-                  <div className="bg-[#F1F5F9] rounded-lg p-3 border border-[#E7F0FF]">
-                    <p className="text-sm font-medium text-[#1A4670]">{user.email}</p>
-                    <p className="text-xs text-[#334155] mt-1">
-                      O email não pode ser alterado pois está vinculado à sua conta
-                    </p>
-                  </div>
-                </div>
-                
                 {/* Account Type */}
                 <div>
                   <div className="flex items-center space-x-3 mb-2">
@@ -600,41 +794,70 @@ const Profile = () => {
                   </div>
                 </div>
 
-                {/* Consent Status */}
-                <div>
-                  <div className="flex items-center space-x-3 mb-2">
-                    <Shield className="w-4 h-4 text-purple-500" />
-                    <Label className="text-sm font-medium text-gray-700">Consentimentos</Label>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span>Termos de Uso</span>
-                      {formData.consent_tos ? 
-                        <CheckCircle className="w-4 h-4 text-green-500" /> : 
-                        <XCircle className="w-4 h-4 text-red-500" />
-                      }
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span>Política de Privacidade</span>
-                      {formData.consent_privacy ? 
-                        <CheckCircle className="w-4 h-4 text-green-500" /> : 
-                        <XCircle className="w-4 h-4 text-red-500" />
-                      }
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span>Lembretes</span>
-                      {formData.consent_reminders ? 
-                        <CheckCircle className="w-4 h-4 text-green-500" /> : 
-                        <XCircle className="w-4 h-4 text-red-500" />
-                      }
-                    </div>
-                  </div>
-                </div>
+                                 {/* Consent Status */}
+                 <div>
+                   <div className="flex items-center space-x-3 mb-2">
+                     <Shield className="w-4 h-4 text-purple-500" />
+                     <Label className="text-sm font-medium text-gray-700">Consentimentos</Label>
+                   </div>
+                   <div className="space-y-2">
+                     <div className="flex items-center justify-between text-xs">
+                       <span>Termos de Uso</span>
+                       {consentSnapshot.tos ? 
+                         <CheckCircle className="w-4 h-4 text-green-500" /> : 
+                         <XCircle className="w-4 h-4 text-red-500" />
+                       }
+                     </div>
+                     <div className="flex items-center justify-between text-xs">
+                       <span>Política de Privacidade</span>
+                       {consentSnapshot.privacy ? 
+                         <CheckCircle className="w-4 h-4 text-green-500" /> : 
+                         <XCircle className="w-4 h-4 text-red-500" />
+                       }
+                     </div>
+                     <div className="flex items-center justify-between text-xs">
+                       <span>Lembretes</span>
+                       {consentSnapshot.reminders ? 
+                         <CheckCircle className="w-4 h-4 text-green-500" /> : 
+                         <XCircle className="w-4 h-4 text-red-500" />
+                       }
+                     </div>
+                     {consentSnapshot.reminders && consentSnapshot.reminders_channel && (
+                       <div className="text-xs text-gray-500 mt-1">
+                         Canal: {consentSnapshot.reminders_channel}
+                       </div>
+                     )}
+                   </div>
+                 </div>
+
+                 {/* Marketing Source */}
+                 {clientData?.marketing_source_code && (
+                   <div>
+                     <div className="flex items-center space-x-3 mb-2">
+                       <MessageSquare className="w-4 h-4 text-blue-500" />
+                       <Label className="text-sm font-medium text-gray-700">Como nos conheceu</Label>
+                     </div>
+                     <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                       <p className="text-sm font-medium text-gray-800">
+                         {(() => {
+                           const source = MARKETING_SOURCE_OPTIONS.find(s => s.code === clientData.marketing_source_code);
+                           if (source) {
+                             if (clientData.marketing_source_code === 'outro' && clientData.marketing_source_other) {
+                               return clientData.marketing_source_other;
+                             }
+                             return source.label;
+                           }
+                           return 'Não informado';
+                         })()}
+                       </p>
+                     </div>
+                   </div>
+                 )}
               </CardContent>
             </Card>
 
             {/* Right Card - Extended Profile (Editable) */}
-            <div className="space-y-6">
+            <div className="space-y-6" data-right-card>
               {/* Contact & Preferences Section */}
               <Card className="group hover:shadow-xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm shadow-lg">
                 <CardHeader className="pb-4">
@@ -644,8 +867,8 @@ const Profile = () => {
                         <Phone className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg font-bold text-gray-800">Contato & Preferências</CardTitle>
-                        <CardDescription className="text-gray-600">Suas informações de contato</CardDescription>
+                                               <CardTitle className="text-lg font-bold text-gray-800">Contato</CardTitle>
+                       <CardDescription className="text-gray-600">Suas informações de contato</CardDescription>
                       </div>
                     </div>
                   </div>
@@ -681,17 +904,26 @@ const Profile = () => {
                       <Label htmlFor="phone" className="text-sm font-medium text-gray-700">Telefone</Label>
                     </div>
                     {isEditing ? (
-                      <Input
-                        id="phone"
+                      <PhoneInputBR
                         value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        onChange={(value) => setFormData({...formData, phone: value})}
                         placeholder="(11) 99999-9999"
                         className="h-10"
                       />
                     ) : (
                       <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
                         <p className="text-sm font-medium text-gray-800">
-                          {clientData?.phone || 'Não informado'}
+                          {clientData?.phone ? 
+                            (() => {
+                              const digits = clientData.phone.replace(/\D/g, '');
+                              if (digits.length === 11) {
+                                return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+                              } else if (digits.length === 10) {
+                                return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+                              }
+                              return clientData.phone;
+                            })() : 'Não informado'
+                          }
                         </p>
                       </div>
                     )}
@@ -713,23 +945,61 @@ const Profile = () => {
 
                       <div>
                         <Label className="text-sm font-medium text-gray-700">Canal de contato preferido</Label>
-                        <Select value={formData.preferred_channel_code} onValueChange={(value) => setFormData({...formData, preferred_channel_code: value})}>
+                        <Select 
+                          value={formData.preferred_channel_code || 'telefone'} 
+                          onValueChange={(value) => setFormData({...formData, preferred_channel_code: value})}
+                        >
                           <SelectTrigger className="mt-1">
                             <SelectValue placeholder="Selecione como prefere ser contatado" />
                           </SelectTrigger>
                           <SelectContent>
-                            {contactChannels.map((channel) => (
-                              <SelectItem key={channel.id} value={channel.code}>
-                                {channel.name}
+                            {PREFERRED_CONTACT_OPTIONS.map((option) => (
+                              <SelectItem key={option.code} value={option.code}>
+                                {option.label}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
+                                             </div>
+
+                       {/* Birth Date */}
+                       <div>
+                         <div className="flex items-center space-x-3 mb-2">
+                           <Calendar className="w-4 h-4 text-purple-500" />
+                           <Label htmlFor="birth_date" className="text-sm font-medium text-gray-700">Data de Aniversário (opcional)</Label>
+                         </div>
+                                                   {isEditing ? (
+                            <DateInputBR
+                              id="birth_date"
+                              value={birthDate ? format(birthDate, 'yyyy-MM-dd') : undefined}
+                              onChange={(value) => {
+                                if (value) {
+                                  try {
+                                    const date = new Date(value);
+                                    if (!isNaN(date.getTime())) {
+                                      setBirthDate(date);
+                                    }
+                                  } catch (error) {
+                                    console.error('Invalid date:', value);
+                                  }
+                                } else {
+                                  setBirthDate(undefined);
+                                }
+                              }}
+                              className="h-10"
+                            />
+                          ) : (
+                           <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
+                             <p className="text-sm font-medium text-gray-800">
+                               {birthDate ? format(birthDate, 'dd/MM/yyyy') : 'Não informado'}
+                             </p>
+                           </div>
+                         )}
+                       </div>
+                     </>
+                   )}
+                 </CardContent>
+               </Card>
 
               {/* Emergency Contact Section */}
               <Card className="group hover:shadow-xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm shadow-lg">
@@ -766,16 +1036,26 @@ const Profile = () => {
                   <div>
                     <Label className="text-sm font-medium text-gray-700">Telefone de emergência</Label>
                     {isEditing ? (
-                      <Input
+                      <PhoneInputBR
                         value={formData.emergency_contact_phone}
-                        onChange={(e) => setFormData({...formData, emergency_contact_phone: e.target.value})}
+                        onChange={(value) => setFormData({...formData, emergency_contact_phone: value})}
                         placeholder="(11) 99999-9999"
                         className="mt-1"
                       />
                     ) : (
                       <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 mt-1">
                         <p className="text-sm font-medium text-gray-800">
-                          {clientData?.emergency_contact_phone || 'Não informado'}
+                          {clientData?.emergency_contact_phone ? 
+                            (() => {
+                              const digits = clientData.emergency_contact_phone.replace(/\D/g, '');
+                              if (digits.length === 11) {
+                                return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+                              } else if (digits.length === 10) {
+                                return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+                              }
+                              return clientData.emergency_contact_phone;
+                            })() : 'Não informado'
+                          }
                         </p>
                       </div>
                     )}
@@ -827,33 +1107,7 @@ const Profile = () => {
                         </p>
                       </div>
 
-                      <div>
-                        <Label className="text-sm font-medium text-gray-700">Como nos conheceu?</Label>
-                        <Select value={formData.marketing_source_code} onValueChange={(value) => setFormData({...formData, marketing_source_code: value})}>
-                          <SelectTrigger className="mt-1">
-                            <SelectValue placeholder="Selecione como descobriu nossos serviços" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {marketingSources.map((source) => (
-                              <SelectItem key={source.id} value={source.code}>
-                                {source.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
 
-                      {formData.marketing_source_code === 'other' && (
-                        <div>
-                          <Label className="text-sm font-medium text-gray-700">Especifique</Label>
-                          <Input
-                            value={formData.marketing_source_other}
-                            onChange={(e) => setFormData({...formData, marketing_source_other: e.target.value})}
-                            placeholder="Como você nos conheceu?"
-                            className="mt-1"
-                          />
-                        </div>
-                      )}
                     </>
                   )}
 
@@ -892,7 +1146,7 @@ const Profile = () => {
                 ) : (
                   <>
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       onClick={handleCancel}
                       disabled={isSaving}
                       className="flex items-center gap-2"
@@ -903,7 +1157,7 @@ const Profile = () => {
                     <Button
                       onClick={handleSave}
                       disabled={isSaving}
-                      className="flex items-center gap-2"
+                      className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
                     >
                       {isSaving ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -925,7 +1179,7 @@ const Profile = () => {
         {/* Micro-Wizard Modal */}
         <ClientMicroWizard
           isOpen={showMicroWizard}
-          onClose={() => setShowMicroWizard(false)}
+          onClose={handleMicroWizardClose}
           onComplete={handleMicroWizardComplete}
           currentUserName={clientData?.name || ''}
         />

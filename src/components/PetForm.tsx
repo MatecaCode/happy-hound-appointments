@@ -12,6 +12,7 @@ import { Combobox } from '@/components/ui/combobox';
 import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { AlertCircle } from 'lucide-react';
 
 interface Pet {
   id: string;
@@ -35,6 +36,7 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
   const { user } = useAuth();
   const { breeds, isLoading: breedsLoading } = useBreeds();
   const [isLoading, setIsLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [birthDate, setBirthDate] = useState<Date | undefined>(
     editingPet?.birth_date ? new Date(editingPet.birth_date) : undefined
   );
@@ -47,8 +49,44 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
     notes: editingPet?.notes || ''
   });
 
+  // Validation function
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = 'Nome do pet é obrigatório';
+    }
+
+    // Breed validation
+    if (!formData.breed_id) {
+      newErrors.breed_id = 'Raça é obrigatória';
+    }
+
+    // Birth date validation
+    if (!birthDate) {
+      newErrors.birth_date = 'Data de nascimento é obrigatória';
+    } else if (birthDate > new Date()) {
+      newErrors.birth_date = 'Data de nascimento não pode ser no futuro';
+    }
+
+    // Size validation
+    if (!formData.size) {
+      newErrors.size = 'Porte é obrigatório';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast.error('Por favor, corrija os erros no formulário');
+      return;
+    }
+
     if (!user) {
       toast.error('Você precisa estar logado para cadastrar um pet');
       return;
@@ -134,47 +172,79 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <Label htmlFor="name">Nome do Pet *</Label>
+        <Label htmlFor="name" className="text-base font-normal text-gray-700">Nome do Pet *</Label>
         <Input
           id="name"
           value={formData.name}
-          onChange={(e) => setFormData({...formData, name: e.target.value})}
+          onChange={(e) => {
+            setFormData({...formData, name: e.target.value});
+            if (errors.name) setErrors({...errors, name: ''});
+          }}
+          className={errors.name ? 'border-red-500' : ''}
           required
         />
+        {errors.name && (
+          <div className="flex items-center gap-2 text-red-500 text-sm mt-1">
+            <AlertCircle className="w-4 h-4" />
+            {errors.name}
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="breed">Raça</Label>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+         <div>
+           <Label htmlFor="breed" className="text-base font-normal text-gray-700">Raça *</Label>
           <Combobox
             options={breedOptions}
             value={formData.breed_id}
-            onValueChange={(value) => setFormData({...formData, breed_id: value})}
+            onValueChange={(value) => {
+              setFormData({...formData, breed_id: value});
+              if (errors.breed_id) setErrors({...errors, breed_id: ''});
+            }}
             placeholder={breedsLoading ? "Carregando..." : "Selecione ou digite uma raça"}
             searchPlaceholder="Digite para buscar raça..."
             emptyText="Nenhuma raça encontrada."
             disabled={breedsLoading}
+            className={errors.breed_id ? 'border-red-500' : ''}
           />
+          {errors.breed_id && (
+            <div className="flex items-center gap-2 text-red-500 text-sm mt-1">
+              <AlertCircle className="w-4 h-4" />
+              {errors.breed_id}
+            </div>
+          )}
         </div>
 
-        <div>
-          <Label>Data de Nascimento</Label>
+                 <div>
+           <Label className="text-base font-normal text-gray-700">Data de Nascimento *</Label>
           <PetDobPicker
             value={birthDate}
-            onChange={setBirthDate}
-            className="w-full"
+            onChange={(date) => {
+              setBirthDate(date);
+              if (errors.birth_date) setErrors({...errors, birth_date: ''});
+            }}
+            className={`w-full ${errors.birth_date ? 'border-red-500' : ''}`}
           />
+          {errors.birth_date && (
+            <div className="flex items-center gap-2 text-red-500 text-sm mt-1">
+              <AlertCircle className="w-4 h-4" />
+              {errors.birth_date}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="size">Porte *</Label>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+         <div>
+           <Label htmlFor="size" className="text-base font-normal text-gray-700">Porte *</Label>
           <Select 
             value={formData.size} 
-            onValueChange={(value) => setFormData({...formData, size: value})}
+            onValueChange={(value) => {
+              setFormData({...formData, size: value});
+              if (errors.size) setErrors({...errors, size: ''});
+            }}
           >
-            <SelectTrigger>
+            <SelectTrigger className={errors.size ? 'border-red-500' : ''}>
               <SelectValue placeholder="Selecione o porte" />
             </SelectTrigger>
             <SelectContent>
@@ -184,10 +254,16 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
               <SelectItem value="extra_large">Extra Grande</SelectItem>
             </SelectContent>
           </Select>
+          {errors.size && (
+            <div className="flex items-center gap-2 text-red-500 text-sm mt-1">
+              <AlertCircle className="w-4 h-4" />
+              {errors.size}
+            </div>
+          )}
         </div>
 
-        <div>
-          <Label htmlFor="weight">Peso (kg)</Label>
+                 <div>
+           <Label htmlFor="weight" className="text-base font-normal text-gray-700">Peso (kg)</Label>
           <Input
             id="weight"
             type="number"
@@ -198,8 +274,8 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
         </div>
       </div>
 
-      <div>
-        <Label htmlFor="gender">Sexo</Label>
+             <div>
+         <Label htmlFor="gender" className="text-base font-normal text-gray-700">Sexo</Label>
         <Select value={formData.gender} onValueChange={(value) => setFormData({...formData, gender: value})}>
           <SelectTrigger>
             <SelectValue placeholder="Selecione o sexo" />
@@ -211,8 +287,8 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
         </Select>
       </div>
 
-      <div>
-        <Label htmlFor="notes">Observações</Label>
+             <div>
+         <Label htmlFor="notes" className="text-base font-normal text-gray-700">Observações</Label>
         <Textarea
           id="notes"
           value={formData.notes}

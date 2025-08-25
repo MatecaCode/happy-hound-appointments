@@ -380,13 +380,13 @@ export type Database = {
           user_id: string
           // Client Profile 2.0 fields
           is_whatsapp: boolean | null
-          preferred_channel_id: string | null
+          preferred_channel: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           preferred_staff_profile_id: string | null
           accessibility_notes: string | null
           general_notes: string | null
-          marketing_source_id: string | null
+          marketing_source_code: string | null
           marketing_source_other: string | null
           profile_completion_score: number | null
           first_visit_setup_at: string | null
@@ -417,13 +417,13 @@ export type Database = {
           user_id: string
           // Client Profile 2.0 fields
           is_whatsapp?: boolean | null
-          preferred_channel_id?: string | null
+          preferred_channel?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           preferred_staff_profile_id?: string | null
           accessibility_notes?: string | null
           general_notes?: string | null
-          marketing_source_id?: string | null
+          marketing_source_code?: string | null
           marketing_source_other?: string | null
           profile_completion_score?: number | null
           first_visit_setup_at?: string | null
@@ -454,13 +454,13 @@ export type Database = {
           user_id?: string
           // Client Profile 2.0 fields
           is_whatsapp?: boolean | null
-          preferred_channel_id?: string | null
+          preferred_channel?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           preferred_staff_profile_id?: string | null
           accessibility_notes?: string | null
           general_notes?: string | null
-          marketing_source_id?: string | null
+          marketing_source_code?: string | null
           marketing_source_other?: string | null
           profile_completion_score?: number | null
           first_visit_setup_at?: string | null

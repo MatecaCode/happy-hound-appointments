@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Layout from '@/components/Layout';
+import { BrandBackground } from '@/components/layout/BrandBackground';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
 import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useBreeds } from '@/hooks/useBreeds';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,6 +37,7 @@ const PetFormPage = () => {
   const { breeds, isLoading: breedsLoading } = useBreeds();
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [birthDate, setBirthDate] = useState<Date | undefined>();
   const [formData, setFormData] = useState({
     name: '',
@@ -91,8 +93,44 @@ const PetFormPage = () => {
     }
   };
 
+  // Validation function
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = 'Nome do pet é obrigatório';
+    }
+
+    // Breed validation
+    if (!formData.breed_id) {
+      newErrors.breed_id = 'Raça é obrigatória';
+    }
+
+    // Birth date validation
+    if (!birthDate) {
+      newErrors.birth_date = 'Data de nascimento é obrigatória';
+    } else if (birthDate > new Date()) {
+      newErrors.birth_date = 'Data de nascimento não pode ser no futuro';
+    }
+
+    // Size validation
+    if (!formData.size) {
+      newErrors.size = 'Porte é obrigatório';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      toast.error('Por favor, corrija os erros no formulário');
+      return;
+    }
+
     if (!user) {
       toast.error('Você precisa estar logado para cadastrar um pet');
       return;
@@ -164,21 +202,22 @@ const PetFormPage = () => {
   if (isFetching) {
     return (
       <Layout>
-        <div className="max-w-4xl mx-auto px-6 py-8">
+        <BrandBackground>
           <div className="flex items-center justify-center py-16">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
               <p>Carregando dados do pet...</p>
             </div>
           </div>
-        </div>
+        </BrandBackground>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <BrandBackground>
+        <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <Button
@@ -200,66 +239,97 @@ const PetFormPage = () => {
           </div>
         </div>
 
-        {/* Form */}
-        <Card className="max-w-2xl">
-          <CardHeader>
-            <CardTitle>Informações do Pet</CardTitle>
-            <CardDescription>
-              Preencha todos os campos obrigatórios marcados com *
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+                 {/* Form */}
+         <div className="max-w-2xl mx-auto">
+           <div className="mb-6">
+             <h2 className="text-2xl font-semibold text-gray-800">Informações do Pet</h2>
+             <p className="text-gray-600 mt-1">
+               Preencha todos os campos obrigatórios marcados com *
+             </p>
+           </div>
+           <div className="bg-white/80 backdrop-blur-sm rounded-xl border border-white/20 shadow-lg p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Pet Name */}
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-base font-medium">
-                  Nome do Pet *
-                </Label>
+                             {/* Pet Name */}
+               <div className="space-y-2">
+                 <Label htmlFor="name" className="text-base font-normal text-gray-700">
+                   Nome do Pet *
+                 </Label>
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  onChange={(e) => {
+                    setFormData({...formData, name: e.target.value});
+                    if (errors.name) setErrors({...errors, name: ''});
+                  }}
                   placeholder="Digite o nome do seu pet"
-                  className="h-12 text-base"
+                  className={`h-12 text-base ${errors.name ? 'border-red-500' : ''}`}
                   required
                 />
+                {errors.name && (
+                  <div className="flex items-center gap-2 text-red-500 text-sm mt-1">
+                    <AlertCircle className="w-4 h-4" />
+                    {errors.name}
+                  </div>
+                )}
               </div>
 
-                             {/* Breed */}
-               <div className="space-y-2">
-                 <Label className="text-base font-medium">Raça</Label>
-                 <Combobox
-                   options={breedOptions}
-                   value={formData.breed_id}
-                   onValueChange={(value) => setFormData({...formData, breed_id: value})}
-                   placeholder={breedsLoading ? "Carregando..." : "Selecione ou digite uma raça"}
-                   searchPlaceholder="Digite para buscar raça..."
-                   emptyText="Nenhuma raça encontrada."
-                   disabled={breedsLoading}
-                 />
+                                                           {/* Breed */}
+                <div className="space-y-2">
+                  <Label className="text-base font-normal text-gray-700">Raça *</Label>
+                                   <Combobox
+                    options={breedOptions}
+                    value={formData.breed_id}
+                    onValueChange={(value) => {
+                      setFormData({...formData, breed_id: value});
+                      if (errors.breed_id) setErrors({...errors, breed_id: ''});
+                    }}
+                    placeholder={breedsLoading ? "Carregando..." : "Selecione ou digite uma raça"}
+                    searchPlaceholder="Digite para buscar raça..."
+                    emptyText="Nenhuma raça encontrada."
+                    disabled={breedsLoading}
+                    className={`h-12 text-base ${errors.breed_id ? 'border-red-500' : ''}`}
+                  />
+                 {errors.breed_id && (
+                   <div className="flex items-center gap-2 text-red-500 text-sm mt-1">
+                     <AlertCircle className="w-4 h-4" />
+                     {errors.breed_id}
+                   </div>
+                 )}
                </div>
 
-               {/* Birth Date */}
-               <div className="space-y-2">
-                 <Label className="text-base font-medium">Data de Nascimento</Label>
+                               {/* Birth Date */}
+                <div className="space-y-2">
+                  <Label className="text-base font-normal text-gray-700">Data de Nascimento *</Label>
                  <PetDobPicker
                    value={birthDate}
-                   onChange={setBirthDate}
-                   className="w-full h-12"
+                   onChange={(date) => {
+                     setBirthDate(date);
+                     if (errors.birth_date) setErrors({...errors, birth_date: ''});
+                   }}
+                   className={`w-full h-12 ${errors.birth_date ? 'border-red-500' : ''}`}
                  />
+                 {errors.birth_date && (
+                   <div className="flex items-center gap-2 text-red-500 text-sm mt-1">
+                     <AlertCircle className="w-4 h-4" />
+                     {errors.birth_date}
+                   </div>
+                 )}
                </div>
 
-              {/* Size and Weight */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label htmlFor="size" className="text-base font-medium">
-                    Porte *
-                  </Label>
+                             {/* Size and Weight */}
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 <div className="space-y-2">
+                   <Label htmlFor="size" className="text-base font-normal text-gray-700">
+                     Porte *
+                   </Label>
                   <Select 
                     value={formData.size} 
-                    onValueChange={(value) => setFormData({...formData, size: value})}
+                    onValueChange={(value) => {
+                      setFormData({...formData, size: value});
+                      if (errors.size) setErrors({...errors, size: ''});
+                    }}
                   >
-                    <SelectTrigger className="h-12 text-base">
+                    <SelectTrigger className={`h-12 text-base ${errors.size ? 'border-red-500' : ''}`}>
                       <SelectValue placeholder="Selecione o porte" />
                     </SelectTrigger>
                     <SelectContent>
@@ -269,12 +339,18 @@ const PetFormPage = () => {
                       <SelectItem value="extra_large">Extra Grande</SelectItem>
                     </SelectContent>
                   </Select>
+                  {errors.size && (
+                    <div className="flex items-center gap-2 text-red-500 text-sm mt-1">
+                      <AlertCircle className="w-4 h-4" />
+                      {errors.size}
+                    </div>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="weight" className="text-base font-medium">
-                    Peso (kg)
-                  </Label>
+                                 <div className="space-y-2">
+                   <Label htmlFor="weight" className="text-base font-normal text-gray-700">
+                     Peso (kg)
+                   </Label>
                   <Input
                     id="weight"
                     type="number"
@@ -287,11 +363,11 @@ const PetFormPage = () => {
                 </div>
               </div>
 
-              {/* Gender */}
-              <div className="space-y-2">
-                <Label htmlFor="gender" className="text-base font-medium">
-                  Sexo
-                </Label>
+                             {/* Gender */}
+               <div className="space-y-2">
+                 <Label htmlFor="gender" className="text-base font-normal text-gray-700">
+                   Sexo
+                 </Label>
                 <Select 
                   value={formData.gender} 
                   onValueChange={(value) => setFormData({...formData, gender: value})}
@@ -306,11 +382,11 @@ const PetFormPage = () => {
                 </Select>
               </div>
 
-              {/* Notes */}
-              <div className="space-y-2">
-                <Label htmlFor="notes" className="text-base font-medium">
-                  Observações
-                </Label>
+                             {/* Notes */}
+               <div className="space-y-2">
+                 <Label htmlFor="notes" className="text-base font-normal text-gray-700">
+                   Observações
+                 </Label>
                 <Textarea
                   id="notes"
                   value={formData.notes}
@@ -348,10 +424,11 @@ const PetFormPage = () => {
                   )}
                 </Button>
               </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
+                         </form>
+           </div>
+         </div>
+        </div>
+      </BrandBackground>
     </Layout>
   );
 };

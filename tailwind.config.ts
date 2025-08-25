@@ -127,8 +127,9 @@ export default {
 				DEFAULT: theme("colors.brand.primary"),
 			}),
 			fontFamily: {
+				sans: ["Pagonia", "Pogonia", "ui-sans-serif", "system-ui", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"],
 				heading: ["Pogonia", "Pagonia", "ui-sans-serif", "system-ui", "sans-serif"],
-				body: ["Nunito", "ui-sans-serif", "system-ui", "sans-serif"],
+				body: ["Pagonia", "Pogonia", "ui-sans-serif", "system-ui", "sans-serif"],
 				nunito: ['Nunito', 'system-ui', 'sans-serif'],
 				quicksand: ['Quicksand', 'system-ui', 'sans-serif'],
 			}

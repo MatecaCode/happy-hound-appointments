@@ -55,30 +55,20 @@ const Navigation = () => {
         .eq('user_id', user.id)
         .single();
       
-      console.log('👤 User roles:', userRoles);
-      
       // Only proceed with staff profile check if user is actually staff
       if (userRoles?.data?.role === 'staff') {
-        console.log('👤 Checking staff status for user:', user.id);
-        
         const { data: profile, error } = await supabase
           .from('staff_profiles')
           .select('id, photo_url')
           .eq('user_id', user.id)
           .single();
-
-        console.log('📊 Staff profile query result:', { profile, error });
           
         if (profile) {
           setStaffPhotoUrl(profile.photo_url);
-          console.log('✅ Staff found, photo_url:', profile.photo_url);
-          console.log('🖼️ Navigation setting photo URL:', profile.photo_url);
         } else {
           setStaffPhotoUrl(null);
-          console.log('❌ No staff profile found');
         }
       } else {
-        console.log('ℹ️ User is not staff, skipping staff profile check');
         setStaffPhotoUrl(null);
       }
     };
@@ -97,10 +87,8 @@ const Navigation = () => {
         }, 
         (payload) => {
           console.log('🔄 Staff profile updated via subscription:', payload);
-          if (payload.new?.photo_url !== staffPhotoUrl) {
-            setStaffPhotoUrl(payload.new.photo_url);
-            console.log('📸 Updated staff photo URL:', payload.new.photo_url);
-          }
+          setStaffPhotoUrl(payload.new?.photo_url || null);
+          console.log('📸 Updated staff photo URL:', payload.new?.photo_url);
         }
       )
       .subscribe();
@@ -116,7 +104,7 @@ const Navigation = () => {
       subscription.unsubscribe();
       clearInterval(interval);
     };
-  }, [user, staffPhotoUrl]);
+  }, [user]);
 
   // Different navigation items for staff vs regular users
   const getNavItems = () => {
@@ -171,7 +159,7 @@ const Navigation = () => {
                         handleSmoothScroll(item.scrollTo!);
                       }
                     }}
-                    className="text-gray-700 hover:text-primary hover:font-medium px-3 py-2 text-sm font-medium transition-all duration-300 relative group no-underline hover:no-underline"
+                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm transition-all duration-300 relative group no-underline hover:no-underline"
                   >
                     {item.name}
                     <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full group-hover:left-0"></span>
@@ -180,7 +168,7 @@ const Navigation = () => {
                   <Link
                     key={item.name}
                     to={item.href}
-                    className="text-gray-700 hover:text-primary hover:font-medium px-3 py-2 text-sm font-medium transition-all duration-300 relative group no-underline hover:no-underline"
+                    className="text-gray-700 hover:text-primary px-3 py-2 text-sm transition-all duration-300 relative group no-underline hover:no-underline"
                   >
                     {item.name}
                     <span className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full group-hover:left-0"></span>
@@ -249,9 +237,6 @@ const Navigation = () => {
                       <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium leading-none">
                           {user.user_metadata?.name || 'Usuário'}
-                        </p>
-                        <p className="text-xs leading-none text-muted-foreground">
-                          {user.email}
                         </p>
                         {userRole && (
                           <p className="text-xs leading-none text-muted-foreground capitalize">
@@ -323,10 +308,10 @@ const Navigation = () => {
               </>
             ) : (
               <div className="flex items-center space-x-4">
-                <Link
-                  to="/login"
-                  className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors"
-                >
+                                 <Link
+                   to="/login"
+                   className="text-gray-700 hover:text-primary px-3 py-2 text-sm transition-colors"
+                 >
                   Entrar
                 </Link>
                 <Link
@@ -368,7 +353,7 @@ const Navigation = () => {
                       }
                       setIsOpen(false);
                     }}
-                    className="text-gray-700 hover:text-primary block w-full text-left px-3 py-2 text-base font-medium transition-colors"
+                    className="text-gray-700 hover:text-primary block w-full text-left px-3 py-2 text-base transition-colors"
                   >
                     {item.name}
                   </button>
@@ -376,7 +361,7 @@ const Navigation = () => {
                   <Link
                     key={item.name}
                     to={item.href}
-                    className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
+                    className="text-gray-700 hover:text-primary block px-3 py-2 text-base transition-colors"
                     onClick={() => setIsOpen(false)}
                   >
                     {item.name}
@@ -495,11 +480,11 @@ const Navigation = () => {
                 </>
               ) : (
                 <>
-                  <Link
-                    to="/login"
-                    className="text-gray-700 hover:text-primary block px-3 py-2 text-base font-medium transition-colors"
-                    onClick={() => setIsOpen(false)}
-                  >
+                                     <Link
+                     to="/login"
+                     className="text-gray-700 hover:text-primary block px-3 py-2 text-base transition-colors"
+                     onClick={() => setIsOpen(false)}
+                   >
                     Entrar
                   </Link>
                   <Link

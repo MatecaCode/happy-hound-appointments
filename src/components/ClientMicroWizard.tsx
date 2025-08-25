@@ -8,6 +8,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
+import PhoneInputBR from '@/components/inputs/PhoneInputBR';
+import { DateInputBR } from '@/components/inputs/DateInputBR';
+import { PREFERRED_CONTACT_OPTIONS, MARKETING_SOURCE_OPTIONS } from '@/constants/profile';
 import { 
   User, 
   MessageSquare, 
@@ -46,6 +49,9 @@ interface WizardData {
   phone?: string;
   is_whatsapp?: boolean;
   preferred_channel_code?: string;
+  marketing_source_code?: string;
+  marketing_source_other?: string;
+  birth_date?: string;
   
   // Step 2 - Lembretes & Consents
   consent_reminders?: boolean;
@@ -76,7 +82,8 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [wizardData, setWizardData] = useState<WizardData>({
-    name: currentUserName
+    name: currentUserName,
+    preferred_channel_code: 'telefone' // Default to telefone
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -96,20 +103,7 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
     try {
       setLoading(true);
       
-      // Load contact channels
-      const { data: channels, error: channelError } = await supabase
-        .from('contact_channels')
-        .select('id, code, name, description')
-        .eq('active', true)
-        .order('display_order');
-      
-      if (channelError) {
-        console.error('Error loading contact channels:', channelError);
-      } else {
-        setContactChannels(channels || []);
-      }
-      
-      // Load active staff profiles
+      // Load active staff profiles only (contact channels now use constants)
       const { data: staff, error: staffError } = await supabase
         .from('staff_profiles')
         .select('id, name, email, can_groom, can_vet, can_bathe')
@@ -123,7 +117,7 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
       }
       
     } catch (error) {
-      console.error('Error loading lookup data:', error);
+      console.error('Error loading staff profiles:', error);
     } finally {
       setLoading(false);
     }
@@ -138,15 +132,19 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
       setSaving(true);
       
       // Prepare profile update data
-      const profileUpdates: any = {};
+      const profileUpdates: Record<string, unknown> = {};
       
-      if (wizardData.phone) profileUpdates.p_phone = wizardData.phone;
-      if (wizardData.is_whatsapp !== undefined) profileUpdates.p_is_whatsapp = wizardData.is_whatsapp;
-      if (wizardData.preferred_channel_code) profileUpdates.p_preferred_channel_code = wizardData.preferred_channel_code;
-      if (wizardData.emergency_contact_name) profileUpdates.p_emergency_contact_name = wizardData.emergency_contact_name;
-      if (wizardData.emergency_contact_phone) profileUpdates.p_emergency_contact_phone = wizardData.emergency_contact_phone;
-      if (wizardData.preferred_staff_profile_id) profileUpdates.p_preferred_staff_profile_id = wizardData.preferred_staff_profile_id;
-      if (wizardData.accessibility_notes) profileUpdates.p_accessibility_notes = wizardData.accessibility_notes;
+             if (wizardData.phone) profileUpdates.p_phone = wizardData.phone;
+       if (wizardData.is_whatsapp !== undefined) profileUpdates.p_is_whatsapp = wizardData.is_whatsapp;
+       // Always include preferred_channel_code (default to 'telefone')
+       profileUpdates.p_preferred_channel_code = wizardData.preferred_channel_code || 'telefone';
+       if (wizardData.marketing_source_code) profileUpdates.p_marketing_source_code = wizardData.marketing_source_code;
+       if (wizardData.marketing_source_other) profileUpdates.p_marketing_source_other = wizardData.marketing_source_other;
+       if (wizardData.birth_date) profileUpdates.p_birth_date = wizardData.birth_date;
+       if (wizardData.emergency_contact_name) profileUpdates.p_emergency_contact_name = wizardData.emergency_contact_name;
+       if (wizardData.emergency_contact_phone) profileUpdates.p_emergency_contact_phone = wizardData.emergency_contact_phone;
+       if (wizardData.preferred_staff_profile_id) profileUpdates.p_preferred_staff_profile_id = wizardData.preferred_staff_profile_id;
+       if (wizardData.accessibility_notes) profileUpdates.p_accessibility_notes = wizardData.accessibility_notes;
       
       // Update profile if we have data
       if (Object.keys(profileUpdates).length > 0) {
@@ -175,15 +173,21 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
       
       // Log each consent
       for (const consent of consents) {
-        const { error: consentError } = await supabase.rpc('client_log_consent', {
-          p_type: consent.type,
-          p_granted: consent.granted,
-          p_channel_code: consent.channel_code || null,
-          p_version: '1.0'
-        });
-        
-        if (consentError) {
-          throw consentError;
+        try {
+          const { error: consentError } = await supabase.rpc('client_log_consent', {
+            p_granted: consent.granted,
+            p_type: consent.type,
+            p_version: 'v1',
+            p_channel_code: consent.channel_code || null
+          });
+          
+          if (consentError) {
+            console.error('Error logging consent:', consentError);
+            toast.error('Falha ao registrar consentimento (continuando assim mesmo)');
+          }
+        } catch (consentError) {
+          console.error('Error logging consent:', consentError);
+          toast.error('Falha ao registrar consentimento (continuando assim mesmo)');
         }
       }
       
@@ -238,12 +242,19 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
   const completeWizard = async () => {
     try {
       // Mark first visit setup as completed
-      const { error } = await supabase.rpc('client_complete_first_visit_setup');
+      const { error } = await supabase.rpc('client_mark_first_visit_setup');
       
       if (error) {
         console.error('Error completing first visit setup:', error);
         toast.error('Erro ao finalizar configuração');
         return;
+      }
+      
+      // Refresh progress from server
+      const { data: progressData } = await supabase.rpc('client_get_profile_progress');
+      if (progressData && progressData.length > 0 && progressData[0].percent_complete >= 80) {
+        // Hide nudge banner if profile is well complete
+        // This will be handled by the parent component
       }
       
       toast.success('Configuração inicial concluída!');
@@ -254,29 +265,30 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
     }
   };
 
-  const hasStepData = (): boolean => {
-    switch (currentStep) {
-      case 1:
-        return !!(wizardData.phone || wizardData.is_whatsapp !== undefined || wizardData.preferred_channel_code);
-      case 2:
-        return !!(wizardData.consent_reminders !== undefined || wizardData.consent_tos !== undefined || wizardData.consent_privacy !== undefined);
-      case 3:
-        return !!(wizardData.emergency_contact_name || wizardData.emergency_contact_phone);
-      case 4:
-        return !!(wizardData.preferred_staff_profile_id || wizardData.accessibility_notes);
-      default:
-        return false;
-    }
-  };
+     const hasStepData = (): boolean => {
+     switch (currentStep) {
+       case 1:
+         return !!(wizardData.phone || wizardData.is_whatsapp !== undefined || wizardData.preferred_channel_code || wizardData.marketing_source_code || wizardData.birth_date);
+       case 2:
+         return !!(wizardData.consent_reminders !== undefined || wizardData.consent_tos !== undefined || wizardData.consent_privacy !== undefined);
+       case 3:
+         return !!(wizardData.emergency_contact_name || wizardData.emergency_contact_phone);
+       case 4:
+         return !!(wizardData.preferred_staff_profile_id || wizardData.accessibility_notes);
+       default:
+         return false;
+     }
+   };
 
   const canProceed = (): boolean => {
     switch (currentStep) {
       case 1:
-        // Phone is recommended but not required
-        return true;
+        // Marketing source is required
+        return !!(wizardData.marketing_source_code && 
+                 (wizardData.marketing_source_code !== 'outro' || wizardData.marketing_source_other));
       case 2:
-        // At least consent to ToS/Privacy to proceed (but can skip)
-        return true;
+        // All consents are required
+        return !!(wizardData.consent_tos && wizardData.consent_privacy && wizardData.consent_reminders);
       case 3:
         // Emergency contact optional
         return true;
@@ -326,10 +338,9 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
       <div className="space-y-4">
         <div>
           <Label htmlFor="wizard-phone">Telefone</Label>
-          <Input
-            id="wizard-phone"
+          <PhoneInputBR
             value={wizardData.phone || ''}
-            onChange={(e) => updateWizardData({ phone: e.target.value })}
+            onChange={(value) => updateWizardData({ phone: value })}
             placeholder="(11) 99999-9999"
             className="mt-1"
           />
@@ -346,29 +357,72 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
           </Label>
         </div>
 
-        <div>
-          <Label htmlFor="wizard-channel">Canal de contato preferido</Label>
-          <Select 
-            value={wizardData.preferred_channel_code || ''} 
-            onValueChange={(value) => updateWizardData({ preferred_channel_code: value })}
-          >
-            <SelectTrigger className="mt-1">
-              <SelectValue placeholder="Selecione como prefere ser contatado" />
-            </SelectTrigger>
-            <SelectContent>
-              {contactChannels.map((channel) => (
-                <SelectItem key={channel.id} value={channel.code}>
-                  <div className="flex items-center space-x-2">
-                    <span>{channel.name}</span>
-                    {channel.code === 'whatsapp' && <MessageSquare className="w-4 h-4 text-green-500" />}
-                    {channel.code === 'email' && <Mail className="w-4 h-4 text-blue-500" />}
-                    {channel.code === 'phone_call' && <Phone className="w-4 h-4 text-orange-500" />}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+                 <div>
+           <Label htmlFor="wizard-channel">Canal de contato preferido</Label>
+           <Select 
+             value={wizardData.preferred_channel_code || 'telefone'} 
+             onValueChange={(value) => updateWizardData({ preferred_channel_code: value })}
+           >
+             <SelectTrigger className="mt-1">
+               <SelectValue placeholder="Selecione como prefere ser contatado" />
+             </SelectTrigger>
+             <SelectContent>
+               {PREFERRED_CONTACT_OPTIONS.map((option) => (
+                 <SelectItem key={option.code} value={option.code}>
+                   <div className="flex items-center space-x-2">
+                     <span>{option.label}</span>
+                     {option.code === 'telefone' && <Phone className="w-4 h-4 text-green-500" />}
+                     {option.code === 'email' && <Mail className="w-4 h-4 text-blue-500" />}
+                     {option.code === 'none' && <X className="w-4 h-4 text-gray-500" />}
+                   </div>
+                 </SelectItem>
+               ))}
+             </SelectContent>
+           </Select>
+         </div>
+
+         <div>
+           <Label htmlFor="wizard-marketing">Como nos conheceu? *</Label>
+           <Select 
+             value={wizardData.marketing_source_code || ''} 
+             onValueChange={(value) => updateWizardData({ marketing_source_code: value })}
+           >
+             <SelectTrigger className="mt-1">
+               <SelectValue placeholder="Selecione como descobriu nossos serviços" />
+             </SelectTrigger>
+             <SelectContent>
+               {MARKETING_SOURCE_OPTIONS.map((source) => (
+                 <SelectItem key={source.code} value={source.code}>
+                   {source.label}
+                 </SelectItem>
+               ))}
+             </SelectContent>
+           </Select>
+         </div>
+
+                   {wizardData.marketing_source_code === 'outro' && (
+            <div>
+              <Label htmlFor="wizard-marketing-other">Qual? *</Label>
+              <Input
+                id="wizard-marketing-other"
+                value={wizardData.marketing_source_other || ''}
+                onChange={(e) => updateWizardData({ marketing_source_other: e.target.value })}
+                placeholder="Como você nos conheceu?"
+                className="mt-1"
+              />
+            </div>
+          )}
+
+                     {/* Birth Date */}
+           <div>
+             <Label htmlFor="wizard-birth-date">Data de Aniversário (opcional)</Label>
+             <DateInputBR
+               id="wizard-birth-date"
+               value={wizardData.birth_date}
+               onChange={(value) => updateWizardData({ birth_date: value })}
+               className="mt-1"
+             />
+           </div>
       </div>
     </div>
   );
@@ -393,14 +447,14 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
                 onCheckedChange={(checked) => updateWizardData({ consent_reminders: checked as boolean })}
               />
               <div>
-                <Label htmlFor="wizard-reminders" className="font-medium text-sm">
-                  Concordo em receber lembretes
-                </Label>
-                <p className="text-xs text-gray-600 mt-1">
-                  Receberá lembretes sobre seus agendamentos via {
-                    contactChannels.find(c => c.code === wizardData.preferred_channel_code)?.name || 'e-mail'
-                  }
-                </p>
+                                 <Label htmlFor="wizard-reminders" className="font-medium text-sm">
+                   Concordo em receber lembretes e comunicações operacionais
+                 </Label>
+                 <p className="text-xs text-gray-600 mt-1">
+                   Receberá lembretes e avisos sobre seus agendamentos via {
+                     PREFERRED_CONTACT_OPTIONS.find(c => c.code === wizardData.preferred_channel_code)?.label || 'e-mail'
+                   } (obrigatório para agendamentos)
+                 </p>
               </div>
             </div>
           </CardContent>
@@ -464,10 +518,9 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
 
         <div>
           <Label htmlFor="wizard-emergency-phone">Telefone de emergência</Label>
-          <Input
-            id="wizard-emergency-phone"
+          <PhoneInputBR
             value={wizardData.emergency_contact_phone || ''}
-            onChange={(e) => updateWizardData({ emergency_contact_phone: e.target.value })}
+            onChange={(value) => updateWizardData({ emergency_contact_phone: value })}
             placeholder="(11) 99999-9999"
             className="mt-1"
           />
@@ -554,7 +607,12 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      console.log('Dialog onOpenChange:', open);
+      if (!open) {
+        onClose();
+      }
+    }}>
       <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader className="text-center">
           <DialogTitle className="text-xl font-bold text-gray-800">
@@ -630,11 +688,11 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
               Pular
             </Button>
 
-            <Button
-              onClick={handleNext}
-              disabled={saving || (currentStep === 2 && (!wizardData.consent_tos || !wizardData.consent_privacy))}
-              size="sm"
-            >
+                         <Button
+               onClick={handleNext}
+               disabled={saving || !canProceed()}
+               size="sm"
+             >
               {saving ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-1" />
               ) : currentStep === 4 ? (
