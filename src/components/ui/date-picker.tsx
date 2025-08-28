@@ -31,7 +31,7 @@ export function DatePicker({
   placeholder = "Selecione a data",
   disabled = false,
   className,
-  fromYear = 2000,
+  fromYear = 1990,
   toYear = new Date().getFullYear()
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false)

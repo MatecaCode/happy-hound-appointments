@@ -27,6 +27,8 @@ import { format } from 'date-fns';
 
 import { Tables } from '@/integrations/supabase/types';
 import { PREFERRED_CONTACT_OPTIONS, MARKETING_SOURCE_OPTIONS } from '@/constants/profile';
+import { debounce } from '@/utils/debounce';
+import { log } from '@/utils/logger';
 
 type ClientData = Tables<'clients'>;
 
@@ -172,7 +174,15 @@ const Profile = () => {
     }
   }, [calculateClientProgress, profileProgress.percent_complete]);
 
-  // Draft persistence management
+  // Import debounce utility
+  const debouncedSaveDraft = React.useMemo(
+    () => debounce((draft: any) => {
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }, 300),
+    [DRAFT_KEY]
+  );
+
+  // Draft persistence management with debouncing
   useEffect(() => {
     if (isEditing) {
       // Save draft to localStorage only when editing
@@ -181,12 +191,12 @@ const Profile = () => {
         isEditing: true,
         updatedAt: new Date().toISOString()
       };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      debouncedSaveDraft(draft);
     } else {
       // When not editing, remove any existing draft
       localStorage.removeItem(DRAFT_KEY);
     }
-  }, [isEditing, formData, DRAFT_KEY]);
+  }, [isEditing, formData, debouncedSaveDraft]);
 
   // Load draft on mount if it exists and is less than 10 minutes old
   useEffect(() => {
@@ -214,7 +224,7 @@ const Profile = () => {
             localStorage.removeItem(DRAFT_KEY);
           }
         } catch (error) {
-          console.error('Error parsing saved draft:', error);
+          log.error('Error parsing saved draft:', error);
           localStorage.removeItem(DRAFT_KEY);
         }
       }
@@ -237,12 +247,18 @@ const Profile = () => {
 
      useEffect(() => {
      if (user) {
+       const controller = new AbortController();
+       
        fetchUserRole();
        fetchClientData();
        loadLookupData();
        checkFirstVisitSetup();
        loadProfileProgress(); // Load server-side progress
        loadConsentSnapshot(); // Load consent snapshot
+       
+       return () => {
+         controller.abort();
+       };
      }
    }, [user]);
 
@@ -256,7 +272,7 @@ const Profile = () => {
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && showMicroWizard) {
-        console.log('Escape key pressed, closing micro-wizard...');
+        log.debug('Escape key pressed, closing micro-wizard...');
         handleMicroWizardClose();
       }
     };
@@ -269,7 +285,7 @@ const Profile = () => {
   useEffect(() => {
     return () => {
       if (showMicroWizard) {
-        console.log('Component unmounting, closing micro-wizard...');
+        log.debug('Component unmounting, closing micro-wizard...');
         setShowMicroWizard(false);
       }
     };
@@ -302,14 +318,14 @@ const Profile = () => {
         .single();
 
       if (roleError) {
-        console.error('Error fetching user role:', roleError);
+        log.error('Error fetching user role:', roleError);
         setRoleLoading(false);
         return;
       }
 
       setUserRole(roleData?.role || null);
     } catch (error) {
-      console.error('Error in fetchUserRole:', error);
+      log.error('Error in fetchUserRole:', error);
     } finally {
       setRoleLoading(false);
     }
@@ -327,7 +343,7 @@ const Profile = () => {
         .single();
 
       if (error) {
-        console.error('Error fetching client data:', error);
+        log.error('Error fetching client data:', error);
         toast.error('Erro ao carregar dados do perfil');
         return;
       }
@@ -367,7 +383,7 @@ const Profile = () => {
       // await loadProfileProgress(); // This line is now handled by the client-side progress calculator
       
     } catch (error) {
-      console.error('Error in fetchClientData:', error);
+      log.error('Error in fetchClientData:', error);
       toast.error('Erro ao carregar dados do perfil');
     } finally {
       setIsLoading(false);
@@ -384,7 +400,7 @@ const Profile = () => {
         .order('name');
       
       if (staffError) {
-        console.error('Error loading staff profiles:', staffError);
+        log.error('Error loading staff profiles:', staffError);
       } else {
         setStaffProfiles(staff || []);
       }
@@ -397,7 +413,7 @@ const Profile = () => {
         .order('name');
       
       if (clinicError) {
-        console.error('Error loading clinics:', clinicError);
+        log.error('Error loading clinics:', clinicError);
       } else {
         setClinics(clinicsData || []);
       }

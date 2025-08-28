@@ -9,6 +9,7 @@ import { PlusCircle, Trash2, Edit, PawPrint, Heart, Sparkles, Loader2 } from 'lu
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { log } from '@/utils/logger';
 
 interface Pet {
   id: string;
@@ -29,29 +30,29 @@ const Pets = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   const fetchPets = async () => {
-    console.log('🔍 fetchPets called:', { 
+    log.debug('fetchPets called:', { 
       user: user?.id, 
       authLoading,
       isLoading 
     });
 
     if (authLoading) {
-      console.log('⏳ Auth still loading, waiting...');
+      log.debug('Auth still loading, waiting...');
       return;
     }
 
     if (!user) {
-      console.log('👤 No user found, clearing pets');
+      log.debug('No user found, clearing pets');
       setPets([]);
       setIsLoading(false);
       return;
     }
 
-    console.log('🔍 Fetching pets for user:', user.id);
+    log.debug('Fetching pets for user:', user.id);
     setIsLoading(true);
     
     try {
-      console.log('📡 Making pets fetch query...');
+      log.debug('Making pets fetch query...');
       
       // Get client_id first
       const { data: clientData, error: clientError } = await supabase
@@ -61,7 +62,7 @@ const Pets = () => {
         .single();
 
       if (clientError || !clientData) {
-        console.log('No client record found for user:', user.id);
+        log.debug('No client record found for user:', user.id);
         setPets([]);
         return;
       }
@@ -77,7 +78,7 @@ const Pets = () => {
         .eq('active', true)
         .order('created_at', { ascending: false });
 
-      console.log('🐶 Fetch pets result:', { 
+      log.debug('Fetch pets result:', { 
         data, 
         error, 
         userCount: data?.length || 0,
@@ -85,7 +86,7 @@ const Pets = () => {
       });
 
       if (error) {
-        console.error('❌ Error fetching pets:', error);
+        log.error('Error fetching pets:', error);
         toast.error('Erro ao carregar pets: ' + error.message);
         return;
       }
@@ -97,17 +98,17 @@ const Pets = () => {
       })) || [];
       
       setPets(transformedPets);
-      console.log('✅ Pets loaded successfully:', transformedPets?.length || 0, 'pets');
+      log.debug('Pets loaded successfully:', transformedPets?.length || 0, 'pets');
       
     } catch (error: any) {
-      console.error('💥 Unexpected error fetching pets:', error);
+      log.error('Unexpected error fetching pets:', error);
       if (error.message === 'Fetch timeout') {
         toast.error('Timeout ao carregar pets. Tente novamente.');
       } else {
         toast.error('Erro inesperado ao carregar pets');
       }
     } finally {
-      console.log('🔄 Setting fetchPets isLoading to false');
+      log.debug('Setting fetchPets isLoading to false');
       setIsLoading(false);
     }
   };
@@ -115,7 +116,7 @@ const Pets = () => {
   const deletePet = async (petId: string) => {
     if (!confirm('Tem certeza que deseja remover este pet?')) return;
 
-    console.log('🗑️ Deleting pet:', petId, 'for user:', user?.id);
+    log.debug('Deleting pet:', petId, 'for user:', user?.id);
     
     try {
       const { error } = await supabase
@@ -124,23 +125,29 @@ const Pets = () => {
         .eq('id', petId);
 
       if (error) {
-        console.error('❌ Error deleting pet:', error);
+        log.error('Error deleting pet:', error);
         toast.error('Erro ao remover pet: ' + error.message);
         return;
       }
 
-      console.log('✅ Pet deleted successfully');
+      log.debug('Pet deleted successfully');
       toast.success('Pet removido com sucesso!');
       await fetchPets();
     } catch (error: any) {
-      console.error('💥 Unexpected error deleting pet:', error);
+      log.error('Unexpected error deleting pet:', error);
       toast.error('Erro inesperado ao remover pet');
     }
   };
 
   useEffect(() => {
-    console.log('🔄 useEffect triggered:', { user: user?.id, authLoading });
+    log.debug('useEffect triggered:', { user: user?.id, authLoading });
+    const controller = new AbortController();
+    
     fetchPets();
+    
+    return () => {
+      controller.abort();
+    };
   }, [user, authLoading]);
 
   useEffect(() => {
@@ -157,7 +164,7 @@ const Pets = () => {
     navigate('/pets/new');
   };
 
-  console.log('🎨 Pets page render:', { 
+  log.debug('Pets page render:', { 
     user: user?.id, 
     authLoading, 
     isLoading, 

@@ -63,10 +63,8 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
       newErrors.breed_id = 'Raça é obrigatória';
     }
 
-    // Birth date validation
-    if (!birthDate) {
-      newErrors.birth_date = 'Data de nascimento é obrigatória';
-    } else if (birthDate > new Date()) {
+    // Birth date validation (optional)
+    if (birthDate && birthDate > new Date()) {
       newErrors.birth_date = 'Data de nascimento não pode ser no futuro';
     }
 
@@ -216,7 +214,7 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
         </div>
 
                  <div>
-           <Label className="text-base font-normal text-gray-700">Data de Nascimento *</Label>
+           <Label className="text-base font-normal text-gray-700">Data de Nascimento (opcional)</Label>
           <PetDobPicker
             value={birthDate}
             onChange={(date) => {
@@ -297,9 +295,11 @@ const PetForm: React.FC<PetFormProps> = ({ onSuccess, editingPet }) => {
         />
       </div>
 
-      <Button type="submit" disabled={isLoading} className="w-full">
-        {isLoading ? 'Salvando...' : (editingPet ? 'Atualizar Pet' : 'Cadastrar Pet')}
-      </Button>
+      <div className="pt-6 px-4">
+        <Button type="submit" disabled={isLoading} className="w-full">
+          {isLoading ? 'Salvando...' : (editingPet ? 'Atualizar Pet' : 'Cadastrar Pet')}
+        </Button>
+      </div>
     </form>
   );
 };

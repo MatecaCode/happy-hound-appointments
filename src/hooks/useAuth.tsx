@@ -1,8 +1,10 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { log } from '@/utils/logger';
 import { User, Session } from '@supabase/supabase-js';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { translateEmailError } from '@/utils/errorMessages';
 
 interface AuthContextType {
   user: User | null;
@@ -58,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const fetchUserRoles = async (userId: string) => {
     try {
-      console.log('🎭 Fetching user roles for:', userId);
+      log.debug('Fetching user roles for:', userId);
       
       // Add timeout to prevent hanging
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -73,14 +75,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (error) {
-        console.error('❌ Failed to fetch user roles:', error);
+        log.error('Failed to fetch user roles:', error);
         setAuthError(`Erro ao buscar roles do usuário: ${error.message}`);
         return ['client']; // Default fallback role
       }
 
       const roles = data?.map(r => r.role) || ['client'];
-      console.log('✅ User roles fetched:', roles);
-      console.log('🔍 Raw data from database:', data);
+      log.debug('User roles fetched:', roles);
+      log.debug('Raw data from database:', data);
       console.log('👤 User ID being queried:', userId);
       return roles;
     } catch (error) {
@@ -290,8 +292,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       navigate('/');
     } catch (error: any) {
       console.error('Sign in error:', error);
-      setAuthError(error.message || 'Erro ao fazer login');
-      toast.error(error.message || 'Erro ao fazer login');
+      const translatedError = translateEmailError(error.message || 'Erro ao fazer login');
+      setAuthError(translatedError);
+      toast.error(translatedError);
       throw error;
     }
   };
@@ -332,12 +335,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) throw error;
 
-      toast.success('Conta criada com sucesso! Verifique seu email.');
+      toast.success('Conta criada com sucesso! Verifique seu email. Se não encontrar o email, verifique sua pasta de spam.');
       navigate('/login');
     } catch (error: any) {
       console.error('Sign up error:', error);
-      setAuthError(error.message || 'Erro ao criar conta');
-      toast.error(error.message || 'Erro ao criar conta');
+      const translatedError = translateEmailError(error.message || 'Erro ao criar conta');
+      setAuthError(translatedError);
+      toast.error(translatedError);
       throw error;
     }
   };

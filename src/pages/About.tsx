@@ -25,15 +25,15 @@ const About = () => {
   return (
     <Layout>
       {/* Hero Section */}
-      <section className="bg-secondary/50 py-16 md:py-24">
+      <section className="bg-secondary/50 py-8 md:py-24">
         <Container>
           <div 
             ref={heroAnimation.ref}
-            className={`text-center mb-12 ${animationClasses.fadeIn} ${
+            className={`text-center mb-6 md:mb-12 ${animationClasses.fadeIn} ${
               heroAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-            <h1 className="mb-4">Sobre <span className="text-brand-primary">Nós</span></h1>
+            <h1 className="mb-4">Sobre <span className="text-primary">Nós</span></h1>
             <p className="text-muted-foreground max-w-3xl mx-auto">
               Uma Jornada de Amor e Inovação pelos Pets
             </p>
@@ -42,16 +42,23 @@ const About = () => {
       </section>
       
       {/* Nossa História */}
-      <section className="py-16 md:py-24">
+      <section className="py-4 md:py-16">
         <Container>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <div 
+            ref={historyAnimation.ref}
+            className={`text-center mb-6 md:mb-12 ${animationClasses.fadeIn} ${
+              historyAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
+            }`}
+          >
+            <h2 className="mb-6">Nossa <span className="text-primary">História</span></h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-12 items-center">
             <div 
-              ref={historyAnimation.ref}
               className={`${animationClasses.fadeIn} ${
                 historyAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
               }`}
             >
-              <h2 className="mb-6">Nossa <span className="text-brand-primary">História</span></h2>
               <p className="text-muted-foreground mb-6">
                 Há mais de 40 anos, trocamos a agitação da capital paulista pela tranquilidade de Atibaia para realizar um sonho: 
                 construir nossa primeira sede própria totalmente dedicada ao bem‑estar dos animais. Em 1988 compramos 
@@ -84,15 +91,15 @@ const About = () => {
       </section>
       
       {/* Pioneiros que Fazem História */}
-      <section className="bg-secondary/30 py-16 md:py-24">
+      <section className="bg-secondary/30 py-8 md:py-16">
         <Container>
           <div 
             ref={valuesAnimation.ref}
-            className={`text-center mb-12 ${animationClasses.fadeIn} ${
+            className={`text-center mb-6 md:mb-12 ${animationClasses.fadeIn} ${
               valuesAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-            <h2>Pioneiros que <span className="text-brand-primary">Fazem História</span></h2>
+            <h2>Pioneiros que <span className="text-primary">Fazem História</span></h2>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
@@ -197,7 +204,7 @@ const About = () => {
                 teamAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
               }`}
             >
-              <h3 className="text-xl font-bold mb-4 text-center">Cuidado nos detalhes</h3>
+              <h3 className="text-xl font-bold mb-4 text-center text-primary">Cuidado nos detalhes</h3>
               <p className="text-muted-foreground">
                 Do primeiro atendimento ao banho & tosa com penteados elaborados, sua tranquilidade é a nossa prioridade.
               </p>
@@ -208,7 +215,7 @@ const About = () => {
                 teamAnimation.isVisible ? animationClasses.slideInRightActive : animationClasses.slideInRightInactive
               }`}
             >
-              <h3 className="text-xl font-bold mb-4 text-center">Customer Success animal</h3>
+              <h3 className="text-xl font-bold mb-4 text-center text-primary">Customer Success animal</h3>
               <p className="text-muted-foreground">
                 Acompanhamos cada etapa da jornada de saúde do pet para garantir resultados duradouros.
               </p>
@@ -219,7 +226,7 @@ const About = () => {
                 teamAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
               }`}
             >
-              <h3 className="text-xl font-bold mb-4 text-center">Segurança em primeiro lugar</h3>
+              <h3 className="text-xl font-bold mb-4 text-center text-primary">Segurança em primeiro lugar</h3>
               <p className="text-muted-foreground">
                 Infraestrutura, protocolos rigorosos e profissionais experientes asseguram tratamentos de ponta com total confiança.
               </p>
@@ -230,7 +237,7 @@ const About = () => {
                 teamAnimation.isVisible ? animationClasses.slideInRightActive : animationClasses.slideInRightInactive
               }`}
             >
-              <h3 className="text-xl font-bold mb-4 text-center">Formamos profissionais</h3>
+              <h3 className="text-xl font-bold mb-4 text-center text-primary">Formamos profissionais</h3>
               <p className="text-muted-foreground">
                 Muitos talentos que começaram conosco abriram seus próprios negócios, impulsionando o mercado pet local.
               </p>

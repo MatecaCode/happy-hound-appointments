@@ -52,6 +52,8 @@ const Register = () => {
     error: null,
     retryCount: 0,
   });
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   
   const { signUp, user, authError, clearAuthError } = useAuth();
   const navigate = useNavigate();
@@ -96,6 +98,70 @@ const Register = () => {
   }, [accountType]);
 
   const requiresCode = accountType === 'staff' || accountType === 'admin';
+  
+  // Email validation function for real-time checking
+  const validateEmail = async (emailToCheck: string) => {
+    if (!emailToCheck || emailToCheck.length < 3) {
+      setEmailError(null);
+      return;
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailToCheck)) {
+      setEmailError('Formato de email inválido');
+      return;
+    }
+
+    setIsCheckingEmail(true);
+    setEmailError(null);
+
+    try {
+      // Only check for existing emails in self-registration (client accounts)
+      if (accountType === 'cliente') {
+        const { data: emailExists, error: emailCheckError } = await supabase.rpc('check_email_exists', {
+          p_email: emailToCheck
+        });
+
+        if (emailCheckError) {
+          console.error('Error checking email existence:', emailCheckError);
+          setEmailError('Erro ao verificar email');
+          return;
+        }
+
+        if (emailExists) {
+          setEmailError('Este email já está cadastrado. Se você já tem uma conta, faça login.');
+          return;
+        }
+      }
+
+      setEmailError(null);
+    } catch (error) {
+      console.error('Email validation error:', error);
+      setEmailError('Erro ao verificar email');
+    } finally {
+      setIsCheckingEmail(false);
+    }
+  };
+
+  // Debounced email validation
+  const debouncedEmailValidation = React.useCallback(
+    React.useMemo(() => {
+      let timeoutId: NodeJS.Timeout;
+      return (emailToCheck: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => validateEmail(emailToCheck), 500);
+      };
+    }, [accountType]),
+    [accountType]
+  );
+
+  // Handle email change
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newEmail = e.target.value;
+    setEmail(newEmail);
+    debouncedEmailValidation(newEmail);
+  };
   
   const validateAndUseRegistrationCode = async (retryCount: number = 0): Promise<boolean> => {
     if (!requiresCode) return true;
@@ -200,6 +266,12 @@ const Register = () => {
       return;
     }
     
+    // Check for email validation errors
+    if (emailError) {
+      setError('Por favor, corrija os erros no email antes de continuar.');
+      return;
+    }
+    
     if (requiresCode && !registrationCode) {
       const typeText = accountType === 'admin' ? 'administradores' : 'funcionários';
       setError(`Código de registro é obrigatório para ${typeText}.`);
@@ -217,12 +289,46 @@ const Register = () => {
     setIsLoading(true);
     setRegistrationStatus({
       isProcessing: true,
-      step: 'Iniciando registro...',
+      step: 'Verificando email...',
       error: null,
       retryCount: 0,
     });
     
     try {
+      // Check if email already exists in auth.users (for self-registration only)
+      if (accountType === 'cliente') {
+        setRegistrationStatus(prev => ({
+          ...prev,
+          step: 'Verificando se o email já está cadastrado...',
+        }));
+
+        const { data: emailExists, error: emailCheckError } = await supabase.rpc('check_email_exists', {
+          p_email: email
+        });
+
+        if (emailCheckError) {
+          console.error('Error checking email existence:', emailCheckError);
+          throw new Error(`Erro ao verificar email: ${emailCheckError.message}`);
+        }
+
+        if (emailExists) {
+          setIsLoading(false);
+          setRegistrationStatus({
+            isProcessing: false,
+            step: '',
+            error: null,
+            retryCount: 0,
+          });
+          setError('Este email já está cadastrado. Se você já tem uma conta, faça login. Se esqueceu sua senha, use a opção "Esqueci minha senha".');
+          return;
+        }
+      }
+
+      setRegistrationStatus(prev => ({
+        ...prev,
+        step: 'Iniciando registro...',
+      }));
+
       // Validate registration code if required
       if (requiresCode) {
         const isValid = await validateAndUseRegistrationCode();
@@ -380,7 +486,7 @@ const Register = () => {
       } else if (accountType === 'admin') {
         toast.success('Registro de administrador realizado! Verifique seu email para confirmar a conta.');
       } else {
-        toast.success('Registro realizado! Verifique seu email para confirmar a conta.');
+        toast.success('Registro realizado! Verifique seu email para confirmar a conta. Se não encontrar o email, verifique sua pasta de spam.');
       }
       
       // Clear any previous errors
@@ -498,9 +604,21 @@ const Register = () => {
                     type="email"
                     placeholder="seu@email.com"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={handleEmailChange}
+                    className={emailError ? 'border-red-500' : ''}
                     required
                   />
+                  {isCheckingEmail && (
+                    <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
+                      <span>Verificando email...</span>
+                    </div>
+                  )}
+                  {emailError && (
+                    <div className="text-sm text-red-500">
+                      {emailError}
+                    </div>
+                  )}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="password">Senha</Label>

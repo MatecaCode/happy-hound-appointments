@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import PhoneInputBR from '@/components/inputs/PhoneInputBR';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -514,10 +515,9 @@ const AdminSettings = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
                                 <Label htmlFor="staff-phone">Telefone</Label>
-                                <Input
-                                  id="staff-phone"
+                                <PhoneInputBR
                                   value={staffFormData.phone}
-                                  onChange={(e) => setStaffFormData({ ...staffFormData, phone: e.target.value })}
+                                  onChange={(value) => setStaffFormData({ ...staffFormData, phone: value })}
                                   placeholder="(11) 99999-9999"
                                 />
                               </div>
@@ -771,10 +771,9 @@ const AdminSettings = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="edit-staff-phone">Telefone</Label>
-                    <Input
-                      id="edit-staff-phone"
+                    <PhoneInputBR
                       value={staffFormData.phone}
-                      onChange={(e) => setStaffFormData({ ...staffFormData, phone: e.target.value })}
+                      onChange={(value) => setStaffFormData({ ...staffFormData, phone: value })}
                       placeholder="(11) 99999-9999"
                     />
                   </div>

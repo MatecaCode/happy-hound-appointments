@@ -26,7 +26,7 @@ export function PetDobPicker({
         toDate={today}
         disabled={(date) => date > today}
         // Keep arrow-only nav (base sets captionLayout="buttons")
-        fromYear={2000}
+        fromYear={1990}
         toYear={new Date().getFullYear()}
       />
     </div>

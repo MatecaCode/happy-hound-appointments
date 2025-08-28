@@ -28,9 +28,10 @@ export function PetDobPicker({
   className,
 }: PetDobPickerProps) {
   const [open, setOpen] = useState(false);
-  const [showTag, setShowTag] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+
+  // Internal component identifier: Pet DOB Picker
 
   // Initialize input value when value changes
   React.useEffect(() => {
@@ -89,19 +90,9 @@ export function PetDobPicker({
     setTimeout(() => setIsTyping(false), 100);
   };
 
+  // Use custom calendar with standardized year range
   return (
-    <div 
-      className={cn("pet-dob-picker-wrapper relative", className)}
-      onMouseEnter={() => setShowTag(true)}
-      onMouseLeave={() => setShowTag(false)}
-    >
-      {/* Debug tag - only shows on hover */}
-      {showTag && (
-        <div className="absolute top-1 left-1 z-50 bg-green-600 text-white text-xs px-2 py-1 rounded shadow-md">
-          🐕 Pet
-        </div>
-      )}
-      
+    <div className={cn("pet-dob-picker-wrapper relative", className)}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <div className="relative">

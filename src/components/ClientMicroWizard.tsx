@@ -25,6 +25,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { log } from '@/utils/logger';
 import { toast } from 'sonner';
 
 interface ContactChannel {
@@ -111,13 +112,13 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
         .order('name');
       
       if (staffError) {
-        console.error('Error loading staff profiles:', staffError);
+        log.error('Error loading staff profiles:', staffError);
       } else {
         setStaffProfiles(staff || []);
       }
       
     } catch (error) {
-      console.error('Error loading staff profiles:', error);
+      log.error('Error loading staff profiles:', error);
     } finally {
       setLoading(false);
     }
@@ -182,11 +183,11 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
           });
           
           if (consentError) {
-            console.error('Error logging consent:', consentError);
+            log.error('Error logging consent:', consentError);
             toast.error('Falha ao registrar consentimento (continuando assim mesmo)');
           }
         } catch (consentError) {
-          console.error('Error logging consent:', consentError);
+          log.error('Error logging consent:', consentError);
           toast.error('Falha ao registrar consentimento (continuando assim mesmo)');
         }
       }

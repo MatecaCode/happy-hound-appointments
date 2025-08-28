@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookingCalendar } from '@/components/calendars/admin/BookingCalendar';
 import { Textarea } from '@/components/ui/textarea';
 import { useAuth } from '@/hooks/useAuth';
+import { log } from '@/utils/logger';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -64,9 +65,9 @@ const AdminBookingPage = () => {
   const { user, isAdmin } = useAuth();
   const navigate = useNavigate();
   
-  console.log('🔍 [ADMIN_BOOKING] Component initialized');
-  console.log('🔍 [ADMIN_BOOKING] User:', user?.email);
-  console.log('🔍 [ADMIN_BOOKING] Is Admin:', isAdmin);
+  log.debug('[ADMIN_BOOKING] Component initialized');
+  log.debug('[ADMIN_BOOKING] User:', user?.email);
+  log.debug('[ADMIN_BOOKING] Is Admin:', isAdmin);
   const [clients, setClients] = useState<Client[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -105,7 +106,7 @@ const AdminBookingPage = () => {
     initializeChromeCompatibility();
 
     const handleUnhandledError = (event: ErrorEvent) => {
-      console.error('🚨 [ADMIN_BOOKING] Unhandled error caught:', {
+      log.error('[ADMIN_BOOKING] Unhandled error caught:', {
         message: event.message,
         filename: event.filename,
         lineno: event.lineno,

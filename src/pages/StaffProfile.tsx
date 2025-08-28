@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import PhoneInputBR from '@/components/inputs/PhoneInputBR';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -433,10 +434,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                 {/* Phone */}
                 <div className="space-y-2">
                   <Label htmlFor="phone">Telefone</Label>
-                  <Input
-                    id="phone"
+                  <PhoneInputBR
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(value) => setFormData({ ...formData, phone: value })}
                     placeholder="(11) 99999-9999"
                   />
                 </div>

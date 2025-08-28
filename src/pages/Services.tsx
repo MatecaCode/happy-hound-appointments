@@ -176,11 +176,11 @@ const Services = () => {
 
   return (
     <Layout>
-      <section className="bg-secondary/50 py-16">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="bg-secondary/50 py-6 sm:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div 
             ref={headerAnimation.ref}
-            className={`text-center mb-12 ${animationClasses.fadeIn} ${
+            className={`text-center mb-6 sm:mb-12 ${animationClasses.fadeIn} ${
               headerAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
@@ -194,70 +194,72 @@ const Services = () => {
       </section>
       
       {/* Serviços Veterinários */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="py-8 sm:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div 
             ref={vetHeaderAnimation.ref}
-            className={`flex items-center justify-center mb-12 ${animationClasses.fadeIn} ${
+            className={`flex items-center justify-center mb-6 sm:mb-12 ${animationClasses.fadeIn} ${
               vetHeaderAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-            <div className="w-16 h-0.5 bg-primary mr-4"></div>
-            <h2 className="text-3xl font-bold">Serviços Veterinários</h2>
-            <div className="w-16 h-0.5 bg-primary ml-4"></div>
+            <div className="w-8 sm:w-16 h-0.5 bg-primary mr-2 sm:mr-4"></div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-center px-2">Serviços Veterinários</h2>
+            <div className="w-8 sm:w-16 h-0.5 bg-primary ml-2 sm:ml-4"></div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
             {vetServices.map((service, index) => (
-              <ServiceCard 
-                key={index}
-                title={service.title}
-                description={service.description}
-                icon={service.icon}
-                popular={service.popular}
-                badge={service.badge}
-                backgroundColor={service.backgroundColor}
-              />
+              <div key={index} className="min-w-0">
+                <ServiceCard 
+                  title={service.title}
+                  description={service.description}
+                  icon={service.icon}
+                  popular={service.popular}
+                  badge={service.badge}
+                  backgroundColor={service.backgroundColor}
+                />
+              </div>
             ))}
           </div>
         </div>
       </section>
       
-      <div className="max-w-7xl mx-auto px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Separator className="my-8" />
       </div>
       
       {/* Banho & Tosa */}
-      <section className="py-16">
-        <div className="max-w-7xl mx-auto px-6">
+      <section className="py-8 sm:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div 
             ref={groomingHeaderAnimation.ref}
-            className={`flex items-center justify-center mb-12 ${animationClasses.fadeIn} ${
+            className={`flex items-center justify-center mb-6 sm:mb-12 ${animationClasses.fadeIn} ${
               groomingHeaderAnimation.isVisible ? animationClasses.fadeInActive : animationClasses.fadeInInactive
             }`}
           >
-            <div className="w-16 h-0.5 bg-primary mr-4"></div>
-            <h2 className="text-3xl font-bold">Banho & Tosa</h2>
-            <div className="w-16 h-0.5 bg-primary ml-4"></div>
+            <div className="w-8 sm:w-16 h-0.5 bg-primary mr-2 sm:mr-4"></div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-center px-2">Banho & Tosa</h2>
+            <div className="w-8 sm:w-16 h-0.5 bg-primary ml-2 sm:ml-4"></div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
             {groomingServices.map((service, index) => (
-              <ServiceCard 
-                key={index}
-                title={service.title}
-                description={service.description}
-                icon={service.icon}
-                popular={service.popular}
-                badge={service.badge}
-                backgroundColor={service.backgroundColor}
-              />
+              <div key={index} className="min-w-0">
+                <ServiceCard 
+                  title={service.title}
+                  description={service.description}
+                  icon={service.icon}
+                  popular={service.popular}
+                  badge={service.badge}
+                  backgroundColor={service.backgroundColor}
+                />
+              </div>
             ))}
           </div>
           
           <div 
             ref={ctaAnimation.ref}
-            className={`mt-16 text-center bg-secondary rounded-xl p-8 ${animationClasses.scaleIn} ${
+            className={`mt-16 text-center bg-secondary rounded-xl p-6 sm:p-8 ${animationClasses.scaleIn} ${
               ctaAnimation.isVisible ? animationClasses.scaleInActive : animationClasses.scaleInInactive
             }`}
           >
@@ -265,7 +267,7 @@ const Services = () => {
             <p className="text-muted-foreground mb-6 max-w-2xl mx-auto">
               Tem uma necessidade específica que não está listada aqui? Oferecemos serviços personalizados adaptados às necessidades específicas do seu pet.
             </p>
-            <Button asChild size="lg" className="transition-all duration-300 hover:shadow-lg hover:scale-105">
+            <Button asChild size="lg" className="w-full sm:w-auto break-words text-sm sm:text-base px-4 sm:px-6 transition-all duration-300 hover:shadow-lg hover:scale-105">
               <Link to="/book">Contate-nos Para Serviços Personalizados</Link>
             </Button>
           </div>

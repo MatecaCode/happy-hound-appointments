@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import PhoneInputBR from '@/components/inputs/PhoneInputBR';
 import { 
   X, 
   AlertCircle, 
@@ -126,9 +127,9 @@ const SmartNudgesBanner: React.FC<SmartNudgesBannerProps> = ({
     <Alert className={`border-l-4 ${getNudgeColor()} ${className}`}>
       <AlertDescription>
         <div className="flex items-start justify-between">
-          <div className="flex items-start space-x-3">
+          <div className="flex items-start space-x-3 flex-1 min-w-0">
             <Icon className="w-5 h-5 mt-0.5 text-gray-600 flex-shrink-0" />
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-gray-800 mb-1">
                 {getNudgeTitle()}
               </h4>
@@ -137,11 +138,11 @@ const SmartNudgesBanner: React.FC<SmartNudgesBannerProps> = ({
                 {missingFieldsText && ` Complete: ${missingFieldsText}.`}
               </p>
               
-              <div className="flex items-center space-x-3">
+              <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
                 <Button
                   size="sm"
                   variant="default"
-                  className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
                   onClick={() => {
                     // Scroll to the editable sections or trigger edit mode
                     const editButton = document.querySelector('[data-action="edit-profile"]') as HTMLButtonElement;
@@ -159,7 +160,7 @@ const SmartNudgesBanner: React.FC<SmartNudgesBannerProps> = ({
                   variant="ghost"
                   onClick={handleDismiss}
                   disabled={isDismissing}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="w-full sm:w-auto text-sm text-gray-500 hover:text-gray-700"
                 >
                   {isDismissing ? (
                     <>
@@ -182,7 +183,7 @@ const SmartNudgesBanner: React.FC<SmartNudgesBannerProps> = ({
             size="sm"
             onClick={handleDismiss}
             disabled={isDismissing}
-            className="text-gray-400 hover:text-gray-600 p-1 h-6 w-6 flex-shrink-0"
+            className="text-gray-400 hover:text-gray-600 p-1 h-6 w-6 flex-shrink-0 ml-2"
           >
             <X className="w-4 h-4" />
           </Button>
@@ -228,12 +229,11 @@ const BookingFlowNudge: React.FC<BookingNudgeProps> = ({
                   Telefone para contato
                 </label>
                 <div className="flex items-center space-x-2">
-                  <input
-                    type="tel"
+                  <PhoneInputBR
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
+                    onChange={(value) => setPhone(value)}
                     placeholder="(11) 99999-9999"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-blue-500 focus:border-blue-500"
+                    className="flex-1"
                   />
                   <label className="flex items-center space-x-1 text-sm">
                     <input

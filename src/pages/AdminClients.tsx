@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import PhoneInputBR from '@/components/inputs/PhoneInputBR';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -723,10 +724,9 @@ const AdminClients = () => {
                   </div>
                   <div>
                     <Label htmlFor="phone">Telefone</Label>
-                    <Input
-                      id="phone"
+                    <PhoneInputBR
                       value={formData.phone}
-                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      onChange={(value) => setFormData({ ...formData, phone: value })}
                       placeholder="(11) 99999-9999"
                     />
                   </div>
@@ -965,10 +965,9 @@ const AdminClients = () => {
               </div>
               <div>
                 <Label htmlFor="edit-phone">Telefone</Label>
-                <Input
-                  id="edit-phone"
+                <PhoneInputBR
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(value) => setFormData({ ...formData, phone: value })}
                   placeholder="(11) 99999-9999"
                 />
               </div>

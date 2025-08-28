@@ -5,6 +5,7 @@ import { Menu } from 'lucide-react';
 
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { log } from '@/utils/logger';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -25,7 +26,7 @@ const Navigation = () => {
     try {
       await signOut();
     } catch (error) {
-      console.error('Error during logout:', error);
+      log.error('Error during logout:', error);
     }
   };
 
@@ -42,7 +43,7 @@ const Navigation = () => {
   React.useEffect(() => {
     const checkStaffStatus = async () => {
       if (!user) {
-        console.log('🚫 No user found, clearing staff status');
+        log.debug('No user found, clearing staff status');
         setStaffPhotoUrl(null);
         return;
       }
@@ -86,9 +87,9 @@ const Navigation = () => {
           filter: `user_id=eq.${user?.id}`
         }, 
         (payload) => {
-          console.log('🔄 Staff profile updated via subscription:', payload);
+          log.debug('Staff profile updated via subscription:', payload);
           setStaffPhotoUrl(payload.new?.photo_url || null);
-          console.log('📸 Updated staff photo URL:', payload.new?.photo_url);
+          log.debug('Updated staff photo URL:', payload.new?.photo_url);
         }
       )
       .subscribe();
@@ -216,9 +217,9 @@ const Navigation = () => {
       <Avatar className="h-8 w-8">
         <AvatarImage 
           src={staffPhotoUrl ? `${staffPhotoUrl}?t=${Date.now()}` : undefined}
-          onLoad={() => console.log('✅ Nav avatar image loaded successfully:', staffPhotoUrl)}
+          onLoad={() => log.debug('Nav avatar image loaded successfully:', staffPhotoUrl)}
           onError={(e) => {
-            console.error('❌ Nav avatar image failed to load:', staffPhotoUrl);
+            log.error('Nav avatar image failed to load:', staffPhotoUrl);
             // Try to load without cache buster as fallback
             if (e.currentTarget.src.includes('?t=') && staffPhotoUrl) {
               e.currentTarget.src = staffPhotoUrl;

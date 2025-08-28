@@ -30,7 +30,7 @@ const Book = () => {
   return (
     <Layout>
       {/* Hero Section with Enhanced Design */}
-      <section className="relative bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 overflow-hidden">
+      <section className="relative bg-gradient-to-br from-blue-50 via-white to-purple-50 pb-0 md:py-12 overflow-hidden">
         {/* Animated Background Elements */}
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-200 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-pulse"></div>
@@ -51,7 +51,7 @@ const Book = () => {
       </section>
 
       {/* Coming Soon Section with Enhanced Design */}
-      <section className="py-12 relative bg-white min-h-screen flex items-center">
+      <section className="pt-0 pb-0 md:py-12 relative bg-white min-h-screen flex items-center">
         <div className="max-w-7xl mx-auto px-6">
           <div className="relative">
             {/* Enhanced Blurred Background Content */}
@@ -128,7 +128,7 @@ const Book = () => {
                       <div className="space-y-3 text-lg text-gray-600">
                         <div className="flex items-center gap-3">
                           <Phone className="h-5 w-5 text-green-500" />
-                          <span>Telefone: (11) 1234-5678</span>
+                          <span>Telefone: (11) 2427-2827</span>
                         </div>
                         <div className="flex items-center gap-3">
                           <MessageCircle className="h-5 w-5 text-green-500" />
@@ -187,46 +187,51 @@ const Book = () => {
                       Em breve você poderá agendar seus serviços de forma rápida e prática.
                     </p>
                     
-                    {/* Enhanced Contact Alert */}
-                                         <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-6 max-w-md mx-auto shadow-lg mb-6">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0">
+                    {/* Enhanced Contact Alert - Mobile Optimized */}
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-4 sm:p-6 mx-4 sm:max-w-md sm:mx-auto shadow-lg mb-6">
+                      <div className="text-center sm:flex sm:items-start sm:gap-3 sm:text-left">
+                        <div className="flex justify-center sm:justify-start mb-3 sm:mb-0">
                           <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                             <AlertCircle className="h-5 w-5 text-blue-600" />
                           </div>
                         </div>
-                        <div className="text-left">
-                          <h3 className="font-bold text-blue-800 text-base mb-2">Entre em contato:</h3>
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <Phone className="h-4 w-4 text-blue-600" />
-                              <span className="text-blue-700 font-medium text-sm">Telefone: (11) 1234-5678</span>
+                        <div className="flex-1">
+                          <h3 className="font-bold text-blue-800 text-base mb-3 sm:mb-2">Entre em contato:</h3>
+                          
+                          {/* Phone Number - Two Line Format */}
+                          <div className="mb-4">
+                            <div className="flex items-center justify-center sm:justify-start gap-2 mb-1">
+                              <Phone className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                              <span className="text-blue-700 font-medium text-sm">Telefone:</span>
                             </div>
-                                                         
-                             {/* WhatsApp CTA - Thinner Green Area */}
-                             <div className="mt-4">
-                               {/* Helper Text with Emoji */}
-                               <div className="flex items-center gap-2 mb-3">
-                                 <span role="img" aria-label="apontando para baixo" className="text-lg">👇</span>
-                                 <span className="text-sm font-medium text-slate-700">Entre em contato com um clique:</span>
-                               </div>
-                               
-                               {/* Thinner WhatsApp Button */}
-                                                               <a
-                                  href="https://rebrand.ly/VettaleWhats"
-                                  target="_blank"
-                                  rel="noopener"
-                                  aria-label="Abrir WhatsApp para agendamento"
-                                  onClick={() => window.gtag?.('event', 'wa_booking_click', { location: 'booking_soon_card' })}
-                                  className="flex items-center gap-3 w-full p-3 rounded-xl bg-green-500 text-white shadow-md transition hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300 hover:scale-105"
-                                >
-                                 {/* WhatsApp icon on the left */}
-                                 <svg viewBox="0 0 24 24" className="h-5 w-5 flex-shrink-0" fill="currentColor" aria-hidden="true">
-                                   <path d="M20.52 3.48A11.87 11.87 0 0 0 12.05 0C5.59 0 .34 5.24.34 11.72c0 2.06.54 4.08 1.57 5.86L0 24l6.57-1.86a11.7 11.7 0 0 0 5.47 1.4h.01c6.46 0 11.72-5.24 11.72-11.7 0-3.13-1.22-6.06-3.25-8.36ZM12.05 21.2h-.01a9.46 9.46 0 0 1-4.83-1.32l-.35-.2-3.9 1.1 1.08-3.8-.23-.39a9.44 9.44 0 0 1-1.47-5.06c0-5.22 4.25-9.47 9.48-9.47 2.53 0 4.9.98 6.69 2.77a9.42 9.42 0 0 1 2.78 6.7c0 5.22-4.25 9.47-9.54 9.47ZM17.2 14.2c-.26-.13-1.54-.76-1.77-.85-.23-.09-.4-.13-.57.13-.17.25-.66.85-.81 1.02-.15.17-.3.19-.56.06-.26-.13-1.09-.4-2.07-1.28-.77-.68-1.29-1.52-1.44-1.78-.15-.26-.02-.4.11-.53.11-.11.26-.3.38-.45.13-.15.17-.26.26-.43.09-.17.04-.32-.02-.45-.06-.13-.57-1.38-.78-1.89-.2-.48-.4-.42-.57-.43h-.49c-.17 0-.45.06-.68.32-.23.25-.9.87-.9 2.12 0 1.25.92 2.46 1.05 2.63.13.17 1.82 2.78 4.4 3.9.62.27 1.11.43 1.49.55.62.20 1.19.17 1.64.10.50-.07 1.54-.63 1.76-1.24.22-.61.22-1.13.15-1.24-.07-.11-.24-.17-.50-.30Z" />
-                                 </svg>
-                                 <span className="font-semibold">Falar no WhatsApp</span>
-                               </a>
-                             </div>
+                            <div className="text-center sm:text-left">
+                              <span className="text-blue-700 font-medium text-sm">(11) 2427-2827</span>
+                            </div>
+                          </div>
+                          
+                          {/* WhatsApp Section */}
+                          <div className="space-y-3">
+                            {/* Helper Text */}
+                            <div className="flex items-center justify-center sm:justify-start gap-2">
+                              <span role="img" aria-label="apontando para baixo" className="text-lg">👇</span>
+                              <span className="text-sm font-medium text-slate-700">Entre em contato com um clique:</span>
+                            </div>
+                            
+                            {/* WhatsApp Button - Mobile Optimized */}
+                            <a
+                              href="https://rebrand.ly/VettaleWhats"
+                              target="_blank"
+                              rel="noopener"
+                              aria-label="Abrir WhatsApp para agendamento"
+                              onClick={() => window.gtag?.('event', 'wa_booking_click', { location: 'booking_soon_card' })}
+                              className="flex items-center justify-center gap-3 w-full p-3 sm:p-4 rounded-xl bg-green-500 text-white shadow-md transition hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-300 hover:scale-105"
+                            >
+                              {/* WhatsApp icon */}
+                              <svg viewBox="0 0 24 24" className="h-5 w-5 flex-shrink-0" fill="currentColor" aria-hidden="true">
+                                <path d="M20.52 3.48A11.87 11.87 0 0 0 12.05 0C5.59 0 .34 5.24.34 11.72c0 2.06.54 4.08 1.57 5.86L0 24l6.57-1.86a11.7 11.7 0 0 0 5.47 1.4h.01c6.46 0 11.72-5.24 11.72-11.7 0-3.13-1.22-6.06-3.25-8.36ZM12.05 21.2h-.01a9.46 9.46 0 0 1-4.83-1.32l-.35-.2-3.9 1.1 1.08-3.8-.23-.39a9.44 9.44 0 0 1-1.47-5.06c0-5.22 4.25-9.47 9.48-9.47 2.53 0 4.9.98 6.69 2.77a9.42 9.42 0 0 1 2.78 6.7c0 5.22-4.25 9.47-9.54 9.47ZM17.2 14.2c-.26-.13-1.54-.76-1.77-.85-.23-.09-.4-.13-.57.13-.17.25-.66.85-.81 1.02-.15.17-.3.19-.56.06-.26-.13-1.09-.4-2.07-1.28-.77-.68-1.29-1.52-1.44-1.78-.15-.26-.02-.4.11-.53.11-.11.26-.3.38-.45.13-.15.17-.26.26-.43.09-.17.04-.32-.02-.45-.06-.13-.57-1.38-.78-1.89-.2-.48-.4-.42-.57-.43h-.49c-.17 0-.45.06-.68.32-.23.25-.9.87-.9 2.12 0 1.25.92 2.46 1.05 2.63.13.17 1.82 2.78 4.4 3.9.62.27 1.11.43 1.49.55.62.20 1.19.17 1.64.10.50-.07 1.54-.63 1.76-1.24.22-.61.22-1.13.15-1.24-.07-.11-.24-.17-.50-.30Z" />
+                              </svg>
+                              <span className="font-semibold text-base">Falar no WhatsApp</span>
+                            </a>
                           </div>
                         </div>
                       </div>

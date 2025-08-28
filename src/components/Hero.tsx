@@ -50,21 +50,21 @@ const Hero = () => {
             
             <div 
               ref={featuresAnimation.ref}
-              className={`flex items-center gap-3 md:gap-4 pt-8 ${animationClasses.slideUp} ${
+              className={`flex flex-wrap items-center justify-center gap-2 sm:gap-3 md:gap-4 pt-8 ${animationClasses.slideUp} ${
                 featuresAnimation.isVisible ? animationClasses.slideUpActive : animationClasses.slideUpInactive
               }`}
             >
               <div className="flex items-center gap-2 group">
-                <Calendar className="h-5 w-5 text-brand-primary transition-transform duration-300 group-hover:scale-110" />
-                <span className="text-sm">Agendamento Online</span>
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-brand-primary transition-transform duration-300 group-hover:scale-110" />
+                <span className="text-xs sm:text-sm">Agendamento Online</span>
               </div>
               <div className="flex items-center gap-2 group">
-                <Heart className="h-5 w-5 text-brand-primary transition-transform duration-300 group-hover:scale-110" />
-                <span className="text-sm">Cuidado Personalizado</span>
+                <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-brand-primary transition-transform duration-300 group-hover:scale-110" />
+                <span className="text-xs sm:text-sm">Cuidado Personalizado</span>
               </div>
               <div className="flex items-center gap-2 group">
-                <Shield className="h-5 w-5 text-brand-primary transition-transform duration-300 group-hover:scale-110" />
-                <span className="text-sm">Segurança Total</span>
+                <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-brand-primary transition-transform duration-300 group-hover:scale-110" />
+                <span className="text-xs sm:text-sm">Segurança Total</span>
               </div>
             </div>
           </Stack>

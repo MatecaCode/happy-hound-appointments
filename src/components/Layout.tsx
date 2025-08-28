@@ -5,6 +5,7 @@ import Navigation from './Navigation';
 import Footer from './Footer';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { log } from '@/utils/logger';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -20,7 +21,7 @@ const Layout = ({ children }: LayoutProps) => {
     // Don't redirect while auth is loading
     if (loading || !user || !userRole) return;
     
-    console.log('🔍 Layout Debug - User role:', userRole, 'Current path:', location.pathname);
+    log.debug('Layout - User role:', userRole, 'Current path:', location.pathname);
     
     // Check if user is staff and redirect to staff dashboard
     const checkStaffRedirect = async () => {

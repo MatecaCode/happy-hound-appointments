@@ -107,10 +107,8 @@ const PetFormPage = () => {
       newErrors.breed_id = 'Raça é obrigatória';
     }
 
-    // Birth date validation
-    if (!birthDate) {
-      newErrors.birth_date = 'Data de nascimento é obrigatória';
-    } else if (birthDate > new Date()) {
+    // Birth date validation (optional)
+    if (birthDate && birthDate > new Date()) {
       newErrors.birth_date = 'Data de nascimento não pode ser no futuro';
     }
 
@@ -263,7 +261,6 @@ const PetFormPage = () => {
                   }}
                   placeholder="Digite o nome do seu pet"
                   className={`h-12 text-base ${errors.name ? 'border-red-500' : ''}`}
-                  required
                 />
                 {errors.name && (
                   <div className="flex items-center gap-2 text-red-500 text-sm mt-1">
@@ -299,7 +296,7 @@ const PetFormPage = () => {
 
                                {/* Birth Date */}
                 <div className="space-y-2">
-                  <Label className="text-base font-normal text-gray-700">Data de Nascimento *</Label>
+                  <Label className="text-base font-normal text-gray-700">Data de Nascimento (opcional)</Label>
                  <PetDobPicker
                    value={birthDate}
                    onChange={(date) => {
@@ -397,7 +394,7 @@ const PetFormPage = () => {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-4 pt-4">
+              <div className="flex gap-4 pt-4 -mx-8 px-5">
                 <Button
                   type="button"
                   variant="outline"

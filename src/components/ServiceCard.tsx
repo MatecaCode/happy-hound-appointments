@@ -48,7 +48,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
     <Card 
       ref={cardAnimation.ref}
       className={cn(
-        "relative overflow-hidden border-0 group cursor-pointer",
+        "relative overflow-hidden border-0 group cursor-pointer w-full max-w-full min-w-0",
         "hover:shadow-xl transition-all duration-500 ease-out",
         popular && "ring-2 ring-primary/20 shadow-md",
         animationClasses.scaleIn,
@@ -74,16 +74,16 @@ const ServiceCard: React.FC<ServiceCardProps> = ({
             {icon}
           </div>
         </div>
-        <CardTitle className="text-xl text-foreground group-hover:text-primary transition-colors duration-300">{title}</CardTitle>
+        <CardTitle className="text-xl text-foreground group-hover:text-primary transition-colors duration-300 break-words">{title}</CardTitle>
       </CardHeader>
       
       <CardContent>
-        <CardDescription className="min-h-[80px] text-muted-foreground leading-relaxed mb-4">
+        <CardDescription className="min-h-[80px] text-muted-foreground leading-relaxed mb-4 break-words">
           {description}
         </CardDescription>
         <Button 
           onClick={handleBookingClick}
-          className="w-full bg-primary hover:bg-primary/90 text-white transition-all duration-300 hover:shadow-lg group-hover:scale-105"
+          className="w-full bg-primary hover:bg-primary/90 text-white transition-all duration-300 hover:shadow-lg group-hover:scale-105 text-sm sm:text-base"
         >
           Agendar Agora
         </Button>

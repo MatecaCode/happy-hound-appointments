@@ -23,9 +23,9 @@ export function PetDobCalendar({
   
   const [calendarMonth, setCalendarMonth] = useState<Date>(value || new Date());
   
-  // Generate year options (from 1900 to current year)
+  // Generate year options (from 1990 to current year) - reduced range for performance
   const currentYear = new Date().getFullYear();
-  const years = Array.from({ length: currentYear - 1900 + 1 }, (_, i) => 1900 + i).reverse();
+  const years = Array.from({ length: currentYear - 1990 + 1 }, (_, i) => 1990 + i).reverse();
   
   // Month names in Portuguese
   const months = [
@@ -47,10 +47,7 @@ export function PetDobCalendar({
 
   return (
     <div className={cn("pet-dob-calendar relative", styles.petDobCalendar, className)}>
-      {/* Debug tag - always visible but small */}
-      <div className="absolute top-1 left-1 z-50 bg-green-600 text-white text-xs px-2 py-1 rounded shadow-md">
-        🐕 Pet
-      </div>
+      {/* Internal component identifier: Pet DOB Calendar */}
       
       {/* Year and Month selectors */}
       <div className="flex gap-2 p-3 pb-2">
@@ -91,7 +88,7 @@ export function PetDobCalendar({
         // DOB: block future dates
         toDate={today}
         disabled={(date) => date > today}
-        fromYear={1900}
+        fromYear={1990}
         toYear={currentYear}
         showOutsideDays={false}
         className="p-3 pt-0"

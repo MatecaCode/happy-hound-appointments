@@ -19,4 +19,10 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    target: 'es2017',
+    esbuild: {
+      drop: ['console', 'debugger']
+    }
+  }
 }));
