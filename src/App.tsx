@@ -47,6 +47,7 @@ import { AuthProvider } from "./hooks/useAuth";
 import TestDataPage from "./pages/TestDataPage";
 import GroomerAvailability from './pages/GroomerAvailability';
 import Claim from "./pages/Claim";
+import StaffClaim from "./pages/StaffClaim";
 
 // Lazy load heavy components for better performance on low-spec PCs
 const Profile = lazy(() => import("./pages/Profile"));
@@ -122,6 +123,7 @@ function App() {
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/confirmation" element={<Confirmation />} />
               <Route path="/claim" element={<Claim />} />
+              <Route path="/staff/claim" element={<StaffClaim />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/groomer-dashboard" element={<GroomerDashboard />} />
               <Route path="/groomer-calendar" element={<GroomerCalendar />} />

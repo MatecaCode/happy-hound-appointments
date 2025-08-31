@@ -230,14 +230,27 @@ const AdminSettings = () => {
 
   // Staff invite function (for existing staff without accounts)
   const sendStaffInvite = async (staffProfile: StaffProfile) => {
+    console.log('📧 [ADMIN_SETTINGS] Sending invite to existing staff:', staffProfile.email);
+    
     try {
-      const { data, error } = await supabase.functions.invoke('send-staff-invite', {
+      // Add timeout to prevent hanging
+      const invitePromise = supabase.functions.invoke('send-staff-invite', {
         body: { 
           email: staffProfile.email, 
           staff_profile_id: staffProfile.id,
           name: staffProfile.name
         },
       });
+      
+      // Wait for invite with 20 second timeout
+      const result = await Promise.race([
+        invitePromise,
+        new Promise<{ data: any; error: any }>((_, reject) => 
+          setTimeout(() => reject(new Error('Invite timeout')), 20000)
+        )
+      ]);
+      
+      const { data, error } = result;
 
       if (error) {
         console.error('❌ [ADMIN_SETTINGS] Staff invite error:', error);
@@ -246,14 +259,22 @@ const AdminSettings = () => {
       }
 
       if (data?.ok) {
+        console.log('✅ [ADMIN_SETTINGS] Invite sent successfully to:', staffProfile.email);
         toast.success(`Convite enviado para ${staffProfile.email}`);
         fetchStaff(); // Refresh to show updated invite status
       } else {
+        console.error('❌ [ADMIN_SETTINGS] Invite failed:', data);
         toast.error(data?.error || 'Erro ao enviar convite');
       }
     } catch (error) {
       console.error('❌ [ADMIN_SETTINGS] Staff invite error:', error);
-      toast.error('Erro ao enviar convite');
+      
+      if (error.message === 'Invite timeout') {
+        console.log('⏰ [ADMIN_SETTINGS] Invite request timed out');
+        toast.error('Tempo limite excedido ao enviar convite. Tente novamente.');
+      } else {
+        toast.error('Erro ao enviar convite');
+      }
     }
   };
 
@@ -263,6 +284,8 @@ const AdminSettings = () => {
       return;
     }
 
+    console.log('🚀 [ADMIN_SETTINGS] Starting staff creation...');
+    
     try {
       // Check if staff profile already exists with this email
       const { data: existingStaff, error: existingError } = await supabase
@@ -282,23 +305,7 @@ const AdminSettings = () => {
         return;
       }
 
-      // Check if client profile already exists with this email
-      const { data: existingClient, error: clientError } = await supabase
-        .from('clients')
-        .select('id, email')
-        .eq('email', staffFormData.email)
-        .single();
-
-      if (clientError && clientError.code !== 'PGRST116') { // PGRST116 = no rows returned
-        console.error('❌ [ADMIN_SETTINGS] Existing client check error:', clientError);
-        toast.error('Erro ao verificar cliente existente');
-        return;
-      }
-
-      if (existingClient) {
-        toast.error('Este email já está sendo usado por um cliente. Não é possível criar um staff com este email.');
-        return;
-      }
+      // Note: Removed client email validation - same email can be used for both client and staff roles
 
       // Create staff profile
       const { data: staffData, error: staffError } = await supabase
@@ -327,35 +334,59 @@ const AdminSettings = () => {
       
 
       // Send invite email via Edge Function
+      console.log('✅ [ADMIN_SETTINGS] Staff created successfully');
+      console.log('📧 [ADMIN_SETTINGS] Sending email to:', staffFormData.email);
+      
+      let emailSent = false;
       try {
-
-        // Send email invitation via Edge Function
-        console.log('✅ [ADMIN_SETTINGS] Staff created successfully');
-        console.log('📧 [ADMIN_SETTINGS] Sending email to:', staffFormData.email);
+        console.log('📧 [ADMIN_SETTINGS] Calling Edge Function...');
         
-        try {
-          const { data: emailData, error: emailError } = await supabase.functions.invoke('send-staff-invite', {
-            body: { 
-              email: staffFormData.email, 
-              staff_profile_id: staffData.id,
-              name: staffFormData.name
-            },
-          });
+        // Add timeout to prevent hanging
+        const emailPromise = supabase.functions.invoke('send-staff-invite', {
+          body: { 
+            email: staffFormData.email, 
+            staff_profile_id: staffData.id,
+            name: staffFormData.name
+          },
+        });
+        
+                 // Wait for email with 20 second timeout
+         const result = await Promise.race([
+           emailPromise,
+           new Promise<{ data: any; error: any }>((_, reject) => 
+             setTimeout(() => reject(new Error('Email timeout')), 20000)
+           )
+         ]);
+        
+        const { data: emailData, error: emailError } = result;
 
-          if (emailError) {
-            console.error('❌ [ADMIN_SETTINGS] Email sending error:', emailError);
-            toast.success('Staff criado com sucesso!', {
-              action: {
-                label: 'Enviar convite',
-                onClick: () => sendStaffInvite({ ...staffData, email: staffFormData.email, name: staffFormData.name } as StaffProfile)
-              }
-            });
-          } else {
-            console.log('✅ [ADMIN_SETTINGS] Email sent successfully:', emailData);
-            toast.success(`Staff criado com sucesso! Convite enviado para ${staffFormData.email}`);
-          }
-        } catch (emailError) {
-          console.error('❌ [ADMIN_SETTINGS] Email sending failed:', emailError);
+        if (emailError) {
+          console.error('❌ [ADMIN_SETTINGS] Email sending error:', emailError);
+          console.log('📧 [ADMIN_SETTINGS] Email error details:', emailError);
+          toast.success('Staff criado com sucesso!', {
+            action: {
+              label: 'Enviar convite',
+              onClick: () => sendStaffInvite({ ...staffData, email: staffFormData.email, name: staffFormData.name } as StaffProfile)
+            }
+          });
+        } else {
+          console.log('✅ [ADMIN_SETTINGS] Email sent successfully:', emailData);
+          toast.success(`Staff criado com sucesso! Convite enviado para ${staffFormData.email}`);
+          emailSent = true;
+        }
+      } catch (emailError) {
+        console.error('❌ [ADMIN_SETTINGS] Email sending failed:', emailError);
+        console.log('📧 [ADMIN_SETTINGS] Email catch error details:', emailError);
+        
+        if (emailError.message === 'Email timeout') {
+          console.log('⏰ [ADMIN_SETTINGS] Email request timed out');
+          toast.success('Staff criado com sucesso! Email não enviado (timeout).', {
+            action: {
+              label: 'Enviar convite',
+              onClick: () => sendStaffInvite({ ...staffData, email: staffFormData.email, name: staffFormData.name } as StaffProfile)
+            }
+          });
+        } else {
           toast.success('Staff criado com sucesso!', {
             action: {
               label: 'Enviar convite',
@@ -363,21 +394,22 @@ const AdminSettings = () => {
             }
           });
         }
-      } catch (e) {
-        console.warn('[ADMIN_SETTINGS] Invite email failed:', e);
-        toast.success('Staff criado com sucesso!', {
-          action: {
-            label: 'Enviar convite',
-            onClick: () => sendStaffInvite({ ...staffData, email: staffFormData.email, name: staffFormData.name } as StaffProfile)
-          }
-        });
       }
+
+      // Always close modal and reset form, regardless of email success
+      console.log('✅ [ADMIN_SETTINGS] Closing modal and resetting form...');
+      console.log('🔧 [ADMIN_SETTINGS] Modal state before closing:', isCreateStaffModalOpen);
       setIsCreateStaffModalOpen(false);
       resetStaffForm();
       fetchStaff();
+      console.log('✅ [ADMIN_SETTINGS] Staff creation process completed');
     } catch (error) {
       console.error('❌ [ADMIN_SETTINGS] Error creating staff:', error);
       toast.error('Erro ao criar staff');
+      // Even on error, close the modal
+      console.log('🔄 [ADMIN_SETTINGS] Closing modal due to error...');
+      setIsCreateStaffModalOpen(false);
+      resetStaffForm();
     }
   };
 
