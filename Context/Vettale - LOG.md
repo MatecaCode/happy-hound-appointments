@@ -408,8 +408,155 @@ follow_ups:
 - If keeping rebrand.ly, set destination to **`https://api.whatsapp.com/send?phone=5511996378518&text=<ENCODED_MSG>`** to preserve the message and avoid previews (some shorteners inject interstitials).
 - When ready, implement the first-party click tracking (GA4 + Supabase `cta_clicks` + Edge Function) to replace shorteners.
 - After QA passes, update status to production and mark outcome pass.
+[/LOG_UPD[LOG_UPDATE]
+date: 2025-08-28
+by: GPT-5 Thinking
+area: UI Performance & Dev Experience (PADS/Profile/Global Logging)
+change_summary:
+•	Dev “silent by default”: logger passa a ocultar logs por padrão; debug só por ?debug=1 ou localStorage.setItem('debug','1').
+•	Logger com redação de PII (emails, tokens, campos *_id, strings longas).
+•	Removida gambi de “console stubbing” no main.tsx; mantido drop: ['console','debugger'] no build.
+•	Limpeza de console.* ruidosos: migrados para log.debug/error em PADS/Profile/Nav/Auth/AdminBooking.
+•	Regra ESLint no-console para evitar regressão.
+•	Documentado “como habilitar/limpar debug”.
+•	Preparado escopo de correção mobile (ainda não aplicado):
+o	/services: prevenir overflow dos cards/CTAs; grid 1-col no mobile; min-w-0 + break-words.
+o	/profile: banner “Complete seu perfil” empilhando ações no mobile, com min-h estável.
+rationale:
+•	Reduzir travamentos nos PCs antigos da clínica (menos custo de render/layout por logs).
+•	Manter capacidade de diagnóstico sob demanda, com PII protegida.
+•	Deixar mapeado um ajuste simples de CLS/overflow em mobile sem tocar back-end.
+touch_points:
+•	code: src/utils/logger.ts, src/main.tsx, src/pages/Pets.tsx, src/pages/Profile.tsx, src/components/ClientMicroWizard.tsx, src/hooks/useAuth.tsx, src/components/Navigation.tsx, src/pages/AdminBookingPage.tsx, vite.config.ts, .eslintrc*
+•	db: n/a
+tests:
+•	Dev local: console limpo por padrão; debug liga/desliga por URL/localStorage; navegação em PADS/Profile sem erros.
+status: staging outcome: pass
+follow_ups:
+•	Teste presencial nos PCs antigos da clínica (abrir /profile e /services, navegar/rolar; observar travas).
+•	Se OK, promover para produção.
+•	Opcional (quando for conveniente): aplicar o patch mobile descrito acima e medir CLS (alvo ≤0,10).
 [/LOG_UPDATE]
-________________________________________
+
+[LOG_UPDATE]
+date: 2025-08-30
+by: GPT-5 Thinking
+area: Admin Clients (Profile 2.0 alignment) + Modal stability
+change_summary:
+- Updated Admin Create/Edit Client to support Client Profile 2.0: kept required {name, email, phone, location}; wired optional fields (is_whatsapp, preferred_channel, emergency contacts, preferred_staff_profile_id, notes, marketing, birth_date, address).
+- Fixed staff lookup: removed non-existent columns (full_name/role), now select {id, name, email, phone, location_id}; load when modal opens and filter by location; added safe label + empty states.
+- Resolved Radix Select crash: replaced `SelectItem value=""` placeholders with non-empty sentinels and DB null-mapping.
+- Restored create flow: admin markers set on insert {admin_created=true, created_by, needs_registration=true, user_id=NULL}; create/edit now persists all fields.
+- Corrected delete regression: removed boolean-vs-integer comparisons in admin delete path.
+- Minor UX: WhatsApp toggle placed under phone; non-blocking toasts + minimal debug logging.
+
+rationale:
+- Admin client creation broke after Profile 2.0 schema changes; bring admin up to parity without breaking invite/claim and prevent UI hard crashes on older clinic machines.
+
+touch_points:
+- code: `AdminClients.tsx` (form, modal, staff fetch, selects, null-mapping, error handling), staff management page (added location_id support to create/edit/list to enable preferred staff), small fixes in delete helper/SQL, constants for select sentinels.
+- db: no schema changes; validated columns in `public.clients`; ensured queries only target existing columns; cleaned delete logic.
+
+tests:
+- Local/Staging manual: 
+  - Open “+ Novo Cliente” → modal stable (no gray screen/chunk error).
+  - Staff dropdown loads; filters by location; shows fallback text when empty.
+  - Create client with new email → row created with admin markers; fields persist.
+  - Edit client → changes persist.
+  - Delete test client → succeeds; no “boolean > integer” error.
+status: staging  outcome: pass
+follow_ups:
+- Cosmetics pass later (labels, spacing, helper copy).
+- Decide final required vs optional field set for admin create.
+- Add lightweight e2e smoke for modal open, create, edit, delete.
+[/LOG_UPDATE]
+[LOG_UPDATE]
+date: 2025-08-30
+by: GPT-5 Thinking
+area: Admin routing hardening + Availability UI + Pet form validation
+change_summary:
+- Audited all Admin links; fixed broken targets and ensured every nav item resolves (no 404s). Added a generic `AdminComingSoon` fallback page.
+- Replaced `/admin/staff-availability` page with a clean “Em Breve” component that preserves `AdminLayout` so the left menu never disappears.
+- Fixed Radix Select crash by removing `SelectItem value=""` placeholders; replaced with non-empty sentinels and mapped to `null` on save.
+- Corrected `staff_profiles` fetch: removed non-existent columns (`full_name`, `role`), aligned to {id, name, email, phone, location_id}; added guarded fetch & empty states.
+- Fixed JSX structure error in `AdminAvailabilityManager` so `AdminLayout` wraps content and page renders reliably.
+- Made pet `birth_date` **required** in create/edit flows; added validation + asterisk on labels.
+rationale:
+- Stabilize admin navigation and forms before deeper booking work; eliminate crashes from invalid Select values and schema drift.
+touch_points:
+- code: `AdminLayout.tsx`, `App.tsx`, `AdminComingSoon.tsx` (new), `AdminStaffAvailability.tsx` (replaced with Coming Soon), `AdminAvailabilityManager.tsx` (JSX fix), `AdminPets.tsx` (DOB required), any Select components using placeholder items, staff fetch helper in admin screens.
+- db: none (query column selection corrected to existing columns).
+tests:
+- Manual: All admin nav items open without 404; Staff Availability shows Coming Soon and keeps menu; creating/editing pets enforces DOB; no Select crash; console clean for staff fetch.
+status: staging  outcome: pass
+follow_ups:
+- Cosmetic pass later (copy/spacing).
+- Keep `AdminComingSoon` as the default fallback for any future, not-yet-implemented admin routes.
+[/LOG_UPDATE]
+[LOG_UPDATE]
+date: 2025-08-31
+by: GPT-5 Thinking
+area: Admin Booking (Dual-Service sequencing, Availability, Calendar & Summary)
+
+change_summary:
+
+Locked booking architecture to order-based mapping: service_order=1 → primary, service_order=2 → secondary across appointment_services and appointment_staff.
+
+RPC now derives authoritative durations from services.default_duration and applies sequential availability (primary from t, secondary from t + dur(primary)) on staff_availability 10-min grid with set-based updates and row-count checks.
+
+Implemented slot search RPC for Step 3 (sequential membership): returns only valid start times for the selected primary/secondary staff+services; optional validator RPC for override reasoning.
+
+Unified UI state to explicit keys: primaryServiceId, secondaryServiceId|null, primaryStaffId, secondaryStaffId|null, selectedDateISO (YYYY-MM-DD), selectedTimeHHMM.
+
+Fixed PGRST202 by consolidating a single payload builder; RPC always called with a complete payload.
+
+Fixed calendar off-by-one: removed UTC conversions; all dates stored/sent in local America/Sao_Paulo (YYYY-MM-DD). Added 2-column Step-3 layout (calendar left, slots right).
+
+Summary (“Resumo”/success) shows staff per service by order (pre-submit from UI state; post-submit via join by service_order).
+
+rationale:
+
+Aligns with LOG non-negotiables: availability is atomic & per staff; updates occur over the generated minute range and are verified. Mapping by order removes ambiguity and avoids role/provider naming drift. Durations/pricing are DB-sourced, not UI-computed, preserving integrity.
+
+touch_points:
+
+code:
+
+src/pages/AdminManualBooking.tsx (state model, validation, payload builder, Step-3 layout & calendar handling, summary mapping)
+
+src/components/BookingSuccess.tsx (post-submit mapping by service_order)
+
+src/hooks/useAdminAvailability.ts (calls slot RPC; transforms chips)
+
+src/utils/time.ts (toHHMMSS, local ISO helpers)
+
+db:
+
+RPC (updated): create_admin_booking_with_dual_services(...) — sequential availability updates; row-count validation.
+
+RPC (new): find_dual_service_slots(_date, _primary_staff_id, _primary_service_id, _secondary_staff_id, _secondary_service_id) — sequential slot finder.
+
+RPC (new, optional): validate_dual_service_slot(...) — conflict reason on grey/red selections.
+
+tables used unchanged: appointments, appointment_services(service_order), appointment_staff(service_order, staff_profile_id), staff_availability, services.
+
+tests:
+
+Dual service (Banho 60 + Tosa 30), Amanda→Rogério, start 11:00:
+
+staff_availability: Amanda 11:00–11:50 → FALSE; Rogério 12:00–12:20 → FALSE; surrounding slots remain TRUE.
+
+Step-3: only valid starts green; others grey/red; override dialog shows validator reason.
+
+Summary before submit: Serviço 1 shows Amanda, Serviço 2 shows Rogério; after submit, success view matches via DB join on service_order.
+
+Single service: only primary rows created/blocked; secondary omitted.
+
+Calendar: click 2025-09-19 → _booking_date='2025-09-19' (no off-by-one); Step-3 layout renders calendar left / slots right on desktop.
+
+status: staging outcome: pass
+
+
 
 End of document.
 

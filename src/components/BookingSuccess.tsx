@@ -79,23 +79,32 @@ const BookingSuccess: React.FC = () => {
             as.staff_profiles?.name
           ).filter(Boolean) || [];
 
-          // Create service-staff assignments
+          // Create service-staff assignments by order
           const serviceAssignments: ServiceStaffAssignment[] = [];
           
           if (appointment.appointment_services && appointment.appointment_staff) {
-            // For each service, find the assigned staff
-            appointment.appointment_services.forEach((aps: any) => {
+            // Sort services by order
+            const sortedServices = [...appointment.appointment_services].sort((a, b) => 
+              (a.service_order || 1) - (b.service_order || 1)
+            );
+            
+            // Sort staff by service_id to match services
+            const sortedStaff = [...appointment.appointment_staff].sort((a, b) => {
+              // Find service orders for comparison
+              const serviceA = appointment.appointment_services.find((s: any) => s.service_id === a.service_id);
+              const serviceB = appointment.appointment_services.find((s: any) => s.service_id === b.service_id);
+              return (serviceA?.service_order || 1) - (serviceB?.service_order || 1);
+            });
+            
+            sortedServices.forEach((aps: any, index: number) => {
               const serviceName = (aps.services as any)?.name || 'Serviço';
               const serviceDuration = aps.duration || 60;
               const servicePrice = aps.price || 0;
               const serviceOrder = aps.service_order || 1;
               
-              // Find staff assigned to this service
-              const assignedStaff = appointment.appointment_staff.find((as: any) => 
-                as.service_id === aps.service_id
-              );
-              
-              const staffName = assignedStaff?.staff_profiles?.name || 'Não atribuído';
+              // Get staff by index (first staff for first service, second staff for second service)
+              const assignedStaff = sortedStaff[index];
+              const staffName = assignedStaff?.staff_profiles?.name?.trim() || 'Não atribuído';
               
               serviceAssignments.push({
                 service_name: serviceName,
@@ -110,7 +119,7 @@ const BookingSuccess: React.FC = () => {
           // If no service assignments, create fallback
           if (serviceAssignments.length === 0) {
             const primaryServiceName = (appointment.services as any)?.name || 'Serviço';
-            const primaryStaffName = staffNames[0] || 'Não atribuído';
+            const primaryStaffName = (staffNames[0] || 'Não atribuído').trim();
             
             serviceAssignments.push({
               service_name: primaryServiceName,
@@ -132,7 +141,7 @@ const BookingSuccess: React.FC = () => {
             total_price: appointment.total_price || 0,
             pet_name: (appointment.pets as any)?.name || 'Pet',
             service_assignments: serviceAssignments,
-            staff_names: staffNames
+            staff_names: staffNames.map(name => name.trim())
           });
         }
       } catch (error) {

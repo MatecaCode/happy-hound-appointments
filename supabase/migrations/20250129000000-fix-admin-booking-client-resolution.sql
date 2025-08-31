@@ -17,7 +17,8 @@ CREATE OR REPLACE FUNCTION public.create_admin_booking_with_dual_services(
     _extra_fee numeric DEFAULT 0,
     _extra_fee_reason text DEFAULT NULL,
     _addons jsonb DEFAULT NULL,
-    _created_by uuid DEFAULT NULL
+    _created_by uuid DEFAULT NULL,
+    _override boolean DEFAULT FALSE
 )
 RETURNS uuid
 LANGUAGE plpgsql
@@ -53,6 +54,8 @@ DECLARE
     current_offset_minutes INTEGER;
     primary_staff_role TEXT;
     secondary_staff_role TEXT;
+    v_upd1 INTEGER;
+    v_upd2 INTEGER;
 BEGIN
     -- Enhanced logging for debugging
     RAISE NOTICE '[create_admin_booking_with_dual_services] CALLED with params: client_user_id=%, client_id=%, pet_id=%, primary_service_id=%, secondary_service_id=%, booking_date=%, time_slot=%, calculated_price=%, calculated_duration=%, notes=%, provider_ids=%, extra_fee=%, created_by=%', 
@@ -140,7 +143,7 @@ BEGIN
         END IF;
     END IF;
 
-    -- Extract service-specific data
+    -- Extract service-specific data from DB (authoritative source)
     primary_service_price := COALESCE(primary_service_record.base_price, 0);
     primary_service_duration_minutes := COALESCE(primary_service_record.default_duration, 60);
     
@@ -150,6 +153,15 @@ BEGIN
     ELSE
         secondary_service_price := 0;
         secondary_service_duration_minutes := 0;
+    END IF;
+    
+    -- Assert durations are valid (must be multiples of 10 minutes)
+    IF primary_service_duration_minutes % 10 != 0 THEN
+        RAISE EXCEPTION 'Primary service duration must be multiple of 10 minutes: %', primary_service_duration_minutes;
+    END IF;
+    
+    IF secondary_service_duration_minutes > 0 AND secondary_service_duration_minutes % 10 != 0 THEN
+        RAISE EXCEPTION 'Secondary service duration must be multiple of 10 minutes: %', secondary_service_duration_minutes;
     END IF;
 
     RAISE NOTICE '[create_admin_booking_with_dual_services] SERVICE DATA: primary_price=%, primary_duration=%min, secondary_price=%, secondary_duration=%min', 
@@ -319,7 +331,7 @@ BEGIN
         'not_started',
         service_duration,
         final_price,
-        TRUE,
+        FALSE, -- Default to FALSE, only set TRUE when override is explicitly used
         _created_by
     ) RETURNING id INTO new_appointment_id;
     
@@ -390,7 +402,7 @@ BEGIN
         END IF;
     END IF;
 
-    -- Block slots for staff members based on service assignments with proper offset logic
+    -- Block slots for staff members with set-based updates and row-count validation
     IF array_length(_provider_ids, 1) > 0 THEN
         -- Assign staff to services (first staff gets primary, second gets secondary)
         primary_staff_id := _provider_ids[1];
@@ -399,39 +411,48 @@ BEGIN
         RAISE NOTICE '[create_admin_booking_with_dual_services] AVAILABILITY BLOCKING: primary_staff=%, secondary_staff=%, primary_duration=%min, secondary_duration=%min', 
             primary_staff_id, secondary_staff_id, primary_service_duration_minutes, secondary_service_duration_minutes;
         
-        -- Block slots for primary staff (primary service duration)
-        slot_minutes := 0;
-        WHILE slot_minutes < primary_service_duration_minutes LOOP
-            current_time := _time_slot + (slot_minutes || ' minutes')::interval;
-            
-            UPDATE staff_availability sa
-            SET available = FALSE
-            WHERE sa.staff_profile_id = primary_staff_id 
-            AND sa.date = _booking_date 
-            AND sa.time_slot = current_time;
-            
-            RAISE NOTICE '[create_admin_booking_with_dual_services] BLOCKED PRIMARY SLOT: staff_id=%, time=%', primary_staff_id, current_time;
-            
-            slot_minutes := slot_minutes + 10;
-        END LOOP;
+        -- Primary staff update (set-based; 10-min slots)
+        WITH slots AS (
+          SELECT (_booking_date::timestamp + _time_slot + (i * interval '10 minutes'))::time AS slot_time
+          FROM generate_series(0, (primary_service_duration_minutes/10) - 1) g(i)
+        )
+        UPDATE staff_availability sa
+        SET available = FALSE, updated_at = now()
+        FROM slots
+        WHERE sa.staff_profile_id = primary_staff_id
+          AND sa.date = _booking_date
+          AND sa.time_slot = slots.slot_time;
         
-        -- Block slots for secondary staff (secondary service duration, starting after primary)
+        GET DIAGNOSTICS v_upd1 = ROW_COUNT;
+        IF v_upd1 <> (primary_service_duration_minutes/10) AND NOT _override THEN
+          RAISE EXCEPTION 'Insufficient availability for primary staff (updated %, expected %).',
+            v_upd1, (primary_service_duration_minutes/10);
+        END IF;
+        
+        RAISE NOTICE '[create_admin_booking_with_dual_services] PRIMARY STAFF BLOCKED: % slots updated', v_upd1;
+        
+        -- Secondary staff update (offset by primary duration; only if provided)
         IF secondary_service_duration_minutes > 0 AND _secondary_service_id IS NOT NULL THEN
-            current_offset_minutes := primary_service_duration_minutes;
-            slot_minutes := 0;
-            WHILE slot_minutes < secondary_service_duration_minutes LOOP
-                current_time := _time_slot + (current_offset_minutes + slot_minutes || ' minutes')::interval;
-                
-                UPDATE staff_availability sa
-                SET available = FALSE
-                WHERE sa.staff_profile_id = secondary_staff_id 
-                AND sa.date = _booking_date 
-                AND sa.time_slot = current_time;
-                
-                RAISE NOTICE '[create_admin_booking_with_dual_services] BLOCKED SECONDARY SLOT: staff_id=%, time=%', secondary_staff_id, current_time;
-                
-                slot_minutes := slot_minutes + 10;
-            END LOOP;
+          WITH slots AS (
+            SELECT (_booking_date::timestamp + _time_slot
+                      + (primary_service_duration_minutes * interval '1 minute')
+                      + (i * interval '10 minutes'))::time AS slot_time
+            FROM generate_series(0, (secondary_service_duration_minutes/10) - 1) g(i)
+          )
+          UPDATE staff_availability sa
+          SET available = FALSE, updated_at = now()
+          FROM slots
+          WHERE sa.staff_profile_id = secondary_staff_id
+            AND sa.date = _booking_date
+            AND sa.time_slot = slots.slot_time;
+        
+          GET DIAGNOSTICS v_upd2 = ROW_COUNT;
+          IF v_upd2 <> (secondary_service_duration_minutes/10) AND NOT _override THEN
+            RAISE EXCEPTION 'Insufficient availability for secondary staff (updated %, expected %).',
+              v_upd2, (secondary_service_duration_minutes/10);
+          END IF;
+          
+          RAISE NOTICE '[create_admin_booking_with_dual_services] SECONDARY STAFF BLOCKED: % slots updated', v_upd2;
         END IF;
         
         RAISE NOTICE '[create_admin_booking_with_dual_services] AVAILABILITY BLOCKING COMPLETE: primary_staff=% blocked for %min, secondary_staff=% blocked for %min', 

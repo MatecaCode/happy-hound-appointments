@@ -46,10 +46,10 @@ useEffect(() => {
   
   const services = [
     {
-      title: "Banho & Escovação Básica",
-      description: "Banho com carinho, escovação cuidadosa e colônia leve para deixar seu pet renovado e feliz.",
-      icon: <ShowerHead className="h-6 w-6" />,
-      backgroundColor: "#FDECE4", // Soft blush/peach
+      title: "Vacinação",
+      description: "Imunização com as principais vacinas para manter seu pet protegido e saudável.",
+      icon: <Heart className="h-6 w-6" />,
+      backgroundColor: "#EAF4FB", // Light blue
     },
     {
       title: "Consulta Veterinária",
@@ -60,33 +60,33 @@ useEffect(() => {
       backgroundColor: "#E9F3E1", // Soft green
     },
     {
-      title: "Vacinação",
-      description: "Imunização do seu pet com as principais vacinas necessárias para sua proteção.",
-      icon: <Heart className="h-6 w-6" />,
-      backgroundColor: "#EAF4FB", // Light blue
+      title: "Banho & Tosa Higiênica",
+      description: "Banho com carinho e tosa higiênica para conforto e bem-estar no dia a dia.",
+      icon: <ShowerHead className="h-6 w-6" />,
+      backgroundColor: "#FDECE4", // Soft blush/peach
     },
   ];
 
   const banhoTosaServices = [
     {
-      title: "Tosa Completa",
-      description: "Tudo do pacote básico mais corte de pelo estilizado conforme sua preferência.",
-      icon: <Scissors className="h-6 w-6" />,
-      popular: true,
-      badge: "Mais Popular",
-      backgroundColor: "#F5EEE5",
-    },
-    {
-      title: "Pacote Spa Luxo",
-      description: "Tosa completa com shampoo especial, condicionador, limpeza de dentes e tratamento de patas.",
+      title: "Banho Ionizado",
+      description: "Banho com ozônio para higiene profunda e bem-estar da pele, conforme indicação.",
       icon: <Sparkles className="h-6 w-6" />,
-      backgroundColor: "#FDECE4",
+      backgroundColor: "#EAF4FB", // Light blue
     },
     {
       title: "Primeira Tosa do Filhote",
-      description: "Introdução suave à tosa para filhotes com menos de 6 meses.",
+      description: "Introdução suave à tosa para filhotes com até 6 meses.",
       icon: <Dog className="h-6 w-6" />,
-      backgroundColor: "#EAF4FB",
+      backgroundColor: "#FDECE4", // Soft blush/peach
+    },
+    {
+      title: "Pacote Spa Luxo",
+      description: "Banho com shampoo especial e condicionador, tosa completa e limpeza de dentes.",
+      icon: <Sparkles className="h-6 w-6" />,
+      popular: true,
+      badge: "Mais Popular",
+      backgroundColor: "#F5EEE5", // Light beige
     }
   ];
 

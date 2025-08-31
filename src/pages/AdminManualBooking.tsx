@@ -32,6 +32,7 @@ import {
 import AdminLayout from '@/components/AdminLayout';
 import { usePricing } from '@/hooks/usePricing';
 import { useAdminAvailability } from '@/hooks/useAdminAvailability';
+import { toHHMM, toHHMMSS, toLocalISO } from '@/utils/time';
 
 
 interface Client {
@@ -82,21 +83,27 @@ interface TimeSlot {
   tooltipMessage: string;
 }
 
-interface BookingData {
-  clientId: string;
-  petId: string;
-  serviceId: string;
+type BookingData = {
+  clientUserId: string | null;   // claimed client only (guardrail)
+  petId: string | null;
+
+  primaryServiceId: string | null;
+  secondaryServiceId: string | null;
+
+  // Role-based staff selection
   staffByRole: {
     banhista?: string;
     tosador?: string;
     veterinario?: string;
   };
-  date: Date | null;
-  timeSlot: string | null;
-  notes: string;
-  price: number;
-  duration: number;
-}
+
+  notes?: string | null;
+  extraFee?: number;
+  extraFeeReason?: string | null;
+
+  selectedDateISO: string | null;   // "YYYY-MM-DD"
+  selectedTimeHHMM: string | null;  // "HH:MM"
+};
 
 const AdminManualBooking = () => {
   const navigate = useNavigate();
@@ -149,15 +156,21 @@ const AdminManualBooking = () => {
 
   // Booking form data
   const [bookingData, setBookingData] = useState<BookingData>({
-    clientId: '',
-    petId: '',
-    serviceId: '',
+    clientUserId: null,
+    petId: null,
+
+    primaryServiceId: null,
+    secondaryServiceId: null,
+
+    // Role-based staff selection
     staffByRole: {},
-    date: null,
-    timeSlot: null,
-    notes: '',
-    price: 0,
-    duration: 0
+
+    notes: null,
+    extraFee: 0,
+    extraFeeReason: null,
+
+    selectedDateISO: null,
+    selectedTimeHHMM: null,
   });
 
   // Handle primary service selection
@@ -174,9 +187,9 @@ const AdminManualBooking = () => {
     
     setBookingData(prev => ({ 
       ...prev, 
-      serviceId: service.id,
-      price: 0,
-      duration: 0
+      primaryServiceId: service.id,
+      secondaryServiceId: null, // Reset secondary when primary changes
+      staffByRole: {} // Reset staff when service changes
     }));
   };
 
@@ -187,7 +200,7 @@ const AdminManualBooking = () => {
 
   // Pricing logic - moved before calculations
   const pricingParams = {
-    serviceId: bookingData.serviceId,
+    serviceId: bookingData.primaryServiceId,
     breedId: selectedPet?.breed, // Use breed name, not breed_id
     size: selectedPet?.size
   };
@@ -228,19 +241,22 @@ const AdminManualBooking = () => {
 
   // Load pets when client changes
   useEffect(() => {
-    if (bookingData.clientId) {
-      loadPets(bookingData.clientId);
+    if (selectedClient?.id) {
+      loadPets(selectedClient.id);
     } else {
       setPets([]);
     }
-  }, [bookingData.clientId]);
+  }, [selectedClient]);
 
   // Load time slots when date or staff changes
   useEffect(() => {
-    if (bookingData.date && getStaffIds().length > 0) {
-      loadTimeSlots(bookingData.date, getStaffIds());
+    if (bookingData.selectedDateISO && getStaffIds().length > 0) {
+      // Create date without timezone conversion by parsing YYYY-MM-DD locally
+      const [year, month, day] = bookingData.selectedDateISO.split('-').map(Number);
+      const date = new Date(year, month - 1, day); // month is 0-based
+      loadTimeSlots(date, getStaffIds());
     }
-  }, [bookingData.date, bookingData.staffByRole]);
+  }, [bookingData.selectedDateISO, bookingData.staffByRole]);
 
   // Transform admin time slots when they change
   useEffect(() => {
@@ -248,17 +264,23 @@ const AdminManualBooking = () => {
     
     if (adminTimeSlots.length > 0) {
       // Transform admin time slots to match our interface
-      const transformedSlots: TimeSlot[] = adminTimeSlots.map(slot => ({
-        id: slot.id,
-        time: slot.time,
-        available: slot.available,
-        hasConflict: !slot.available,
-        conflictDetails: !slot.available ? 'Profissional não disponível' : undefined,
-        status: slot.available ? 'available' : 'occupied',
-        tooltipMessage: slot.available ? 'Horário disponível' : 'Profissional não disponível'
-      }));
+      const transformedSlots: TimeSlot[] = adminTimeSlots.map(slot => {
+        const label = toHHMM(slot.time);
+        
+        return {
+          id: slot.id,
+          time: label, // Use HH:MM format for display
+          available: slot.available, // Use the available property from the hook
+          hasConflict: false, // Will be determined by validation
+          conflictDetails: undefined,
+          status: slot.available ? 'available' : 'occupied', // Red for booked/unavailable
+          tooltipMessage: slot.available ? 'Horário disponível' : 'Horário ocupado - Clique para override'
+        };
+      });
 
       console.log('✅ [ADMIN_MANUAL_BOOKING] Transformed slots:', transformedSlots);
+      console.log('🔍 [ADMIN_MANUAL_BOOKING] Available count:', transformedSlots.filter(s => s.available).length);
+      console.log('🔍 [ADMIN_MANUAL_BOOKING] Occupied count:', transformedSlots.filter(s => !s.available).length);
       setTimeSlots(transformedSlots);
     }
   }, [adminTimeSlots]);
@@ -370,16 +392,24 @@ const AdminManualBooking = () => {
       console.log('📅 [ADMIN_MANUAL_BOOKING] Date:', date);
       console.log('👥 [ADMIN_MANUAL_BOOKING] Staff IDs:', staffIds);
 
-      // Get the selected service to determine duration
-      const selectedService = services.find(s => s.id === bookingData.serviceId);
-      if (!selectedService) {
-        console.log('⚠️ [ADMIN_MANUAL_BOOKING] No service selected');
+      // Get the selected services
+      const primaryService = services.find(s => s.id === bookingData.primaryServiceId);
+      const secondaryService = bookingData.secondaryServiceId ? 
+        services.find(s => s.id === bookingData.secondaryServiceId) : null;
+      
+      if (!primaryService) {
+        console.log('⚠️ [ADMIN_MANUAL_BOOKING] No primary service selected');
         setTimeSlots([]);
         return;
       }
 
-      // Use admin-specific time slot fetching
-      await fetchAdminTimeSlots(date, staffIds, selectedService);
+      console.log('🔧 [ADMIN_MANUAL_BOOKING] Services for time slot loading:', {
+        primary: primaryService.name,
+        secondary: secondaryService?.name || 'None'
+      });
+
+      // Use admin-specific time slot fetching with dual-service support
+      await fetchAdminTimeSlots(date, staffIds, primaryService, secondaryService);
       
     } catch (error) {
       console.error('❌ [ADMIN_MANUAL_BOOKING] Error loading time slots:', error);
@@ -403,29 +433,58 @@ const AdminManualBooking = () => {
     console.log('🔧 [ADMIN_MANUAL_BOOKING] Time slot selected:', slot);
     setSelectedTimeSlot(slot);
     
-    if (slot.status === 'unavailable') {
-      console.log('🔧 [ADMIN_MANUAL_BOOKING] Slot unavailable, returning');
-      return;
-    }
-    
     // Always set the timeSlot regardless of status
     console.log('🔧 [ADMIN_MANUAL_BOOKING] Setting timeSlot to:', slot.time);
     setBookingData(prev => {
-      const newData = { ...prev, timeSlot: slot.time };
+      const newData = { ...prev, selectedTimeHHMM: slot.time };
       console.log('🔧 [ADMIN_MANUAL_BOOKING] Updated booking data:', newData);
       return newData;
     });
     
-    if (slot.status === 'occupied') {
-      console.log('🔧 [ADMIN_MANUAL_BOOKING] Slot occupied, showing conflict modal');
-      setConflictDetails(`Conflito detectado com agendamento(s) existente(s) no horário ${slot.time}`);
-      setShowConflictModal(true);
-      return;
-    }
-    
     if (slot.status === 'available') {
       console.log('🔧 [ADMIN_MANUAL_BOOKING] Slot available, proceeding normally');
       return;
+    }
+    
+    // For occupied slots, show override warning
+    if (slot.status === 'occupied') {
+      console.log('🔧 [ADMIN_MANUAL_BOOKING] Validating unavailable slot for conflicts');
+      
+      try {
+        const staffIds = getStaffIds();
+        const primaryStaffId = staffIds[0];
+        const secondaryStaffId = staffIds.length > 1 ? staffIds[1] : null;
+        
+        const { data, error } = await supabase.rpc('validate_dual_service_slot', {
+          _date: bookingData.selectedDateISO!,
+          _start_time: toHHMMSS(slot.time),
+          _primary_staff_id: primaryStaffId,
+          _primary_service_id: bookingData.primaryServiceId,
+          _secondary_staff_id: secondaryStaffId,
+          _secondary_service_id: selectedSecondaryService?.id || null
+        });
+        
+        if (error) {
+          console.error('❌ [ADMIN_MANUAL_BOOKING] Validation error:', error);
+          toast.error('Erro ao validar horário');
+          return;
+        }
+        
+        const validationResult = data?.[0];
+        if (!validationResult?.ok) {
+          console.log('🔧 [ADMIN_MANUAL_BOOKING] Conflict detected, showing override modal');
+          setConflictDetails(validationResult?.reason || 'Conflito detectado');
+          setShowConflictModal(true);
+          return;
+        } else {
+          console.log('🔧 [ADMIN_MANUAL_BOOKING] Validation passed, proceeding');
+          return;
+        }
+      } catch (error) {
+        console.error('❌ [ADMIN_MANUAL_BOOKING] Validation error:', error);
+        toast.error('Erro ao validar horário');
+        return;
+      }
     }
   };
 
@@ -442,7 +501,7 @@ const AdminManualBooking = () => {
         return { ...prev, staffByRole: newStaffByRole };
       }
       
-      // Otherwise, select the new staff member
+      // Otherwise, select the new staff member for this role
       return {
         ...prev,
         staffByRole: {
@@ -454,9 +513,9 @@ const AdminManualBooking = () => {
   };
 
   const checkForConflicts = async () => {
-    if (!bookingData.date || !bookingData.timeSlot) return null;
+    if (!bookingData.selectedDateISO || !bookingData.selectedTimeHHMM) return null;
 
-    const dateStr = format(bookingData.date, 'yyyy-MM-dd');
+    const dateStr = bookingData.selectedDateISO;
     const staffIds = getStaffIds();
 
     const { data: existingAppointments, error } = await supabase
@@ -480,9 +539,9 @@ const AdminManualBooking = () => {
       const appointmentEnd = new Date(`2000-01-01T${appointment.time}:00`);
       appointmentEnd.setMinutes(appointmentEnd.getMinutes() + (appointment.duration || 60));
       
-      const bookingStart = new Date(`2000-01-01T${bookingData.timeSlot}:00`);
-      const bookingEnd = new Date(`2000-01-01T${bookingData.timeSlot}:00`);
-      bookingEnd.setMinutes(bookingEnd.getMinutes() + (bookingData.duration || 60));
+      const bookingStart = new Date(`2000-01-01T${bookingData.selectedTimeHHMM}:00`);
+      const bookingEnd = new Date(`2000-01-01T${bookingData.selectedTimeHHMM}:00`);
+      bookingEnd.setMinutes(bookingEnd.getMinutes() + (totalDuration || 60));
       
       return (bookingStart < appointmentEnd && bookingEnd > appointmentStart);
     }) || [];
@@ -494,30 +553,36 @@ const AdminManualBooking = () => {
     console.log('🔧 [ADMIN_MANUAL_BOOKING] createBooking called with isOverride:', isOverride);
     
     // Safeguard: if timeSlot is missing but selectedTimeSlot exists, use it
-    let finalTimeSlot = bookingData.timeSlot;
+    let finalTimeSlot = bookingData.selectedTimeHHMM;
     if (!finalTimeSlot && selectedTimeSlot) {
       console.log('🔧 [ADMIN_MANUAL_BOOKING] Using selectedTimeSlot as fallback:', selectedTimeSlot.time);
       finalTimeSlot = selectedTimeSlot.time;
     }
     
     console.log('🔧 [ADMIN_MANUAL_BOOKING] Validation check:', {
-      user: !!user,
-      clientId: bookingData.clientId,
+      user: !!user?.id,
+      clientId: bookingData.clientUserId,
       petId: bookingData.petId,
-      serviceId: bookingData.serviceId,
-      date: bookingData.date,
-      timeSlot: finalTimeSlot
+      primaryServiceId: bookingData.primaryServiceId,
+      secondaryServiceId: bookingData.secondaryServiceId,
+      staffByRole: bookingData.staffByRole,
+      date: bookingData.selectedDateISO,
+      time: bookingData.selectedTimeHHMM,
     });
     
-    if (!user || !bookingData.clientId || !bookingData.petId || !bookingData.serviceId || 
-        !bookingData.date || !finalTimeSlot) {
+    const missingUser = !user?.id;
+    const missingClientId = !bookingData.clientUserId;     // claimed client only
+    const missingPetId = !bookingData.petId;
+    const missingServiceId = !bookingData.primaryServiceId;
+    const missingDate = !bookingData.selectedDateISO;
+    const missingTimeSlot = !bookingData.selectedTimeHHMM;
+    const missingSecondaryServiceStaff = !!bookingData.secondaryServiceId && Object.keys(bookingData.staffByRole).length < 2;
+
+    if (missingUser || missingClientId || missingPetId || missingServiceId ||
+        missingDate || missingTimeSlot || missingSecondaryServiceStaff) {
       console.error('❌ [ADMIN_MANUAL_BOOKING] Validation failed:', {
-        missingUser: !user,
-        missingClientId: !bookingData.clientId,
-        missingPetId: !bookingData.petId,
-        missingServiceId: !bookingData.serviceId,
-        missingDate: !bookingData.date,
-        missingTimeSlot: !finalTimeSlot
+        missingUser, missingClientId, missingPetId, missingServiceId,
+        missingDate, missingTimeSlot, missingSecondaryServiceStaff
       });
       toast.error('Por favor, preencha todos os campos obrigatórios');
       return;
@@ -526,115 +591,69 @@ const AdminManualBooking = () => {
     setIsLoading(true);
 
     try {
-      const client = clients.find(c => c.id === bookingData.clientId);
+      const client = clients.find(c => c.user_id === bookingData.clientUserId);
       if (!client) {
         throw new Error('Cliente não encontrado');
       }
 
-      const service = services.find(s => s.id === bookingData.serviceId);
+      const service = services.find(s => s.id === bookingData.primaryServiceId);
       if (!service) {
         throw new Error('Serviço não encontrado');
       }
 
-      const dateStr = format(bookingData.date, 'yyyy-MM-dd');
+      const dateStr = bookingData.selectedDateISO;
       const staffIds = getStaffIds();
 
-      // 🧠 Split booking logic based on override status and dual services
-      let rpcName: string;
-      let bookingPayload: any;
+      // 🧠 Unified payload builder for all booking types
+      function buildCreatePayload(): Record<string, any> | null {
+        // Validate required fields
+        if (!bookingData.clientUserId || !bookingData.petId || !bookingData.primaryServiceId || 
+            !bookingData.selectedDateISO || !bookingData.selectedTimeHHMM || !user?.id) {
+          console.error('❌ [ADMIN_MANUAL_BOOKING] Missing required fields for payload');
+          return null;
+        }
 
-      // Check if we have a secondary service (dual-service booking)
-      const hasSecondaryService = selectedSecondaryService !== null;
-      
-      if (hasSecondaryService) {
-        // Use the new dual-service function
-        rpcName = 'create_admin_booking_with_dual_services';
-        console.log('🔧 [ADMIN_MANUAL_BOOKING] Using dual-service RPC:', rpcName);
+        const providerIds = Object.values(bookingData.staffByRole).filter(Boolean) as string[];
         
-        bookingPayload = {
-          // Use _client_id for unclaimed admin-created clients, _client_user_id for claimed clients
-          ...(client.user_id 
-            ? { _client_user_id: client.user_id }    // Claimed client
-            : { _client_id: client.id }              // Unclaimed admin-created client
-          ),
+        return {
+          _client_user_id: bookingData.clientUserId,
           _pet_id: bookingData.petId,
-          _primary_service_id: bookingData.serviceId,
-          _booking_date: dateStr,
-          _time_slot: finalTimeSlot,
-          _secondary_service_id: selectedSecondaryService.id,
-          _calculated_price: bookingData.price,
-          _calculated_duration: bookingData.duration,
-          _notes: bookingData.notes,
-          _provider_ids: staffIds,
-          _created_by: user.id
+          _primary_service_id: bookingData.primaryServiceId,
+          _booking_date: bookingData.selectedDateISO,
+          _time_slot: toHHMMSS(bookingData.selectedTimeHHMM),
+          _secondary_service_id: bookingData.secondaryServiceId ?? null,
+          _calculated_price: totalPrice,
+          _calculated_duration: totalDuration,
+          _notes: bookingData.notes ?? null,
+          _provider_ids: providerIds,
+          _extra_fee: bookingData.extraFee ?? 0,
+          _extra_fee_reason: bookingData.extraFeeReason ?? null,
+          _addons: [], // TODO: Add addons support later
+          _created_by: user.id,
         };
-      } else {
-        // Use the standard single-service function
-        rpcName = isOverride ? 'create_booking_admin_override' : 'create_booking_admin';
-        console.log('🔧 [ADMIN_MANUAL_BOOKING] Using single-service RPC:', rpcName, 'with isOverride:', isOverride);
-
-                // Prepare base booking payload
-        const basePayload = {
-          // Use _client_id for unclaimed admin-created clients, _client_user_id for claimed clients
-          ...(client.user_id 
-            ? { _client_user_id: client.user_id }    // Claimed client
-            : { _client_id: client.id }              // Unclaimed admin-created client
-          ),
-          _pet_id: bookingData.petId,
-          _service_id: bookingData.serviceId,
-          _provider_ids: staffIds,
-          _booking_date: dateStr,
-          _time_slot: finalTimeSlot,
-          _notes: bookingData.notes,
-          _calculated_price: bookingData.price,
-          _calculated_duration: bookingData.duration,
-          _created_by: user.id
-        };
-
-        // Add override-specific parameters if this is an override booking
-        if (isOverride) {
-          // Get conflicting appointment ID from the conflict detection
-          const conflicts = await checkForConflicts();
-          const conflictingAppointmentId = conflicts?.[0]?.id; // Use 'id' instead of 'appointment_id'
-          
-          bookingPayload = {
-            ...basePayload,
-            _override_on_top_of_appointment_id: conflictingAppointmentId,
-            _admin_notes: `Override confirmado em ${dateStr} às ${finalTimeSlot}`
-          };
-          
-          console.log('🔧 [ADMIN_MANUAL_BOOKING] Override parameters:', {
-            conflictingAppointmentId,
-            adminNotes: bookingPayload._admin_notes
-          });
-        } else {
-          // Add standard booking parameters
-          bookingPayload = {
-            ...basePayload,
-            _override_conflicts: false
-          };
-                }
       }
 
-      console.log('🔧 [ADMIN_MANUAL_BOOKING] Creating booking with payload:', bookingPayload);
-      console.log('🔧 [ADMIN_MANUAL_BOOKING] Debug info:', {
-        clientId: client.id,
-        clientUserId: client.user_id,
-        staffIds,
-        staffIdsType: typeof staffIds,
-        staffIdsLength: staffIds.length
-      });
+      const payload = buildCreatePayload();
+      if (!payload) {
+        toast.error('Por favor, preencha todos os campos obrigatórios');
+        return;
+      }
 
-      const { data: appointmentId, error: bookingError } = await supabase.rpc(rpcName, bookingPayload);
+      // Add debugging logs
+      console.log('[CREATE_BOOKING] payload keys', payload && Object.keys(payload));
+      console.log('[CREATE_BOOKING] payload', payload);
 
-      if (bookingError) {
-        console.error('❌ [ADMIN_MANUAL_BOOKING] Booking error:', bookingError);
-        throw bookingError;
+      // Always use the dual-service RPC (it handles both single and dual services)
+      const { data: appointmentId, error } = await supabase.rpc('create_admin_booking_with_dual_services', payload);
+
+      if (error) {
+        console.error('[CREATE_BOOKING] rpc error', error);
+        throw error;
       }
 
       console.log('✅ [ADMIN_MANUAL_BOOKING] Booking created successfully:', appointmentId);
 
-      toast.success(isOverride ? 'Agendamento criado com override!' : 'Agendamento criado com sucesso!');
+      toast.success('Agendamento criado com sucesso!');
       // Redirect to add-ons confirmation page
       navigate('/admin/booking-success', { 
         state: { appointmentId: appointmentId } 
@@ -661,13 +680,21 @@ const AdminManualBooking = () => {
   };
 
   const handleSubmit = async () => {
-    if (!bookingData.date || !bookingData.timeSlot) {
+    console.log('🔧 [ADMIN_MANUAL_BOOKING] handleSubmit called with booking data:', bookingData);
+    
+    if (!bookingData.selectedDateISO || !bookingData.selectedTimeHHMM) {
+      console.log('❌ [ADMIN_MANUAL_BOOKING] Missing date or time:', {
+        selectedDateISO: bookingData.selectedDateISO,
+        selectedTimeHHMM: bookingData.selectedTimeHHMM
+      });
       toast.error('Por favor, selecione uma data e horário');
       return;
     }
 
     // Check if it's Sunday
-    const isSunday = bookingData.date.getDay() === 0; // 0 = Sunday
+    const [year, month, day] = bookingData.selectedDateISO.split('-').map(Number);
+    const selectedDate = new Date(year, month - 1, day); // month is 0-based
+    const isSunday = selectedDate.getDay() === 0; // 0 = Sunday
     if (isSunday) {
       toast.error('Agendamentos não são permitidos aos domingos');
       return;
@@ -707,19 +734,19 @@ const AdminManualBooking = () => {
     console.log('🔧 [ADMIN_MANUAL_BOOKING] Selected time slot:', selectedTimeSlot);
     console.log('🔧 [ADMIN_MANUAL_BOOKING] All validation fields present:', {
       user: !!user,
-      clientId: !!bookingData.clientId,
+      clientUserId: !!bookingData.clientUserId,
       petId: !!bookingData.petId,
-      serviceId: !!bookingData.serviceId,
-      date: !!bookingData.date,
-      timeSlot: !!bookingData.timeSlot
+      primaryServiceId: !!bookingData.primaryServiceId,
+      selectedDateISO: !!bookingData.selectedDateISO,
+      selectedTimeHHMM: !!bookingData.selectedTimeHHMM
     });
     await createBooking(true);
     setShowConflictModal(false);
   };
 
-  const canProceedToStep2 = bookingData.clientId && bookingData.petId && bookingData.serviceId;
+  const canProceedToStep2 = bookingData.clientUserId && bookingData.petId && bookingData.primaryServiceId;
   const canProceedToStep3 = canProceedToStep2 && Object.keys(bookingData.staffByRole).length > 0;
-  const canSubmit = canProceedToStep3 && bookingData.date && bookingData.timeSlot;
+  const canSubmit = canProceedToStep3 && bookingData.selectedDateISO && bookingData.selectedTimeHHMM;
 
   // Get required roles for the selected service
   const getRequiredRoles = () => {
@@ -848,8 +875,8 @@ const AdminManualBooking = () => {
                     setSelectedClient(client);
                     setBookingData(prev => ({ 
                       ...prev, 
-                      clientId: client.id, 
-                      petId: '' // Reset pet when client changes
+                      clientUserId: client.user_id, 
+                      petId: null // Reset pet when client changes
                     }));
                   }}
                   selectedClient={selectedClient}
@@ -860,17 +887,17 @@ const AdminManualBooking = () => {
               <div className="space-y-2">
                 <Label htmlFor="pet-select">Pet</Label>
                 <Select
-                  value={bookingData.petId}
+                  value={bookingData.petId || ''}
                   onValueChange={(value) => {
                     const pet = pets.find(p => p.id === value);
                     setSelectedPet(pet || null);
                     setBookingData(prev => ({ ...prev, petId: value }));
                   }}
-                  disabled={!bookingData.clientId || isLoadingPets}
+                  disabled={!bookingData.clientUserId || isLoadingPets}
                 >
                   <SelectTrigger id="pet-select">
                     <SelectValue placeholder={
-                      !bookingData.clientId ? "Selecione um cliente primeiro" :
+                      !bookingData.clientUserId ? "Selecione um cliente primeiro" :
                       isLoadingPets ? "Carregando..." : "Selecione um pet"
                     } />
                   </SelectTrigger>
@@ -922,9 +949,8 @@ const AdminManualBooking = () => {
                       setSelectedSecondaryService(service);
                       setBookingData(prev => ({ 
                         ...prev, 
-                        serviceId: service.id, // This will be updated by handlePrimaryServiceChange
-                        price: 0,
-                        duration: 0
+                        secondaryServiceId: service?.id || null
+                        // Keep existing staff selections - don't reset when adding secondary service
                       }));
                     }}
                     selectedService={selectedSecondaryService}
@@ -949,6 +975,16 @@ const AdminManualBooking = () => {
                       <span className="text-gray-600">Duração Principal:</span>
                       <span className="font-semibold text-blue-600 ml-1">{primaryServiceDuration} minutos</span>
                     </div>
+                    <div className="flex items-center">
+                      <span className="text-gray-600">Profissional:</span>
+                      <span className="font-medium text-gray-900 ml-1">
+                        {(() => {
+                          const primaryStaffId = Object.values(bookingData.staffByRole)[0];
+                          const primaryStaff = staffMembers.find(s => s.id === primaryStaffId);
+                          return primaryStaff?.name?.trim() || 'Não atribuído';
+                        })()}
+                      </span>
+                    </div>
                     
                     {/* Secondary Service Information */}
                     {selectedSecondaryService && (
@@ -965,6 +1001,16 @@ const AdminManualBooking = () => {
                           <div className="flex items-center">
                             <span className="text-gray-600">Duração Secundária:</span>
                             <span className="font-semibold text-blue-600 ml-1">{secondaryServiceDuration} minutos</span>
+                          </div>
+                          <div className="flex items-center">
+                            <span className="text-gray-600">Profissional:</span>
+                            <span className="font-medium text-gray-900 ml-1">
+                              {(() => {
+                                const secondaryStaffId = Object.values(bookingData.staffByRole)[1];
+                                const secondaryStaff = staffMembers.find(s => s.id === secondaryStaffId);
+                                return secondaryStaff?.name?.trim() || 'Não atribuído';
+                              })()}
+                            </span>
                           </div>
                         </div>
                         
@@ -1101,100 +1147,124 @@ const AdminManualBooking = () => {
                 Escolha a data e horário para o agendamento (override permitido)
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Date Selection */}
-              <div className="space-y-2">
-                <Label>Data</Label>
-                                 <BookingCalendar
-                   selected={bookingData.date}
-                   onSelect={(date) => setBookingData(prev => ({ ...prev, date }))}
-                   visibleMonth={visibleMonth}
-                   onMonthChange={handleMonthChange}
-                   disabled={isDisabledDate}
-                   className="rounded-md border w-fit"
-                 />
+                        <CardContent className="space-y-6">
+              {/* Desktop Layout: Calendar left, Time slots right */}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[320px_1fr]">
+                {/* Left Column: Calendar + Legend */}
+                <div className="space-y-4">
+                  {/* Date Selection */}
+                  <div className="space-y-2">
+                    <Label>Data</Label>
+                    <BookingCalendar
+                      selected={bookingData.selectedDateISO ? (() => {
+                        const [year, month, day] = bookingData.selectedDateISO.split('-').map(Number);
+                        return new Date(year, month - 1, day); // month is 0-based
+                      })() : null}
+                      onSelect={(date) => {
+                        const selectedDateISO = date ? toLocalISO(date) : null;
+                        console.log('[CALENDAR]', { 
+                          clicked: date, 
+                          clickedDay: date?.getDate(),
+                          selectedDateISO,
+                          selectedDay: selectedDateISO?.split('-')[2]
+                        });
+                        setBookingData(prev => ({ 
+                          ...prev, 
+                          selectedDateISO 
+                        }));
+                      }}
+                      visibleMonth={visibleMonth}
+                      onMonthChange={handleMonthChange}
+                      disabled={isDisabledDate}
+                      className="rounded-md border w-fit"
+                    />
+                  </div>
+
+                  {/* Color Legend - Only show when date is selected */}
+                  {bookingData.selectedDateISO && (
+                    <div className="space-y-2">
+                      <Label>Legenda</Label>
+                      <div className="flex flex-col gap-2 text-xs text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 border-2 border-green-500 rounded"></div>
+                          <span>Disponível</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 border-2 border-red-500 bg-red-50 rounded"></div>
+                          <span>Ocupado</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Column: Time Slots */}
+                {bookingData.selectedDateISO && (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Horário</Label>
+                      
+                      <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-h-60 overflow-y-auto">
+                        {availabilityLoading ? (
+                          <div className="col-span-full flex items-center justify-center py-8">
+                            <div className="flex items-center gap-2">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span className="text-sm text-gray-600">Carregando horários...</span>
+                            </div>
+                          </div>
+                        ) : timeSlots.length > 0 ? (
+                          <TooltipProvider>
+                            {timeSlots.map((slot) => {
+                              let buttonVariant: "default" | "outline" | "secondary" = "outline";
+                              let buttonClassName = "h-auto py-2";
+                              
+                              if (bookingData.selectedTimeHHMM === slot.time) {
+                                buttonVariant = "default";
+                              } else {
+                                switch (slot.status) {
+                                  case 'available':
+                                    buttonClassName += " border-green-500 text-green-700 hover:bg-green-50 hover:border-green-600";
+                                    break;
+                                  case 'occupied':
+                                    buttonClassName += " border-red-500 text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-600";
+                                    break;
+                                  default:
+                                    buttonClassName += " border-gray-300 text-gray-400 bg-gray-50 cursor-not-allowed";
+                                    break;
+                                }
+                              }
+
+                              return (
+                                <Tooltip key={slot.id}>
+                                  <TooltipTrigger asChild>
+                                                                    <Button
+                                  variant={buttonVariant}
+                                  className={buttonClassName}
+                                  onClick={() => handleTimeSlotSelect(slot)}
+                                  disabled={slot.status === 'unavailable'}
+                                >
+                                      <div className="flex flex-col items-center">
+                                        <span>{slot.time}</span>
+                                      </div>
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{slot.tooltipMessage}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })}
+                          </TooltipProvider>
+                        ) : (
+                          <div className="col-span-full flex items-center justify-center py-8">
+                            <span className="text-sm text-gray-500">Nenhum horário disponível</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-
-                             {/* Time Slots */}
-               {bookingData.date && (
-                 <div className="space-y-2">
-                   <Label>Horário</Label>
-                   
-                   {/* Color Legend */}
-                   <div className="flex items-center gap-4 text-xs text-gray-600 mb-2">
-                     <div className="flex items-center gap-1">
-                       <div className="w-3 h-3 border-2 border-green-500 rounded"></div>
-                       <span>Disponível</span>
-                     </div>
-                     <div className="flex items-center gap-1">
-                       <div className="w-3 h-3 border-2 border-red-500 rounded"></div>
-                       <span>Ocupado</span>
-                     </div>
-                     <div className="flex items-center gap-1">
-                       <div className="w-3 h-3 border-2 border-gray-300 bg-gray-50 rounded"></div>
-                       <span>Indisponível</span>
-                     </div>
-                   </div>
-                   
-                   <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto">
-                     {availabilityLoading ? (
-                       <div className="col-span-3 flex items-center justify-center py-8">
-                         <div className="flex items-center gap-2">
-                           <Loader2 className="h-4 w-4 animate-spin" />
-                           <span className="text-sm text-gray-600">Carregando horários...</span>
-                         </div>
-                       </div>
-                     ) : timeSlots.length > 0 ? (
-                       <TooltipProvider>
-                         {timeSlots.map((slot) => {
-                           let buttonVariant: "default" | "outline" | "secondary" = "outline";
-                           let buttonClassName = "h-auto py-2";
-                           
-                           if (bookingData.timeSlot === slot.time) {
-                             buttonVariant = "default";
-                           } else {
-                             switch (slot.status) {
-                               case 'available':
-                                 buttonClassName += " border-green-500 text-green-700 hover:bg-green-50 hover:border-green-600";
-                                 break;
-                               case 'occupied':
-                                 buttonClassName += " border-red-500 text-red-700 hover:bg-red-50 hover:border-red-600";
-                                 break;
-                               case 'unavailable':
-                                 buttonClassName += " border-gray-300 text-gray-400 bg-gray-50 cursor-not-allowed";
-                                 break;
-                             }
-                           }
-
-                           return (
-                             <Tooltip key={slot.id}>
-                               <TooltipTrigger asChild>
-                                 <Button
-                                   variant={buttonVariant}
-                                   className={buttonClassName}
-                                   onClick={() => handleTimeSlotSelect(slot)}
-                                   disabled={slot.status === 'unavailable'}
-                                 >
-                                   <div className="flex flex-col items-center">
-                                     <span>{slot.time}</span>
-                                   </div>
-                                 </Button>
-                               </TooltipTrigger>
-                               <TooltipContent>
-                                 <p>{slot.tooltipMessage}</p>
-                               </TooltipContent>
-                             </Tooltip>
-                           );
-                         })}
-                       </TooltipProvider>
-                     ) : (
-                       <div className="col-span-3 flex items-center justify-center py-8">
-                         <span className="text-sm text-gray-500">Nenhum horário disponível</span>
-                       </div>
-                     )}
-                   </div>
-                 </div>
-               )}
 
               {/* Manual Override Toggle */}
               <div className="space-y-2">
@@ -1225,7 +1295,7 @@ const AdminManualBooking = () => {
                 <Textarea
                   id="notes"
                   placeholder="Informações adicionais sobre o agendamento..."
-                  value={bookingData.notes}
+                  value={bookingData.notes || ''}
                   onChange={(e) => setBookingData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={3}
                 />

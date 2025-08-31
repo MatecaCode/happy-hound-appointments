@@ -193,11 +193,16 @@ const AdminPets = () => {
      return matchesSearch && matchesClient && matchesBreed;
    });
 
-     const handleCreatePet = async () => {
-     if (!formData.name || !formData.client_id) {
-       toast.error('Nome e dono são obrigatórios');
-       return;
-     }
+       const handleCreatePet = async () => {
+    if (!formData.name || !formData.client_id) {
+      toast.error('Nome e dono são obrigatórios');
+      return;
+    }
+
+    if (!birthDate) {
+      toast.error('Data de nascimento é obrigatória');
+      return;
+    }
 
            try {
         const { data: petData, error: petError } = await supabase
@@ -231,11 +236,16 @@ const AdminPets = () => {
     }
   };
 
-     const handleEditPet = async () => {
-     if (!selectedPet || !formData.name) {
-       toast.error('Nome é obrigatório');
-       return;
-     }
+       const handleEditPet = async () => {
+    if (!selectedPet || !formData.name) {
+      toast.error('Nome é obrigatório');
+      return;
+    }
+
+    if (!birthDate) {
+      toast.error('Data de nascimento é obrigatória');
+      return;
+    }
 
      console.log('🔍 [ADMIN_PETS] Updating pet:', selectedPet.id);
      console.log('🔍 [ADMIN_PETS] Form data:', formData);
@@ -514,7 +524,7 @@ const AdminPets = () => {
                      </div>
                   
                                      <div>
-                     <Label htmlFor="birth-date">Data de Nascimento</Label>
+                     <Label htmlFor="birth-date">Data de Nascimento *</Label>
                      <PetDobPicker
                        value={birthDate}
                        onChange={setBirthDate}
@@ -741,13 +751,13 @@ const AdminPets = () => {
                    </Select>
                  </div>
               
-                             <div>
-                 <Label htmlFor="edit-birth-date">Data de Nascimento</Label>
-                 <PetDobPicker
-                   value={birthDate}
-                   onChange={setBirthDate}
-                 />
-               </div>
+                                               <div>
+                    <Label htmlFor="edit-birth-date">Data de Nascimento *</Label>
+                    <PetDobPicker
+                      value={birthDate}
+                      onChange={setBirthDate}
+                    />
+                  </div>
 
                              <div>
                  <Label htmlFor="edit-client">Dono</Label>

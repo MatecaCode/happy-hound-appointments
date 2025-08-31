@@ -10,6 +10,7 @@ import {
   getAdminRequiredBackendSlots, 
   formatAdminTimeSlot
 } from '@/utils/adminTimeSlotHelpers';
+import { toHHMM } from '@/utils/time';
 
 export interface AdminTimeSlot {
   id: string;
@@ -110,11 +111,12 @@ export const useAdminAvailability = () => {
     }
   }, []);
 
-  // Simplified admin time slot fetching - always generate slots for the date
+  // Enhanced admin time slot fetching with dual-service support
   const fetchAdminTimeSlots = useCallback(async (
     date: Date,
     staffIds: string[],
-    selectedService: AdminService | null
+    selectedService: AdminService | null,
+    selectedSecondaryService: AdminService | null = null
   ) => {
     console.log(`🔧 [ADMIN_AVAILABILITY] Fetching admin time slots`);
     console.log(`📅 [ADMIN_AVAILABILITY] Date: ${format(date, 'yyyy-MM-dd')}`);
@@ -132,7 +134,7 @@ export const useAdminAvailability = () => {
       console.log(`⚠️ [ADMIN_AVAILABILITY] No service selected - marking all slots as unavailable`);
       const unavailableSlots = clientSlots.map(slot => ({
         id: slot,
-        time: formatAdminTimeSlot(slot),
+        time: toHHMM(slot),
         available: false
       }));
       setTimeSlots(unavailableSlots);
@@ -147,7 +149,7 @@ export const useAdminAvailability = () => {
         console.log(`⚠️ [ADMIN_AVAILABILITY] Service requires staff but none selected - marking all slots as unavailable`);
         const unavailableSlots = clientSlots.map(slot => ({
           id: slot,
-          time: formatAdminTimeSlot(slot),
+          time: toHHMM(slot),
           available: false
         }));
         setTimeSlots(unavailableSlots);
@@ -157,7 +159,7 @@ export const useAdminAvailability = () => {
         console.log(`✅ [ADMIN_AVAILABILITY] Service doesn't require staff - marking all slots as available`);
         const availableSlots = clientSlots.map(slot => ({
           id: slot,
-          time: formatAdminTimeSlot(slot),
+          time: toHHMM(slot),
           available: true
         }));
         setTimeSlots(availableSlots);
@@ -165,84 +167,91 @@ export const useAdminAvailability = () => {
       }
     }
 
-    // Deduplicate staff IDs
-    const uniqueStaffIds = [...new Set(staffIds)];
+    // Use the new dual-service RPC function
     const dateForQuery = format(date, 'yyyy-MM-dd');
-    const serviceDuration = selectedService.default_duration || 60;
+    
+    // Determine primary and secondary staff IDs
+    const primaryStaffId = staffIds[0] || null;
+    const secondaryStaffId = staffIds.length > 1 ? staffIds[1] : null;
+
+    // Check if all required parameters are available
+    if (!primaryStaffId || !selectedService?.id) {
+      console.log(`⚠️ [ADMIN_AVAILABILITY] Missing required parameters - marking all slots as unavailable`);
+      const unavailableSlots = clientSlots.map(slot => ({
+        id: slot,
+        time: toHHMM(slot),
+        available: false
+      }));
+      setTimeSlots(unavailableSlots);
+      return;
+    }
 
     setLoading(true);
 
     try {
-      console.log(`🔍 [ADMIN_AVAILABILITY] Fetching availability data for ${uniqueStaffIds.length} staff members`);
-      console.log(`⏱️ [ADMIN_AVAILABILITY] Service duration: ${serviceDuration} minutes`);
+      console.log(`🔍 [ADMIN_AVAILABILITY] Using dual-service slot finding`);
+      console.log(`👥 [ADMIN_AVAILABILITY] Primary staff: ${primaryStaffId}`);
+      console.log(`👥 [ADMIN_AVAILABILITY] Secondary staff: ${secondaryStaffId}`);
+      console.log(`📋 [ADMIN_AVAILABILITY] Primary service: ${selectedService?.name}`);
+      console.log(`📋 [ADMIN_AVAILABILITY] Secondary service: ${selectedSecondaryService?.name}`);
 
-      // Fetch staff availability from database
-      const { data: rawAvailabilityData, error } = await supabase
-        .from('staff_availability')
-        .select('staff_profile_id, time_slot, available')
-        .in('staff_profile_id', uniqueStaffIds)
-        .eq('date', dateForQuery);
+      // Add debugging logs for development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ADMIN_SLOTS] params', {
+          date: dateForQuery,
+          primaryServiceId: selectedService?.id,
+          secondaryServiceId: selectedSecondaryService?.id,
+          primaryStaffId,
+          secondaryStaffId,
+        });
+      }
+
+      // Call the new RPC function
+      const { data: availableStartTimes, error } = await supabase.rpc('find_dual_service_slots', {
+        _date: dateForQuery,
+        _primary_staff_id: primaryStaffId,
+        _primary_service_id: selectedService?.id,
+        _secondary_staff_id: secondaryStaffId,
+        _secondary_service_id: selectedSecondaryService?.id || null
+      });
 
       if (error) {
-        console.error('❌ [ADMIN_AVAILABILITY] Error fetching staff availability:', error);
+        console.error('[ADMIN_SLOTS] rpc error', error);
+      }
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ADMIN_SLOTS] slots', (availableStartTimes ?? []).slice(0, 10));
+      }
+
+      if (error) {
+        console.error('❌ [ADMIN_AVAILABILITY] Error fetching dual-service slots:', error);
         toast.error('Erro ao buscar horários disponíveis');
         // Mark all slots as unavailable on error
         const unavailableSlots = clientSlots.map(slot => ({
           id: slot,
-          time: formatAdminTimeSlot(slot),
+          time: toHHMM(slot),
           available: false
         }));
         setTimeSlots(unavailableSlots);
         return;
       }
 
-      console.log(`📊 [ADMIN_AVAILABILITY] Raw availability data: ${rawAvailabilityData?.length || 0} records`);
+      console.log(`📊 [ADMIN_AVAILABILITY] Found ${availableStartTimes?.length || 0} available start times`);
 
-      // Create availability lookup map
-      const availabilityMap = new Map();
-      rawAvailabilityData?.forEach(record => {
-        const key = `${record.staff_profile_id}_${record.time_slot}`;
-        availabilityMap.set(key, record.available);
+      // Build available time slots set from RPC results (canonical HH:MM format)
+      const availableHHMM = new Set((availableStartTimes ?? []).map((r: any) => toHHMM(r.start_time)));
+
+      // Convert available start times to AdminTimeSlot format
+      const availableSlots: AdminTimeSlot[] = clientSlots.map(slot => {
+        const label = toHHMM(slot); // Ensure HH:MM format
+        const isAvailable = availableHHMM.has(label);
+
+        return {
+          id: slot,
+          time: label,
+          available: isAvailable
+        };
       });
-
-      console.log(`🗂️ [ADMIN_AVAILABILITY] Availability map created with ${availabilityMap.size} entries`);
-
-      // Check each 30-minute slot for availability
-      const availableSlots: AdminTimeSlot[] = [];
-
-      for (const clientSlot of clientSlots) {
-        let isSlotAvailable = true;
-
-        // Get all required 10-minute slots for the full service duration
-        const requiredSlots = getAdminRequiredBackendSlots(clientSlot, serviceDuration, isSaturday);
-        
-        // Check if ALL selected staff are available for ALL required slots
-        for (const staffId of uniqueStaffIds) {
-          let staffAvailable = true;
-          
-          for (const requiredSlot of requiredSlots) {
-            const key = `${staffId}_${requiredSlot}`;
-            const isAvailable = availabilityMap.get(key);
-            
-            // If no data exists for this slot, mark as unavailable
-            if (isAvailable !== true) {
-              staffAvailable = false;
-              break;
-            }
-          }
-          
-          if (!staffAvailable) {
-            isSlotAvailable = false;
-            break;
-          }
-        }
-
-        availableSlots.push({
-          id: clientSlot,
-          time: formatAdminTimeSlot(clientSlot),
-          available: isSlotAvailable
-        });
-      }
 
       console.log(`✅ [ADMIN_AVAILABILITY] Generated ${availableSlots.length} admin time slots`);
       console.log(`📊 [ADMIN_AVAILABILITY] Available slots: ${availableSlots.filter(s => s.available).length}`);
@@ -252,12 +261,12 @@ export const useAdminAvailability = () => {
     } catch (error) {
       console.error('❌ [ADMIN_AVAILABILITY] Pipeline error:', error);
       toast.error('Erro inesperado ao buscar horários');
-      // Mark all slots as unavailable on error
-      const unavailableSlots = clientSlots.map(slot => ({
-        id: slot,
-        time: formatAdminTimeSlot(slot),
-        available: false
-      }));
+              // Mark all slots as unavailable on error
+        const unavailableSlots = clientSlots.map(slot => ({
+          id: slot,
+          time: toHHMM(slot),
+          available: false
+        }));
       setTimeSlots(unavailableSlots);
     } finally {
       setLoading(false);

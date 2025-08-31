@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import PhoneInputBR from '@/components/inputs/PhoneInputBR';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -12,6 +13,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
 import { BreedCombobox } from '@/components/BreedCombobox';
+import { PREFERRED_CONTACT_OPTIONS, MARKETING_SOURCE_OPTIONS } from '@/constants/profile';
 import { toast } from 'sonner';
 import { 
   Users, 
@@ -57,11 +59,29 @@ interface Client {
   location_name?: string;
   pet_count?: number;
   needs_registration?: boolean;
+  // Client Profile 2.0 fields
+  is_whatsapp?: boolean;
+  preferred_channel?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  preferred_staff_profile_id?: string;
+  accessibility_notes?: string;
+  general_notes?: string;
+  marketing_source_code?: string;
+  marketing_source_other?: string;
+  birth_date?: string;
 }
 
 interface Location {
   id: string;
   name: string;
+}
+
+interface StaffProfile {
+  id: string;
+  name?: string;
+  full_name?: string;
+  location_id?: string;
 }
 
 interface Pet {
@@ -87,19 +107,33 @@ const AdminClients = () => {
   const { user } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [emailCheckError, setEmailCheckError] = useState<string>('');
+  const [clientBirthDate, setClientBirthDate] = useState<Date | undefined>(undefined);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     email: '',
     address: '',
     notes: '',
-    location_id: ''
+    location_id: '',
+    // Client Profile 2.0 fields
+    is_whatsapp: false,
+    preferred_channel: 'telefone',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+          preferred_staff_profile_id: 'none',
+      accessibility_notes: '',
+      general_notes: '',
+      marketing_source_code: 'not_informed',
+    marketing_source_other: '',
+    birth_date: ''
   });
 
   // Pet management state
@@ -116,15 +150,22 @@ const AdminClients = () => {
     notes: '',
     birth_date: ''
   });
-  const [birthDate, setBirthDate] = useState<Date | undefined>(undefined);
+  const [petBirthDate, setPetBirthDate] = useState<Date | undefined>(undefined);
   const [selectedBreed, setSelectedBreed] = useState<Breed | undefined>(undefined);
 
-  // Load clients and locations
+  // Load clients, locations and breeds
   useEffect(() => {
     fetchClients();
     fetchLocations();
     fetchBreeds();
   }, []);
+
+  // Load staff profiles when modals open or location changes
+  useEffect(() => {
+    if (isCreateModalOpen || isEditModalOpen) {
+      fetchStaffProfiles();
+    }
+  }, [formData.location_id, isCreateModalOpen, isEditModalOpen]);
 
   const fetchClients = async () => {
     if (!user) return;
@@ -151,6 +192,16 @@ const AdminClients = () => {
           claim_invited_at,
           claimed_at,
           needs_registration,
+          is_whatsapp,
+          preferred_channel,
+          emergency_contact_name,
+          emergency_contact_phone,
+          preferred_staff_profile_id,
+          accessibility_notes,
+          general_notes,
+          marketing_source_code,
+          marketing_source_other,
+          birth_date,
           locations:location_id (name)
         `)
         .order('created_at', { ascending: false });
@@ -206,6 +257,38 @@ const AdminClients = () => {
     }
   };
 
+  const fetchStaffProfiles = async () => {
+    try {
+      console.log('🔍 [ADMIN_CLIENTS] Fetching staff profiles for location:', formData.location_id);
+      
+      let query = supabase
+        .from('staff_profiles')
+        .select('id, name, phone, email, location_id')
+        .eq('active', true);
+      
+      // If a location is selected, filter by that location
+      if (formData.location_id) {
+        query = query.eq('location_id', formData.location_id);
+      }
+      
+      const { data, error } = await query.order('name');
+
+      if (error) {
+        console.error('❌ [ADMIN_CLIENTS] Error fetching staff profiles:', error);
+        toast.error('Erro ao carregar profissionais');
+        setStaffProfiles([]);
+        return;
+      }
+
+      console.log('✅ [ADMIN_CLIENTS] Staff profiles loaded:', data);
+      setStaffProfiles(data || []);
+    } catch (error) {
+      console.error('❌ [ADMIN_CLIENTS] Error fetching staff profiles:', error);
+      toast.error('Erro ao carregar profissionais');
+      setStaffProfiles([]);
+    }
+  };
+
   const fetchBreeds = async () => {
     try {
       const { data, error } = await supabase
@@ -237,28 +320,82 @@ const AdminClients = () => {
     return matchesSearch && matchesLocation;
   });
 
+  const checkEmailAvailability = async (email: string): Promise<boolean> => {
+    try {
+      const { data: checkResult, error: checkError } = await supabase.functions.invoke(
+        'send-client-invite',
+        {
+          body: {
+            email: email,
+            checkOnly: true
+          }
+        }
+      );
+
+      if (checkError) {
+        console.error('❌ [ADMIN_CLIENTS] Email check error:', checkError);
+        setEmailCheckError('Erro ao verificar email');
+        return false;
+      }
+
+      if (!checkResult?.available) {
+        setEmailCheckError('Este e-mail já está cadastrado.');
+        return false;
+      }
+
+      setEmailCheckError('');
+      return true;
+    } catch (error) {
+      console.error('❌ [ADMIN_CLIENTS] Email check error:', error);
+      setEmailCheckError('Erro ao verificar email');
+      return false;
+    }
+  };
+
   const handleCreateClient = async () => {
-    if (!formData.name || !formData.email || !formData.location_id) {
-      toast.error('Nome, email e local são obrigatórios');
+    if (!formData.name || !formData.email || !formData.phone || !formData.location_id) {
+      toast.error('Nome, email, telefone e local são obrigatórios');
       return;
     }
 
+    // Check email availability first
+    const emailAvailable = await checkEmailAvailability(formData.email);
+    if (!emailAvailable) {
+      return; // Error already set in emailCheckError state
+    }
+
     try {
-      // Create client record without user_id (will be set when client registers)
+      // Debug: Log the data being sent
+      const clientDataToInsert = {
+        user_id: null, // Will be set when client completes registration
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        address: formData.address,
+        notes: formData.general_notes,
+        location_id: formData.location_id,
+        admin_created: true,
+        created_by: user.id,
+        needs_registration: true,
+        // Client Profile 2.0 fields
+        is_whatsapp: formData.is_whatsapp,
+        preferred_channel: formData.preferred_channel,
+        emergency_contact_name: formData.emergency_contact_name,
+        emergency_contact_phone: formData.emergency_contact_phone,
+        preferred_staff_profile_id: formData.preferred_staff_profile_id === 'none' ? null : formData.preferred_staff_profile_id,
+        accessibility_notes: formData.accessibility_notes,
+        general_notes: formData.general_notes,
+        marketing_source_code: formData.marketing_source_code === 'not_informed' ? null : formData.marketing_source_code,
+        marketing_source_other: formData.marketing_source_other,
+        birth_date: clientBirthDate ? format(clientBirthDate, 'yyyy-MM-dd') : null
+      };
+      
+      console.log('🔍 [ADMIN_CLIENTS] Creating client with data:', clientDataToInsert);
+      
+      // Create client record with all Client Profile 2.0 fields
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
-        .insert({
-          user_id: null, // Will be set when client completes registration
-          name: formData.name,
-          phone: formData.phone,
-          email: formData.email,
-          address: formData.address,
-          notes: formData.notes,
-          location_id: formData.location_id,
-          admin_created: true,
-          created_by: user.id,
-          needs_registration: true // Flag to indicate client needs to complete registration
-        })
+        .insert(clientDataToInsert)
         .select()
         .single();
 
@@ -267,6 +404,8 @@ const AdminClients = () => {
         toast.error('Erro ao criar cliente: ' + clientError.message);
         return;
       }
+
+      console.log('✅ [ADMIN_CLIENTS] Client created successfully:', clientData);
 
       // Send invitation email using Edge Function
       try {
@@ -282,7 +421,12 @@ const AdminClients = () => {
 
         if (inviteError) {
           console.error('❌ [ADMIN_CLIENTS] Invite error:', inviteError);
-          toast.error('Cliente criado mas falha ao enviar convite: ' + inviteError.message);
+          toast.error('Cliente criado, mas falha ao enviar convite.', {
+            action: {
+              label: 'Reenviar convite',
+              onClick: () => handleSendClaimEmail(clientData)
+            }
+          });
         } else if (inviteResult?.status === 'invited') {
           toast.success('Cliente criado com sucesso! Convite enviado para ' + clientData.email);
         } else {
@@ -290,7 +434,12 @@ const AdminClients = () => {
         }
       } catch (inviteError) {
         console.error('❌ [ADMIN_CLIENTS] Invite function error:', inviteError);
-        toast.success('Cliente criado com sucesso! Convite será enviado manualmente.');
+        toast.error('Cliente criado, mas falha ao enviar convite.', {
+          action: {
+            label: 'Reenviar convite',
+            onClick: () => handleSendClaimEmail(clientData)
+          }
+        });
       }
 
       setIsCreateModalOpen(false);
@@ -303,8 +452,8 @@ const AdminClients = () => {
   };
 
   const handleEditClient = async () => {
-    if (!selectedClient || !formData.name || !formData.email) {
-      toast.error('Nome e email são obrigatórios');
+    if (!selectedClient || !formData.name || !formData.email || !formData.phone) {
+      toast.error('Nome, email e telefone são obrigatórios');
       return;
     }
 
@@ -316,8 +465,19 @@ const AdminClients = () => {
           phone: formData.phone,
           email: formData.email,
           address: formData.address,
-          notes: formData.notes,
-          location_id: formData.location_id
+          notes: formData.general_notes,
+          location_id: formData.location_id,
+          // Client Profile 2.0 fields
+          is_whatsapp: formData.is_whatsapp,
+          preferred_channel: formData.preferred_channel,
+          emergency_contact_name: formData.emergency_contact_name,
+          emergency_contact_phone: formData.emergency_contact_phone,
+          preferred_staff_profile_id: formData.preferred_staff_profile_id === 'none' ? null : formData.preferred_staff_profile_id,
+          accessibility_notes: formData.accessibility_notes,
+          general_notes: formData.general_notes,
+          marketing_source_code: formData.marketing_source_code === 'not_informed' ? null : formData.marketing_source_code,
+          marketing_source_other: formData.marketing_source_other,
+          birth_date: clientBirthDate ? format(clientBirthDate, 'yyyy-MM-dd') : null
         })
         .eq('id', selectedClient.id);
 
@@ -534,7 +694,7 @@ const AdminClients = () => {
           breed: selectedBreed?.name || petFormData.breed,
           breed_id: selectedBreed?.id || null,
           size: petFormData.size,
-          birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : null,
+          birth_date: petBirthDate ? format(petBirthDate, 'yyyy-MM-dd') : null,
           notes: petFormData.notes,
           client_id: selectedClientForPets.id
         })
@@ -567,7 +727,7 @@ const AdminClients = () => {
       notes: '',
       birth_date: ''
     });
-    setBirthDate(undefined);
+    setPetBirthDate(undefined);
     setSelectedBreed(undefined);
   };
 
@@ -622,8 +782,20 @@ const AdminClients = () => {
       email: '',
       address: '',
       notes: '',
-      location_id: ''
+      location_id: '',
+      // Client Profile 2.0 fields
+      is_whatsapp: false,
+      preferred_channel: 'telefone',
+      emergency_contact_name: '',
+      emergency_contact_phone: '',
+      preferred_staff_profile_id: 'none',
+      accessibility_notes: '',
+      general_notes: '',
+      marketing_source_code: 'not_informed',
+      marketing_source_other: ''
     });
+    setClientBirthDate(undefined);
+    setEmailCheckError('');
   };
 
   const openEditModal = (client: Client) => {
@@ -634,8 +806,20 @@ const AdminClients = () => {
       email: client.email || '',
       address: client.address || '',
       notes: client.notes || '',
-      location_id: client.location_id || ''
+      location_id: client.location_id || '',
+      // Client Profile 2.0 fields
+      is_whatsapp: client.is_whatsapp || false,
+      preferred_channel: client.preferred_channel || 'telefone',
+      emergency_contact_name: client.emergency_contact_name || '',
+      emergency_contact_phone: client.emergency_contact_phone || '',
+      preferred_staff_profile_id: client.preferred_staff_profile_id || 'none',
+      accessibility_notes: client.accessibility_notes || '',
+      general_notes: client.general_notes || '',
+      marketing_source_code: client.marketing_source_code || 'not_informed',
+      marketing_source_other: client.marketing_source_other || ''
     });
+    setClientBirthDate(client.birth_date ? new Date(client.birth_date) : undefined);
+    setEmailCheckError('');
     setIsEditModalOpen(true);
   };
 
@@ -708,7 +892,7 @@ const AdminClients = () => {
                   Novo Cliente
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-md">
+              <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Criar Novo Cliente</DialogTitle>
                 </DialogHeader>
@@ -722,24 +906,44 @@ const AdminClients = () => {
                       placeholder="Nome completo"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="phone">Telefone</Label>
-                    <PhoneInputBR
-                      value={formData.phone}
-                      onChange={(value) => setFormData({ ...formData, phone: value })}
-                      placeholder="(11) 99999-9999"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="email">Email *</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      placeholder="cliente@email.com"
-                    />
-                  </div>
+                                     <div>
+                     <Label htmlFor="phone">Telefone *</Label>
+                     <PhoneInputBR
+                       value={formData.phone}
+                       onChange={(value) => setFormData({ ...formData, phone: value })}
+                       placeholder="(11) 99999-9999"
+                     />
+                   </div>
+                   
+                   {/* WhatsApp Checkbox - moved right after phone */}
+                   <div className="flex items-center space-x-2">
+                     <Checkbox
+                       id="is_whatsapp"
+                       checked={formData.is_whatsapp}
+                       onCheckedChange={(checked) => setFormData({...formData, is_whatsapp: checked as boolean})}
+                     />
+                     <Label htmlFor="is_whatsapp" className="text-sm">
+                       Este número é WhatsApp
+                     </Label>
+                   </div>
+                   
+                   <div>
+                     <Label htmlFor="email">Email *</Label>
+                     <Input
+                       id="email"
+                       type="email"
+                       value={formData.email}
+                       onChange={(e) => {
+                         setFormData({ ...formData, email: e.target.value });
+                         if (emailCheckError) setEmailCheckError(''); // Clear error on change
+                       }}
+                       placeholder="cliente@email.com"
+                       className={emailCheckError ? 'border-red-500' : ''}
+                     />
+                     {emailCheckError && (
+                       <p className="text-red-500 text-sm mt-1">{emailCheckError}</p>
+                     )}
+                   </div>
                   <div>
                     <Label htmlFor="address">Endereço</Label>
                     <Input
@@ -763,25 +967,159 @@ const AdminClients = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                                     </div>
+
+                   {/* Preferred Channel */}
+                  <div>
+                    <Label htmlFor="preferred_channel">Canal de contato preferido</Label>
+                    <Select value={formData.preferred_channel} onValueChange={(value) => setFormData({ ...formData, preferred_channel: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o canal preferido" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PREFERRED_CONTACT_OPTIONS.map((option) => (
+                          <SelectItem key={option.code} value={option.code}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Emergency Contact */}
+                  <div>
+                    <Label htmlFor="emergency_contact_name">Contato de emergência</Label>
+                    <Input
+                      id="emergency_contact_name"
+                      value={formData.emergency_contact_name}
+                      onChange={(e) => setFormData({ ...formData, emergency_contact_name: e.target.value })}
+                      placeholder="Nome do contato de emergência"
+                    />
                   </div>
                   <div>
-                    <Label htmlFor="notes">Notas</Label>
+                    <Label htmlFor="emergency_contact_phone">Telefone do contato de emergência</Label>
+                    <PhoneInputBR
+                      value={formData.emergency_contact_phone}
+                      onChange={(value) => setFormData({ ...formData, emergency_contact_phone: value })}
+                      placeholder="(11) 99999-9999"
+                    />
+                  </div>
+
+                  {/* Preferred Staff */}
+                  <div>
+                    <Label htmlFor="preferred_staff">Profissional preferido</Label>
+                    <Select value={formData.preferred_staff_profile_id} onValueChange={(value) => setFormData({ ...formData, preferred_staff_profile_id: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um profissional (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma preferência</SelectItem>
+                        {staffProfiles.length === 0 ? (
+                          <SelectItem value="no_staff_available" disabled>
+                            {formData.location_id ? 'Nenhum profissional neste local' : 'Selecione um local primeiro'}
+                          </SelectItem>
+                        ) : (
+                          staffProfiles.map((staff) => (
+                            <SelectItem key={staff.id} value={staff.id}>
+                              {staff.name || 'Sem nome'}
+                              {!formData.location_id && staff.location_id && (
+                                <span className="text-gray-500 text-xs ml-2">
+                                  ({locations.find(loc => loc.id === staff.location_id)?.name || 'Local desconhecido'})
+                                </span>
+                              )}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Birth Date */}
+                  <div>
+                    <Label htmlFor="birth_date">Data de nascimento</Label>
+                    <PetDobPicker
+                      value={clientBirthDate}
+                      onChange={setClientBirthDate}
+                    />
+                  </div>
+
+                  {/* Marketing Source */}
+                  <div>
+                    <Label htmlFor="marketing_source">Como nos conheceu?</Label>
+                    <Select value={formData.marketing_source_code} onValueChange={(value) => setFormData({ ...formData, marketing_source_code: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione como nos conheceu (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="not_informed">Não informado</SelectItem>
+                        {MARKETING_SOURCE_OPTIONS.map((option) => (
+                          <SelectItem key={option.code} value={option.code}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Marketing Source Other (show only if 'outro' is selected) */}
+                  {formData.marketing_source_code === 'outro' && (
+                    <div>
+                      <Label htmlFor="marketing_source_other">Especificar origem</Label>
+                      <Input
+                        id="marketing_source_other"
+                        value={formData.marketing_source_other}
+                        onChange={(e) => setFormData({ ...formData, marketing_source_other: e.target.value })}
+                        placeholder="Descreva como nos conheceu"
+                      />
+                    </div>
+                  )}
+
+                  {/* Accessibility Notes */}
+                  <div>
+                    <Label htmlFor="accessibility_notes">Necessidades especiais</Label>
                     <Textarea
-                      id="notes"
-                      value={formData.notes}
-                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                      placeholder="Observações sobre o cliente"
+                      id="accessibility_notes"
+                      value={formData.accessibility_notes}
+                      onChange={(e) => setFormData({ ...formData, accessibility_notes: e.target.value })}
+                      placeholder="Observações sobre acessibilidade ou necessidades especiais"
+                      rows={2}
+                    />
+                  </div>
+
+                  {/* General Notes */}
+                  <div>
+                    <Label htmlFor="general_notes">Observações gerais</Label>
+                    <Textarea
+                      id="general_notes"
+                      value={formData.general_notes}
+                      onChange={(e) => setFormData({ ...formData, general_notes: e.target.value })}
+                      placeholder="Observações gerais sobre o cliente"
                       rows={3}
                     />
                   </div>
-                  <div className="flex gap-2 pt-4">
-                    <Button onClick={handleCreateClient} className="flex-1">
-                      Criar Cliente
-                    </Button>
-                    <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>
-                      Cancelar
-                    </Button>
-                  </div>
+
+                  {/* Email Error Display */}
+                  {emailCheckError && (
+                    <div className="text-red-600 text-sm mt-2">
+                      {emailCheckError}
+                    </div>
+                  )}
+
+                                <div className="flex gap-2 pt-4">
+                <Button 
+                  onClick={handleCreateClient} 
+                  className="flex-1" 
+                  disabled={!!emailCheckError || !formData.name || !formData.email || !formData.phone || !formData.location_id}
+                >
+                  Criar Cliente
+                </Button>
+                <Button variant="outline" onClick={() => {
+                  setIsCreateModalOpen(false);
+                  resetForm();
+                }}>
+                  Cancelar
+                </Button>
+              </div>
                 </div>
               </DialogContent>
             </Dialog>
@@ -912,6 +1250,7 @@ const AdminClients = () => {
                         title={client.claim_invited_at ? 'Reenviar convite' : 'Enviar convite'}
                       >
                         <Send className="h-3 w-3" />
+                        {client.claim_invited_at ? '' : ''}
                       </Button>
                     )}
                     
@@ -949,7 +1288,7 @@ const AdminClients = () => {
 
         {/* Edit Modal */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Editar Cliente</DialogTitle>
             </DialogHeader>
@@ -963,24 +1302,37 @@ const AdminClients = () => {
                   placeholder="Nome completo"
                 />
               </div>
-              <div>
-                <Label htmlFor="edit-phone">Telefone</Label>
-                <PhoneInputBR
-                  value={formData.phone}
-                  onChange={(value) => setFormData({ ...formData, phone: value })}
-                  placeholder="(11) 99999-9999"
-                />
-              </div>
-              <div>
-                <Label htmlFor="edit-email">Email *</Label>
-                <Input
-                  id="edit-email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="cliente@email.com"
-                />
-              </div>
+                             <div>
+                 <Label htmlFor="edit-phone">Telefone *</Label>
+                 <PhoneInputBR
+                   value={formData.phone}
+                   onChange={(value) => setFormData({ ...formData, phone: value })}
+                   placeholder="(11) 99999-9999"
+                 />
+               </div>
+               
+               {/* WhatsApp Checkbox - moved right after phone */}
+               <div className="flex items-center space-x-2">
+                 <Checkbox
+                   id="edit_is_whatsapp"
+                   checked={formData.is_whatsapp}
+                   onCheckedChange={(checked) => setFormData({...formData, is_whatsapp: checked as boolean})}
+                 />
+                 <Label htmlFor="edit_is_whatsapp" className="text-sm">
+                   Este número é WhatsApp
+                 </Label>
+               </div>
+               
+               <div>
+                 <Label htmlFor="edit-email">Email *</Label>
+                 <Input
+                   id="edit-email"
+                   type="email"
+                   value={formData.email}
+                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                   placeholder="cliente@email.com"
+                 />
+               </div>
               <div>
                 <Label htmlFor="edit-address">Endereço</Label>
                 <Input
@@ -1004,17 +1356,137 @@ const AdminClients = () => {
                     ))}
                   </SelectContent>
                 </Select>
+                             </div>
+
+               {/* Preferred Channel */}
+              <div>
+                <Label htmlFor="edit_preferred_channel">Canal de contato preferido</Label>
+                <Select value={formData.preferred_channel} onValueChange={(value) => setFormData({ ...formData, preferred_channel: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o canal preferido" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PREFERRED_CONTACT_OPTIONS.map((option) => (
+                      <SelectItem key={option.code} value={option.code}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Emergency Contact */}
+              <div>
+                <Label htmlFor="edit_emergency_contact_name">Contato de emergência</Label>
+                <Input
+                  id="edit_emergency_contact_name"
+                  value={formData.emergency_contact_name}
+                  onChange={(e) => setFormData({ ...formData, emergency_contact_name: e.target.value })}
+                  placeholder="Nome do contato de emergência"
+                />
               </div>
               <div>
-                <Label htmlFor="edit-notes">Notas</Label>
+                <Label htmlFor="edit_emergency_contact_phone">Telefone do contato de emergência</Label>
+                <PhoneInputBR
+                  value={formData.emergency_contact_phone}
+                  onChange={(value) => setFormData({ ...formData, emergency_contact_phone: value })}
+                  placeholder="(11) 99999-9999"
+                />
+              </div>
+
+              {/* Preferred Staff */}
+              <div>
+                <Label htmlFor="edit_preferred_staff">Profissional preferido</Label>
+                <Select value={formData.preferred_staff_profile_id} onValueChange={(value) => setFormData({ ...formData, preferred_staff_profile_id: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um profissional (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhuma preferência</SelectItem>
+                    {staffProfiles.length === 0 ? (
+                      <SelectItem value="no_staff_available" disabled>
+                        {formData.location_id ? 'Nenhum profissional neste local' : 'Selecione um local primeiro'}
+                      </SelectItem>
+                    ) : (
+                      staffProfiles.map((staff) => (
+                        <SelectItem key={staff.id} value={staff.id}>
+                          {staff.name || 'Sem nome'}
+                          {!formData.location_id && staff.location_id && (
+                            <span className="text-gray-500 text-xs ml-2">
+                              ({locations.find(loc => loc.id === staff.location_id)?.name || 'Local desconhecido'})
+                            </span>
+                          )}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Birth Date */}
+              <div>
+                <Label htmlFor="edit_birth_date">Data de nascimento</Label>
+                <PetDobPicker
+                  value={clientBirthDate}
+                  onChange={setClientBirthDate}
+                />
+              </div>
+
+              {/* Marketing Source */}
+              <div>
+                <Label htmlFor="edit_marketing_source">Como nos conheceu?</Label>
+                <Select value={formData.marketing_source_code} onValueChange={(value) => setFormData({ ...formData, marketing_source_code: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione como nos conheceu (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="not_informed">Não informado</SelectItem>
+                    {MARKETING_SOURCE_OPTIONS.map((option) => (
+                      <SelectItem key={option.code} value={option.code}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Marketing Source Other (show only if 'outro' is selected) */}
+              {formData.marketing_source_code === 'outro' && (
+                <div>
+                  <Label htmlFor="edit_marketing_source_other">Especificar origem</Label>
+                  <Input
+                    id="edit_marketing_source_other"
+                    value={formData.marketing_source_other}
+                    onChange={(e) => setFormData({ ...formData, marketing_source_other: e.target.value })}
+                    placeholder="Descreva como nos conheceu"
+                  />
+                </div>
+              )}
+
+              {/* Accessibility Notes */}
+              <div>
+                <Label htmlFor="edit_accessibility_notes">Necessidades especiais</Label>
                 <Textarea
-                  id="edit-notes"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Observações sobre o cliente"
+                  id="edit_accessibility_notes"
+                  value={formData.accessibility_notes}
+                  onChange={(e) => setFormData({ ...formData, accessibility_notes: e.target.value })}
+                  placeholder="Observações sobre acessibilidade ou necessidades especiais"
+                  rows={2}
+                />
+              </div>
+
+              {/* General Notes */}
+              <div>
+                <Label htmlFor="edit_general_notes">Observações gerais</Label>
+                <Textarea
+                  id="edit_general_notes"
+                  value={formData.general_notes}
+                  onChange={(e) => setFormData({ ...formData, general_notes: e.target.value })}
+                  placeholder="Observações gerais sobre o cliente"
                   rows={3}
                 />
               </div>
+              
               <div className="flex gap-2 pt-4">
                 <Button onClick={handleEditClient} className="flex-1">
                   Salvar Alterações
@@ -1139,8 +1611,8 @@ const AdminClients = () => {
                <div>
                  <Label htmlFor="pet-birth-date">Data de Nascimento</Label>
                  <PetDobPicker
-                   value={birthDate}
-                   onChange={setBirthDate}
+                   value={petBirthDate}
+                   onChange={setPetBirthDate}
                  />
                </div>
                <div>

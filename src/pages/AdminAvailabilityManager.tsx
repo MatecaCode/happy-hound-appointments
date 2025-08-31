@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarIcon, Clock, User, Plus } from 'lucide-react';
+import AdminLayout from '@/components/AdminLayout';
 
 interface StaffProfile {
   id: string;
@@ -186,12 +187,14 @@ const AdminAvailabilityManager = () => {
   }, {} as Record<string, AvailabilitySlot[]>);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Gerenciamento de Disponibilidade</h1>
-      </div>
+    <AdminLayout>
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Gerenciamento de Disponibilidade</h1>
+          <p className="text-gray-600 mt-2">Gerencie a disponibilidade dos profissionais</p>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar Section */}
         <Card>
           <CardHeader>
@@ -309,8 +312,9 @@ const AdminAvailabilityManager = () => {
             )}
           </CardContent>
         </Card>
+        </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 };
 

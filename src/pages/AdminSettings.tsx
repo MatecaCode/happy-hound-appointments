@@ -51,6 +51,12 @@ interface StaffProfile {
   created_at: string;
   updated_at: string;
   assigned_services?: string[];
+  location_id?: string;
+}
+
+interface Location {
+  id: string;
+  name: string;
 }
 
 interface Service {
@@ -73,6 +79,7 @@ const AdminSettings = () => {
   // State
   const [staff, setStaff] = useState<StaffProfile[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
@@ -89,7 +96,8 @@ const AdminSettings = () => {
     can_groom: false,
     can_vet: false,
     role: 'staff' as 'staff' | 'admin',
-    assignedServices: [] as string[]
+    assignedServices: [] as string[],
+    location_id: ''
   });
 
   // Service filter state
@@ -112,6 +120,7 @@ const AdminSettings = () => {
     if (user) {
       fetchStaff();
       fetchServices();
+      fetchLocations();
     }
   }, [user]);
 
@@ -133,7 +142,8 @@ const AdminSettings = () => {
           bio,
           hourly_rate,
           created_at,
-          updated_at
+          updated_at,
+          location_id
         `)
         .eq('active', true)
         .order('name');
@@ -181,6 +191,26 @@ const AdminSettings = () => {
     }
   };
 
+  const fetchLocations = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('active', true)
+        .order('name');
+
+      if (error) {
+        console.error('❌ [ADMIN_SETTINGS] Error fetching locations:', error);
+        throw error;
+      }
+
+      setLocations(data || []);
+    } catch (error) {
+      console.error('❌ [ADMIN_SETTINGS] Error fetching locations:', error);
+      toast.error('Erro ao carregar locais');
+    }
+  };
+
   const handleCreateStaff = async () => {
     if (!staffFormData.name || !staffFormData.email) {
       toast.error('Nome e email são obrigatórios');
@@ -200,6 +230,7 @@ const AdminSettings = () => {
           can_bathe: staffFormData.can_bathe,
           can_groom: staffFormData.can_groom,
           can_vet: staffFormData.can_vet,
+          location_id: staffFormData.location_id || null,
           active: true
         })
         .select()
@@ -281,7 +312,8 @@ const AdminSettings = () => {
           hourly_rate: staffFormData.hourly_rate,
           can_bathe: staffFormData.can_bathe,
           can_groom: staffFormData.can_groom,
-          can_vet: staffFormData.can_vet
+          can_vet: staffFormData.can_vet,
+          location_id: staffFormData.location_id || null
         })
         .eq('id', selectedStaff.id);
 
@@ -337,7 +369,8 @@ const AdminSettings = () => {
       can_groom: staffMember.can_groom,
       can_vet: staffMember.can_vet,
       role: 'staff',
-      assignedServices: staffMember.assigned_services || []
+      assignedServices: staffMember.assigned_services || [],
+      location_id: staffMember.location_id || ''
     });
 
     setIsEditStaffModalOpen(true);
@@ -354,7 +387,8 @@ const AdminSettings = () => {
       can_groom: false,
       can_vet: false,
       role: 'staff',
-      assignedServices: []
+      assignedServices: [],
+      location_id: ''
     });
   };
 
@@ -534,6 +568,22 @@ const AdminSettings = () => {
                             </div>
 
                             <div>
+                              <Label htmlFor="staff-location">Local</Label>
+                              <Select value={staffFormData.location_id} onValueChange={(value) => setStaffFormData({ ...staffFormData, location_id: value })}>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Selecione um local (opcional)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {locations.map((location) => (
+                                    <SelectItem key={location.id} value={location.id}>
+                                      {location.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
                               <Label htmlFor="staff-bio">Biografia</Label>
                               <Textarea
                                 id="staff-bio"
@@ -657,6 +707,11 @@ const AdminSettings = () => {
                                   <p className="flex items-center gap-2">
                                     <span>🎯 {getRoleDisplay(staffMember)}</span>
                                   </p>
+                                  {staffMember.location_id && (
+                                    <p className="flex items-center gap-2">
+                                      <span>🏢 {locations.find(loc => loc.id === staffMember.location_id)?.name || 'Local desconhecido'}</span>
+                                    </p>
+                                  )}
                                   {staffMember.assigned_services && staffMember.assigned_services.length > 0 && (
                                     <div className="flex items-center gap-2">
                                       <span>🔧 Serviços: {staffMember.assigned_services.join(', ')}</span>
@@ -787,6 +842,22 @@ const AdminSettings = () => {
                       placeholder="0.00"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="edit-staff-location">Local</Label>
+                  <Select value={staffFormData.location_id} onValueChange={(value) => setStaffFormData({ ...staffFormData, location_id: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um local (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locations.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
