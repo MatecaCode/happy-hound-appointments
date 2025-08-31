@@ -27,21 +27,11 @@ Deno.serve(async (req) => {
     const redirectTo = 'https://vettale.vercel.app/staff/claim';
     console.log('🔗 [STAFF_SETUP] Using redirectTo:', redirectTo);
 
-    // Step 1: Create auth user (if doesn't exist) or get existing
+    // Step 1: Try to create user directly (will fail if exists, which is fine)
     let userId;
     
-    // Check if user already exists
-    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.listUsers();
-    if (userError) {
-      return new Response(JSON.stringify({ ok: false, error: 'Failed to check existing users' }), { status: 400, headers: corsHeaders });
-    }
-    
-    const existingUser = userData.users.find(u => u.email === email);
-    if (existingUser) {
-      userId = existingUser.id;
-      console.log('✅ [STAFF_SETUP] Found existing user:', userId);
-    } else {
-      // Create new user without sending invite
+    try {
+      // Try to create user - this will fail if user already exists
       const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
         email: email,
         email_confirm: true, // Auto-confirm email
@@ -49,12 +39,19 @@ Deno.serve(async (req) => {
       });
       
       if (createError) {
-        console.error('❌ [STAFF_SETUP] User creation error:', createError);
-        return new Response(JSON.stringify({ ok: false, error: createError.message }), { status: 400, headers: corsHeaders });
+        // If user already exists, that's fine - we'll proceed with recovery
+        if (createError.message.includes('already registered') || createError.message.includes('already exists')) {
+          console.log('ℹ️ [STAFF_SETUP] User already exists, proceeding with recovery');
+        } else {
+          console.error('❌ [STAFF_SETUP] User creation error:', createError);
+          return new Response(JSON.stringify({ ok: false, error: createError.message }), { status: 400, headers: corsHeaders });
+        }
+      } else {
+        userId = createData.user?.id;
+        console.log('✅ [STAFF_SETUP] User created:', userId);
       }
-      
-      userId = createData.user?.id;
-      console.log('✅ [STAFF_SETUP] User created:', userId);
+    } catch (e) {
+      console.log('ℹ️ [STAFF_SETUP] User creation failed (likely already exists):', e);
     }
 
     // Step 2: Send password reset link (this uses the password reset template)
@@ -76,8 +73,8 @@ Deno.serve(async (req) => {
       .from('staff_profiles')
       .update({ 
         claim_invited_at: new Date().toISOString(), 
-        email: email,
-        user_id: userId 
+        email: email
+        // user_id will be set by the trigger when email is confirmed
       })
       .eq('id', staff_profile_id);
 
