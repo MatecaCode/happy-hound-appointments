@@ -139,7 +139,7 @@ const CreateTestData = () => {
 
       // Create 10-minute time slots
       const timeSlots = [];
-      for (let hour = 9; hour < 17; hour++) {
+      for (let hour = 9; hour <= 17; hour++) {
         for (let min = 0; min < 60; min += 10) {
           timeSlots.push(`${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`);
         }

@@ -127,13 +127,13 @@ const Services = () => {
       backgroundColor: "#FDECE4", // Soft blush/peach
     },
     {
-      title: "Clássico",
+      title: "Spa Luxo",
       description: "Banho + tosa por 3 meses para um visual sempre em dia.",
       icon: <Package className="h-6 w-6" />,
       backgroundColor: "#F5EEE5", // Light beige
     },
     {
-      title: "Spa Luxo",
+      title: "Spa Premium",
       description: "Banho + tosa com hidratação por 3 meses para brilho e maciez.",
       icon: <Package className="h-6 w-6" />,
       popular: true,

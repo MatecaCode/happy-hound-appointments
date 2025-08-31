@@ -52,9 +52,9 @@ Deno.serve(async (req) => {
 
     // Step 3: Generate time slots from 09:00 to 16:30 (every 30 minutes)
     const timeSlots = []
-    for (let hour = 9; hour < 17; hour++) {
+    for (let hour = 9; hour <= 17; hour++) {
       timeSlots.push(`${hour.toString().padStart(2, '0')}:00:00`)
-      if (hour < 16) { // Don't add 16:30 since we stop at 16:30
+      if (hour < 17) { // Don't add 17:30 since we stop at 17:00
         timeSlots.push(`${hour.toString().padStart(2, '0')}:30:00`)
       }
     }

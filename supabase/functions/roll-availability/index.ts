@@ -49,11 +49,11 @@ serve(async (req) => {
 
     console.log(`👥 Found ${staffProfiles?.length || 0} active staff members`);
 
-    // Generate time slots (09:00-16:30 every 30 minutes)
+    // Generate time slots (09:00-17:00 every 30 minutes)
     const timeSlots = [];
-    for (let hour = 9; hour < 17; hour++) {
+    for (let hour = 9; hour <= 17; hour++) {
       timeSlots.push(`${hour.toString().padStart(2, '0')}:00:00`);
-      if (hour < 16) {
+      if (hour < 17) {
         timeSlots.push(`${hour.toString().padStart(2, '0')}:30:00`);
       }
     }

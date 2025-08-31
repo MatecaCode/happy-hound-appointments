@@ -52,6 +52,9 @@ interface StaffProfile {
   updated_at: string;
   assigned_services?: string[];
   location_id?: string;
+  user_id?: string | null;
+  claim_invited_at?: string | null;
+  claimed_at?: string | null;
 }
 
 interface Location {
@@ -143,7 +146,10 @@ const AdminSettings = () => {
           hourly_rate,
           created_at,
           updated_at,
-          location_id
+          location_id,
+          user_id,
+          claim_invited_at,
+          claimed_at
         `)
         .eq('active', true)
         .order('name');
@@ -211,6 +217,46 @@ const AdminSettings = () => {
     }
   };
 
+  // Helper function to get staff claim status
+  const getStaffClaimStatus = (staffProfile: StaffProfile) => {
+    if (staffProfile.user_id && staffProfile.claimed_at) {
+      return { status: 'claimed', label: 'Conta Vinculada', variant: 'default' as const };
+    }
+    if (staffProfile.claim_invited_at && !staffProfile.user_id) {
+      return { status: 'invited', label: 'Convite Enviado', variant: 'secondary' as const };
+    }
+    return { status: 'not_invited', label: 'Sem Convite', variant: 'outline' as const };
+  };
+
+  // Staff invite function (for existing staff without accounts)
+  const sendStaffInvite = async (staffProfile: StaffProfile) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('send-staff-invite', {
+        body: { 
+          email: staffProfile.email, 
+          staff_profile_id: staffProfile.id,
+          name: staffProfile.name
+        },
+      });
+
+      if (error) {
+        console.error('❌ [ADMIN_SETTINGS] Staff invite error:', error);
+        toast.error('Erro ao enviar convite');
+        return;
+      }
+
+      if (data?.ok) {
+        toast.success(`Convite enviado para ${staffProfile.email}`);
+        fetchStaff(); // Refresh to show updated invite status
+      } else {
+        toast.error(data?.error || 'Erro ao enviar convite');
+      }
+    } catch (error) {
+      console.error('❌ [ADMIN_SETTINGS] Staff invite error:', error);
+      toast.error('Erro ao enviar convite');
+    }
+  };
+
   const handleCreateStaff = async () => {
     if (!staffFormData.name || !staffFormData.email) {
       toast.error('Nome e email são obrigatórios');
@@ -218,6 +264,42 @@ const AdminSettings = () => {
     }
 
     try {
+      // Check if staff profile already exists with this email
+      const { data: existingStaff, error: existingError } = await supabase
+        .from('staff_profiles')
+        .select('id, email')
+        .eq('email', staffFormData.email)
+        .single();
+
+      if (existingError && existingError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('❌ [ADMIN_SETTINGS] Existing staff check error:', existingError);
+        toast.error('Erro ao verificar staff existente');
+        return;
+      }
+
+      if (existingStaff) {
+        toast.error('Já existe um staff cadastrado com este email.');
+        return;
+      }
+
+      // Check if client profile already exists with this email
+      const { data: existingClient, error: clientError } = await supabase
+        .from('clients')
+        .select('id, email')
+        .eq('email', staffFormData.email)
+        .single();
+
+      if (clientError && clientError.code !== 'PGRST116') { // PGRST116 = no rows returned
+        console.error('❌ [ADMIN_SETTINGS] Existing client check error:', clientError);
+        toast.error('Erro ao verificar cliente existente');
+        return;
+      }
+
+      if (existingClient) {
+        toast.error('Este email já está sendo usado por um cliente. Não é possível criar um staff com este email.');
+        return;
+      }
+
       // Create staff profile
       const { data: staffData, error: staffError } = await supabase
         .from('staff_profiles')
@@ -244,46 +326,51 @@ const AdminSettings = () => {
 
       
 
-      // Generate invite and send email via Edge Function
+      // Send invite email via Edge Function
       try {
-        // First create the code on the server (also done inside the edge fn if omitted)
-        const { data: inviteCode, error: codeError } = await supabase.rpc('create_staff_invite_code', {
-          p_email: staffFormData.email,
-          p_notes: `Admin invite for ${staffFormData.email}`
-        });
-
-        if (codeError) {
-          console.warn('[ADMIN_SETTINGS] Invite code error:', codeError.message);
-        }
 
         // Send email invitation via Edge Function
         console.log('✅ [ADMIN_SETTINGS] Staff created successfully');
-        console.log('📧 [ADMIN_SETTINGS] Invite code generated:', inviteCode);
         console.log('📧 [ADMIN_SETTINGS] Sending email to:', staffFormData.email);
         
         try {
           const { data: emailData, error: emailError } = await supabase.functions.invoke('send-staff-invite', {
             body: { 
               email: staffFormData.email, 
-              name: staffFormData.name,
-              code: inviteCode || undefined 
+              staff_profile_id: staffData.id,
+              name: staffFormData.name
             },
           });
 
           if (emailError) {
             console.error('❌ [ADMIN_SETTINGS] Email sending error:', emailError);
-            toast.success(`Staff criado com sucesso! Código de convite: ${inviteCode} (Email não enviado)`);
+            toast.success('Staff criado com sucesso!', {
+              action: {
+                label: 'Enviar convite',
+                onClick: () => sendStaffInvite({ ...staffData, email: staffFormData.email, name: staffFormData.name } as StaffProfile)
+              }
+            });
           } else {
             console.log('✅ [ADMIN_SETTINGS] Email sent successfully:', emailData);
-            toast.success(`Staff criado com sucesso! Email enviado para ${staffFormData.email}`);
+            toast.success(`Staff criado com sucesso! Convite enviado para ${staffFormData.email}`);
           }
         } catch (emailError) {
           console.error('❌ [ADMIN_SETTINGS] Email sending failed:', emailError);
-          toast.success(`Staff criado com sucesso! Código de convite: ${inviteCode} (Email não enviado)`);
+          toast.success('Staff criado com sucesso!', {
+            action: {
+              label: 'Enviar convite',
+              onClick: () => sendStaffInvite({ ...staffData, email: staffFormData.email, name: staffFormData.name } as StaffProfile)
+            }
+          });
         }
       } catch (e) {
         console.warn('[ADMIN_SETTINGS] Invite email failed:', e);
-        toast.success('Staff criado com sucesso');
+        toast.success('Staff criado com sucesso!', {
+          action: {
+            label: 'Enviar convite',
+            onClick: () => sendStaffInvite({ ...staffData, email: staffFormData.email, name: staffFormData.name } as StaffProfile)
+          }
+        });
       }
       setIsCreateStaffModalOpen(false);
       resetStaffForm();
@@ -336,20 +423,30 @@ const AdminSettings = () => {
     }
   };
 
-  const handleToggleStaffStatus = async (staffId: string, currentStatus: boolean) => {
+  const handleRemoveStaff = async (staffId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from('staff_profiles')
-        .update({ active: !currentStatus })
-        .eq('id', staffId);
+      if (currentStatus) {
+        // Removing staff completely - remove all data using database function
+        console.log('🗑️ [ADMIN_SETTINGS] Removing staff completely for ID:', staffId);
+        
+        const { error } = await supabase.rpc('remove_staff_completely', {
+          p_staff_id: staffId
+        });
 
-      if (error) {
-        console.error('❌ [ADMIN_SETTINGS] Status toggle error:', error);
-        toast.error('Erro ao alterar status');
+        if (error) {
+          console.error('❌ [ADMIN_SETTINGS] Error removing staff:', error);
+          toast.error('Erro ao remover staff do sistema');
+          return;
+        }
+
+        console.log('✅ [ADMIN_SETTINGS] Staff completely removed from all tables');
+        toast.success('Staff removido completamente do sistema');
+      } else {
+        // Activating staff - this shouldn't happen since we're removing the profile
+        toast.error('Não é possível reativar um staff removido. Crie um novo perfil.');
         return;
       }
 
-      toast.success(`Staff ${currentStatus ? 'desativado' : 'ativado'} com sucesso`);
       fetchStaff();
     } catch (error) {
       console.error('❌ [ADMIN_SETTINGS] Error toggling staff status:', error);
@@ -693,6 +790,14 @@ const AdminSettings = () => {
                                     )}
                                     {staffMember.active ? 'Ativo' : 'Inativo'}
                                   </Badge>
+                                  {(() => {
+                                    const claimStatus = getStaffClaimStatus(staffMember);
+                                    return (
+                                      <Badge variant={claimStatus.variant}>
+                                        {claimStatus.label}
+                                      </Badge>
+                                    );
+                                  })()}
                                 </div>
                                 
                                 <div className="space-y-1 text-sm text-gray-600">
@@ -735,7 +840,7 @@ const AdminSettings = () => {
                                    Editar
                                  </Button>
                                  
-                                                                   <Button
+                                 <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => openAvailabilityPage(staffMember)}
@@ -743,6 +848,19 @@ const AdminSettings = () => {
                                     <Calendar className="h-3 w-3 mr-1" />
                                     Disponibilidade
                                   </Button>
+
+                                 {/* Invite Button - Only show for staff without accounts */}
+                                 {getStaffClaimStatus(staffMember).status !== 'claimed' && (
+                                   <Button
+                                     size="sm"
+                                     variant="outline"
+                                     onClick={() => sendStaffInvite(staffMember)}
+                                     className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                                   >
+                                     <UserCheck className="h-3 w-3 mr-1" />
+                                     {getStaffClaimStatus(staffMember).status === 'invited' ? 'Reenviar' : 'Enviar'} Convite
+                                   </Button>
+                                 )}
                                  
                                  <AlertDialog>
                                    <AlertDialogTrigger asChild>
@@ -755,18 +873,18 @@ const AdminSettings = () => {
                                        ) : (
                                          <UserCheck className="h-3 w-3 mr-1" />
                                        )}
-                                       {staffMember.active ? 'Desativar' : 'Ativar'}
+                                       {staffMember.active ? 'Remover' : 'Ativar'}
                                      </Button>
                                    </AlertDialogTrigger>
                                    <AlertDialogContent>
                                      <AlertDialogHeader>
                                        <AlertDialogTitle>
-                                         {staffMember.active ? 'Desativar' : 'Ativar'} Staff
+                                         {staffMember.active ? 'Remover' : 'Ativar'} Staff
                                        </AlertDialogTitle>
                                        <AlertDialogDescription>
-                                         Tem certeza que deseja {staffMember.active ? 'desativar' : 'ativar'} o staff "{staffMember.name}"?
+                                         Tem certeza que deseja {staffMember.active ? 'remover' : 'ativar'} o staff "{staffMember.name}"?
                                          {staffMember.active 
-                                           ? ' Eles não poderão mais receber novos agendamentos.'
+                                           ? ' Esta ação irá remover completamente o staff e todos os seus dados do sistema. Esta ação não pode ser desfeita.'
                                            : ' Eles poderão voltar a receber agendamentos.'
                                          }
                                        </AlertDialogDescription>
@@ -774,10 +892,10 @@ const AdminSettings = () => {
                                      <AlertDialogFooter>
                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                        <AlertDialogAction
-                                         onClick={() => handleToggleStaffStatus(staffMember.id, staffMember.active)}
+                                         onClick={() => handleRemoveStaff(staffMember.id, staffMember.active)}
                                          className={staffMember.active ? "bg-red-600 hover:bg-red-700" : ""}
                                        >
-                                         {staffMember.active ? 'Desativar' : 'Ativar'}
+                                         {staffMember.active ? 'Remover' : 'Ativar'}
                                        </AlertDialogAction>
                                      </AlertDialogFooter>
                                    </AlertDialogContent>

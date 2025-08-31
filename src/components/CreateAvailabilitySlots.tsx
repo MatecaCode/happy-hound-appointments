@@ -40,8 +40,8 @@ export default function CreateAvailabilitySlots() {
           // Skip Sundays
           if (d.getDay() === 0) continue;
           
-          // Generate 10-minute slots from 9:00 to 16:00 (weekdays) / 12:00 (Saturdays)
-          for (let hour = 9; hour < 17; hour++) {
+          // Generate 10-minute slots from 9:00 to 17:00 (weekdays) / 12:00 (Saturdays)
+          for (let hour = 9; hour <= 17; hour++) {
             for (let min = 0; min < 60; min += 10) {
               const timeSlot = `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`;
               availabilitySlots.push({

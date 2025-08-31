@@ -556,6 +556,63 @@ Calendar: click 2025-09-19 → _booking_date='2025-09-19' (no off-by-one); Step-
 
 status: staging outcome: pass
 
+[LOG_UPDATE]
+date: 2025-08-31
+by: GPT-5 Thinking
+area: Website Frontend / Home & Services Copy / Packages
+
+change_summary:
+
+Home → “Nossos Serviços Principais”: definidos os 3 cards como Vacinação, Consulta Veterinária (badge Mais Agendado) e Banho & Tosa Higiênica (texto ajustado).
+
+Home → “Banho & Tosa Especializada”: removida duplicidade; agora Banho Ionizado, Primeira Tosa do Filhote e Pacote Spa Luxo com badge Mais Popular; descrição do Spa Luxo revisada; removido “tratamento de patas”.
+
+/services → “Serviços Veterinários”: mantida grade expandida; aplicada variação de cores para reduzir áreas brancas; sem mudanças funcionais.
+
+/services → “Banho & Tosa” (serviços individuais): convertida para 8 cards — Banho Simples, Banho Ionizado, Tosa Completa (badge Mais Popular), Tosa na Tesoura, Tosa Higiênica, Corte de Unhas, Limpeza de Dentes, Primeira Tosa do Filhote; removidos combos desta grade.
+
+/services → Pacotes: padronizados Essencial, Clássico, Spa Luxo (badge Mais Popular) e Master Ozônio; títulos sem parênteses; composição movida às descrições; duração padrão 3 meses; alturas equalizadas dos cards; paleta consistente.
+
+Micro-animações melhoradas (hover/entrada) para dar “pop” nos cards; apenas CSS/estilo.
+
+Nenhuma alteração em DB/APIs/rotas; atualizações restritas a textos, badges, ordem e classes visuais.
+
+rationale:
+
+Evitar repetição entre sessões da Home e destacar diferenciais (Banho Ionizado, Primeira Tosa do Filhote, Pacotes).
+
+Alinhar linguagem ao Manual de Tom de Voz: segunda pessoa, frases curtas, voz ativa, foco no presente e sem promessas irreais.
+
+Manter consistência visual e legibilidade em mobile (grids com variação de cor e prevenção de overflow conforme diretriz já mapeada no LOG).
+
+touch_points:
+
+code: componentes/trechos de conteúdo dos cards da Home (serviços principais e “Banho & Tosa Especializada”); página /services (seções “Serviços Veterinários”, “Banho & Tosa” e “Pacotes”); ajustes CSS utilitários para alturas iguais e micro-animações.
+
+db: none.
+
+tests:
+
+Verificação visual: textos/badges corretos; Spa Luxo marcado como Mais Popular; Consulta como Mais Agendado na Home; remoção de duplicidades.
+
+Mobile: grid 1-col sem overflow; min-w-0 + break-words quando necessário.
+
+Acessibilidade/UX: CTA “Agendar Agora” preservado; foco/hover nos cards funcionando; LCP estável.
+
+Smoke: navegação Home → Services sem erros.
+
+status: production outcome: pass
+
+follow_ups:
+
+Centralizar a cópia em um JSON/MDX único para evitar divergências entre seções.
+
+Confirmar comercialmente a duração “3 meses” dos pacotes antes de integrar pagamento/DB.
+
+Instrumentar cliques de CTA (GA4) para medir desempenho de ordem/badges.
+
+Avaliar nomes alternativos de pacotes (ex.: Essencial Cuidado, Clássico Estilo, Luxo Brilho, Ozônio Premier) em A/B.
+[/LOG_UPDATE]
 
 
 End of document.

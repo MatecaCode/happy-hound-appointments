@@ -171,7 +171,7 @@ const AdminDashboard = () => {
               icon={<AlertCircle className="h-6 w-6" />}
               iconBgColor="bg-orange-100"
               iconColor="text-orange-600"
-              href="/admin/actions"
+              href="/admin/appointments"
               loading={loading}
             />
             
@@ -285,7 +285,7 @@ const AdminDashboard = () => {
                     <span className="text-sm font-medium text-gray-600">
                       {stats.pendingApprovals} agendamento(s) aguardando aprovação
                     </span>
-                    <Link to="/admin/actions">
+                    <Link to="/admin/appointments">
                       <Button size="sm" variant="outline" className="border-brand-blue text-brand-blue hover:bg-brand-blue hover:text-white">
                         Gerenciar
                       </Button>
