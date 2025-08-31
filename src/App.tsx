@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { useEffect, lazy, Suspense } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Services from "./pages/Services";
 import Book from "./pages/Book";
@@ -79,6 +80,34 @@ function ScrollToTop() {
   return null;
 }
 
+// Global token catcher for auth invite links
+function GlobalTokenCatcher() {
+  useEffect(() => {
+    const handleAuthTokens = async () => {
+      // Check if URL contains auth tokens (access_token, type=, etc.)
+      if (location.hash && (location.hash.includes('access_token') || location.hash.includes('type='))) {
+        console.log('🔗 [GLOBAL_TOKEN_CATCHER] Auth tokens detected in URL hash');
+        
+        try {
+          // Process the session from URL
+          await supabase.auth.getSessionFromUrl({ storeSession: true });
+          console.log('✅ [GLOBAL_TOKEN_CATCHER] Session processed successfully');
+          
+          // Clean up the URL hash
+          window.history.replaceState(null, '', location.pathname + location.search);
+          console.log('🧹 [GLOBAL_TOKEN_CATCHER] URL hash cleared');
+        } catch (error) {
+          console.error('❌ [GLOBAL_TOKEN_CATCHER] Error processing auth tokens:', error);
+        }
+      }
+    };
+
+    handleAuthTokens();
+  }, []);
+
+  return null;
+}
+
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -87,6 +116,7 @@ function App() {
         <BrowserRouter>
           <AuthProvider>
             <ScrollToTop />
+            <GlobalTokenCatcher />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/about" element={<About />} />

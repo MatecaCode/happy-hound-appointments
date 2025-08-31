@@ -35,6 +35,7 @@ import AdminLayout from '@/components/AdminLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { invokeWithRetry } from '@/utils/invokeWithRetry';
 
 // Interfaces
 interface StaffProfile {
@@ -89,6 +90,8 @@ const AdminSettings = () => {
   const [isCreateStaffModalOpen, setIsCreateStaffModalOpen] = useState(false);
   const [isEditStaffModalOpen, setIsEditStaffModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffProfile | null>(null);
+  const [isCreatingStaff, setIsCreatingStaff] = useState(false);
+  const [resendingSetupFor, setResendingSetupFor] = useState<string | null>(null);
   const [staffFormData, setStaffFormData] = useState({
     name: '',
     email: '',
@@ -126,6 +129,11 @@ const AdminSettings = () => {
       fetchLocations();
     }
   }, [user]);
+
+  // Debug: Monitor staff state changes
+  useEffect(() => {
+    console.log('🔄 [ADMIN_SETTINGS] Staff state updated:', staff.length, 'members');
+  }, [staff]);
 
   const fetchStaff = async () => {
     setIsLoading(true);
@@ -168,6 +176,7 @@ const AdminSettings = () => {
       })) || [];
 
       console.log('✅ [ADMIN_SETTINGS] Staff with services:', staffWithServices);
+      console.log('📊 [ADMIN_SETTINGS] Setting staff state with', staffWithServices.length, 'members');
       setStaff(staffWithServices);
     } catch (error) {
       console.error('❌ [ADMIN_SETTINGS] Error fetching staff:', error);
@@ -223,60 +232,43 @@ const AdminSettings = () => {
       return { status: 'claimed', label: 'Conta Vinculada', variant: 'default' as const };
     }
     if (staffProfile.claim_invited_at && !staffProfile.user_id) {
-      return { status: 'invited', label: 'Convite Enviado', variant: 'secondary' as const };
+      return { status: 'invited', label: 'Setup Enviado', variant: 'secondary' as const };
     }
-    return { status: 'not_invited', label: 'Sem Convite', variant: 'outline' as const };
+    return { status: 'not_invited', label: 'Pendente', variant: 'outline' as const };
   };
 
-  // Staff invite function (for existing staff without accounts)
+  // Staff setup function (resilient with retry)
   const sendStaffInvite = async (staffProfile: StaffProfile) => {
-    console.log('📧 [ADMIN_SETTINGS] Sending invite to existing staff:', staffProfile.email);
+    console.log('🔐 [ADMIN_SETTINGS] Setting up account for staff:', staffProfile.email);
+    
+    setResendingSetupFor(staffProfile.id);
+    const id = "resend-setup";
+    toast.loading("Reenviando…", { id });
     
     try {
-      // Add timeout to prevent hanging
-      const invitePromise = supabase.functions.invoke('send-staff-invite', {
+      await invokeWithRetry(supabase, 'send-staff-invite', {
         body: { 
           email: staffProfile.email, 
           staff_profile_id: staffProfile.id,
           name: staffProfile.name
         },
+        timeoutMs: 12000,
+        retries: 2,
+        backoffMs: 2500,
       });
       
-      // Wait for invite with 20 second timeout
-      const result = await Promise.race([
-        invitePromise,
-        new Promise<{ data: any; error: any }>((_, reject) => 
-          setTimeout(() => reject(new Error('Invite timeout')), 20000)
-        )
-      ]);
-      
-      const { data, error } = result;
-
-      if (error) {
-        console.error('❌ [ADMIN_SETTINGS] Staff invite error:', error);
-        toast.error('Erro ao enviar convite');
-        return;
-      }
-
-      if (data?.ok) {
-        console.log('✅ [ADMIN_SETTINGS] Invite sent successfully to:', staffProfile.email);
-        toast.success(`Convite enviado para ${staffProfile.email}`);
-        fetchStaff(); // Refresh to show updated invite status
-      } else {
-        console.error('❌ [ADMIN_SETTINGS] Invite failed:', data);
-        toast.error(data?.error || 'Erro ao enviar convite');
-      }
+      console.log('✅ [ADMIN_SETTINGS] Staff setup sent successfully to:', staffProfile.email);
+      toast.success("Setup reenviado!", { id });
+      fetchStaff(); // Refresh to show updated invite status
     } catch (error) {
-      console.error('❌ [ADMIN_SETTINGS] Staff invite error:', error);
-      
-      if (error.message === 'Invite timeout') {
-        console.log('⏰ [ADMIN_SETTINGS] Invite request timed out');
-        toast.error('Tempo limite excedido ao enviar convite. Tente novamente.');
-      } else {
-        toast.error('Erro ao enviar convite');
-      }
+      console.error('❌ [ADMIN_SETTINGS] Staff setup error:', error);
+      toast.error("Não foi possível reenviar agora. Tente novamente em instantes.", { id });
+    } finally {
+      setResendingSetupFor(null);
     }
   };
+
+
 
   const handleCreateStaff = async () => {
     if (!staffFormData.name || !staffFormData.email) {
@@ -284,6 +276,7 @@ const AdminSettings = () => {
       return;
     }
 
+    setIsCreatingStaff(true);
     console.log('🚀 [ADMIN_SETTINGS] Starting staff creation...');
     
     try {
@@ -333,76 +326,40 @@ const AdminSettings = () => {
 
       
 
-      // Send invite email via Edge Function
+      // Staff created successfully - confirm immediately
       console.log('✅ [ADMIN_SETTINGS] Staff created successfully');
-      console.log('📧 [ADMIN_SETTINGS] Sending email to:', staffFormData.email);
+      toast.success('Staff criado. Enviando e-mail de setup…');
       
-      let emailSent = false;
-      try {
-        console.log('📧 [ADMIN_SETTINGS] Calling Edge Function...');
-        
-        // Add timeout to prevent hanging
-        const emailPromise = supabase.functions.invoke('send-staff-invite', {
-          body: { 
-            email: staffFormData.email, 
-            staff_profile_id: staffData.id,
-            name: staffFormData.name
-          },
-        });
-        
-                 // Wait for email with 20 second timeout
-         const result = await Promise.race([
-           emailPromise,
-           new Promise<{ data: any; error: any }>((_, reject) => 
-             setTimeout(() => reject(new Error('Email timeout')), 20000)
-           )
-         ]);
-        
-        const { data: emailData, error: emailError } = result;
-
-        if (emailError) {
-          console.error('❌ [ADMIN_SETTINGS] Email sending error:', emailError);
-          console.log('📧 [ADMIN_SETTINGS] Email error details:', emailError);
-          toast.success('Staff criado com sucesso!', {
-            action: {
-              label: 'Enviar convite',
-              onClick: () => sendStaffInvite({ ...staffData, email: staffFormData.email, name: staffFormData.name } as StaffProfile)
-            }
-          });
-        } else {
-          console.log('✅ [ADMIN_SETTINGS] Email sent successfully:', emailData);
-          toast.success(`Staff criado com sucesso! Convite enviado para ${staffFormData.email}`);
-          emailSent = true;
-        }
-      } catch (emailError) {
-        console.error('❌ [ADMIN_SETTINGS] Email sending failed:', emailError);
-        console.log('📧 [ADMIN_SETTINGS] Email catch error details:', emailError);
-        
-        if (emailError.message === 'Email timeout') {
-          console.log('⏰ [ADMIN_SETTINGS] Email request timed out');
-          toast.success('Staff criado com sucesso! Email não enviado (timeout).', {
-            action: {
-              label: 'Enviar convite',
-              onClick: () => sendStaffInvite({ ...staffData, email: staffFormData.email, name: staffFormData.name } as StaffProfile)
-            }
-          });
-        } else {
-          toast.success('Staff criado com sucesso!', {
-            action: {
-              label: 'Enviar convite',
-              onClick: () => sendStaffInvite({ ...staffData, email: staffFormData.email, name: staffFormData.name } as StaffProfile)
-            }
-          });
-        }
-      }
-
-      // Always close modal and reset form, regardless of email success
-      console.log('✅ [ADMIN_SETTINGS] Closing modal and resetting form...');
-      console.log('🔧 [ADMIN_SETTINGS] Modal state before closing:', isCreateStaffModalOpen);
+      // Close modal and reset form immediately (non-blocking)
       setIsCreateStaffModalOpen(false);
       resetStaffForm();
-      fetchStaff();
-      console.log('✅ [ADMIN_SETTINGS] Staff creation process completed');
+      fetchStaff(); // Refresh to show updated status
+      
+      // Fire-and-forget setup email with retry
+      invokeWithRetry(supabase, 'send-staff-invite', {
+        body: { 
+          email: staffFormData.email, 
+          staff_profile_id: staffData.id,
+          name: staffFormData.name
+        },
+        timeoutMs: 12000,
+        retries: 1,
+        backoffMs: 2500,
+      })
+        .then(() => {
+          console.log('✅ [ADMIN_SETTINGS] Setup email sent successfully');
+          toast.success('Setup enviado 🎉');
+          fetchStaff(); // Refresh to update status
+        })
+        .catch((err) => {
+          console.error('[STAFF_SETUP] invoke failed:', err);
+          toast('Staff criado, mas houve lentidão ao enviar o e-mail. Use "Reenviar Setup".', { 
+            icon: "⚠️" 
+          });
+        })
+        .finally(() => {
+          setIsCreatingStaff(false);
+        });
     } catch (error) {
       console.error('❌ [ADMIN_SETTINGS] Error creating staff:', error);
       toast.error('Erro ao criar staff');
@@ -410,6 +367,7 @@ const AdminSettings = () => {
       console.log('🔄 [ADMIN_SETTINGS] Closing modal due to error...');
       setIsCreateStaffModalOpen(false);
       resetStaffForm();
+      setIsCreatingStaff(false);
     }
   };
 
@@ -458,31 +416,83 @@ const AdminSettings = () => {
   const handleRemoveStaff = async (staffId: string, currentStatus: boolean) => {
     try {
       if (currentStatus) {
-        // Removing staff completely - remove all data using database function
-        console.log('🗑️ [ADMIN_SETTINGS] Removing staff completely for ID:', staffId);
+        // First, get the staff profile to find the user_id and email
+        const { data: staffProfile, error: fetchError } = await supabase
+          .from('staff_profiles')
+          .select('user_id, email, name')
+          .eq('id', staffId)
+          .single();
+
+        if (fetchError) {
+          console.error('❌ [ADMIN_SETTINGS] Error fetching staff for deletion:', fetchError);
+          toast.error('Erro ao buscar dados do staff');
+          return;
+        }
+
+        console.log('🗑️ [ADMIN_SETTINGS] Removing staff completely:', staffProfile);
         
-        const { error } = await supabase.rpc('remove_staff_completely', {
+        // Remove from app tables using database function
+        const { error: rpcError } = await supabase.rpc('remove_staff_completely', {
           p_staff_id: staffId
         });
 
-        if (error) {
-          console.error('❌ [ADMIN_SETTINGS] Error removing staff:', error);
+        if (rpcError) {
+          console.error('❌ [ADMIN_SETTINGS] Error removing staff from app tables:', rpcError);
           toast.error('Erro ao remover staff do sistema');
           return;
         }
 
-        console.log('✅ [ADMIN_SETTINGS] Staff completely removed from all tables');
-        toast.success('Staff removido completamente do sistema');
+        console.log('✅ [ADMIN_SETTINGS] Staff removed from app tables');
+
+        // Delete auth user if it exists (either by user_id or by email)
+        if (staffProfile.user_id || staffProfile.email) {
+          console.log('🗑️ [ADMIN_SETTINGS] Deleting auth user via Edge Function:', { user_id: staffProfile.user_id, email: staffProfile.email });
+          
+          const { data: deleteData, error: authError } = await supabase.functions.invoke('delete-staff-user', {
+            body: { 
+              user_id: staffProfile.user_id,
+              email: staffProfile.email,
+              staff_profile_id: staffId
+            }
+          });
+          
+          if (authError || !deleteData?.ok) {
+            console.error('❌ [ADMIN_SETTINGS] Error deleting auth user:', authError || deleteData);
+            toast.error('Staff removido, mas erro ao deletar usuário de autenticação');
+          } else {
+            console.log('✅ [ADMIN_SETTINGS] Auth user deleted successfully');
+            toast.success('Staff e usuário de autenticação removidos completamente');
+          }
+        } else {
+          console.log('ℹ️ [ADMIN_SETTINGS] No linked auth user to delete');
+          toast.success('Staff removido completamente do sistema');
+        }
       } else {
         // Activating staff - this shouldn't happen since we're removing the profile
         toast.error('Não é possível reativar um staff removido. Crie um novo perfil.');
         return;
       }
 
-      fetchStaff();
+      // Always refresh the staff list after successful deletion
+      console.log('🔄 [ADMIN_SETTINGS] Refreshing staff list after deletion...');
+      
+      // Small delay to ensure database operations are complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      await fetchStaff();
+      console.log('✅ [ADMIN_SETTINGS] Staff list refreshed successfully');
+      
     } catch (error) {
-      console.error('❌ [ADMIN_SETTINGS] Error toggling staff status:', error);
-      toast.error('Erro ao alterar status');
+      console.error('❌ [ADMIN_SETTINGS] Error removing staff:', error);
+      toast.error('Erro ao remover staff');
+      
+      // Even on error, try to refresh the list to ensure UI is up to date
+      try {
+        console.log('🔄 [ADMIN_SETTINGS] Attempting to refresh staff list after error...');
+        await fetchStaff();
+      } catch (refreshError) {
+        console.error('❌ [ADMIN_SETTINGS] Error refreshing staff list:', refreshError);
+      }
     }
   };
 
@@ -765,10 +775,25 @@ const AdminSettings = () => {
                             
 
                             <div className="flex gap-2 pt-4">
-                              <Button onClick={handleCreateStaff} className="flex-1">
-                                Criar Staff
+                              <Button 
+                                onClick={handleCreateStaff} 
+                                className="flex-1"
+                                disabled={isCreatingStaff}
+                              >
+                                {isCreatingStaff ? (
+                                  <>
+                                    <ClockIcon className="mr-2 h-4 w-4 animate-spin" />
+                                    Criando Staff...
+                                  </>
+                                ) : (
+                                  'Criar Staff'
+                                )}
                               </Button>
-                              <Button variant="outline" onClick={() => setIsCreateStaffModalOpen(false)}>
+                              <Button 
+                                variant="outline" 
+                                onClick={() => setIsCreateStaffModalOpen(false)}
+                                disabled={isCreatingStaff}
+                              >
                                 Cancelar
                               </Button>
                             </div>
@@ -881,18 +906,29 @@ const AdminSettings = () => {
                                     Disponibilidade
                                   </Button>
 
-                                 {/* Invite Button - Only show for staff without accounts */}
-                                 {getStaffClaimStatus(staffMember).status !== 'claimed' && (
-                                   <Button
-                                     size="sm"
-                                     variant="outline"
-                                     onClick={() => sendStaffInvite(staffMember)}
-                                     className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                                   >
-                                     <UserCheck className="h-3 w-3 mr-1" />
-                                     {getStaffClaimStatus(staffMember).status === 'invited' ? 'Reenviar' : 'Enviar'} Convite
-                                   </Button>
-                                 )}
+                                                                 {/* Setup/Re-send Setup Button - Show for staff without claimed accounts */}
+                                {(getStaffClaimStatus(staffMember).status === 'invited' || 
+                                  getStaffClaimStatus(staffMember).status === 'not_invited') && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => sendStaffInvite(staffMember)}
+                                    disabled={resendingSetupFor === staffMember.id}
+                                    className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                                  >
+                                    {resendingSetupFor === staffMember.id ? (
+                                      <>
+                                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-1" />
+                                        Enviando...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <UserCheck className="h-3 w-3 mr-1" />
+                                        {getStaffClaimStatus(staffMember).status === 'invited' ? 'Reenviar Setup' : 'Enviar Setup'}
+                                      </>
+                                    )}
+                                  </Button>
+                                )}
                                  
                                  <AlertDialog>
                                    <AlertDialogTrigger asChild>

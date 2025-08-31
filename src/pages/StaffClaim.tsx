@@ -23,6 +23,20 @@ const StaffClaim: React.FC = () => {
     const processSession = async () => {
       try {
         console.log('🔗 [STAFF_CLAIM] Processing session from URL...');
+        console.log('🔗 [STAFF_CLAIM] Current URL:', window.location.href);
+        
+        // Check for auth errors in URL hash first
+        const urlHash = window.location.hash;
+        if (urlHash.includes('error=')) {
+          const urlParams = new URLSearchParams(urlHash.substring(1));
+          const errorCode = urlParams.get('error');
+          const errorDescription = urlParams.get('error_description');
+          
+          console.error('❌ [STAFF_CLAIM] Auth error in URL:', { errorCode, errorDescription });
+          setError(`Erro de autenticação: ${errorDescription || errorCode || 'Link inválido'}`);
+          setIsProcessingSession(false);
+          return;
+        }
         
         // Get session from URL (handles invite links)
         const { data, error } = await supabase.auth.getSessionFromUrl({ 
