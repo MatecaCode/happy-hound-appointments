@@ -58,6 +58,10 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 
 const queryClient = new QueryClient();
 
+// Quick sanity asserts
+console.log("[ENV] URL:", import.meta.env.VITE_SUPABASE_URL);
+console.log("[ENV] Anon present:", !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+
 // Loading skeleton for lazy components
 const LoadingSkeleton = () => (
   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E7F0FF] via-white to-[#F1F5F9]">

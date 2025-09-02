@@ -522,8 +522,15 @@ const AdminClients = () => {
       if (deletionResult.user_id) {
         try {
           console.log('🗑️ [ADMIN_CLIENTS] Deleting auth user:', deletionResult.user_id);
-          await supabase.auth.admin.deleteUser(deletionResult.user_id);
-          console.log('✅ [ADMIN_CLIENTS] Auth user deleted successfully');
+          const { error: authError } = await supabase.functions.invoke('delete-staff-user', {
+            body: { user_id: deletionResult.user_id }
+          });
+          if (authError) {
+            console.error('❌ [ADMIN_CLIENTS] Auth delete error:', authError);
+            toast.warning('Cliente deletado, mas erro ao remover conta de autenticação');
+          } else {
+            console.log('✅ [ADMIN_CLIENTS] Auth user deleted successfully');
+          }
         } catch (authError) {
           console.error('❌ [ADMIN_CLIENTS] Auth delete error:', authError);
           // Don't fail the entire operation if auth deletion fails

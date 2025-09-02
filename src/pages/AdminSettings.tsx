@@ -35,7 +35,8 @@ import AdminLayout from '@/components/AdminLayout';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { invokeWithRetry } from '@/utils/invokeWithRetry';
+import { sendStaffSetupEmail, adminDeleteAuthUser } from '@/lib/staffSetup';
+import { FN_SEND_STAFF_INVITE } from '@/lib/functions';
 
 // Interfaces
 interface StaffProfile {
@@ -237,32 +238,27 @@ const AdminSettings = () => {
     return { status: 'not_invited', label: 'Pendente', variant: 'outline' as const };
   };
 
-  // Staff setup function (resilient with retry)
+  // Staff setup function - send invite email
   const sendStaffInvite = async (staffProfile: StaffProfile) => {
-    console.log('🔐 [ADMIN_SETTINGS] Setting up account for staff:', staffProfile.email);
-    
-    setResendingSetupFor(staffProfile.id);
-    const id = "resend-setup";
-    toast.loading("Reenviando…", { id });
-    
+    const toastId = `send-setup-${staffProfile.id}`;
     try {
-      await invokeWithRetry(supabase, 'send-staff-invite', {
-        body: { 
-          email: staffProfile.email, 
+      setResendingSetupFor(staffProfile.id);
+      const { data, error } = await supabase.functions.invoke(FN_SEND_STAFF_INVITE, {
+        body: {
+          email: staffProfile.email.trim().toLowerCase(),
           staff_profile_id: staffProfile.id,
-          name: staffProfile.name
         },
-        timeoutMs: 12000,
-        retries: 2,
-        backoffMs: 2500,
       });
-      
-      console.log('✅ [ADMIN_SETTINGS] Staff setup sent successfully to:', staffProfile.email);
-      toast.success("Setup reenviado!", { id });
-      fetchStaff(); // Refresh to show updated invite status
-    } catch (error) {
-      console.error('❌ [ADMIN_SETTINGS] Staff setup error:', error);
-      toast.error("Não foi possível reenviar agora. Tente novamente em instantes.", { id });
+
+      if (error || !data?.ok) {
+        throw new Error(error?.message || data?.error || "Falha ao enviar setup");
+      }
+
+      toast.success("Setup enviado 🎉", { id: toastId });
+      fetchStaff(); // Refresh to show updated status
+    } catch (e: any) {
+      console.error("[SEND_STAFF_SETUP] error", e);
+      toast.error(e?.message ?? "Falha ao enviar setup", { id: toastId });
     } finally {
       setResendingSetupFor(null);
     }
@@ -324,42 +320,14 @@ const AdminSettings = () => {
         return;
       }
 
-      
-
       // Staff created successfully - confirm immediately
       console.log('✅ [ADMIN_SETTINGS] Staff created successfully');
-      toast.success('Staff criado. Enviando e-mail de setup…');
+      toast.success('Staff criado ✅');
       
-      // Close modal and reset form immediately (non-blocking)
+      // Close modal and reset form immediately
       setIsCreateStaffModalOpen(false);
       resetStaffForm();
       fetchStaff(); // Refresh to show updated status
-      
-      // Fire-and-forget setup email with retry
-      invokeWithRetry(supabase, 'send-staff-invite', {
-        body: { 
-          email: staffFormData.email, 
-          staff_profile_id: staffData.id,
-          name: staffFormData.name
-        },
-        timeoutMs: 12000,
-        retries: 1,
-        backoffMs: 2500,
-      })
-        .then(() => {
-          console.log('✅ [ADMIN_SETTINGS] Setup email sent successfully');
-          toast.success('Setup enviado 🎉');
-          fetchStaff(); // Refresh to update status
-        })
-        .catch((err) => {
-          console.error('[STAFF_SETUP] invoke failed:', err);
-          toast('Staff criado, mas houve lentidão ao enviar o e-mail. Use "Reenviar Setup".', { 
-            icon: "⚠️" 
-          });
-        })
-        .finally(() => {
-          setIsCreatingStaff(false);
-        });
     } catch (error) {
       console.error('❌ [ADMIN_SETTINGS] Error creating staff:', error);
       toast.error('Erro ao criar staff');
@@ -448,21 +416,19 @@ const AdminSettings = () => {
         if (staffProfile.user_id || staffProfile.email) {
           console.log('🗑️ [ADMIN_SETTINGS] Deleting auth user via Edge Function:', { user_id: staffProfile.user_id, email: staffProfile.email });
           
-          const { data: deleteData, error: authError } = await supabase.functions.invoke('delete-staff-user', {
-            body: { 
-              user_id: staffProfile.user_id,
-              email: staffProfile.email,
-              staff_profile_id: staffId
-            }
-          });
-          
-          if (authError || !deleteData?.ok) {
-            console.error('❌ [ADMIN_SETTINGS] Error deleting auth user:', authError || deleteData);
-            toast.error('Staff removido, mas erro ao deletar usuário de autenticação');
-          } else {
-            console.log('✅ [ADMIN_SETTINGS] Auth user deleted successfully');
-            toast.success('Staff e usuário de autenticação removidos completamente');
-          }
+          // Try to delete auth user in background (does not block UI)
+          adminDeleteAuthUser(supabase, { 
+            user_id: staffProfile.user_id, 
+            email: staffProfile.email 
+          })
+            .then(() => {
+              console.log('✅ [ADMIN_SETTINGS] Auth user deleted successfully');
+              toast.success('Staff e usuário de autenticação removidos completamente');
+            })
+            .catch((e) => {
+              console.warn('[ADMIN_DELETE_AUTH] failed:', e?.message);
+              toast.success('Staff removido do sistema');
+            });
         } else {
           console.log('ℹ️ [ADMIN_SETTINGS] No linked auth user to delete');
           toast.success('Staff removido completamente do sistema');
