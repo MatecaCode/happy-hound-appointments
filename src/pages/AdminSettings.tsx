@@ -276,11 +276,11 @@ const AdminSettings = () => {
     console.log('🚀 [ADMIN_SETTINGS] Starting staff creation...');
     
     try {
-      // Check if staff profile already exists with this email
+      // Check if staff profile already exists with this email (case-insensitive)
       const { data: existingStaff, error: existingError } = await supabase
         .from('staff_profiles')
         .select('id, email')
-        .eq('email', staffFormData.email)
+        .ilike('email', staffFormData.email.trim())
         .single();
 
       if (existingError && existingError.code !== 'PGRST116') { // PGRST116 = no rows returned
@@ -301,7 +301,7 @@ const AdminSettings = () => {
         .from('staff_profiles')
         .insert({
           name: staffFormData.name,
-          email: staffFormData.email,
+          email: staffFormData.email.trim().toLowerCase(),
           phone: staffFormData.phone,
           bio: staffFormData.bio,
           hourly_rate: staffFormData.hourly_rate,
@@ -320,11 +320,43 @@ const AdminSettings = () => {
         return;
       }
 
-      // Staff created successfully - confirm immediately
-      console.log('✅ [ADMIN_SETTINGS] Staff created successfully');
-      toast.success('Staff criado ✅');
+      // Staff created successfully
+      console.log('✅ [ADMIN_SETTINGS] Staff created successfully:', staffData);
+
+      // Send invitation email using Edge Function (like client flow)
+      try {
+        const { data: inviteResult, error: inviteError } = await supabase.functions.invoke(
+          FN_SEND_STAFF_INVITE,
+          {
+            body: {
+              email: staffData.email.trim().toLowerCase(),
+              staff_profile_id: staffData.id
+            }
+          }
+        );
+
+        if (inviteError) {
+          console.error('❌ [ADMIN_SETTINGS] Invite error:', inviteError);
+          toast.success('Staff criado com sucesso!', {
+            description: 'Falha ao enviar convite automaticamente. Use o botão "Enviar Setup" para reenviar.',
+          });
+        } else if (inviteResult?.ok) {
+          toast.success('Staff criado com sucesso! 🎉', {
+            description: `Convite enviado para ${staffData.email}`,
+          });
+        } else {
+          toast.success('Staff criado com sucesso!', {
+            description: 'Convite será enviado separadamente.',
+          });
+        }
+      } catch (inviteErr) {
+        console.error('❌ [ADMIN_SETTINGS] Invite send error:', inviteErr);
+        toast.success('Staff criado com sucesso!', {
+          description: 'Use o botão "Enviar Setup" para enviar o convite.',
+        });
+      }
       
-      // Close modal and reset form immediately
+      // Close modal and reset form
       setIsCreateStaffModalOpen(false);
       resetStaffForm();
       fetchStaff(); // Refresh to show updated status
