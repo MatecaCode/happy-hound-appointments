@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    const redirectTo = 'https://vettale.vercel.app/staff/claim';
+    const redirectTo = Deno.env.get('STAFF_CLAIM_REDIRECT') ?? 'https://vettale.shop/staff/claim';
     console.log('🔗 [STAFF_SETUP] Using redirectTo:', redirectTo);
 
     // Step 1: Try to create user directly (will fail if exists, which is fine)

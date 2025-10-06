@@ -26,7 +26,7 @@ Deno.serve(async (req) => {
     await admin.auth.admin.createUser({ email, email_confirm: false }).catch(() => {});
 
     // 2) send Supabase Reset Password email
-    const redirectTo = 'https://vettale.vercel.app/staff/claim';
+    const redirectTo = Deno.env.get('STAFF_CLAIM_REDIRECT') ?? 'https://vettale.shop/staff/claim';
     const { error: resetErr } = await admin.auth.resetPasswordForEmail(email, { redirectTo });
     if (resetErr) {
       console.error('[STAFF_SETUP] resetPasswordForEmail:', resetErr);
