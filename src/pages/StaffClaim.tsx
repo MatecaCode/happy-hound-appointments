@@ -24,6 +24,8 @@ const StaffClaim: React.FC = () => {
       try {
         console.log('🔗 [STAFF_CLAIM] Processing session from URL...');
         console.log('🔗 [STAFF_CLAIM] Current URL:', window.location.href);
+        console.log('🔗 [STAFF_CLAIM] URL Hash:', window.location.hash);
+        console.log('🔗 [STAFF_CLAIM] URL Search:', window.location.search);
         
         // Check for auth errors in URL hash first
         const urlHash = window.location.hash;
@@ -38,27 +40,93 @@ const StaffClaim: React.FC = () => {
           return;
         }
         
-        // Get session from URL (handles invite links)
-        const { data, error } = await supabase.auth.getSessionFromUrl({ 
-          storeSession: true 
+        // Try multiple methods to get the session
+        let sessionData = null;
+        let sessionError = null;
+        
+        // Check if there are auth tokens in the URL
+        const urlParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = urlParams.get('access_token');
+        const refreshToken = urlParams.get('refresh_token');
+        
+        console.log('🔍 [STAFF_CLAIM] URL tokens:', { 
+          hasAccessToken: !!accessToken, 
+          hasRefreshToken: !!refreshToken,
+          tokenType: urlParams.get('token_type'),
+          expiresIn: urlParams.get('expires_in')
         });
+        
+        if (accessToken) {
+          // Method 1: Try setSession with tokens from URL (newer approach)
+          try {
+            const { data, error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || ''
+            });
+            sessionData = data;
+            sessionError = error;
+            console.log('🔍 [STAFF_CLAIM] setSession result:', { sessionData, sessionError });
+          } catch (err) {
+            console.log('⚠️ [STAFF_CLAIM] setSession failed, trying getSessionFromUrl:', err);
+            sessionError = err;
+          }
+        }
+        
+        // Method 2: Try getSessionFromUrl (fallback for older Supabase versions)
+        if (!sessionData && !sessionError) {
+          try {
+            const result = await supabase.auth.getSessionFromUrl({ storeSession: true });
+            sessionData = result.data;
+            sessionError = result.error;
+            console.log('🔍 [STAFF_CLAIM] getSessionFromUrl result:', { sessionData, sessionError });
+          } catch (err) {
+            console.log('⚠️ [STAFF_CLAIM] getSessionFromUrl failed, trying getSession:', err);
+            sessionError = err;
+          }
+        }
+        
+        // Method 3: Try getSession (check current session)
+        if (!sessionData && !sessionError) {
+          try {
+            const result = await supabase.auth.getSession();
+            sessionData = result.data;
+            sessionError = result.error;
+            console.log('🔍 [STAFF_CLAIM] getSession result:', { sessionData, sessionError });
+          } catch (err) {
+            console.error('❌ [STAFF_CLAIM] All session methods failed:', err);
+            sessionError = err;
+          }
+        }
 
-        if (error) {
-          console.error('❌ [STAFF_CLAIM] Session processing error:', error);
+        if (sessionError) {
+          console.error('❌ [STAFF_CLAIM] Session processing error:', sessionError);
           setError('Erro ao processar convite. Verifique se o link está correto.');
           setIsProcessingSession(false);
           return;
         }
 
-        if (data.session) {
+        if (sessionData?.session) {
           console.log('✅ [STAFF_CLAIM] Session processed successfully');
-          console.log('📧 [STAFF_CLAIM] User email:', data.session.user.email);
+          console.log('📧 [STAFF_CLAIM] User email:', sessionData.session.user.email);
+          console.log('👤 [STAFF_CLAIM] User metadata:', sessionData.session.user.user_metadata);
           
           // Clear URL hash to clean up the URL
           window.history.replaceState(null, '', window.location.pathname);
         } else {
-          console.log('⚠️ [STAFF_CLAIM] No session found in URL');
-          setError('Link de convite inválido ou expirado.');
+          console.log('⚠️ [STAFF_CLAIM] No session found');
+          console.log('🔍 [STAFF_CLAIM] Checking if user is already logged in...');
+          
+          // Check if user is already authenticated
+          const { data: currentSession } = await supabase.auth.getSession();
+          if (currentSession?.session) {
+            console.log('✅ [STAFF_CLAIM] User already authenticated:', currentSession.session.user.email);
+            // User is already logged in, they can proceed to set password
+          } else {
+            console.log('❌ [STAFF_CLAIM] No active session found');
+            // Instead of showing an error immediately, let them try to set password
+            // The error might be due to session processing, but they might still be able to update password
+            console.log('🔄 [STAFF_CLAIM] Allowing password setup attempt despite session issues');
+          }
         }
       } catch (err) {
         console.error('❌ [STAFF_CLAIM] Unexpected error:', err);
@@ -90,13 +158,28 @@ const StaffClaim: React.FC = () => {
     try {
       console.log('🔐 [STAFF_CLAIM] Updating user password...');
       
+      // First check if user is authenticated
+      const { data: currentSession } = await supabase.auth.getSession();
+      console.log('🔍 [STAFF_CLAIM] Current session before password update:', {
+        hasSession: !!currentSession?.session,
+        userEmail: currentSession?.session?.user?.email
+      });
+      
       const { error } = await supabase.auth.updateUser({ 
         password: password 
       });
 
       if (error) {
         console.error('❌ [STAFF_CLAIM] Password update error:', error);
-        setError('Erro ao definir senha. Tente novamente.');
+        
+        // Provide more specific error messages
+        if (error.message.includes('session_not_found') || error.message.includes('not authenticated')) {
+          setError('Sessão expirada. Por favor, solicite um novo convite.');
+        } else if (error.message.includes('weak_password')) {
+          setError('Senha muito fraca. Use pelo menos 8 caracteres com letras e números.');
+        } else {
+          setError(`Erro ao definir senha: ${error.message}`);
+        }
         return;
       }
 
