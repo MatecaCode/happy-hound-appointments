@@ -243,17 +243,37 @@ const AdminSettings = () => {
     const toastId = `send-setup-${staffProfile.id}`;
     try {
       setResendingSetupFor(staffProfile.id);
-      const { data, error } = await supabase.functions.invoke(FN_SEND_STAFF_INVITE, {
-        body: {
+      
+      // Use fetch directly to get better error details
+      const response = await fetch(`https://ieotixprkfglummoobkb.supabase.co/functions/v1/send-staff-invite`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imllb3RpeHBya2ZnbHVtbW9vYmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkzMjUxNjUsImV4cCI6MjA2NDkwMTE2NX0.hWAxW1tBbMQr3BOPSPOR57eiYvzWzDjaUMjigLyUaGQ`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: staffProfile.email.trim().toLowerCase(),
           staff_profile_id: staffProfile.id,
-        },
+        }),
       });
 
-      if (error || !data?.ok) {
-        throw new Error(error?.message || data?.error || "Falha ao enviar setup");
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        console.error("[SEND_STAFF_SETUP] HTTP Error:", {
+          status: response.status,
+          statusText: response.statusText,
+          data: responseData
+        });
+        throw new Error(responseData?.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
+      if (responseData?.error) {
+        console.error("[SEND_STAFF_SETUP] Edge function returned error:", responseData);
+        throw new Error(responseData.error);
+      }
+
+      console.log("[SEND_STAFF_SETUP] Success:", responseData);
       toast.success("Setup enviado 🎉", { id: toastId });
       fetchStaff(); // Refresh to show updated status
     } catch (e: any) {
@@ -325,34 +345,44 @@ const AdminSettings = () => {
 
       // Send invitation email using Edge Function (like client flow)
       try {
-        const { data: inviteResult, error: inviteError } = await supabase.functions.invoke(
-          FN_SEND_STAFF_INVITE,
-          {
-            body: {
-              email: staffData.email.trim().toLowerCase(),
-              staff_profile_id: staffData.id
-            }
-          }
-        );
+        const response = await fetch(`https://ieotixprkfglummoobkb.supabase.co/functions/v1/send-staff-invite`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imllb3RpeHBya2ZnbHVtbW9vYmtiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkzMjUxNjUsImV4cCI6MjA2NDkwMTE2NX0.hWAxW1tBbMQr3BOPSPOR57eiYvzWzDjaUMjigLyUaGQ`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: staffData.email.trim().toLowerCase(),
+            staff_profile_id: staffData.id,
+          }),
+        });
 
-        if (inviteError) {
-          console.error('❌ [ADMIN_SETTINGS] Invite error:', inviteError);
-          toast.success('Staff criado com sucesso!', {
-            description: 'Falha ao enviar convite automaticamente. Use o botão "Enviar Setup" para reenviar.',
+        const responseData = await response.json();
+        
+        if (!response.ok) {
+          console.error("❌ [ADMIN_SETTINGS] Invite HTTP Error:", {
+            status: response.status,
+            statusText: response.statusText,
+            data: responseData
           });
-        } else if (inviteResult?.ok) {
+          toast.success('Staff criado com sucesso!', {
+            description: `Falha ao enviar convite: ${responseData?.error || 'Erro desconhecido'}. Use o botão "Enviar Setup" para reenviar.`,
+          });
+        } else if (responseData?.error) {
+          console.error("❌ [ADMIN_SETTINGS] Invite function error:", responseData);
+          toast.success('Staff criado com sucesso!', {
+            description: `Falha ao enviar convite: ${responseData.error}. Use o botão "Enviar Setup" para reenviar.`,
+          });
+        } else {
+          console.log("✅ [ADMIN_SETTINGS] Invite sent successfully:", responseData);
           toast.success('Staff criado com sucesso! 🎉', {
             description: `Convite enviado para ${staffData.email}`,
           });
-        } else {
-          toast.success('Staff criado com sucesso!', {
-            description: 'Convite será enviado separadamente.',
-          });
         }
       } catch (inviteErr) {
-        console.error('❌ [ADMIN_SETTINGS] Invite send error:', inviteErr);
+        console.error('❌ [ADMIN_SETTINGS] Invite exception:', inviteErr);
         toast.success('Staff criado com sucesso!', {
-          description: 'Use o botão "Enviar Setup" para enviar o convite.',
+          description: 'Falha ao enviar convite automaticamente. Use o botão "Enviar Setup" para reenviar.',
         });
       }
       
