@@ -16,6 +16,9 @@ import { CalendarIcon, Edit, DollarSign, FileText, ArrowLeft, Loader2, AlertCirc
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAdminAvailability } from '@/hooks/useAdminAvailability';
+import { toHHMM } from '@/utils/time';
 
 interface AppointmentDetails {
   id: string;
@@ -30,6 +33,20 @@ interface AppointmentDetails {
   status?: string;
   total_price?: number;
   service_id?: string;
+  is_admin_override?: boolean;
+  booked_by_admin?: boolean;
+  is_double_booking?: boolean;
+  override_conflicts?: any;
+}
+
+interface TimeSlot {
+  id: string;
+  time: string;
+  available: boolean;
+  hasConflict: boolean;
+  conflictDetails?: string;
+  status: 'available' | 'occupied' | 'unavailable';
+  tooltipMessage: string;
 }
 
 interface AvailabilityData {
@@ -42,8 +59,15 @@ interface AvailabilityData {
   current_booking_count: number;
   other_booking_count: number;
   is_fully_available: boolean;
+  is_primary_available?: boolean;
+  is_secondary_available?: boolean;
+  overall_status?: string;
   is_same_booking: boolean;
   service_duration: number;
+  primary_service_duration?: number;
+  secondary_service_duration?: number;
+  primary_start_time?: string;
+  secondary_start_time?: string;
   start_time: string;
   end_time: string;
   staff_availability?: any[]; // Added for dual-service availability
@@ -106,9 +130,30 @@ const AdminEditBooking = () => {
   // Pending staff changes (not applied until save)
   const [pendingStaffChanges, setPendingStaffChanges] = useState<Record<string, string | null>>({});
   
+  // Single source of truth for selected staff IDs (current + pending changes)
+  const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
+  
   // Modal state
   const [showOverrideModal, setShowOverrideModal] = useState(false);
   const [pendingEditData, setPendingEditData] = useState<any>(null);
+  
+  // Dual-service detection
+  const [isDualService, setIsDualService] = useState(false);
+  
+  // Time slot grid state
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
+  
+  // Admin availability hook
+  const { 
+    timeSlots: adminTimeSlots, 
+    services, 
+    providers, 
+    loading: availabilityLoading, 
+    fetchAdminServices, 
+    fetchAdminProviders, 
+    fetchAdminTimeSlots 
+  } = useAdminAvailability();
 
   // Load appointment details
   useEffect(() => {
@@ -211,6 +256,18 @@ const AdminEditBooking = () => {
       }));
 
       setServiceStaffAssignments(assignments);
+      
+      // Initialize selectedStaffIds from current assignments
+      const currentStaffIds = assignments
+        .filter(assignment => assignment.staff_profile_id)
+        .map(assignment => assignment.staff_profile_id!);
+      setSelectedStaffIds(currentStaffIds);
+      console.log('🔍 [ADMIN_EDIT_BOOKING] Initialized staff IDs:', currentStaffIds);
+      
+      // Detect if this is a dual-service appointment (has service_order = 2)
+      const hasDualService = assignments.some(assignment => assignment.service_order === 2);
+      setIsDualService(hasDualService);
+      console.log('🔍 [ADMIN_EDIT_BOOKING] Dual-service detected:', hasDualService);
 
     } catch (error) {
       console.error('❌ [ADMIN_EDIT_BOOKING] Error loading service staff assignments:', error);
@@ -253,6 +310,20 @@ const AdminEditBooking = () => {
       ...prev,
       [serviceId]: newStaffId
     }));
+    
+    // Update selectedStaffIds to reflect current + pending changes
+    const updatedStaffIds = serviceStaffAssignments.map(assignment => {
+      if (assignment.service_id === serviceId) {
+        return newStaffId; // Use new staff ID for this service
+      }
+      // Check if there's a pending change for this assignment
+      const pendingChange = pendingStaffChanges[assignment.service_id];
+      return pendingChange !== undefined ? pendingChange : assignment.staff_profile_id;
+    }).filter(Boolean) as string[]; // Remove null values
+    
+    setSelectedStaffIds(updatedStaffIds);
+    console.log('🔍 [ADMIN_EDIT_BOOKING] Updated selected staff IDs:', updatedStaffIds);
+    console.log('🔍 [ADMIN_EDIT_BOOKING] This should trigger time slot reload for new staff availability');
   };
 
   // Apply all pending staff changes when form is submitted
@@ -363,45 +434,90 @@ const AdminEditBooking = () => {
     loadTimeSlots();
   }, [selectedDate]);
 
-  // Check availability when date, time, or duration changes
+  // Load time slots when date or staff assignments change
   useEffect(() => {
-    const checkAvailability = async () => {
-      if (!selectedDate || !selectedTime || !appointmentId) {
-        setAvailabilityData(null);
+    const loadTimeSlots = async () => {
+      if (!selectedDate || serviceStaffAssignments.length === 0) {
+        setTimeSlots([]);
         return;
       }
 
-      setIsCheckingAvailability(true);
-      try {
-        // Calculate total duration: current duration + selected duration to add
-        const currentDuration = appointmentDetails?.duration || 0;
-        const durationToAdd = selectedDuration || 0;
-        const totalDuration = currentDuration + durationToAdd;
-        
-        // Use the new dual-staff availability function
-        const { data, error } = await supabase.rpc('check_dual_staff_availability_for_edit', {
-          _appointment_id: appointmentId,
-          _new_date: format(selectedDate, 'yyyy-MM-dd'),
-          _new_time: selectedTime,
-          _new_duration: totalDuration
-        });
+      console.log('🔧 [ADMIN_EDIT_BOOKING] Loading time slots for date:', selectedDate);
+      console.log('🔧 [ADMIN_EDIT_BOOKING] Service staff assignments:', serviceStaffAssignments);
 
-        if (error) {
-          console.error('Error checking availability:', error);
-          return;
-        }
+      // Use selectedStaffIds (current + pending changes) for time slot loading
+      const staffIds = selectedStaffIds;
 
-        console.log('🔍 [ADMIN_EDIT_BOOKING] Availability data:', data);
-        setAvailabilityData(data);
-      } catch (error) {
-        console.error('Error checking availability:', error);
-      } finally {
-        setIsCheckingAvailability(false);
+      if (staffIds.length === 0) {
+        console.log('⚠️ [ADMIN_EDIT_BOOKING] No staff assigned');
+        setTimeSlots([]);
+        return;
       }
+
+      // Get services from assignments
+      const primaryService = serviceStaffAssignments.find(a => a.service_order === 1);
+      const secondaryService = serviceStaffAssignments.find(a => a.service_order === 2);
+
+      if (!primaryService) {
+        console.log('⚠️ [ADMIN_EDIT_BOOKING] No primary service found');
+        setTimeSlots([]);
+        return;
+      }
+
+      // Find service details from services array
+      const primaryServiceDetails = services.find(s => s.id === primaryService.service_id);
+      const secondaryServiceDetails = secondaryService ? services.find(s => s.id === secondaryService.service_id) : null;
+
+      console.log('🔧 [ADMIN_EDIT_BOOKING] Services for time slot loading:', {
+        primary: primaryServiceDetails?.name,
+        secondary: secondaryServiceDetails?.name || 'None'
+      });
+
+      // Use admin availability hook to fetch time slots
+      await fetchAdminTimeSlots(
+        selectedDate,
+        staffIds,
+        primaryServiceDetails || null,
+        secondaryServiceDetails || null
+      );
     };
 
-    checkAvailability();
-  }, [selectedDate, selectedTime, selectedDuration, appointmentId, appointmentDetails?.duration]);
+    loadTimeSlots();
+  }, [selectedDate, serviceStaffAssignments, services, fetchAdminTimeSlots, selectedStaffIds]);
+
+  // Convert admin time slots to TimeSlot format with status and tooltips
+  useEffect(() => {
+    const convertedSlots: TimeSlot[] = adminTimeSlots.map(slot => {
+      const status: 'available' | 'occupied' | 'unavailable' = slot.available ? 'available' : 'occupied';
+      
+      return {
+        id: slot.id,
+        time: slot.time,
+        available: slot.available,
+        hasConflict: !slot.available,
+        conflictDetails: slot.available ? undefined : 'Horário ocupado',
+        status,
+        tooltipMessage: slot.available 
+          ? `Disponível às ${slot.time}`
+          : `Ocupado às ${slot.time}`
+      };
+    });
+
+    setTimeSlots(convertedSlots);
+    console.log('🔧 [ADMIN_EDIT_BOOKING] Converted time slots:', convertedSlots.length);
+  }, [adminTimeSlots]);
+
+  // Initialize services on component mount
+  useEffect(() => {
+    fetchAdminServices();
+  }, [fetchAdminServices]);
+
+  // Handle time slot selection
+  const handleTimeSlotSelect = (slot: TimeSlot) => {
+    console.log('🔧 [ADMIN_EDIT_BOOKING] Time slot selected:', slot);
+    setSelectedTimeSlot(slot);
+    setSelectedTime(slot.time);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -411,7 +527,12 @@ const AdminEditBooking = () => {
       return;
     }
 
-    const timeToUse = selectedTime || appointmentDetails?.time;
+    if (!selectedTime) {
+      toast.error('Por favor, selecione um horário');
+      return;
+    }
+
+    const timeToUse = selectedTime;
     
     // Debug: Log the time format being validated
     console.log('🔍 [ADMIN_EDIT_BOOKING] Time to validate:', timeToUse);
@@ -428,29 +549,22 @@ const AdminEditBooking = () => {
     const durationToAdd = selectedDuration || 0;
     const totalDuration = currentDuration + durationToAdd;
 
-    // Check if we have availability data and if there are conflicts
-    let hasConflicts = false;
-    if (availabilityData && !availabilityData.is_fully_available) {
-      // Only consider it a conflict if there are other bookings involved
-      // Same booking extensions should not trigger override modal
-      if (availabilityData.other_booking_count > 0) {
-        hasConflicts = true;
-        
-        // Store the edit data and show custom modal instead of window.confirm
-        setPendingEditData({
-          appointmentId,
-          newDate: format(selectedDate, 'yyyy-MM-dd'),
-          newTime: timeToUse,
-          newDuration: totalDuration,
-          extraFee: parseFloat(extraFee) || 0,
-          selectedAddon,
-          adminNotes: adminNotes || null,
-          editReason: editReason || null,
-          forceOverride: true
-        });
-        setShowOverrideModal(true);
-        return;
-      }
+    // Check if the selected time slot has conflicts
+    if (selectedTimeSlot && selectedTimeSlot.status === 'occupied') {
+      // Store the edit data and show custom modal instead of window.confirm
+      setPendingEditData({
+        appointmentId,
+        newDate: format(selectedDate, 'yyyy-MM-dd'),
+        newTime: timeToUse,
+        newDuration: totalDuration,
+        extraFee: parseFloat(extraFee) || 0,
+        selectedAddon,
+        adminNotes: adminNotes || null,
+        editReason: editReason || null,
+        forceOverride: true
+      });
+      setShowOverrideModal(true);
+      return;
     }
 
     // No conflicts, proceed directly
@@ -471,8 +585,14 @@ const AdminEditBooking = () => {
     setIsSaving(true);
     try {
       console.log('🔧 [ADMIN_EDIT_BOOKING] Submitting edit:', editData);
+      console.log('🔧 [ADMIN_EDIT_BOOKING] Is dual-service:', isDualService);
 
-      const { error } = await supabase.rpc('edit_booking_admin', {
+      // Use appropriate RPC function based on service type
+      const rpcFunction = isDualService ? 'edit_admin_booking_with_dual_services' : 'edit_booking_admin';
+      console.log('🔧 [ADMIN_EDIT_BOOKING] Using RPC function:', rpcFunction);
+
+      // Prepare RPC parameters
+      const rpcParams: any = {
         _appointment_id: editData.appointmentId,
         _new_date: editData.newDate,
         _new_time: editData.newTime,
@@ -482,7 +602,15 @@ const AdminEditBooking = () => {
         _edit_reason: editData.editReason,
         _edited_by: (await supabase.auth.getUser()).data.user?.id,
         _force_override: editData.forceOverride
-      });
+      };
+
+      // Add staff IDs for dual-service function
+      if (rpcFunction === 'edit_admin_booking_with_dual_services') {
+        rpcParams._new_staff_ids = selectedStaffIds;
+        console.log('🔧 [ADMIN_EDIT_BOOKING] Including staff IDs:', selectedStaffIds);
+      }
+
+      const { error } = await supabase.rpc(rpcFunction, rpcParams);
 
       if (error) {
         console.error('❌ [ADMIN_EDIT_BOOKING] Error:', error);
@@ -510,9 +638,13 @@ const AdminEditBooking = () => {
         }
       }
 
-      // Apply pending staff changes
-      await applyPendingStaffChanges();
+      // Staff changes are now handled directly by the RPC
+      // Clear pending changes since they've been applied
+      setPendingStaffChanges({});
 
+      // Refresh staff assignments and availability data
+      await loadServiceStaffAssignments(editData.appointmentId);
+      
       console.log('✅ [ADMIN_EDIT_BOOKING] Successfully edited booking');
       
       // Show appropriate success message
@@ -636,8 +768,21 @@ const AdminEditBooking = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label className="text-sm font-medium text-gray-700">Serviço</Label>
-                  <p className="text-sm text-gray-900">{appointmentDetails.service_name}</p>
+                  <Label className="text-sm font-medium text-gray-700">Serviço{serviceStaffAssignments.length > 1 ? 's' : ''}</Label>
+                  <div className="text-sm text-gray-900">
+                    {serviceStaffAssignments.length > 0 ? (
+                      serviceStaffAssignments
+                        .sort((a, b) => a.service_order - b.service_order)
+                        .map((assignment, index) => (
+                          <span key={assignment.service_id}>
+                            {assignment.service_name}
+                            {index < serviceStaffAssignments.length - 1 && ' + '}
+                          </span>
+                        ))
+                    ) : (
+                      appointmentDetails.service_name || 'Serviço não especificado'
+                    )}
+                  </div>
                 </div>
                 
                 <div>
@@ -657,7 +802,24 @@ const AdminEditBooking = () => {
                 
                 <div>
                   <Label className="text-sm font-medium text-gray-700">Status</Label>
-                  <p className="text-sm text-gray-900 capitalize">{appointmentDetails.status}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-900 capitalize">{appointmentDetails.status}</p>
+                    {appointmentDetails.is_admin_override && (
+                      <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
+                        Admin Override
+                      </span>
+                    )}
+                    {appointmentDetails.booked_by_admin && !appointmentDetails.is_admin_override && (
+                      <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                        Admin Booking
+                      </span>
+                    )}
+                    {appointmentDetails.is_double_booking && (
+                      <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-800 rounded-full">
+                        Double Booking
+                      </span>
+                    )}
+                  </div>
                 </div>
                 
                 <div>
@@ -714,7 +876,7 @@ const AdminEditBooking = () => {
                       <div className="flex items-center gap-2 text-sm text-gray-600">
                         <span>Data atual:</span>
                         <span className="font-medium text-gray-900">
-                          {format(new Date(appointmentDetails.date), 'PPP', { locale: ptBR })}
+                          {format(new Date(appointmentDetails.date + 'T12:00:00'), 'PPP', { locale: ptBR })}
                         </span>
                         <span className="text-blue-600">
                           → {format(selectedDate, 'PPP', { locale: ptBR })}
@@ -723,112 +885,128 @@ const AdminEditBooking = () => {
                     )}
                   </div>
 
-                  {/* Time Selection */}
-                   <div className="space-y-2">
-                     <Label htmlFor="time">Novo Horário</Label>
-                     <Select value={selectedTime} onValueChange={setSelectedTime}>
-                       <SelectTrigger>
-                         <SelectValue placeholder="Selecione um horário" />
-                       </SelectTrigger>
-                       <SelectContent>
-                         <SelectItem value={appointmentDetails.time}>
-                           Mesmo Horário ({appointmentDetails.time})
-                         </SelectItem>
-                         {isLoadingTimeSlots ? (
-                           <SelectItem value="loading" disabled>Carregando...</SelectItem>
-                         ) : (
-                           availableTimeSlots.map((time) => (
-                             <SelectItem key={time} value={time}>
-                               {time}
-                             </SelectItem>
-                           ))
-                         )}
-                       </SelectContent>
-                     </Select>
-                     
-                     {/* Availability Status */}
-                     {selectedTime && availabilityData && (
-                       <div className="mt-3 p-3 rounded-lg border">
-                         <div className="flex items-center gap-2 mb-2">
-                           <span className="text-sm font-medium">Status da Disponibilidade:</span>
-                           {isCheckingAvailability ? (
-                             <span className="text-sm text-gray-500">Verificando...</span>
-                           ) : availabilityData.is_fully_available ? (
-                             <span className="text-sm text-green-600 font-medium">✅ Disponível</span>
-                           ) : (
-                             <span className="text-sm text-red-600 font-medium">❌ Parcialmente Ocupado</span>
-                           )}
-                         </div>
-                         
-                         {availabilityData && !isCheckingAvailability && (
-                           <div className="text-xs text-gray-600 space-y-1">
-                             <p>Duração do serviço: {availabilityData.service_duration} min</p>
-                             <p>Horário: {availabilityData.start_time} - {availabilityData.end_time}</p>
-                             <p>Slots disponíveis: {availabilityData.available_slots?.length || 0}/{availabilityData.total_slots}</p>
-                             
-                             {/* Show staff availability for dual-service appointments */}
-                             {availabilityData.staff_availability && availabilityData.staff_availability.length > 0 && (
-                               <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-                                 <p className="text-blue-700 font-medium mb-1">👥 Disponibilidade dos Staff:</p>
-                                 <div className="space-y-1">
-                                   {availabilityData.staff_availability.map((staff: any, index: number) => (
-                                     <div key={staff.service_id} className="flex items-center justify-between">
-                                       <span className="text-blue-600 text-xs">
-                                         {staff.service_name} ({staff.staff_name || 'Não atribuído'}):
-                                       </span>
-                                       <span className={`text-xs font-medium ${staff.is_available ? 'text-green-600' : 'text-red-600'}`}>
-                                         {staff.is_available ? '✅ Disponível' : '❌ Indisponível'}
-                                       </span>
-                                     </div>
-                                   ))}
-                                 </div>
-                               </div>
-                             )}
-                             
-                             {/* Show same booking indicator */}
-                             {availabilityData.is_same_booking && (
-                               <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
-                                 <p className="text-blue-700 font-medium">
-                                   📋 Mesmo agendamento - estendendo duração
-                                 </p>
-                                 <p className="text-blue-600 text-xs mt-1">
-                                   Você está modificando o mesmo agendamento, apenas adicionando tempo.
-                                 </p>
-                               </div>
-                             )}
-                             
-                             {availabilityData.unavailable_count > 0 && (
-                               <div className="mt-2 p-2 bg-red-50 rounded border border-red-200">
-                                 <p className="text-red-700 font-medium">
-                                   ⚠️ {availabilityData.unavailable_count} slot(s) ocupado(s)
-                                 </p>
-                                 
-                                 {/* Show breakdown of occupied slots */}
-                                 {availabilityData.current_booking_count > 0 && (
-                                   <p className="text-blue-700 text-xs mt-1">
-                                     📋 {availabilityData.current_booking_count} slot(s) deste agendamento
-                                   </p>
-                                 )}
-                                 
-                                 {availabilityData.other_booking_count > 0 && (
-                                   <p className="text-red-600 text-xs mt-1">
-                                     ⚠️ {availabilityData.other_booking_count} slot(s) de outros agendamentos
-                                   </p>
-                                 )}
-                                 
-                                 {/* Only show override warning if there are conflicts with other bookings */}
-                                 {availabilityData.other_booking_count > 0 && (
-                                   <p className="text-red-600 text-xs mt-1">
-                                     O agendamento será criado como override se confirmado.
-                                   </p>
-                                 )}
-                               </div>
-                             )}
-                           </div>
-                         )}
-                       </div>
-                     )}
-                   </div>
+                  {/* Time Slot Grid */}
+                  {selectedDate && (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Horário</Label>
+                        
+                        <div className="grid grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 max-h-60 overflow-y-auto">
+                          {availabilityLoading ? (
+                            <div className="col-span-full flex items-center justify-center py-8">
+                              <div className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span className="text-sm text-gray-600">Carregando horários...</span>
+                              </div>
+                            </div>
+                          ) : timeSlots.length > 0 ? (
+                            <TooltipProvider>
+                              {timeSlots.map((slot) => {
+                                let buttonVariant: "default" | "outline" | "secondary" = "outline";
+                                let buttonClassName = "h-auto py-2";
+                                
+                                if (selectedTime === slot.time) {
+                                  buttonVariant = "default";
+                                } else {
+                                  switch (slot.status) {
+                                    case 'available':
+                                      buttonClassName += " border-green-500 text-green-700 hover:bg-green-50 hover:border-green-600";
+                                      break;
+                                    case 'occupied':
+                                      buttonClassName += " border-red-500 text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-600";
+                                      break;
+                                    default:
+                                      buttonClassName += " border-gray-300 text-gray-400 bg-gray-50 cursor-not-allowed";
+                                      break;
+                                  }
+                                }
+
+                                return (
+                                  <Tooltip key={slot.id}>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        type="button"
+                                        variant={buttonVariant}
+                                        className={buttonClassName}
+                                        onClick={() => handleTimeSlotSelect(slot)}
+                                        disabled={slot.status === 'unavailable'}
+                                      >
+                                        <div className="flex flex-col items-center">
+                                          <span>{slot.time}</span>
+                                        </div>
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>{slot.tooltipMessage}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                );
+                              })}
+                            </TooltipProvider>
+                          ) : (
+                            <div className="col-span-full text-center py-8 text-gray-500">
+                              <p>Nenhum horário disponível para esta data</p>
+                              <p className="text-sm">Verifique se há staff atribuído aos serviços</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Selected time display */}
+                        {selectedTimeSlot && (
+                          <div className="mt-3 p-3 rounded-lg border bg-blue-50 border-blue-200">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm font-medium">Horário Selecionado:</span>
+                              <span className="text-sm text-blue-600 font-medium">
+                                {selectedTimeSlot.time}
+                              </span>
+                              <span className={`text-xs px-2 py-1 rounded ${
+                                selectedTimeSlot.status === 'available' 
+                                  ? 'bg-green-100 text-green-700' 
+                                  : 'bg-red-100 text-red-700'
+                              }`}>
+                                {selectedTimeSlot.status === 'available' ? '✅ Disponível' : '❌ Ocupado'}
+                              </span>
+                            </div>
+                            
+                            {appointmentDetails && (
+                              <div className="text-xs text-gray-600 space-y-1">
+                                <p>
+                                  Horário atual: {appointmentDetails.time} → 
+                                  <span className="text-blue-600 font-medium"> {selectedTimeSlot.time}</span>
+                                </p>
+                                <p>
+                                  Duração: {appointmentDetails.duration || 0} min
+                                  {selectedDuration > 0 && (
+                                    <span className="text-blue-600 font-medium">
+                                      {' → '}{(appointmentDetails.duration || 0) + selectedDuration} min 
+                                      <span className="text-green-600"> (+{selectedDuration} min)</span>
+                                    </span>
+                                  )}
+                                </p>
+                                {selectedDuration > 0 && isDualService && (
+                                  <div className="mt-2 p-2 bg-green-50 rounded border border-green-200">
+                                    <p className="text-green-700 font-medium text-xs">
+                                      🔄 Extensão: +{selectedDuration} min será adicionado ao último segmento
+                                    </p>
+                                    <p className="text-green-600 text-xs mt-1">
+                                      {isDualService ? 'Serviço secundário será estendido' : 'Serviço primário será estendido'}
+                                    </p>
+                                  </div>
+                                )}
+                                {selectedDuration > 0 && !isDualService && (
+                                  <div className="mt-2 p-2 bg-blue-50 rounded border border-blue-200">
+                                    <p className="text-blue-700 font-medium text-xs">
+                                      ⏱️ Extensão: +{selectedDuration} min será adicionado ao serviço
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Duration Selection */}
                   <div className="space-y-2">
@@ -948,7 +1126,7 @@ const AdminEditBooking = () => {
                               
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium text-gray-700">
-                                  Staff Atual: {effectiveAssignment.staff_name || 'Não atribuído'}
+                                  Staff Atual: {assignment.staff_name || 'Não atribuído'}
                                 </Label>
                                 
                                 <Select 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -87,22 +87,32 @@ type BookingData = {
   clientUserId: string | null;   // claimed client only (guardrail)
   petId: string | null;
 
+  date: string | null;           // 'YYYY-MM-DD'
+  time: string | null;           // 'HH:mm:ss'
+  
+  primary?: { 
+    service_id: string; 
+    staff_id: string; 
+  };
+  secondary?: { 
+    service_id: string; 
+    staff_id: string; 
+  }; // present only if user picked
+
+  // Legacy fields for backward compatibility during transition
   primaryServiceId: string | null;
   secondaryServiceId: string | null;
-
-  // Role-based staff selection
   staffByRole: {
     banhista?: string;
     tosador?: string;
     veterinario?: string;
   };
+  selectedDateISO: string | null;   // "YYYY-MM-DD"
+  selectedTimeHHMM: string | null;  // "HH:MM"
 
   notes?: string | null;
   extraFee?: number;
   extraFeeReason?: string | null;
-
-  selectedDateISO: string | null;   // "YYYY-MM-DD"
-  selectedTimeHHMM: string | null;  // "HH:MM"
 };
 
 const AdminManualBooking = () => {
@@ -154,23 +164,32 @@ const AdminManualBooking = () => {
     return false;
   };
 
+  // Optimized staff name mapping for Resumo
+  const staffNameById = useMemo(
+    () => Object.fromEntries((staffMembers ?? []).map(s => [s.id, s.name ?? ''])),
+    [staffMembers]
+  );
+
   // Booking form data
   const [bookingData, setBookingData] = useState<BookingData>({
     clientUserId: null,
     petId: null,
 
+    date: null,           // 'YYYY-MM-DD'
+    time: null,           // 'HH:mm:ss'
+    primary: undefined,
+    secondary: undefined,
+
+    // Legacy fields for backward compatibility
     primaryServiceId: null,
     secondaryServiceId: null,
-
-    // Role-based staff selection
     staffByRole: {},
+    selectedDateISO: null,
+    selectedTimeHHMM: null,
 
     notes: null,
     extraFee: 0,
     extraFeeReason: null,
-
-    selectedDateISO: null,
-    selectedTimeHHMM: null,
   });
 
   // Handle primary service selection
@@ -187,8 +206,11 @@ const AdminManualBooking = () => {
     
     setBookingData(prev => ({ 
       ...prev, 
+      primary: { service_id: service.id, staff_id: '' }, // Initialize with empty staff_id
+      secondary: undefined, // Reset secondary when primary changes
+      // Legacy compatibility
       primaryServiceId: service.id,
-      secondaryServiceId: null, // Reset secondary when primary changes
+      secondaryServiceId: null,
       staffByRole: {} // Reset staff when service changes
     }));
   };
@@ -436,7 +458,11 @@ const AdminManualBooking = () => {
     // Always set the timeSlot regardless of status
     console.log('🔧 [ADMIN_MANUAL_BOOKING] Setting timeSlot to:', slot.time);
     setBookingData(prev => {
-      const newData = { ...prev, selectedTimeHHMM: slot.time };
+      const newData = { 
+        ...prev, 
+        time: toHHMMSS(slot.time), // New state structure (convert to HH:mm:ss)
+        selectedTimeHHMM: slot.time // Legacy compatibility
+      };
       console.log('🔧 [ADMIN_MANUAL_BOOKING] Updated booking data:', newData);
       return newData;
     });
@@ -498,16 +524,78 @@ const AdminManualBooking = () => {
       if (currentStaffId === staffId) {
         const newStaffByRole = { ...prev.staffByRole };
         delete newStaffByRole[role];
-        return { ...prev, staffByRole: newStaffByRole };
+        
+        // Update new state structure based on service requirements
+        let updatedPrimary = prev.primary;
+        let updatedSecondary = prev.secondary;
+        
+        // Check if this staff was assigned to primary service
+        if (prev.primary && prev.primaryServiceId) {
+          const primaryService = services.find(s => s.id === prev.primaryServiceId);
+          if (primaryService && 
+              ((primaryService.requires_bath && role === 'banhista') ||
+               (primaryService.requires_grooming && role === 'tosador') ||
+               (primaryService.requires_vet && role === 'veterinario'))) {
+            updatedPrimary = { ...prev.primary, staff_id: '' };
+          }
+        }
+        
+        // Check if this staff was assigned to secondary service
+        if (prev.secondary && prev.secondaryServiceId) {
+          const secondaryService = services.find(s => s.id === prev.secondaryServiceId);
+          if (secondaryService && 
+              ((secondaryService.requires_bath && role === 'banhista') ||
+               (secondaryService.requires_grooming && role === 'tosador') ||
+               (secondaryService.requires_vet && role === 'veterinario'))) {
+            updatedSecondary = { ...prev.secondary, staff_id: '' };
+          }
+        }
+        
+        return { 
+          ...prev, 
+          staffByRole: newStaffByRole,
+          primary: updatedPrimary,
+          secondary: updatedSecondary
+        };
       }
       
       // Otherwise, select the new staff member for this role
+      const newStaffByRole = {
+        ...prev.staffByRole,
+        [role]: staffId
+      };
+      
+      // Update new state structure based on service requirements
+      let updatedPrimary = prev.primary;
+      let updatedSecondary = prev.secondary;
+      
+      // Check if this staff should be assigned to primary service
+      if (prev.primary && prev.primaryServiceId) {
+        const primaryService = services.find(s => s.id === prev.primaryServiceId);
+        if (primaryService && 
+            ((primaryService.requires_bath && role === 'banhista') ||
+             (primaryService.requires_grooming && role === 'tosador') ||
+             (primaryService.requires_vet && role === 'veterinario'))) {
+          updatedPrimary = { ...prev.primary, staff_id: staffId };
+        }
+      }
+      
+      // Check if this staff should be assigned to secondary service
+      if (prev.secondary && prev.secondaryServiceId) {
+        const secondaryService = services.find(s => s.id === prev.secondaryServiceId);
+        if (secondaryService && 
+            ((secondaryService.requires_bath && role === 'banhista') ||
+             (secondaryService.requires_grooming && role === 'tosador') ||
+             (secondaryService.requires_vet && role === 'veterinario'))) {
+          updatedSecondary = { ...prev.secondary, staff_id: staffId };
+        }
+      }
+      
       return {
         ...prev,
-        staffByRole: {
-          ...prev.staffByRole,
-          [role]: staffId
-        }
+        staffByRole: newStaffByRole,
+        primary: updatedPrimary,
+        secondary: updatedSecondary
       };
     });
   };
@@ -604,33 +692,62 @@ const AdminManualBooking = () => {
       const dateStr = bookingData.selectedDateISO;
       const staffIds = getStaffIds();
 
-      // 🧠 Unified payload builder for all booking types
+      // 🧠 DETERMINISTIC payload builder with single source of truth
       function buildCreatePayload(): Record<string, any> | null {
-        // Validate required fields
-        if (!bookingData.clientUserId || !bookingData.petId || !bookingData.primaryServiceId || 
-            !bookingData.selectedDateISO || !bookingData.selectedTimeHHMM || !user?.id) {
+        // Validate required fields using new state structure
+        if (!bookingData.clientUserId || !bookingData.petId || !bookingData.primary?.service_id || 
+            !bookingData.date || !bookingData.time || !user?.id) {
           console.error('❌ [ADMIN_MANUAL_BOOKING] Missing required fields for payload');
+          console.error('Missing fields:', {
+            clientUserId: !bookingData.clientUserId,
+            petId: !bookingData.petId,
+            primaryService: !bookingData.primary?.service_id,
+            primaryStaff: !bookingData.primary?.staff_id,
+            date: !bookingData.date,
+            time: !bookingData.time,
+            user: !user?.id
+          });
           return null;
         }
 
-        const providerIds = Object.values(bookingData.staffByRole).filter(Boolean) as string[];
-        
-        return {
+        // Build payload deterministically from new state structure
+        const payload = {
           _client_user_id: bookingData.clientUserId,
           _pet_id: bookingData.petId,
-          _primary_service_id: bookingData.primaryServiceId,
-          _booking_date: bookingData.selectedDateISO,
-          _time_slot: toHHMMSS(bookingData.selectedTimeHHMM),
-          _secondary_service_id: bookingData.secondaryServiceId ?? null,
+          _booking_date: bookingData.date,           // 'YYYY-MM-DD'
+          _time_slot: bookingData.time,             // 'HH:mm:ss'
+          _primary_service_id: bookingData.primary.service_id,
+          _secondary_service_id: bookingData.secondary?.service_id ?? null,
           _calculated_price: totalPrice,
           _calculated_duration: totalDuration,
           _notes: bookingData.notes ?? null,
-          _provider_ids: providerIds,
+          _provider_ids: [
+            bookingData.primary.staff_id,
+            ...(bookingData.secondary?.staff_id ? [bookingData.secondary.staff_id] : [])
+          ].filter(Boolean),
           _extra_fee: bookingData.extraFee ?? 0,
           _extra_fee_reason: bookingData.extraFeeReason ?? null,
           _addons: [], // TODO: Add addons support later
           _created_by: user.id,
         };
+
+        console.table(payload);
+
+        // Hard guard: if a secondary service is selected in UI state, both secondary ids must exist
+        if (bookingData.secondary && (!payload._secondary_service_id || !bookingData.secondary.staff_id)) {
+          throw new Error('[ADMIN_BOOKING] Secondary selected but missing ids');
+        }
+
+        console.log('[DEBUG] Final payload structure:', {
+          ...payload,
+          provider_ids_details: payload._provider_ids.map((id: string, index: number) => ({
+            index,
+            staff_id: id,
+            staff_name: staffMembers.find(s => s.id === id)?.name || 'Unknown'
+          }))
+        });
+        
+        return payload;
       }
 
       const payload = buildCreatePayload();
@@ -643,8 +760,15 @@ const AdminManualBooking = () => {
       console.log('[CREATE_BOOKING] payload keys', payload && Object.keys(payload));
       console.log('[CREATE_BOOKING] payload', payload);
 
-      // Always use the dual-service RPC (it handles both single and dual services)
-      const { data: appointmentId, error } = await supabase.rpc('create_admin_booking_with_dual_services', payload);
+      // Call the correct RPC only when secondary exists
+      const rpcName = bookingData.secondary
+        ? 'create_admin_booking_with_dual_services'
+        : 'create_booking_admin';
+
+      console.log(`[ADMIN_BOOKING] Using RPC: ${rpcName}`);
+      console.log(`[ADMIN_BOOKING] Secondary service exists: ${!!bookingData.secondary}`);
+
+      const { data: appointmentId, error } = await supabase.rpc(rpcName, payload);
 
       if (error) {
         console.error('[CREATE_BOOKING] rpc error', error);
@@ -949,6 +1073,8 @@ const AdminManualBooking = () => {
                       setSelectedSecondaryService(service);
                       setBookingData(prev => ({ 
                         ...prev, 
+                        secondary: service ? { service_id: service.id, staff_id: '' } : undefined,
+                        // Legacy compatibility
                         secondaryServiceId: service?.id || null
                         // Keep existing staff selections - don't reset when adding secondary service
                       }));
@@ -959,7 +1085,23 @@ const AdminManualBooking = () => {
               )}
 
               {/* Service Information Display */}
-              {selectedService && (
+              {selectedService && (() => {
+                // Debug logging for Resumo state
+                console.table({
+                  primary_staff_id: bookingData.primary?.staff_id,
+                  secondary_staff_id: bookingData.secondary?.staff_id
+                });
+
+                // Derive names from single source of truth
+                const primaryName = bookingData.primary?.staff_id
+                  ? (staffNameById[bookingData.primary.staff_id] || 'Não atribuído')
+                  : 'Não atribuído';
+
+                const secondaryName = bookingData.secondary?.staff_id
+                  ? (staffNameById[bookingData.secondary.staff_id] || 'Não atribuído')
+                  : 'Não atribuído';
+
+                return (
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <h4 className="font-medium mb-3 text-gray-900">Informações do Serviço</h4>
                   <div className="space-y-2 text-sm">
@@ -977,13 +1119,7 @@ const AdminManualBooking = () => {
                     </div>
                     <div className="flex items-center">
                       <span className="text-gray-600">Profissional:</span>
-                      <span className="font-medium text-gray-900 ml-1">
-                        {(() => {
-                          const primaryStaffId = Object.values(bookingData.staffByRole)[0];
-                          const primaryStaff = staffMembers.find(s => s.id === primaryStaffId);
-                          return primaryStaff?.name?.trim() || 'Não atribuído';
-                        })()}
-                      </span>
+                      <span className="font-medium text-gray-900 ml-1">{primaryName}</span>
                     </div>
                     
                     {/* Secondary Service Information */}
@@ -1004,13 +1140,7 @@ const AdminManualBooking = () => {
                           </div>
                           <div className="flex items-center">
                             <span className="text-gray-600">Profissional:</span>
-                            <span className="font-medium text-gray-900 ml-1">
-                              {(() => {
-                                const secondaryStaffId = Object.values(bookingData.staffByRole)[1];
-                                const secondaryStaff = staffMembers.find(s => s.id === secondaryStaffId);
-                                return secondaryStaff?.name?.trim() || 'Não atribuído';
-                              })()}
-                            </span>
+                            <span className="font-medium text-gray-900 ml-1">{secondaryName}</span>
                           </div>
                         </div>
                         
@@ -1035,16 +1165,27 @@ const AdminManualBooking = () => {
                     )}
                   </div>
                 </div>
-              )}
+                );
+              })()}
 
-              {/* Debug Section - Remove this after testing */}
-              <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                <strong>Debug Info:</strong><br/>
-                Selected Service: {selectedService?.name || 'None'}<br/>
-                Show Secondary Dropdown: {showSecondaryServiceDropdown ? 'YES' : 'NO'}<br/>
-                Available TOSA Services: {tosaServices.length}<br/>
-                TOSA Services: {tosaServices.map(s => s.name).join(', ')}
-              </div>
+              {/* Debug Section - Only show in debug mode */}
+              {(() => {
+                const isDebug =
+                  (typeof window !== 'undefined' &&
+                   new URLSearchParams(window.location.search).get('debug') === '1') ||
+                  (typeof localStorage !== 'undefined' &&
+                   localStorage.getItem('debug') === '1');
+                
+                return isDebug ? (
+                  <div className="p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                    <strong>Debug Info:</strong><br/>
+                    Selected Service: {selectedService?.name || 'None'}<br/>
+                    Show Secondary Dropdown: {showSecondaryServiceDropdown ? 'YES' : 'NO'}<br/>
+                    Available TOSA Services: {tosaServices.length}<br/>
+                    TOSA Services: {tosaServices.map(s => s.name).join(', ')}
+                  </div>
+                ) : null;
+              })()}
 
               {/* Next Button */}
               <div className="flex justify-end pt-4">
@@ -1170,7 +1311,8 @@ const AdminManualBooking = () => {
                         });
                         setBookingData(prev => ({ 
                           ...prev, 
-                          selectedDateISO 
+                          date: selectedDateISO, // New state structure
+                          selectedDateISO // Legacy compatibility
                         }));
                       }}
                       visibleMonth={visibleMonth}

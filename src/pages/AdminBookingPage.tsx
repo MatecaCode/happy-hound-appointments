@@ -989,23 +989,33 @@ const AdminBookingPage = () => {
                   <div className="text-xs text-gray-500">
                     <p>Dias com disponibilidade: {availabilitySummary.filter(a => a.has_availability).length}</p>
                     <p>Dias sem disponibilidade: {availabilitySummary.filter(a => !a.has_availability).length}</p>
-                    <details className="mt-2">
-                      <summary className="cursor-pointer text-blue-600">Debug: Ver detalhes da disponibilidade</summary>
-                      <div className="mt-1 p-2 bg-gray-100 rounded text-xs">
-                        <p>Staff Profile IDs: {staffProfileIds.join(', ')}</p>
-                        <p>Total de dias carregados: {availabilitySummary.length}</p>
-                        <p>Primeiros 5 dias com disponibilidade:</p>
-                                                 <ul className="ml-4">
-                           {availabilitySummary
-                             .filter(a => a.has_availability)
-                             .slice(0, 5)
-                             .map((a, i) => (
-                               <li key={i}>{a.date} - Disponível</li>
-                             ))
-                           }
-                         </ul>
-                      </div>
-                    </details>
+                    {(() => {
+                      const isDebug =
+                        (typeof window !== 'undefined' &&
+                         new URLSearchParams(window.location.search).get('debug') === '1') ||
+                        (typeof localStorage !== 'undefined' &&
+                         localStorage.getItem('debug') === '1');
+                      
+                      return isDebug ? (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-blue-600">Debug: Ver detalhes da disponibilidade</summary>
+                          <div className="mt-1 p-2 bg-gray-100 rounded text-xs">
+                            <p>Staff Profile IDs: {staffProfileIds.join(', ')}</p>
+                            <p>Total de dias carregados: {availabilitySummary.length}</p>
+                            <p>Primeiros 5 dias com disponibilidade:</p>
+                                                     <ul className="ml-4">
+                               {availabilitySummary
+                                 .filter(a => a.has_availability)
+                                 .slice(0, 5)
+                                 .map((a, i) => (
+                                   <li key={i}>{a.date} - Disponível</li>
+                                 ))
+                               }
+                             </ul>
+                          </div>
+                        </details>
+                      ) : null;
+                    })()}
                   </div>
                 )}
               </div>

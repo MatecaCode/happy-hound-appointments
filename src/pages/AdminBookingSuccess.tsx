@@ -93,29 +93,12 @@ const AdminBookingSuccess: React.FC = () => {
       const { data, error } = await supabase
         .from('appointments')
         .select(`
-          id,
-          date,
-          time,
-          total_price,
-          notes,
-          duration,
-          client:clients!inner(
-            id,
-            name,
-            user_id
-          ),
+          id, date, time, total_price, notes, duration,
+          client:clients!inner(id, name, user_id),
           pet:pets!inner(name),
           service:services!inner(name),
-          appointment_staff(
-            staff_profile:staff_profiles!inner(name),
-            service_id
-          ),
-          appointment_services(
-            service_order,
-            price,
-            duration,
-            services(name)
-          )
+          appointment_services(service_order, service_id, price, duration, services(name)),
+          appointment_staff(service_id, staff_profile:staff_profiles!inner(name))
         `)
         .eq('id', appointmentId)
         .single();
@@ -125,20 +108,38 @@ const AdminBookingSuccess: React.FC = () => {
       // Create service-staff assignments
       const serviceAssignments: ServiceStaffAssignment[] = [];
       
-      if ((data as any).appointment_services && (data as any).appointment_staff) {
-        // For each service, find the assigned staff
-        (data as any).appointment_services.forEach((aps: any) => {
-          const serviceName = (aps.services as any)?.name || 'Serviço';
+      // Build mappings using service_id as join key
+      const services = (data as any)?.appointment_services ?? [];
+      const staff = (data as any)?.appointment_staff ?? [];
+
+      const staffByServiceId = new Map(
+        staff.map((ast: any) => [ast.service_id, ast?.staff_profile?.name || 'Não atribuído'])
+      );
+
+      const primaryServiceId = services.find((s: any) => s.service_order === 1)?.service_id;
+      const secondaryServiceId = services.find((s: any) => s.service_order === 2)?.service_id;
+
+      const primaryName = primaryServiceId ? (staffByServiceId.get(primaryServiceId) ?? 'Não atribuído') : 'Não atribuído';
+      const secondaryName = secondaryServiceId ? (staffByServiceId.get(secondaryServiceId) ?? 'Não atribuído') : 'Não atribuído';
+
+      console.table({
+        appointmentId,
+        primaryServiceId, 
+        secondaryServiceId,
+        primaryName, 
+        secondaryName,
+        staffRecords: staff.length, 
+        serviceRows: services.length,
+      });
+
+      if (services.length > 0) {
+        // For each service, find the assigned staff using the Map
+        services.forEach((aps: any) => {
+          const serviceName = aps.services?.name || 'Serviço';
           const serviceDuration = aps.duration || 60;
           const servicePrice = aps.price || 0;
           const serviceOrder = aps.service_order || 1;
-          
-          // Find staff assigned to this service
-          const assignedStaff = (data as any).appointment_staff.find((as: any) => 
-            as.service_id === aps.service_id
-          );
-          
-          const staffName = assignedStaff?.staff_profile?.name || 'Não atribuído';
+          const staffName = staffByServiceId.get(aps.service_id) as string || 'Não atribuído';
           
           serviceAssignments.push({
             service_name: serviceName,
@@ -153,7 +154,7 @@ const AdminBookingSuccess: React.FC = () => {
       // If no service assignments, create fallback
       if (serviceAssignments.length === 0) {
         const primaryServiceName = (data as any).service?.name || 'Serviço';
-        const primaryStaffName = (data as any).appointment_staff?.[0]?.staff_profile?.name || 'Não atribuído';
+        const primaryStaffName = staff[0]?.staff_profile?.name || 'Não atribuído';
         
         serviceAssignments.push({
           service_name: primaryServiceName,
@@ -339,7 +340,10 @@ const AdminBookingSuccess: React.FC = () => {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR');
+    // Parse YYYY-MM-DD format without timezone conversion
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day); // month is 0-based
+    return date.toLocaleDateString('pt-BR');
   };
 
   const formatTime = (timeString: string) => {
@@ -402,6 +406,10 @@ const AdminBookingSuccess: React.FC = () => {
                 <span>{appointment.client.user.full_name}</span>
               </div>
               {/* Service Assignments */}
+              {(() => {
+                // Defensive logging for staff assignments (already logged during fetch)
+                return null;
+              })()}
               {appointment.service_assignments && appointment.service_assignments.length > 0 ? (
                 appointment.service_assignments.map((assignment, index) => (
                   <div key={index} className="border-l-4 border-blue-500 pl-3 space-y-2">

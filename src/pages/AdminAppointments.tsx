@@ -402,14 +402,14 @@ const AdminAppointments = () => {
       };
 
       return (
-        <div className={`border rounded-xl p-6 flex flex-col shadow-md hover:shadow-lg transition-shadow ${getCardBackground()} ${getOverrideBorder()}`}>
+        <div className={`border rounded-xl p-6 pb-4 flex flex-col shadow-md hover:shadow-lg transition-shadow min-w-0 ${getCardBackground()} ${getOverrideBorder()}`}>
           {/* 1. Pet Name (bold) */}
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex-1">
-              <h3 className="text-xl font-bold text-gray-900 mb-1">{appointment.pet_name}</h3>
-              <p className="text-sm text-gray-500">{appointment.service_name}</p>
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-xl font-bold text-gray-900 mb-1 truncate">{appointment.pet_name}</h3>
+              <p className="text-sm text-gray-500 break-words">{appointment.service_name}</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               {getStatusBadge(appointment.status, appointment.service_status)}
               {getServiceStatusBadge(appointment.service_status)}
             </div>
@@ -443,14 +443,14 @@ const AdminAppointments = () => {
           </div>
 
           {/* 4. Duration and Price - side by side */}
-          <div className="flex items-center gap-2 text-sm mb-4">
-            <div className="flex items-center gap-1">
+          <div className="flex flex-wrap items-center gap-2 text-sm mb-4">
+            <div className="inline-flex items-center gap-1">
               <span className="text-gray-500">⏱</span>
               <span className="text-xs font-medium text-gray-700">Duração:</span>
               <span className="text-sm">{appointment.duration || 60} min</span>
             </div>
             <span className="text-gray-300">|</span>
-            <div className="flex items-center gap-1">
+            <div className="inline-flex items-center gap-1">
               <span className="text-gray-500">💰</span>
               <span className="text-xs font-medium text-gray-700">Preço:</span>
               <span className="text-sm font-medium">R$ {(appointment.total_price || 0).toFixed(2)}</span>
@@ -565,29 +565,37 @@ const AdminAppointments = () => {
           )}
 
           {/* 10. Action Buttons - Always at bottom */}
-        <div className="flex items-center justify-between pt-4 mt-auto">
-          <div className="flex items-center gap-2">
-                         <AppointmentActions 
-               appointmentId={appointment.id} 
-               status={appointment.status} 
-               onCancel={refreshAppointments}
-               onConfirm={refreshAppointments}
-               onEdit={refreshAppointments}
-               isAdminOverride={appointment.is_admin_override}
-               currentDate={appointment.date}
-               currentTime={appointment.time}
-               currentExtraFee={appointment.extra_fee}
-               currentNotes={appointment.notes}
-             />
-          </div>
+        <div className="flex flex-wrap items-center gap-3 mt-4 pt-4 border-t min-w-0">
+          <AppointmentActions 
+            appointmentId={appointment.id} 
+            status={appointment.status} 
+            onCancel={refreshAppointments}
+            onConfirm={refreshAppointments}
+            onEdit={refreshAppointments}
+            isAdminOverride={appointment.is_admin_override}
+            currentDate={appointment.date}
+            currentTime={appointment.time}
+            currentExtraFee={appointment.extra_fee}
+            currentNotes={appointment.notes}
+          />
           
-          {/* Debug Link */}
-          <Link 
-            to={`/admin/debug/availability/${appointment.staff_ids?.[0] || 'unknown'}/${format(appointment.date, 'yyyy-MM-dd')}`}
-            className="text-xs text-blue-600 hover:text-blue-800 font-mono"
-          >
-            🛠️ Debug
-          </Link>
+          {/* Debug Link - Only show in debug mode */}
+          {(() => {
+            const isDebug =
+              (typeof window !== 'undefined' &&
+               new URLSearchParams(window.location.search).get('debug') === '1') ||
+              (typeof localStorage !== 'undefined' &&
+               localStorage.getItem('debug') === '1');
+            
+            return isDebug ? (
+              <Link 
+                to={`/admin/debug/availability/${appointment.staff_ids?.[0] || 'unknown'}/${format(appointment.date, 'yyyy-MM-dd')}`}
+                className="text-xs text-blue-600 hover:text-blue-800 font-mono"
+              >
+                🛠️ Debug
+              </Link>
+            ) : null;
+          })()}
         </div>
       </div>
     );

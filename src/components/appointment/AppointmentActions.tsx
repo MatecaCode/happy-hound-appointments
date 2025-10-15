@@ -218,14 +218,14 @@ const AppointmentActions = ({
 
   return (
     <>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {/* Show Confirm button only for pending appointments - ADMIN ONLY */}
         {status === 'pending' && isAdmin && (
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowConfirmDialog(true)}
-            className="text-green-600 border-green-200 hover:bg-green-50"
+            className="text-green-600 border-green-200 hover:bg-green-50 flex-shrink-0"
           >
             <CheckCircle className="h-4 w-4 mr-1" />
             Confirmar
@@ -238,7 +238,7 @@ const AppointmentActions = ({
             <Button
               variant="outline"
               size="sm"
-              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              className="text-blue-600 border-blue-200 hover:bg-blue-50 flex-shrink-0"
             >
               <Edit className="h-4 w-4 mr-1" />
               Editar
@@ -254,7 +254,7 @@ const AppointmentActions = ({
             variant="outline"
             size="sm"
             onClick={() => setShowCancelDialog(true)}
-            className="text-red-600 border-red-200 hover:bg-red-50"
+            className="text-red-600 border-red-200 hover:bg-red-50 flex-shrink-0"
           >
             <X className="h-4 w-4 mr-1" />
             Cancelar

@@ -68,6 +68,7 @@ const EditBookingDialog = ({
   const [isLoadingTimeSlots, setIsLoadingTimeSlots] = useState(false);
   const [availabilityData, setAvailabilityData] = useState<any>(null);
   const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [isDualService, setIsDualService] = useState(false);
 
   // Load appointment details
   useEffect(() => {
@@ -102,6 +103,18 @@ const EditBookingDialog = ({
           pet_name: (data.pets as any)?.name,
           client_name: (data.clients as any)?.name
         });
+
+        // Check if this is a dual-service appointment
+        const { data: serviceData, error: serviceError } = await supabase
+          .from('appointment_services')
+          .select('service_order')
+          .eq('appointment_id', appointmentId);
+
+        if (!serviceError && serviceData) {
+          const hasDualService = serviceData.some(service => service.service_order === 2);
+          setIsDualService(hasDualService);
+          console.log('🔍 [EDIT_BOOKING_DIALOG] Dual-service detected:', hasDualService);
+        }
       } catch (error) {
         console.error('Error loading appointment details:', error);
         toast.error('Erro ao carregar detalhes do agendamento');
@@ -151,7 +164,7 @@ const EditBookingDialog = ({
 
       setIsCheckingAvailability(true);
       try {
-        const { data, error } = await supabase.rpc('check_staff_availability_for_edit', {
+        const { data, error } = await supabase.rpc('check_dual_staff_availability_for_edit', {
           _appointment_id: appointmentId,
           _new_date: format(selectedDate, 'yyyy-MM-dd'),
           _new_time: selectedTime
@@ -203,7 +216,10 @@ const EditBookingDialog = ({
 
       // Check if we have availability data and if there are conflicts
       let hasConflicts = false;
-      if (availabilityData && !availabilityData.is_fully_available) {
+      const isAvailable = availabilityData?.overall_status === 'Livre' || 
+                         (availabilityData?.overall_status === undefined && availabilityData?.is_fully_available);
+      
+      if (availabilityData && !isAvailable) {
         hasConflicts = true;
         
         // Show warning about override
@@ -220,7 +236,11 @@ const EditBookingDialog = ({
       }
 
       // Proceed with edit (force override if conflicts were found)
-      const { error } = await supabase.rpc('edit_booking_admin', {
+      // Use appropriate RPC function based on service type
+      const rpcFunction = isDualService ? 'edit_admin_booking_with_dual_services' : 'edit_booking_admin';
+      console.log('🔧 [EDIT_BOOKING_DIALOG] Using RPC function:', rpcFunction, 'isDualService:', isDualService);
+
+      const { error } = await supabase.rpc(rpcFunction, {
         _appointment_id: appointmentId,
         _new_date: format(selectedDate, 'yyyy-MM-dd'),
         _new_time: timeToUse,
@@ -366,10 +386,12 @@ const EditBookingDialog = ({
                    <span className="text-sm font-medium">Status da Disponibilidade:</span>
                    {isCheckingAvailability ? (
                      <span className="text-sm text-gray-500">Verificando...</span>
-                   ) : availabilityData.is_fully_available ? (
+                   ) : (availabilityData.overall_status === 'Livre' || (availabilityData.overall_status === undefined && availabilityData.is_fully_available)) ? (
                      <span className="text-sm text-green-600 font-medium">✅ Disponível</span>
+                   ) : (availabilityData.overall_status === 'Parcialmente Ocupado' || (availabilityData.overall_status === undefined && !availabilityData.is_fully_available && availabilityData.unavailable_count > 0)) ? (
+                     <span className="text-sm text-orange-600 font-medium">⚠️ Parcialmente Ocupado</span>
                    ) : (
-                     <span className="text-sm text-red-600 font-medium">❌ Parcialmente Ocupado</span>
+                     <span className="text-sm text-red-600 font-medium">❌ Ocupado</span>
                    )}
                  </div>
                  
