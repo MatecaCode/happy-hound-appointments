@@ -227,6 +227,12 @@ const Claim = () => {
           console.error('❌ [CLAIM] Failed to update claimed_at:', updateError);
         }
 
+        // Entering claim mode for client: set transient claim gate
+        try {
+          localStorage.setItem('claim_in_progress','1');
+          claimDiag.log('claim gate SET (linked client)');
+        } catch {}
+
         setClaimStatus({
           status: 'password_setup',
           message: 'Configure sua senha para finalizar',
@@ -278,6 +284,12 @@ const Claim = () => {
             } catch (updateError) {
               console.error('❌ [CLAIM] Failed to update claimed_at:', updateError);
             }
+
+            // Entering claim mode for client: set transient claim gate
+            try {
+              localStorage.setItem('claim_in_progress','1');
+              claimDiag.log('claim gate SET (unlinked client)');
+            } catch {}
 
             setClaimStatus({
               status: 'password_setup',
@@ -366,6 +378,12 @@ const Claim = () => {
         claimDiag.log('cleaning hash after password update');
         (window as any).CLAIM_DIAG?.push({ step: 'hash_cleaned', when: 'after_password_update' });
         window.history.replaceState(null, '', window.location.pathname);
+
+        // Clear claim gate as password was successfully set
+        try {
+          localStorage.removeItem('claim_in_progress');
+          claimDiag.log('claim gate CLEARED');
+        } catch {}
       }
       
       // Immediate redirect

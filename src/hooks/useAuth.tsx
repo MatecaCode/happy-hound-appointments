@@ -264,6 +264,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setAuthError(null);
         }
         
+        // Global redirect gate: if claim_in_progress and currently on /claim, do NOT auto-redirect elsewhere
+        try {
+          const claimGate = localStorage.getItem('claim_in_progress');
+          const onClaimRoute = typeof window !== 'undefined' && window.location.pathname === '/claim';
+          if (claimGate === '1' && onClaimRoute) {
+            // Stay on claim page until password setup completes
+            setLoading(false);
+            return;
+          }
+        } catch {}
+
         setLoading(false);
       }
     );
