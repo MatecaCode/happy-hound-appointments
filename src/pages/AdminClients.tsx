@@ -1334,9 +1334,9 @@ const AdminClients = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
             {filteredClients.map((client) => (
-              <Card key={client.id} className="hover:shadow-lg transition-shadow">
+              <Card key={client.id} className="hover:shadow-lg transition-shadow h-full flex flex-col">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -1380,7 +1380,7 @@ const AdminClients = () => {
                      </div>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
+                <CardContent className="space-y-3 flex-1 flex flex-col">
                   {client.phone && (
                     <div className="flex items-center gap-2 text-sm text-gray-600">
                       <Phone className="h-4 w-4" />
@@ -1410,7 +1410,7 @@ const AdminClients = () => {
                     </div>
                   )}
                   
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2 pt-2 mt-auto">
                     <Button
                       variant="outline"
                       size="sm"
@@ -1421,7 +1421,7 @@ const AdminClients = () => {
                       Editar
                     </Button>
                     
-                    {client.admin_created && !client.claimed_at && (
+                    {client.admin_created && !client.user_id && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1429,8 +1429,8 @@ const AdminClients = () => {
                         className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300"
                         title={client.claim_invited_at ? 'Reenviar convite' : 'Enviar convite'}
                       >
-                        <Send className="h-3 w-3" />
-                        {client.claim_invited_at ? '' : ''}
+                        <Send className="h-3 w-3 mr-1" />
+                        {client.claim_invited_at ? 'Reenviar Convite' : 'Enviar Convite'}
                       </Button>
                     )}
                     
