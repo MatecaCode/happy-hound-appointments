@@ -35,18 +35,22 @@ export async function adminDeleteAuthUser(
   payload: { user_id?: string | null; email?: string | null },
   timeoutMs = 12000
 ) {
-  const controller = new AbortController();
-  const t = setTimeout(() => controller.abort(), timeoutMs);
-
   try {
-    // @ts-ignore
+    console.log('[ADMIN_DELETE_AUTH] Invoking delete-staff-user with payload:', payload);
+    
     const { data, error } = await supabase.functions.invoke('delete-staff-user', {
       body: payload,
-      fetch: (url: string, init: any) => fetch(url, { ...init, signal: controller.signal }),
     });
-    if (error) throw error;
+    
+    if (error) {
+      console.error('[ADMIN_DELETE_AUTH] Function error:', error);
+      throw error;
+    }
+    
+    console.log('[ADMIN_DELETE_AUTH] Function success:', data);
     return data;
-  } finally {
-    clearTimeout(t);
+  } catch (e) {
+    console.error('[ADMIN_DELETE_AUTH] Unexpected error:', e);
+    throw e;
   }
 }

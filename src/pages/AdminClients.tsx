@@ -34,7 +34,8 @@ import {
   Cat,
   HelpCircle,
   Send,
-  CheckCircle
+  CheckCircle,
+  AlertTriangle
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -153,11 +154,16 @@ const AdminClients = () => {
   const [petBirthDate, setPetBirthDate] = useState<Date | undefined>(undefined);
   const [selectedBreed, setSelectedBreed] = useState<Breed | undefined>(undefined);
 
+  // Data integrity state
+  const [dataIntegrity, setDataIntegrity] = useState<any>(null);
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+
   // Load clients, locations and breeds
   useEffect(() => {
     fetchClients();
     fetchLocations();
     fetchBreeds();
+    checkDataIntegrity();
   }, []);
 
   // Load staff profiles when modals open or location changes
@@ -309,6 +315,142 @@ const AdminClients = () => {
     }
   };
 
+  const checkDataIntegrity = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('client_data_integrity')
+        .select('*');
+
+      if (error) {
+        console.error('❌ [ADMIN_CLIENTS] Error checking data integrity:', error);
+        return;
+      }
+
+      const integrityMap = data?.reduce((acc: any, item: any) => {
+        acc[item.metric] = parseInt(item.value);
+        return acc;
+      }, {});
+
+      setDataIntegrity(integrityMap);
+    } catch (error) {
+      console.error('❌ [ADMIN_CLIENTS] Error checking data integrity:', error);
+    }
+  };
+
+  const handleCleanupOrphanedClients = async () => {
+    const confirmed = window.confirm(
+      'Esta ação irá limpar registros de clientes órfãos (que referenciam usuários inexistentes). ' +
+      'Os dados do cliente serão preservados, mas a referência ao usuário será removida. Continuar?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsCleaningUp(true);
+      
+      // First run a dry-run to see what will be affected
+      const { data: dryRunResult, error: dryRunError } = await supabase
+        .rpc('cleanup_orphaned_clients', { _dry_run: true, _delete_orphaned: false });
+
+      if (dryRunError) {
+        console.error('❌ [ADMIN_CLIENTS] Dry run error:', dryRunError);
+        toast.error('Erro ao verificar registros órfãos');
+        return;
+      }
+
+      const orphanedCount = dryRunResult?.orphaned_found || 0;
+      
+      if (orphanedCount === 0) {
+        toast.success('Nenhum registro órfão encontrado! Dados já estão íntegros.');
+        return;
+      }
+
+      // Run the actual cleanup
+      const { data: cleanupResult, error: cleanupError } = await supabase
+        .rpc('cleanup_orphaned_clients', { _dry_run: false, _delete_orphaned: false });
+
+      if (cleanupError) {
+        console.error('❌ [ADMIN_CLIENTS] Cleanup error:', cleanupError);
+        toast.error('Erro ao limpar registros órfãos');
+        return;
+      }
+
+      const updatedCount = cleanupResult?.records_updated || 0;
+      
+      if (updatedCount > 0) {
+        toast.success(`${updatedCount} registros órfãos foram limpos com sucesso!`);
+        // Refresh data
+        fetchClients();
+        checkDataIntegrity();
+      } else {
+        toast.info('Nenhum registro foi alterado.');
+      }
+
+    } catch (error) {
+      console.error('❌ [ADMIN_CLIENTS] Cleanup error:', error);
+      toast.error('Erro inesperado ao limpar registros órfãos');
+    } finally {
+      setIsCleaningUp(false);
+    }
+  };
+
+  const handleCleanupStaffDuplicates = async () => {
+    const confirmed = window.confirm(
+      'Esta ação irá remover registros de clientes que duplicam funcionários ativos. ' +
+      'Funcionários devem aparecer apenas na página de staff, não como clientes. Continuar?'
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setIsCleaningUp(true);
+      
+      // First run a dry-run to see what will be affected
+      const { data: dryRunResult, error: dryRunError } = await supabase
+        .rpc('cleanup_staff_client_duplicates', { _dry_run: true });
+
+      if (dryRunError) {
+        console.error('❌ [ADMIN_CLIENTS] Staff duplicates dry run error:', dryRunError);
+        toast.error('Erro ao verificar duplicatas de staff');
+        return;
+      }
+
+      const duplicateCount = dryRunResult?.duplicates_found || 0;
+      
+      if (duplicateCount === 0) {
+        toast.success('Nenhuma duplicata de staff encontrada! Dados já estão corretos.');
+        return;
+      }
+
+      // Run the actual cleanup
+      const { data: cleanupResult, error: cleanupError } = await supabase
+        .rpc('cleanup_staff_client_duplicates', { _dry_run: false });
+
+      if (cleanupError) {
+        console.error('❌ [ADMIN_CLIENTS] Staff duplicates cleanup error:', cleanupError);
+        toast.error('Erro ao limpar duplicatas de staff');
+        return;
+      }
+
+      const deletedCount = cleanupResult?.records_deleted || 0;
+      
+      if (deletedCount > 0) {
+        toast.success(`${deletedCount} registros duplicados de staff foram removidos com sucesso!`);
+        // Refresh data
+        fetchClients();
+        checkDataIntegrity();
+      } else {
+        toast.info('Nenhum registro foi alterado.');
+      }
+
+    } catch (error) {
+      console.error('❌ [ADMIN_CLIENTS] Staff duplicates cleanup error:', error);
+      toast.error('Erro inesperado ao limpar duplicatas de staff');
+    } finally {
+      setIsCleaningUp(false);
+    }
+  };
+
   const filteredClients = clients.filter(client => {
     const matchesSearch = 
       client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -353,15 +495,17 @@ const AdminClients = () => {
   };
 
   const handleCreateClient = async () => {
-    if (!formData.name || !formData.email || !formData.phone || !formData.location_id) {
-      toast.error('Nome, email, telefone e local são obrigatórios');
+    if (!formData.name || !formData.phone || !formData.location_id) {
+      toast.error('Nome, telefone e local são obrigatórios');
       return;
     }
 
-    // Check email availability first
-    const emailAvailable = await checkEmailAvailability(formData.email);
-    if (!emailAvailable) {
-      return; // Error already set in emailCheckError state
+    // Check email availability only if email is provided
+    if (formData.email && formData.email.trim()) {
+      const emailAvailable = await checkEmailAvailability(formData.email);
+      if (!emailAvailable) {
+        return; // Error already set in emailCheckError state
+      }
     }
 
     try {
@@ -370,7 +514,7 @@ const AdminClients = () => {
         user_id: null, // Will be set when client completes registration
         name: formData.name,
         phone: formData.phone,
-        email: formData.email,
+        email: formData.email && formData.email.trim() ? formData.email.trim() : null,
         address: formData.address,
         notes: formData.general_notes,
         location_id: formData.location_id,
@@ -854,6 +998,35 @@ const AdminClients = () => {
           <p className="text-gray-600 mt-2">Gerencie todos os clientes registrados no sistema</p>
         </div>
 
+        {/* Data Integrity Warning */}
+        {dataIntegrity && dataIntegrity.orphaned_clients > 0 && (
+          <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                <div>
+                  <h3 className="font-medium text-yellow-800">
+                    Problema de Integridade de Dados Detectado
+                  </h3>
+                  <p className="text-sm text-yellow-700">
+                    {dataIntegrity.orphaned_clients} cliente(s) com referências órfãs encontrado(s). 
+                    Estes registros referenciam usuários que não existem mais.
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={handleCleanupOrphanedClients}
+                disabled={isCleaningUp}
+                variant="outline"
+                className="text-yellow-700 border-yellow-300 hover:bg-yellow-100"
+              >
+                {isCleaningUp ? 'Limpando...' : 'Limpar Registros'}
+              </Button>
+            </div>
+          </div>
+        )}
+
+
         {/* Toolbar */}
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="flex-1 relative">
@@ -935,7 +1108,7 @@ const AdminClients = () => {
                    </div>
                    
                    <div>
-                     <Label htmlFor="email">Email *</Label>
+                     <Label htmlFor="email">Email</Label>
                      <Input
                        id="email"
                        type="email"
@@ -1116,7 +1289,7 @@ const AdminClients = () => {
                 <Button 
                   onClick={handleCreateClient} 
                   className="flex-1" 
-                  disabled={!!emailCheckError || !formData.name || !formData.email || !formData.phone || !formData.location_id}
+                  disabled={!!emailCheckError || !formData.name || !formData.phone || !formData.location_id}
                 >
                   Criar Cliente
                 </Button>
@@ -1331,7 +1504,7 @@ const AdminClients = () => {
                </div>
                
                <div>
-                 <Label htmlFor="edit-email">Email *</Label>
+                 <Label htmlFor="edit-email">Email</Label>
                  <Input
                    id="edit-email"
                    type="email"

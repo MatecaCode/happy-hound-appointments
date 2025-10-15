@@ -306,11 +306,13 @@ const AdminSettings = () => {
       if (existingError && existingError.code !== 'PGRST116') { // PGRST116 = no rows returned
         console.error('❌ [ADMIN_SETTINGS] Existing staff check error:', existingError);
         toast.error('Erro ao verificar staff existente');
+        setIsCreatingStaff(false);
         return;
       }
 
       if (existingStaff) {
         toast.error('Já existe um staff cadastrado com este email.');
+        setIsCreatingStaff(false);
         return;
       }
 
@@ -336,7 +338,19 @@ const AdminSettings = () => {
 
       if (staffError) {
         console.error('❌ [ADMIN_SETTINGS] Staff creation error:', staffError);
-        toast.error('Erro ao criar staff');
+        
+        // Provide more specific error messages based on error details
+        let errorMessage = 'Erro ao criar staff';
+        if (staffError.message?.includes('duplicate key') || staffError.code === '23505') {
+          errorMessage = 'Já existe um staff cadastrado com este email.';
+        } else if (staffError.message?.includes('violates check constraint')) {
+          errorMessage = 'Dados inválidos fornecidos. Verifique os campos obrigatórios.';
+        } else if (staffError.message) {
+          errorMessage = `Erro: ${staffError.message}`;
+        }
+        
+        toast.error(errorMessage);
+        setIsCreatingStaff(false);
         return;
       }
 
@@ -365,13 +379,34 @@ const AdminSettings = () => {
             statusText: response.statusText,
             data: responseData
           });
+          
+          // Handle specific error cases for better user feedback
+          let inviteErrorMessage = 'Erro desconhecido';
+          if (responseData?.error) {
+            if (responseData.error.includes('already registered') || responseData.error.includes('already exists')) {
+              inviteErrorMessage = 'Este email já possui uma conta no sistema';
+            } else if (responseData.error.includes('P0001')) {
+              inviteErrorMessage = 'Este email já está associado a uma conta existente';
+            } else {
+              inviteErrorMessage = responseData.error;
+            }
+          }
+          
           toast.success('Staff criado com sucesso!', {
-            description: `Falha ao enviar convite: ${responseData?.error || 'Erro desconhecido'}. Use o botão "Enviar Setup" para reenviar.`,
+            description: `Falha ao enviar convite: ${inviteErrorMessage}. Use o botão "Enviar Setup" para reenviar.`,
           });
         } else if (responseData?.error) {
           console.error("❌ [ADMIN_SETTINGS] Invite function error:", responseData);
+          
+          let inviteErrorMessage = responseData.error;
+          if (responseData.error.includes('already registered') || responseData.error.includes('already exists')) {
+            inviteErrorMessage = 'Este email já possui uma conta no sistema';
+          } else if (responseData.error.includes('P0001')) {
+            inviteErrorMessage = 'Este email já está associado a uma conta existente';
+          }
+          
           toast.success('Staff criado com sucesso!', {
-            description: `Falha ao enviar convite: ${responseData.error}. Use o botão "Enviar Setup" para reenviar.`,
+            description: `Falha ao enviar convite: ${inviteErrorMessage}. Use o botão "Enviar Setup" para reenviar.`,
           });
         } else {
           console.log("✅ [ADMIN_SETTINGS] Invite sent successfully:", responseData);
@@ -379,24 +414,37 @@ const AdminSettings = () => {
             description: `Convite enviado para ${staffData.email}`,
           });
         }
-      } catch (inviteErr) {
+      } catch (inviteErr: any) {
         console.error('❌ [ADMIN_SETTINGS] Invite exception:', inviteErr);
         toast.success('Staff criado com sucesso!', {
           description: 'Falha ao enviar convite automaticamente. Use o botão "Enviar Setup" para reenviar.',
         });
       }
       
-      // Close modal and reset form
+      // Close modal and reset form - always do this on success
       setIsCreateStaffModalOpen(false);
       resetStaffForm();
+      setIsCreatingStaff(false);
       fetchStaff(); // Refresh to show updated status
-    } catch (error) {
+      
+    } catch (error: any) {
       console.error('❌ [ADMIN_SETTINGS] Error creating staff:', error);
-      toast.error('Erro ao criar staff');
-      // Even on error, close the modal
-      console.log('🔄 [ADMIN_SETTINGS] Closing modal due to error...');
-      setIsCreateStaffModalOpen(false);
-      resetStaffForm();
+      
+      // Provide more specific error messages
+      let errorMessage = 'Erro ao criar staff';
+      if (error?.message) {
+        if (error.message.includes('duplicate key') || error.message.includes('already exists')) {
+          errorMessage = 'Já existe um staff cadastrado com este email.';
+        } else if (error.message.includes('P0001')) {
+          errorMessage = 'Este email já está associado a uma conta existente no sistema.';
+        } else if (error.message.includes('network') || error.message.includes('fetch')) {
+          errorMessage = 'Erro de conexão. Verifique sua internet e tente novamente.';
+        } else {
+          errorMessage = `Erro: ${error.message}`;
+        }
+      }
+      
+      toast.error(errorMessage);
       setIsCreatingStaff(false);
     }
   };
@@ -479,18 +527,53 @@ const AdminSettings = () => {
           console.log('🗑️ [ADMIN_SETTINGS] Deleting auth user via Edge Function:', { user_id: staffProfile.user_id, email: staffProfile.email });
           
           // Try to delete auth user in background (does not block UI)
-          adminDeleteAuthUser(supabase, { 
-            user_id: staffProfile.user_id, 
-            email: staffProfile.email 
-          })
-            .then(() => {
-              console.log('✅ [ADMIN_SETTINGS] Auth user deleted successfully');
-              toast.success('Staff e usuário de autenticação removidos completamente');
-            })
-            .catch((e) => {
-              console.warn('[ADMIN_DELETE_AUTH] failed:', e?.message);
-              toast.success('Staff removido do sistema');
+          try {
+            await adminDeleteAuthUser(supabase, { 
+              user_id: staffProfile.user_id, 
+              email: staffProfile.email 
             });
+            console.log('✅ [ADMIN_SETTINGS] Auth user deleted successfully');
+            toast.success('Staff e usuário de autenticação removidos completamente');
+          } catch (e: any) {
+            console.warn('[ADMIN_DELETE_AUTH] Edge Function failed:', e?.message);
+            
+            // Try fallback RPC to log the deletion request
+            try {
+              const { data: rpcResult, error: rpcError } = await supabase
+                .rpc('admin_delete_auth_user', {
+                  _user_id: staffProfile.user_id,
+                  _email: staffProfile.email
+                });
+              
+              if (rpcError) {
+                console.error('[ADMIN_DELETE_AUTH] RPC fallback failed:', rpcError);
+              } else {
+                console.log('[ADMIN_DELETE_AUTH] Deletion request logged via RPC:', rpcResult);
+              }
+            } catch (rpcError) {
+              console.error('[ADMIN_DELETE_AUTH] RPC fallback error:', rpcError);
+            }
+            
+            // Check if it's a CORS error specifically
+            if (e?.message?.includes('CORS') || e?.message?.includes('Access-Control-Allow-Origin')) {
+              console.warn('[ADMIN_DELETE_AUTH] CORS error detected - Edge Function may not be deployed or configured correctly');
+              toast.warning(
+                'Staff removido do sistema. ⚠️ Usuário de autenticação pode ainda existir (erro de CORS). ' +
+                'Pode ser necessário remover manualmente no painel do Supabase.',
+                { duration: 8000 }
+              );
+            } else if (e?.message?.includes('No auth user found')) {
+              console.log('[ADMIN_DELETE_AUTH] No auth user found to delete');
+              toast.success('Staff removido do sistema (nenhum usuário de autenticação encontrado)');
+            } else {
+              console.error('[ADMIN_DELETE_AUTH] Unexpected error:', e);
+              toast.warning(
+                'Staff removido do sistema. ⚠️ Erro ao remover usuário de autenticação. ' +
+                'Verifique manualmente no painel do Supabase se necessário.',
+                { duration: 6000 }
+              );
+            }
+          }
         } else {
           console.log('ℹ️ [ADMIN_SETTINGS] No linked auth user to delete');
           toast.success('Staff removido completamente do sistema');

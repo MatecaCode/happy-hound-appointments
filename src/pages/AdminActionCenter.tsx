@@ -6,11 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { 
   Calendar, 
   Edit, 
-  DollarSign, 
   Users, 
-  AlertTriangle,
   Plus,
-  X,
   Settings
 } from 'lucide-react';
 import AdminLayout from '@/components/AdminLayout';
@@ -96,117 +93,65 @@ const AdminActionCenter = () => {
             </CardContent>
           </Card>
 
-          {/* Extra Charges */}
+          {/* Manage Users */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5 text-green-500" />
-                Aplicar Cobranças Extras
+                <Users className="h-5 w-5 text-blue-500" />
+                Gerenciar Usuários
               </CardTitle>
               <CardDescription>
-                Área para adicionar taxas adicionais a um agendamento existente.
+                Gerencie clientes e usuários do sistema.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <p className="text-sm text-gray-600">
-                  Adicione taxas extras, descontos ou cobranças especiais a agendamentos.
-                  Suporte a múltiplas categorias de cobrança.
+                  Visualize, edite e gerencie informações de clientes e usuários.
+                  Controle de acesso e permissões.
                 </p>
                 <div className="flex items-center gap-2">
-                  <Badge variant="secondary">Em desenvolvimento</Badge>
-                  <Badge variant="outline">Múltiplas categorias</Badge>
+                  <Badge variant="secondary">Disponível</Badge>
+                  <Badge variant="outline">Controle completo</Badge>
                 </div>
-                <Button disabled className="w-full">
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Adicionar Cobrança Extra
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Staff Reassignment */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-purple-500" />
-                Reatribuir Staff
-              </CardTitle>
-              <CardDescription>
-                Reatribua profissionais para agendamentos existentes.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  Mude o profissional responsável por um agendamento.
-                  Útil para emergências ou reorganização de equipe.
-                </p>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">Em desenvolvimento</Badge>
-                  <Badge variant="outline">Notificação automática</Badge>
-                </div>
-                <Button disabled className="w-full">
+                <Button 
+                  onClick={() => navigate('/admin/clients')}
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                >
                   <Users className="h-4 w-4 mr-2" />
-                  Reatribuir Profissional
+                  Gerenciar Usuários
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Emergency Actions */}
+          {/* Manage Staff */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
-                Ações de Emergência
+                <Settings className="h-5 w-5 text-purple-500" />
+                Gerenciar Staff
               </CardTitle>
               <CardDescription>
-                Ações críticas para situações de emergência.
+                Configuração de sistema e gerenciamento de staff.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 <p className="text-sm text-gray-600">
-                  Cancelamento em massa, bloqueio de horários, ou outras ações críticas.
-                  Requer confirmação adicional.
+                  Gerencie staff, serviços, preços e configurações operacionais.
+                  Controle completo do sistema.
                 </p>
                 <div className="flex items-center gap-2">
-                  <Badge variant="destructive">Crítico</Badge>
-                  <Badge variant="outline">Confirmação dupla</Badge>
+                  <Badge variant="secondary">Disponível</Badge>
+                  <Badge variant="outline">Configuração avançada</Badge>
                 </div>
-                <Button disabled variant="destructive" className="w-full">
-                  <AlertTriangle className="h-4 w-4 mr-2" />
-                  Ações de Emergência
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* System Overrides */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5 text-gray-500" />
-                Overrides do Sistema
-              </CardTitle>
-              <CardDescription>
-                Controles avançados para situações especiais.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p className="text-sm text-gray-600">
-                  Bypass de regras do sistema, horários especiais, ou configurações temporárias.
-                  Use com cautela.
-                </p>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">Em desenvolvimento</Badge>
-                  <Badge variant="outline">Acesso restrito</Badge>
-                </div>
-                <Button disabled variant="outline" className="w-full">
+                <Button 
+                  onClick={() => navigate('/admin/settings')}
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                >
                   <Settings className="h-4 w-4 mr-2" />
-                  Configurar Overrides
+                  Configuração de Sistema
                 </Button>
               </div>
             </CardContent>
@@ -233,12 +178,12 @@ const AdminActionCenter = () => {
                   <div className="text-sm text-gray-600">Modificações</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">0</div>
-                  <div className="text-sm text-gray-600">Cobranças Extras</div>
+                  <div className="text-2xl font-bold text-blue-600">0</div>
+                  <div className="text-sm text-gray-600">Usuários Gerenciados</div>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-purple-600">0</div>
-                  <div className="text-sm text-gray-600">Reatribuições</div>
+                  <div className="text-sm text-gray-600">Configurações Staff</div>
                 </div>
               </div>
             </CardContent>

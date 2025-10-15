@@ -73,6 +73,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     {
       title: 'Staff Management',
       items: [
+        { title: 'Gerenciar Contas Staff', href: '/admin/settings', icon: <Settings className="h-5 w-5" /> },
         { title: 'Availability Manager', href: '/admin/availability', icon: <UserCheck className="h-5 w-5" /> },
         { title: 'Staff Availability', href: '/admin/staff-availability', icon: <UserCheck className="h-5 w-5" /> },
       ]
