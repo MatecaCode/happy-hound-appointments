@@ -22,6 +22,67 @@ const Navigation = () => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
 
+  // Display name shown in the user dropdown; prefer server-side role name (user_roles.name)
+  const [displayName, setDisplayName] = React.useState<string>('Usuário');
+
+  React.useEffect(() => {
+    const resolveDisplayName = async () => {
+      if (!user) {
+        setDisplayName('Usuário');
+        return;
+      }
+
+      // 1) Try metadata name
+      const metaName = (user.user_metadata?.name || '').toString().trim();
+      if (metaName) {
+        setDisplayName(metaName);
+      }
+
+      try {
+        // 2) Prefer user_roles.name (populated on claim; reflects admin-entered client name)
+        const { data: roleRow } = await supabase
+          .from('user_roles')
+          .select('name, role')
+          .eq('user_id', user.id)
+          .order('role', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        const roleName = (roleRow?.name || '').toString().trim();
+        if (roleName) {
+          setDisplayName(roleName);
+        } else if (!metaName) {
+          // 3) Fallback to clients.name if available
+          const { data: clientRow } = await supabase
+            .from('clients')
+            .select('name')
+            .eq('user_id', user.id)
+            .limit(1)
+            .maybeSingle();
+          const clientName = (clientRow?.name || '').toString().trim();
+          if (clientName) setDisplayName(clientName);
+        }
+      } catch {
+        // keep current displayName
+      }
+    };
+
+    resolveDisplayName();
+
+    // Realtime update when user_roles for this user changes (e.g., claim completes)
+    const channel = supabase
+      .channel('user_roles_name_updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'user_roles', filter: `user_id=eq.${user?.id}` }, (payload) => {
+        const nextName = (payload.new as any)?.name?.toString().trim();
+        if (nextName) setDisplayName(nextName);
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [user]);
+
   const handleLogout = async () => {
     try {
       await signOut();
@@ -237,7 +298,7 @@ const Navigation = () => {
                     <DropdownMenuLabel className="font-normal">
                       <div className="flex flex-col space-y-1">
                         <p className="text-sm font-medium leading-none">
-                          {user.user_metadata?.name || 'Usuário'}
+                          {displayName}
                         </p>
                         {userRole && (
                           <p className="text-xs leading-none text-muted-foreground capitalize">
