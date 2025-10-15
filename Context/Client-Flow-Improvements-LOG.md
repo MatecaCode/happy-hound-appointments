@@ -422,3 +422,4 @@ const handlePasswordSubmit = async (e: React.FormEvent) => {
 **End of Improvements Log**  
 **Total Development Time:** ~1.5 hours  
 **Result:** Flexible client creation + secure account claiming with password setup
+

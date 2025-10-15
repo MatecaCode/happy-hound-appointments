@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { CheckCircle, Loader2, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { claimDiag, generateClaimSummary } from '@/utils/claimDiag';
 
 interface ClaimStatus {
   status: 'loading' | 'success' | 'password_setup' | 'error' | 'no_client';
@@ -24,6 +25,12 @@ const Claim = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const TARGET = (import.meta as any).env?.VITE_AFTER_CLAIM_REDIRECT ?? '/';
+  
+  // Redirect guard - ensures single redirect only
+  const redirectedRef = useRef(false);
+  const hasProcessedSessionRef = useRef(false);
+  
   const [claimStatus, setClaimStatus] = useState<ClaimStatus>({
     status: 'loading',
     message: 'Verificando sua conta...'
@@ -37,7 +44,147 @@ const Claim = () => {
   const [isSettingPassword, setIsSettingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
 
+  // Safe navigate - single-fire guard
+  const safeNavigate = useCallback(() => {
+    if (redirectedRef.current) {
+      claimDiag.log('safeNavigate blocked - already redirected');
+      (window as any).CLAIM_DIAG?.push({ step: 'navigate_blocked', reason: 'already_redirected' });
+      return;
+    }
+    redirectedRef.current = true;
+    
+    claimDiag.log('navigate_called', 'target:', TARGET);
+    (window as any).CLAIM_DIAG?.push({ step: 'navigate_called', target: TARGET });
+    
+    // Clean hash before navigating
+    if (typeof window !== 'undefined') {
+      claimDiag.log('cleaning hash before navigate');
+      (window as any).CLAIM_DIAG?.push({ step: 'hash_cleaned', when: 'before_navigate' });
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    
+    try {
+      navigate(TARGET, { replace: true });
+      claimDiag.log('navigate executed successfully');
+    } catch (error) {
+      claimDiag.log('navigate ERROR:', error);
+      (window as any).CLAIM_DIAG?.push({ step: 'navigate_error', error: String(error) });
+    }
+  }, [navigate, TARGET]);
+
+  // MOUNT + Process session from URL hash once only
   useEffect(() => {
+    // Log mount info
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    const hasTokens = hash.includes('access_token') || hash.includes('refresh_token');
+    
+    claimDiag.log('MOUNT', {
+      hash: hash.substring(0, 50),
+      search: window.location.search,
+      path: window.location.pathname,
+      hasTokens
+    });
+    (window as any).CLAIM_DIAG?.push({
+      step: 'mount',
+      hasTokens,
+      hash: hash.substring(0, 50),
+      path: window.location.pathname
+    });
+    
+    // INVENTORY REPORT
+    if (claimDiag.on) {
+      console.group('🔍 CLAIM FLOW INVENTORY');
+      console.log('Redirect Target:', TARGET);
+      console.log('Files/Components touching claim flow:');
+      console.log('  - src/pages/Claim.tsx (this component)');
+      console.log('  - src/utils/claimDiag.ts (diagnostic utility)');
+      console.log('  - src/hooks/useAuth.ts (auth context)');
+      console.log('  - src/integrations/supabase/client.ts (supabase client)');
+      console.log('\nEffects & Functions:');
+      console.log('  - Session bootstrap: useEffect (line ~75-126)');
+      console.log('  - onAuthStateChange: useEffect (line ~128-156)');
+      console.log('  - checkClaimStatus: useEffect (line ~158-161)');
+      console.log('  - safeNavigate: useCallback (line ~47-73)');
+      console.log('  - handlePasswordSubmit: function (line ~285)');
+      console.log('\nSupabase Auth Calls:');
+      console.log('  - supabase.auth.getSessionFromUrl() (line ~105)');
+      console.log('  - supabase.auth.updateUser({ password }) (line ~309)');
+      console.log('  - supabase.auth.onAuthStateChange() (line ~132)');
+      console.log('\nNavigation Calls:');
+      console.log('  - navigate(TARGET, { replace: true }) via safeNavigate() (line ~67)');
+      console.log('\nRoute Guards:');
+      console.log('  - redirectedRef guard in safeNavigate (line ~49)');
+      console.log('  - checkClaimStatus guard (line ~160): if (!user || redirectedRef.current) return');
+      console.groupEnd();
+    }
+    
+    const processFromUrl = async () => {
+      if (hasProcessedSessionRef.current) {
+        claimDiag.log('session already processed, skipping');
+        return;
+      }
+      
+      try {
+        if (hash && (hash.includes('access_token') || hash.includes('type='))) {
+          claimDiag.log('processing session from URL hash');
+          hasProcessedSessionRef.current = true;
+          
+          const { data, error } = await supabase.auth.getSessionFromUrl();
+          
+          claimDiag.log('getSessionFromUrl result:', { ok: !error, userId: data?.user?.id, error });
+          (window as any).CLAIM_DIAG?.push({
+            step: 'session_set',
+            ok: !error,
+            userId: data?.user?.id,
+            error: error?.message
+          });
+          
+          // Clean hash immediately after processing
+          claimDiag.log('cleaning hash after session processing');
+          (window as any).CLAIM_DIAG?.push({ step: 'hash_cleaned', when: 'after_session' });
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      } catch (err) {
+        claimDiag.log('session processing error:', err);
+        (window as any).CLAIM_DIAG?.push({ step: 'session_error', error: String(err) });
+      }
+    };
+    processFromUrl();
+  }, []);
+
+  // Listen for auth state changes and redirect
+  useEffect(() => {
+    claimDiag.log('setting up onAuthStateChange listener');
+    
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      claimDiag.log('auth event:', event, 'userId:', session?.user?.id);
+      (window as any).CLAIM_DIAG?.push({
+        step: 'auth_event',
+        event,
+        userId: session?.user?.id
+      });
+      
+      if (['USER_UPDATED', 'SIGNED_IN', 'TOKEN_REFRESHED'].includes(event)) {
+        claimDiag.log('auth event triggers redirect:', event);
+        
+        // Clean hash and redirect
+        if (typeof window !== 'undefined') {
+          claimDiag.log('cleaning hash in auth listener');
+          (window as any).CLAIM_DIAG?.push({ step: 'hash_cleaned', when: 'auth_event' });
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        safeNavigate();
+      }
+    });
+    return () => {
+      claimDiag.log('cleaning up auth listener');
+      sub?.subscription?.unsubscribe?.();
+    };
+  }, [safeNavigate]);
+
+  // Check claim status only once when user is available and not redirected
+  useEffect(() => {
+    if (!user || redirectedRef.current) return;
     checkClaimStatus();
   }, [user]);
 
@@ -167,11 +314,15 @@ const Claim = () => {
     
     if (password !== confirmPassword) {
       setPasswordError('As senhas não coincidem.');
+      claimDiag.log('password mismatch - early return');
+      (window as any).CLAIM_DIAG?.push({ step: 'early_return', reason: 'password_mismatch' });
       return;
     }
 
     if (password.length < 6) {
       setPasswordError('A senha deve ter pelo menos 6 caracteres.');
+      claimDiag.log('password too short - early return');
+      (window as any).CLAIM_DIAG?.push({ step: 'early_return', reason: 'password_too_short' });
       return;
     }
 
@@ -179,15 +330,21 @@ const Claim = () => {
     setPasswordError('');
 
     try {
-      console.log('🔄 [CLAIM] Setting password for user...');
+      claimDiag.log('updateUser START');
+      (window as any).CLAIM_DIAG?.push({ step: 'update_user_start' });
       
       const { error: updateError } = await supabase.auth.updateUser({
         password: password
       });
 
+      claimDiag.log('updateUser DONE', { ok: !updateError, error: updateError?.message });
+      (window as any).CLAIM_DIAG?.push({
+        step: 'update_user_done',
+        ok: !updateError,
+        error: updateError?.message
+      });
+
       if (updateError) {
-        console.error('❌ [CLAIM] Password update error:', updateError);
-        
         if (updateError.message.includes('session_not_found')) {
           setPasswordError('Sessão expirada. Clique no link do email novamente.');
         } else if (updateError.message.includes('weak_password')) {
@@ -195,21 +352,38 @@ const Claim = () => {
         } else {
           setPasswordError(updateError.message || 'Erro ao definir senha');
         }
+        claimDiag.log('updateUser error - early return');
+        (window as any).CLAIM_DIAG?.push({ step: 'early_return', reason: 'update_user_error' });
         return;
       }
 
-      console.log('✅ [CLAIM] Password set successfully');
-      
-      setClaimStatus({
-        ...claimStatus,
-        status: 'success',
-        message: 'Conta configurada com sucesso!'
-      });
-      
+      // Success - show toast and redirect
       toast.success('Senha definida com sucesso!');
+      claimDiag.log('password set success - preparing redirect');
+      
+      // Clean hash immediately to prevent re-triggering claim mode
+      if (typeof window !== 'undefined') {
+        claimDiag.log('cleaning hash after password update');
+        (window as any).CLAIM_DIAG?.push({ step: 'hash_cleaned', when: 'after_password_update' });
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+      
+      // Immediate redirect
+      claimDiag.log('calling safeNavigate (immediate)');
+      safeNavigate();
+      
+      // Fallback after 1.5s if auth event doesn't fire
+      setTimeout(() => {
+        claimDiag.log('calling safeNavigate (fallback)');
+        safeNavigate();
+        
+        // Generate summary after fallback
+        setTimeout(() => generateClaimSummary(), 100);
+      }, 1500);
       
     } catch (error: any) {
-      console.error('❌ [CLAIM] Unexpected error setting password:', error);
+      claimDiag.log('unexpected error:', error);
+      (window as any).CLAIM_DIAG?.push({ step: 'unexpected_error', error: String(error) });
       setPasswordError('Erro inesperado ao definir senha');
     } finally {
       setIsSettingPassword(false);

@@ -1343,7 +1343,7 @@ const AdminClients = () => {
                       <CardTitle className="text-lg">{client.name}</CardTitle>
                       <CardDescription className="flex items-center gap-1 mt-1">
                         <Mail className="h-3 w-3" />
-                        {client.email}
+                        {client.email && client.email.trim() !== '' ? client.email : 'Email faltando'}
                       </CardDescription>
                     </div>
                                          <div className="flex flex-col gap-1">

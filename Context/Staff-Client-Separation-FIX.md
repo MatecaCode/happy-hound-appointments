@@ -211,3 +211,4 @@ The staff creation flow now works perfectly:
 **End of Fix Log**  
 **Total Debug Time:** ~2 hours  
 **Result:** Clean, separated staff and client creation flows
+
