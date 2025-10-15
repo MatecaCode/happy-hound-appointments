@@ -77,6 +77,7 @@ const Claim = () => {
     // Log mount info
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
     const hasTokens = hash.includes('access_token') || hash.includes('refresh_token');
+    const looksLikeInvite = hash.includes('type=invite') || hash.includes('type=recovery') || hasTokens;
     
     claimDiag.log('MOUNT', {
       hash: hash.substring(0, 50),
@@ -126,6 +127,12 @@ const Claim = () => {
       
       try {
         if (hash && (hash.includes('access_token') || hash.includes('type='))) {
+          // Set claim gate immediately to suppress premature redirects
+          try {
+            localStorage.setItem('claim_in_progress','1');
+            claimDiag.log('claim gate SET (mount/hasTokens)');
+          } catch {}
+
           claimDiag.log('processing session from URL hash');
           hasProcessedSessionRef.current = true;
           
