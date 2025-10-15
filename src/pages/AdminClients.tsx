@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -157,6 +157,10 @@ const AdminClients = () => {
   // Data integrity state
   const [dataIntegrity, setDataIntegrity] = useState<any>(null);
   const [isCleaningUp, setIsCleaningUp] = useState(false);
+  type ClaimStatus = { linked?: boolean; verified: boolean; invited: boolean; can_invite: boolean };
+  const [claimStatusMap, setClaimStatusMap] = useState<Record<string, ClaimStatus>>({});
+  const claimUiDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('claim_ui_debug') === '1';
+  const loadingClaimRef = useRef(false);
 
   // Load clients, locations and breeds
   useEffect(() => {
@@ -234,6 +238,40 @@ const AdminClients = () => {
       );
 
       setClients(clientsWithPetCounts);
+      // After clients load, fetch claim status via admin RPC
+      const clientIds = (clientsWithPetCounts || []).map((c) => c.id);
+      if (clientIds.length === 0) { setClaimStatusMap({}); return; }
+      if (loadingClaimRef.current) { if (claimUiDebug) console.info('[CLAIM_RPC] skip (already loading)'); return; }
+      loadingClaimRef.current = true;
+      try {
+        const { data: statusRows, error: statusError } = await supabase
+          .rpc('admin_get_client_claim_status', { _client_ids: clientIds });
+        if (statusError) {
+          console.error('[CLAIM_RPC][ERR]', statusError);
+          return; // fail loud, do not retry with different signature
+        }
+        const map: Record<string, ClaimStatus> = {};
+        statusRows?.forEach((row: any) => {
+          if (!row?.client_id) return;
+          map[row.client_id] = {
+            linked: typeof row.linked !== 'undefined' ? !!row.linked : undefined,
+            verified: !!row.verified,
+            invited: !!row.invited,
+            can_invite: !!row.can_invite,
+          };
+        });
+        setClaimStatusMap(map);
+        if (!statusRows || statusRows.length === 0) {
+          console.warn('[CLAIM_RPC][EMPTY]', { idsCount: clientIds.length });
+        }
+        if (claimUiDebug) {
+          console.info('[CLAIM_RPC] ids', clientIds.length, 'rows', statusRows?.length ?? 0);
+        }
+      } catch (e) {
+        console.error('❌ [ADMIN_CLIENTS] Error loading claim status:', e);
+      } finally {
+        loadingClaimRef.current = false;
+      }
       console.log('📊 [ADMIN_CLIENTS] Clients loaded:', clientsWithPetCounts);
     } catch (error) {
       console.error('❌ [ADMIN_CLIENTS] Error fetching clients:', error);
@@ -461,6 +499,25 @@ const AdminClients = () => {
     
     return matchesSearch && matchesLocation;
   });
+
+  // Defensive helper: compute UI status with fallback when RPC is missing/empty
+  const getClaimStatusForClient = (client: Client) => {
+    const fbLinked = !!client.user_id; // ignore dirty claimed_at in fallback
+    const existing = claimStatusMap[client.id];
+    if (existing) return existing;
+    return {
+      linked: fbLinked,
+      verified: false,
+      invited: !!client.claim_invited_at,
+      can_invite: !fbLinked,
+    } as ClaimStatus;
+  };
+
+  // Bulk invite count derived from status (uses fallback)
+  const bulkEligibleCount = clients.filter((c) => {
+    const s = getClaimStatusForClient(c);
+    return !!s.can_invite && !s.invited;
+  }).length;
 
   const checkEmailAvailability = async (email: string): Promise<boolean> => {
     try {
@@ -702,7 +759,9 @@ const AdminClients = () => {
   };
 
   const handleSendClaimEmail = async (client: Client) => {
-    if (!client.admin_created || client.claimed_at) {
+    // Gate by status with fallback
+    const status = getClaimStatusForClient(client);
+    if (!status || !status.can_invite) {
       toast.error('Este cliente não é elegível para reivindicação de conta');
       return;
     }
@@ -727,7 +786,12 @@ const AdminClients = () => {
 
       if (inviteResult?.status === 'invited') {
         toast.success(`Convite enviado para ${client.email}`);
-        fetchClients(); // Refresh to show updated claim_invited_at
+        // Optimistically mark invited in RPC map, and refetch clients/status
+        setClaimStatusMap((prev) => ({
+          ...prev,
+          [client.id]: { ...(prev[client.id] || { linked: !!client.user_id, verified: false, invited: false, can_invite: !!!client.user_id }), invited: true }
+        }));
+        fetchClients();
       } else {
         toast.error('Erro inesperado ao enviar convite');
       }
@@ -738,10 +802,8 @@ const AdminClients = () => {
   };
 
   const handleBulkSendClaimEmails = async () => {
-    // Filter for eligible clients (admin-created, unclaimed, not yet invited)
-    const eligibleClients = clients.filter(client => 
-      client.admin_created && !client.claimed_at && !client.claim_invited_at
-    );
+    // Filter for eligible clients based on RPC (not claimed/verified and not invited)
+    const eligibleClients = clients.filter(client => claimStatusMap[client.id]?.can_invite);
 
     if (eligibleClients.length === 0) {
       toast.error('Nenhum cliente elegível para reivindicação de conta (sem convites pendentes)');
@@ -1059,10 +1121,10 @@ const AdminClients = () => {
               onClick={handleBulkSendClaimEmails}
               variant="outline"
               className="flex items-center gap-2"
-              disabled={clients.filter(c => c.admin_created && !c.user_id && !c.claim_invited_at).length === 0}
+              disabled={bulkEligibleCount === 0}
             >
               <Send className="h-4 w-4" />
-              Envio em Lote ({clients.filter(c => c.admin_created && !c.user_id && !c.claim_invited_at).length})
+              Envio em Lote ({bulkEligibleCount})
             </Button>
 
             <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen}>
@@ -1355,28 +1417,24 @@ const AdminClients = () => {
                          <PawPrint className="h-3 w-3" />
                          {client.pet_count || 0}
                        </Badge>
-                                             {client.admin_created && client.claimed_at && (
+                      {(() => { const s = getClaimStatusForClient(client); if (claimUiDebug) { console.info('[CLAIM_UI]', client.id, s); } return s; })() &&
+                       ((getClaimStatusForClient(client).linked || getClaimStatusForClient(client).verified)) && (
                         <Badge variant="default" className="text-xs bg-green-600">
                           <CheckCircle className="h-3 w-3 mr-1" />
                           Conta Vinculada
                         </Badge>
                       )}
-                      {client.admin_created && client.claim_invited_at && !client.claimed_at && (
+                      {(() => { const s = getClaimStatusForClient(client); return (!s.linked && !s.verified && s.invited); })() && (
                         <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
                           <Send className="h-3 w-3 mr-1" />
                           Convite Enviado
                         </Badge>
                       )}
-                      {client.admin_created && !client.claim_invited_at && !client.claimed_at && (
+                      {(() => { const s = getClaimStatusForClient(client); return (!s.linked && !s.verified && !s.invited); })() && (
                         <Badge variant="destructive" className="text-xs">
-                          Aguarda Convite
+                          Pendente Registro
                         </Badge>
                       )}
-                       {client.needs_registration && !client.admin_created && (
-                         <Badge variant="destructive" className="text-xs">
-                           Pendente Registro
-                         </Badge>
-                       )}
                      </div>
                   </div>
                 </CardHeader>
@@ -1421,16 +1479,16 @@ const AdminClients = () => {
                       Editar
                     </Button>
                     
-                    {client.admin_created && !client.user_id && (
+                    {getClaimStatusForClient(client).can_invite && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleSendClaimEmail(client)}
                         className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300"
-                        title={client.claim_invited_at ? 'Reenviar convite' : 'Enviar convite'}
+                        title={getClaimStatusForClient(client).invited ? 'Reenviar convite' : 'Enviar convite'}
                       >
                         <Send className="h-3 w-3 mr-1" />
-                        {client.claim_invited_at ? 'Reenviar Convite' : 'Enviar Convite'}
+                        {getClaimStatusForClient(client).invited ? 'Reenviar Convite' : 'Enviar Convite'}
                       </Button>
                     )}
                     
