@@ -152,7 +152,7 @@ const Claim = () => {
     processFromUrl();
   }, []);
 
-  // Listen for auth state changes and redirect
+  // Listen for auth state changes and redirect (respect claim gate)
   useEffect(() => {
     claimDiag.log('setting up onAuthStateChange listener');
     
@@ -164,6 +164,16 @@ const Claim = () => {
         userId: session?.user?.id
       });
       
+      // Gate: while claim_in_progress and on /claim, ignore SIGNED_IN/TOKEN_REFRESHED
+      try {
+        const claimGate = localStorage.getItem('claim_in_progress') === '1';
+        const onClaimRoute = typeof window !== 'undefined' && window.location.pathname === '/claim';
+        if (claimGate && onClaimRoute && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+          claimDiag.log('auth event ignored due to claim gate:', event);
+          return;
+        }
+      } catch {}
+
       if (['USER_UPDATED', 'SIGNED_IN', 'TOKEN_REFRESHED'].includes(event)) {
         claimDiag.log('auth event triggers redirect:', event);
         
