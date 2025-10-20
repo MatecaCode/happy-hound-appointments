@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { format, startOfWeek, endOfWeek, addDays } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { 
   Clock, 
   RefreshCw, 
@@ -21,6 +23,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AdminLayout from '@/components/AdminLayout';
+import WeekGrid from '@/components/schedule/WeekGrid';
+import WeekLoadBar from '@/components/schedule/WeekLoadBar';
 
 interface AppointmentData {
   appointment_id: string;
@@ -57,6 +61,9 @@ const AdminAgendaHoje = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedAppointment, setSelectedAppointment] = useState<AppointmentData | null>(null);
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [groupByStaff, setGroupByStaff] = useState(false);
+  const [compact, setCompact] = useState(false);
 
   // Generate time slots from 09:00 to 17:00 in 30-minute intervals
   useEffect(() => {
@@ -75,7 +82,7 @@ const AdminAgendaHoje = () => {
     if (user) {
       fetchAppointments();
     }
-  }, [user, selectedDate]);
+  }, [user, selectedDate, viewMode]);
 
   
 
@@ -85,7 +92,15 @@ const AdminAgendaHoje = () => {
       setError(null);
       
       const selectedDateStr = selectedDate.toISOString().split('T')[0];
-      console.log('Fetching appointments for:', selectedDateStr);
+      let startDateStr = selectedDateStr;
+      let endDateStr = selectedDateStr;
+      if (viewMode === 'week') {
+        const start = startOfWeek(selectedDate, { weekStartsOn: 1 });
+        const end = endOfWeek(selectedDate, { weekStartsOn: 1 });
+        startDateStr = format(start, 'yyyy-MM-dd');
+        endDateStr = format(end, 'yyyy-MM-dd');
+      }
+      console.log('Fetching appointments for:', viewMode === 'day' ? selectedDateStr : `${startDateStr} -> ${endDateStr}`);
       
       // First, get all staff members
       const { data: staffData, error: staffError } = await supabase
@@ -111,10 +126,10 @@ const AdminAgendaHoje = () => {
 
       setStaffColumns(staffColumnsData);
 
-             // Now fetch appointments for selected date
-       const { data: appointmentData, error: appointmentError } = await supabase
-         .from('appointments')
-         .select(`
+      // Fetch appointments for the selected range
+      let query = supabase
+        .from('appointments')
+        .select(`
            id,
            date,
            time,
@@ -133,9 +148,15 @@ const AdminAgendaHoje = () => {
                can_vet
              )
            )
-         `)
-         .eq('date', selectedDateStr)
-         .order('time');
+         `);
+
+      if (viewMode === 'day') {
+        query = query.eq('date', selectedDateStr);
+      } else {
+        query = query.gte('date', startDateStr).lte('date', endDateStr).order('date');
+      }
+
+      const { data: appointmentData, error: appointmentError } = await query.order('time');
 
       if (appointmentError) {
         console.error('Error fetching appointments:', appointmentError);
@@ -178,7 +199,7 @@ const AdminAgendaHoje = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, viewMode]);
 
   const getStaffTypeFromProfile = (staff: any): string => {
     // Veterinário takes priority
@@ -305,13 +326,13 @@ const AdminAgendaHoje = () => {
 
   const goToPreviousDay = () => {
     const newDate = new Date(selectedDate);
-    newDate.setDate(selectedDate.getDate() - 1);
+    newDate.setDate(selectedDate.getDate() - (viewMode === 'day' ? 1 : 7));
     setSelectedDate(newDate);
   };
 
   const goToNextDay = () => {
     const newDate = new Date(selectedDate);
-    newDate.setDate(selectedDate.getDate() + 1);
+    newDate.setDate(selectedDate.getDate() + (viewMode === 'day' ? 1 : 7));
     setSelectedDate(newDate);
   };
 
@@ -359,7 +380,9 @@ const AdminAgendaHoje = () => {
                 
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <Calendar className="h-4 w-4" />
-                  {formatDate(selectedDate)}
+                  {viewMode === 'day' 
+                    ? formatDate(selectedDate) 
+                    : `${format(startOfWeek(selectedDate, { weekStartsOn: 1 }), "dd 'de' MMM", { locale: ptBR })} - ${format(endOfWeek(selectedDate, { weekStartsOn: 1 }), "dd 'de' MMM yyyy", { locale: ptBR })}`}
                 </div>
                 
                 <Button 
@@ -377,6 +400,23 @@ const AdminAgendaHoje = () => {
                   className={selectedDate.toDateString() === new Date().toDateString() ? 'bg-blue-50 border-blue-200' : ''}
                 >
                   Hoje
+                </Button>
+              </div>
+              {/* View Toggle */}
+              <div className="flex items-center gap-2">
+                <Button 
+                  onClick={() => setViewMode('day')} 
+                  variant={viewMode === 'day' ? 'default' : 'outline'}
+                  size="sm"
+                >
+                  Dia
+                </Button>
+                <Button 
+                  onClick={() => setViewMode('week')} 
+                  variant={viewMode === 'week' ? 'default' : 'outline'}
+                  size="sm"
+                >
+                  Semana
                 </Button>
               </div>
               
@@ -417,95 +457,170 @@ const AdminAgendaHoje = () => {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border">
-            {/* Calendar Grid */}
-            <div className="overflow-x-auto">
-              <div className="min-w-max">
-                {/* Staff Headers */}
-                <div className="grid border-b" style={{ 
-                  gridTemplateColumns: `120px repeat(${staffColumns.length}, minmax(200px, 1fr))` 
-                }}>
-                  <div className="p-4 font-semibold text-gray-700 bg-gray-50">
-                    Horário
-                  </div>
-                  {staffColumns.map((staff) => (
-                    <div key={staff.id} className="p-4 text-center border-l">
-                      <div className="font-semibold text-gray-900">{staff.name}</div>
-                      <Badge variant="secondary" className="mt-1">
-                        {staff.type}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Time Slots */}
-                <div className="grid" style={{ 
-                  gridTemplateColumns: `120px repeat(${staffColumns.length}, minmax(200px, 1fr))` 
-                }}>
-                  {timeSlots.map((timeSlot, timeIndex) => (
-                    <React.Fragment key={timeSlot}>
-                      {/* Time Label */}
-                      <div className="p-2 text-sm text-gray-600 bg-gray-50 border-r border-b flex items-center justify-center">
-                        <Clock className="h-3 w-3 mr-1" />
-                        {timeSlot}
+          <>
+            {viewMode === 'day' ? (
+              <div className="bg-white rounded-lg border">
+                {/* Calendar Grid */}
+                <div className="overflow-x-auto">
+                  <div className="min-w-max">
+                    {/* Staff Headers */}
+                    <div className="grid border-b" style={{ 
+                      gridTemplateColumns: `120px repeat(${staffColumns.length}, minmax(200px, 1fr))` 
+                    }}>
+                      <div className="p-4 font-semibold text-gray-700 bg-gray-50">
+                        Horário
                       </div>
-                      
-                      {/* Staff Columns */}
-                      {staffColumns.map((staff) => {
-                                                 const appointment = getAppointmentForTimeSlot(staff.id, timeSlot);
-                         const isAppointmentStart = appointment && appointment.time === timeSlot;
-                        
-                        return (
-                          <div key={`${staff.id}-${timeSlot}`} className="border-l border-b p-1 min-h-[60px] relative">
-                            {isAppointmentStart && appointment && (
-                              <Card 
-                                className={`${getAppointmentColor(appointment.status, appointment.service_name)} border-2 cursor-pointer hover:shadow-md transition-shadow absolute inset-1 z-10`}
-                                style={{ height: getAppointmentHeight(appointment.duration) }}
-                                                                 onClick={() => handleAppointmentClick(appointment)}
-                              >
-                                <CardContent className="p-2 h-full flex flex-col justify-between">
-                                  <div className="flex items-start justify-between mb-1">
-                                    <div className="flex items-center gap-1">
-                                      {getServiceIcon(appointment.service_name)}
-                                      <span className="font-semibold text-xs">
-                                        {appointment.pet_name}
-                                      </span>
-                                    </div>
-                                    <Badge 
-                                      variant="outline" 
-                                      className="text-xs"
-                                    >
-                                      {appointment.status}
-                                    </Badge>
-                                  </div>
-                                  
-                                  <div className="text-xs mb-1">
-                                    {appointment.service_name}
-                                  </div>
-                                  
-                                  <div className="text-xs text-gray-600">
-                                    <User className="h-3 w-3 inline mr-1" />
-                                    {appointment.client_name}
-                                  </div>
-                                  
-                                  <div className="text-xs text-gray-500 mt-auto">
-                                    {appointment.time} - {new Date(`2000-01-01T${appointment.time}`).getTime() + appointment.duration * 60000 > new Date(`2000-01-01T${appointment.time}`).getTime() ? 
-                                      new Date(new Date(`2000-01-01T${appointment.time}`).getTime() + appointment.duration * 60000).toTimeString().slice(0, 5) : 
-                                      appointment.time
-                                    }
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            )}
+                      {staffColumns.map((staff) => (
+                        <div key={staff.id} className="p-4 text-center border-l">
+                          <div className="font-semibold text-gray-900">{staff.name}</div>
+                          <Badge variant="secondary" className="mt-1">
+                            {staff.type}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Time Slots */}
+                    <div className="grid" style={{ 
+                      gridTemplateColumns: `120px repeat(${staffColumns.length}, minmax(200px, 1fr))` 
+                    }}>
+                      {timeSlots.map((timeSlot) => (
+                        <React.Fragment key={timeSlot}>
+                          {/* Time Label */}
+                          <div className="p-2 text-sm text-gray-600 bg-gray-50 border-r border-b flex items-center justify-center">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {timeSlot}
                           </div>
-                        );
-                      })}
-                    </React.Fragment>
-                  ))}
+                          
+                          {/* Staff Columns */}
+                          {staffColumns.map((staff) => {
+                            const appointment = getAppointmentForTimeSlot(staff.id, timeSlot);
+                            const isAppointmentStart = appointment && appointment.time === timeSlot;
+                            return (
+                              <div key={`${staff.id}-${timeSlot}`} className="border-l border-b p-1 min-h-[60px] relative">
+                                {isAppointmentStart && appointment && (
+                                  <Card 
+                                    className={`${getAppointmentColor(appointment.status, appointment.service_name)} border-2 cursor-pointer hover:shadow-md transition-shadow absolute inset-1 z-10`}
+                                    style={{ height: getAppointmentHeight(appointment.duration) }}
+                                    onClick={() => handleAppointmentClick(appointment)}
+                                  >
+                                    <CardContent className="p-2 h-full flex flex-col justify-between">
+                                      <div className="flex items-start justify-between mb-1">
+                                        <div className="flex items-center gap-1">
+                                          {getServiceIcon(appointment.service_name)}
+                                          <span className="font-semibold text-xs">
+                                            {appointment.pet_name}
+                                          </span>
+                                        </div>
+                                        <Badge 
+                                          variant="outline" 
+                                          className="text-xs"
+                                        >
+                                          {appointment.status}
+                                        </Badge>
+                                      </div>
+                                      
+                                      <div className="text-xs mb-1">
+                                        {appointment.service_name}
+                                      </div>
+                                      
+                                      <div className="text-xs text-gray-600">
+                                        <User className="h-3 w-3 inline mr-1" />
+                                        {appointment.client_name}
+                                      </div>
+                                      
+                                      <div className="text-xs text-gray-500 mt-auto">
+                                        {appointment.time} - {new Date(`2000-01-01T${appointment.time}`).getTime() + appointment.duration * 60000 > new Date(`2000-01-01T${appointment.time}`).getTime() ? 
+                                          new Date(new Date(`2000-01-01T${appointment.time}`).getTime() + appointment.duration * 60000).toTimeString().slice(0, 5) : 
+                                          appointment.time
+                                        }
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Load bar */}
+                <WeekLoadBar
+                  data={Array.from({ length: 7 }, (_, i) => {
+                    const day = addDays(startOfWeek(selectedDate, { weekStartsOn: 1 }), i);
+                    const dayISO = format(day, 'yyyy-MM-dd');
+                    const dayAppointments = appointments.filter(a => a.date === dayISO);
+                    const bookedMinutes = dayAppointments.reduce((sum, a) => sum + (a.duration || 60), 0);
+                    // staffed minutes approximation: number of visible staff * 8h
+                    const staffedMinutes = staffColumns.length * 8 * 60;
+                    return {
+                      dateISO: dayISO,
+                      label: format(day, 'E dd', { locale: ptBR }),
+                      bookedMinutes,
+                      staffedMinutes,
+                      count: dayAppointments.length,
+                    };
+                  })}
+                  onClickDay={(iso) => {
+                    const [y, m, d] = iso.split('-').map(Number);
+                    setSelectedDate(new Date(y!, (m! - 1), d!));
+                  }}
+                />
+
+                {/* Controls */}
+                <div className="flex items-center gap-2">
+                  <Badge variant={groupByStaff ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setGroupByStaff(v => !v)}>
+                    {groupByStaff ? 'Agrupar por Staff' : 'Agrupar por Dia'}
+                  </Badge>
+                  <Badge variant={compact ? 'default' : 'outline'} className="cursor-pointer" onClick={() => setCompact(v => !v)}>
+                    {compact ? 'Compacto' : 'Detalhado'}
+                  </Badge>
+                </div>
+
+                {/* Week grid */}
+                <Card>
+                  <CardContent className="p-0">
+                    <WeekGrid
+                      hourLabels={timeSlots}
+                      days={Array.from({ length: 7 }, (_, i) => {
+                        const day = addDays(startOfWeek(selectedDate, { weekStartsOn: 1 }), i);
+                        const dayISO = format(day, 'yyyy-MM-dd');
+                        // group by staff id
+                        const byStaff: Record<string, any[]> = {};
+                        staffColumns.forEach(sc => (byStaff[sc.id] = []));
+                        appointments.filter(a => a.date === dayISO).forEach(a => {
+                          const durationMin = a.duration || 60;
+                          const startHHMM = a.time;
+                          const staffId = a.staff_id;
+                          if (!byStaff[staffId]) byStaff[staffId] = [];
+                          byStaff[staffId].push({
+                            id: a.appointment_id,
+                            pet_name: a.pet_name,
+                            service_name: a.service_name,
+                            status: a.status,
+                            startHHMM,
+                            durationMin,
+                          });
+                        });
+                        return {
+                          dateISO: dayISO,
+                          label: format(day, "EEE dd 'de' MMM", { locale: ptBR }),
+                          staff: staffColumns.map(s => ({ id: s.id, name: s.name })),
+                          byStaffAppointments: byStaff,
+                        };
+                      })}
+                      compact={compact}
+                    />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </>
         )}
 
         {/* Summary */}
@@ -521,7 +636,11 @@ const AdminAgendaHoje = () => {
               <CardContent>
                 <div className="text-2xl font-bold">{appointments.length}</div>
                 <p className="text-xs text-muted-foreground">
-                  Para {selectedDate.toLocaleDateString('pt-BR')}
+                  {viewMode === 'day' ? (
+                    <>Para {selectedDate.toLocaleDateString('pt-BR')}</>
+                  ) : (
+                    <>Semana de {format(startOfWeek(selectedDate, { weekStartsOn: 1 }), "dd/MM")} a {format(endOfWeek(selectedDate, { weekStartsOn: 1 }), "dd/MM")}</>
+                  )}
                 </p>
               </CardContent>
             </Card>

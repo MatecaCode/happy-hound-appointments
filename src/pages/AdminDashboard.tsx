@@ -181,6 +181,7 @@ const AdminDashboard = () => {
               icon={<UserCheck className="h-6 w-6" />}
               iconBgColor="bg-green-100"
               iconColor="text-green-600"
+              href="/admin/agenda-hoje"
               loading={loading}
             />
             

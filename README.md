@@ -1,3 +1,22 @@
+## Service Status Flow (Admin/Staff)
+
+All writes to `appointments.service_status` must go through the RPC `public.appointment_set_service_status`.
+
+Allowed transitions:
+- `not_started` → `in_progress` → `completed` (forward-only, idempotent on same value)
+
+Side effects:
+- Sets `service_started_at` on first transition to `in_progress`.
+- Sets `service_completed_at` on first transition to `completed`.
+- Inserts `appointment_events(event_type='service_status_changed')`.
+- Queues a `notification_queue` entry on completion.
+
+Who can call:
+- Admins, or assigned staff on the appointment (via `appointment_staff` → `staff_profiles.user_id`).
+
+Non-goals:
+- Does not change lifecycle status (`pending/confirmed/cancelled/completed`). Existing lifecycle updates remain unchanged.
+
 # VetTale - Pet Services Booking System
 
 A comprehensive React/TypeScript application for managing pet grooming and veterinary services bookings.

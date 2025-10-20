@@ -83,10 +83,11 @@ const ServiceStatusSection = () => {
     setUpdatingIds(prev => new Set(prev).add(appointmentId));
     
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ service_status: newStatus })
-        .eq('id', appointmentId);
+      const { error } = await supabase.rpc('appointment_set_service_status', {
+        p_appointment_id: appointmentId,
+        p_new_status: newStatus,
+        p_note: null
+      });
 
       if (error) throw error;
 

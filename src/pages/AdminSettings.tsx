@@ -709,10 +709,7 @@ const AdminSettings = () => {
               <Users className="h-4 w-4" />
               Staff
             </TabsTrigger>
-            <TabsTrigger value="services" className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Serviços & Preços
-            </TabsTrigger>
+            {/* Serviços & Preços moved to dedicated page under /admin/pricing */}
             <TabsTrigger value="hours" className="flex items-center gap-2">
               <Clock className="h-4 w-4" />
               Horários
@@ -1223,119 +1220,7 @@ const AdminSettings = () => {
  
 
  
-           {/* Services & Pricing */}
-          <TabsContent value="services" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <DollarSign className="h-5 w-5" />
-                  Serviços e Preços
-                </CardTitle>
-                <CardDescription>
-                  Configure serviços disponíveis e suas tarifas
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {/* Search and Filter Toolbar */}
-                  <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                      <Input
-                        placeholder="Buscar serviços por nome ou descrição..."
-                        value={serviceSearchTerm}
-                        onChange={(e) => setServiceSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    
-                    <Select value={serviceTypeFilter} onValueChange={setServiceTypeFilter}>
-                      <SelectTrigger className="w-48">
-                        <Filter className="h-4 w-4 mr-2" />
-                        <SelectValue placeholder="Filtrar por tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos os tipos</SelectItem>
-                        <SelectItem value="grooming">Tosa e Banho</SelectItem>
-                        <SelectItem value="veterinary">Veterinário</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">Catálogo de Serviços</h3>
-                      <p className="text-sm text-gray-600">
-                        {filteredServices.length === services.length 
-                          ? `Gerencie serviços e preços (${services.length} serviços)`
-                          : `Mostrando ${filteredServices.length} de ${services.length} serviços`
-                        }
-                      </p>
-                    </div>
-                    <Button disabled>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Novo Serviço
-                    </Button>
-                  </div>
-                  
-                  {/* Services List */}
-                  {filteredServices.length === 0 ? (
-                    <div className="text-center py-8">
-                      <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                        {services.length === 0 ? 'Nenhum serviço encontrado' : 'Nenhum serviço corresponde aos filtros'}
-                      </h3>
-                      <p className="text-gray-600">
-                        {services.length === 0 
-                          ? 'Não há serviços ativos no sistema'
-                          : 'Tente ajustar os filtros de busca'
-                        }
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {filteredServices.map((service) => (
-                        <div key={service.id} className="flex items-center justify-between p-3 border rounded-lg hover:shadow-sm transition-shadow">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium">{service.name}</p>
-                              <Badge variant="outline" className="text-xs">
-                                {getServiceTypeIcon(service.service_type)}
-                                {service.service_type === 'grooming' ? 'Tosa e Banho' : 'Veterinário'}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-gray-600">
-                              {service.description || 'Sem descrição'}
-                            </p>
-                            {service.base_price && (
-                              <p className="text-xs text-gray-500 mt-1">
-                                Preço base: R$ {service.base_price.toFixed(2)} • Duração: {service.default_duration || 0} min
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {service.base_price && (
-                              <Badge variant="outline">
-                                R$ {service.base_price.toFixed(2)}
-                              </Badge>
-                            )}
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => navigate(`/admin/services/${service.id}/edit-pricing`)}
-                            >
-                              <Edit className="h-3 w-3 mr-1" />
-                              Editar Preços
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          {/* Services & Pricing moved to dedicated page under /admin/pricing */}
 
           {/* Operating Hours */}
           <TabsContent value="hours" className="space-y-6">

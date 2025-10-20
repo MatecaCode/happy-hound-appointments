@@ -6,6 +6,8 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import ServiceStatusDropdown from '@/components/appointments/ServiceStatusDropdown';
+import { useCanEditServiceStatus } from '@/hooks/useCanEditServiceStatus';
 import { Dog, Clock, CheckCircle, XCircle, Play, AlertCircle, Calendar, User, ArrowLeft, Search, Filter, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,7 +56,7 @@ interface AppointmentWithDetails {
 }
 
 const AdminAppointments = () => {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -217,6 +219,11 @@ const AdminAppointments = () => {
     fetchAppointments();
   }, [user]);
 
+  const reloadAppointments = async () => {
+    // Reuse the existing refreshAppointments logic but expose a single call for children
+    await refreshAppointments();
+  };
+
   const refreshAppointments = async () => {
     // Re-fetch appointments
     const fetchAppointments = async () => {
@@ -363,18 +370,7 @@ const AdminAppointments = () => {
     }
   };
 
-  const getServiceStatusBadge = (serviceStatus?: string) => {
-    switch (serviceStatus) {
-      case 'not_started':
-        return <Badge variant="secondary" className="text-xs">Não iniciado</Badge>;
-      case 'in_progress':
-        return <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">Em andamento</Badge>;
-      case 'completed':
-        return <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">Concluído</Badge>;
-      default:
-        return null;
-    }
-  };
+  // Service status now controlled by dropdown on cards; badge helper removed
 
     const AppointmentDetailCard = ({ appointment }: { appointment: AppointmentWithDetails }) => {
       // Determine card background based on status
@@ -401,6 +397,8 @@ const AdminAppointments = () => {
         return '';
       };
 
+      const canEdit = useCanEditServiceStatus({ appointmentId: appointment.id, staffIds: appointment.staff_ids, isAdmin });
+
       return (
         <div className={`border rounded-xl p-6 pb-4 flex flex-col shadow-md hover:shadow-lg transition-shadow min-w-0 ${getCardBackground()} ${getOverrideBorder()}`}>
           {/* 1. Pet Name (bold) */}
@@ -411,7 +409,13 @@ const AdminAppointments = () => {
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0">
               {getStatusBadge(appointment.status, appointment.service_status)}
-              {getServiceStatusBadge(appointment.service_status)}
+              <ServiceStatusDropdown
+                appointmentId={appointment.id}
+                value={(appointment.service_status as 'not_started' | 'in_progress' | 'completed')}
+                canEdit={canEdit}
+                refetchAppointments={reloadAppointments}
+                isAdmin={isAdmin}
+              />
             </div>
           </div>
 
@@ -852,7 +856,7 @@ const AdminAppointments = () => {
                   <p className="text-lg text-gray-600">{selectedAppointment.service_name}</p>
                   <div className="flex items-center gap-4 mt-2">
                     {getStatusBadge(selectedAppointment.status, selectedAppointment.service_status)}
-                    {getServiceStatusBadge(selectedAppointment.service_status)}
+                    {/* Service status dropdown can be integrated here if desired */}
                   </div>
                 </div>
 

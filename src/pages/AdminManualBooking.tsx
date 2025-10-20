@@ -710,25 +710,27 @@ const AdminManualBooking = () => {
           return null;
         }
 
-        // Build payload deterministically from new state structure
+        // Build payload for unified RPC (required params first, then optional with defaults)
         const payload = {
-          _client_user_id: bookingData.clientUserId,
-          _pet_id: bookingData.petId,
+          // Required parameters (no defaults)
           _booking_date: bookingData.date,           // 'YYYY-MM-DD'
           _time_slot: bookingData.time,             // 'HH:mm:ss'
+          _pet_id: bookingData.petId,
           _primary_service_id: bookingData.primary.service_id,
-          _secondary_service_id: bookingData.secondary?.service_id ?? null,
-          _calculated_price: totalPrice,
-          _calculated_duration: totalDuration,
-          _notes: bookingData.notes ?? null,
           _provider_ids: [
             bookingData.primary.staff_id,
             ...(bookingData.secondary?.staff_id ? [bookingData.secondary.staff_id] : [])
           ].filter(Boolean),
+          _created_by: user.id,
+          // Optional parameters (with defaults)
+          _client_user_id: bookingData.clientUserId,
+          _client_id: null, // Not used in this flow
+          _secondary_service_id: bookingData.secondary?.service_id ?? null,
+          _notes: bookingData.notes ?? null,
           _extra_fee: bookingData.extraFee ?? 0,
           _extra_fee_reason: bookingData.extraFeeReason ?? null,
           _addons: [], // TODO: Add addons support later
-          _created_by: user.id,
+          _override_conflicts: false
         };
 
         console.table(payload);
@@ -760,12 +762,10 @@ const AdminManualBooking = () => {
       console.log('[CREATE_BOOKING] payload keys', payload && Object.keys(payload));
       console.log('[CREATE_BOOKING] payload', payload);
 
-      // Call the correct RPC only when secondary exists
-      const rpcName = bookingData.secondary
-        ? 'create_admin_booking_with_dual_services'
-        : 'create_booking_admin';
+      // Always use unified RPC for all booking scenarios
+      const rpcName = 'create_unified_admin_booking';
 
-      console.log(`[ADMIN_BOOKING] Using RPC: ${rpcName}`);
+      console.log(`[ADMIN_BOOKING] Using unified RPC: ${rpcName}`);
       console.log(`[ADMIN_BOOKING] Secondary service exists: ${!!bookingData.secondary}`);
 
       const { data: appointmentId, error } = await supabase.rpc(rpcName, payload);

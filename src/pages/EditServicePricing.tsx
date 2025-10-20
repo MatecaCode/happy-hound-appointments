@@ -333,7 +333,7 @@ const EditServicePricing = () => {
         <div>
           <Button 
             variant="outline" 
-            onClick={() => navigate('/admin/settings')}
+            onClick={() => navigate('/admin/pricing')}
             className="mb-4"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />

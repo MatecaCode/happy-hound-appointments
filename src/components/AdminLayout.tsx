@@ -16,7 +16,8 @@ import {
   X,
   ChevronDown,
   ChevronRight,
-  FileText
+  FileText,
+  DollarSign
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -75,7 +76,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       items: [
         { title: 'Gerenciar Contas Staff', href: '/admin/settings', icon: <Settings className="h-5 w-5" /> },
         { title: 'Availability Manager', href: '/admin/availability', icon: <UserCheck className="h-5 w-5" /> },
-        { title: 'Staff Availability', href: '/admin/staff-availability', icon: <UserCheck className="h-5 w-5" /> },
+      ]
+    },
+    {
+      title: 'Ajuste de Preços',
+      items: [
+        { title: 'Serviços & Preços', href: '/admin/pricing', icon: <DollarSign className="h-5 w-5" /> },
       ]
     },
     {

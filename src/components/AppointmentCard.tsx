@@ -6,6 +6,10 @@ import { CalendarDays, Clock, Dog, User, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import AppointmentActions from './appointment/AppointmentActions';
+import ServiceStatusDropdown from '@/components/appointments/ServiceStatusDropdown';
+import { useAuth } from '@/hooks/useAuth';
+import { useCanEditServiceStatus } from '@/hooks/useCanEditServiceStatus';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AppointmentCardProps {
   appointment: {
@@ -46,6 +50,8 @@ interface AppointmentCardProps {
 }
 
 const AppointmentCard = ({ appointment, onUpdate }: AppointmentCardProps) => {
+  const { user, isAdmin } = useAuth();
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -80,6 +86,9 @@ const AppointmentCard = ({ appointment, onUpdate }: AppointmentCardProps) => {
   const addonsTotal = appointment.addons?.reduce((sum, addon) => sum + (addon.price || 0), 0) || 0;
   const finalTotal = appointment.service.price + addonsTotal;
 
+  // Helper: determine if current user is assigned staff for this appointment
+  const canEditService = useCanEditServiceStatus({ appointmentId: appointment.id, isAdmin });
+
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
@@ -91,6 +100,11 @@ const AppointmentCard = ({ appointment, onUpdate }: AppointmentCardProps) => {
             <Badge className={getStatusColor(appointment.status)}>
               {getStatusText(appointment.status)}
             </Badge>
+            <ServiceStatusDropdown
+              appointmentId={appointment.id}
+              value={appointment.service_status as any}
+              canEdit={canEditService}
+            />
             <AppointmentActions 
               appointmentId={appointment.id}
               status={appointment.status}

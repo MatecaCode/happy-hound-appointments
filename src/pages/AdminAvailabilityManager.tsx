@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { CalendarIcon, Clock, User, Plus } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AdminLayout from '@/components/AdminLayout';
 
 interface StaffProfile {
@@ -34,6 +35,7 @@ const AdminAvailabilityManager = () => {
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
   const [availabilitySlots, setAvailabilitySlots] = useState<AvailabilitySlot[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
 
   useEffect(() => {
     fetchStaffProfiles();
@@ -92,6 +94,92 @@ const AdminAvailabilityManager = () => {
       toast.error('Erro ao carregar disponibilidade');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Timezone helpers — enforce America/Sao_Paulo for date comparisons
+  const getSaoPauloDateParts = (date: Date) => {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const parts = formatter.formatToParts(date).reduce((acc: Record<string, number>, p) => {
+      if (p.type === 'year' || p.type === 'month' || p.type === 'day') {
+        acc[p.type] = parseInt(p.value, 10);
+      }
+      return acc;
+    }, {});
+    return { year: parts.year, month: parts.month, day: parts.day } as { year: number; month: number; day: number };
+  };
+
+  const getTodaySaoPaulo = (): Date => {
+    const { year, month, day } = getSaoPauloDateParts(new Date());
+    // Use UTC midnight for stability when rendering day-only comparisons
+    return new Date(Date.UTC(year, month - 1, day));
+  };
+
+  const isBeforeTodaySaoPaulo = (date: Date): boolean => {
+    const { year, month, day } = getSaoPauloDateParts(date);
+    const candidate = new Date(Date.UTC(year, month - 1, day));
+    const today = getTodaySaoPaulo();
+    return candidate.getTime() < today.getTime();
+  };
+
+  // Compute 30-minute anchor times within business hours for rendering
+  const getAnchorTimes = (): string[] => {
+    const anchors: string[] = [];
+    const startHour = 9; // 09:00 baseline
+    const endHour = 17; // up to 17:00; last anchor at 16:30
+    for (let hour = startHour; hour < endHour; hour++) {
+      anchors.push(`${hour.toString().padStart(2, '0')}:00:00`);
+      anchors.push(`${hour.toString().padStart(2, '0')}:30:00`);
+    }
+    return anchors;
+  };
+
+  const getSubslotTimesForAnchor = (anchor: string): string[] => {
+    // anchor format HH:MM:SS; cover +00, +10, +20 for :00 and +30, +40, +50 for :30
+    const [hStr, mStr] = anchor.split(':');
+    const hour = parseInt(hStr, 10);
+    const minute = parseInt(mStr, 10);
+    const baseMinutes = minute === 0 ? [0, 10, 20] : [30, 40, 50];
+    return baseMinutes.map((min) => `${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`);
+  };
+
+  const getDateStr = (): string => format(selectedDate, 'yyyy-MM-dd');
+
+  const toggleAnchorAvailability = async (
+    staffId: string,
+    anchor: string,
+    currentAvailable: boolean
+  ) => {
+    try {
+      const subslots = getSubslotTimesForAnchor(anchor);
+      const dateStr = getDateStr();
+      const { data, error } = await supabase
+        .from('staff_availability')
+        .update({ available: !currentAvailable })
+        .eq('staff_profile_id', staffId)
+        .eq('date', dateStr)
+        .in('time_slot', subslots)
+        .select('id');
+
+      if (error) throw error;
+
+      const affected = data?.length || 0;
+      if (affected > 0) {
+        toast.success(`Disponibilidade atualizada (${affected} horários).`);
+      } else {
+        toast.error('Nenhum horário atualizado para este intervalo.');
+      }
+      if (selectedDate) {
+        fetchAvailabilityForDate(selectedDate);
+      }
+    } catch (err: any) {
+      console.error('[ADMIN_AVAILABILITY] Anchor toggle error', err);
+      toast.error('Erro ao atualizar disponibilidade');
     }
   };
 
@@ -213,6 +301,13 @@ const AdminAvailabilityManager = () => {
               onSelect={(date) => date && setSelectedDate(date)}
               locale={ptBR}
               className="rounded-md border"
+              // Block past dates (America/Sao_Paulo)
+              disabled={(date) => isBeforeTodaySaoPaulo(date)}
+              // Prevent navigating to months before current SP month
+              fromMonth={(() => {
+                const t = getTodaySaoPaulo();
+                return new Date(t.getUTCFullYear(), t.getUTCMonth(), 1);
+              })()}
             />
           </CardContent>
         </Card>
@@ -229,7 +324,28 @@ const AdminAvailabilityManager = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {staffProfiles.map((staff) => (
+            {/* Staff filter */}
+            <div className="space-y-2">
+              <label className="text-sm text-gray-600">Profissionais</label>
+              <Select
+                value={selectedStaffIds[0] || 'all'}
+                onValueChange={(value) => {
+                  if (value === 'all') setSelectedStaffIds([]);
+                  else setSelectedStaffIds([value]);
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {staffProfiles.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {(selectedStaffIds.length === 0 ? staffProfiles : staffProfiles.filter(s => selectedStaffIds.includes(s.id))).map((staff) => (
               <div key={staff.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
                   <h4 className="font-medium">{staff.name}</h4>
@@ -237,14 +353,63 @@ const AdminAvailabilityManager = () => {
                     {getStaffRole(staff)}
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={() => generateAvailabilityForStaff(staff.id)}
-                  disabled={isLoading}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Gerar
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    className="bg-green-500 hover:bg-green-600"
+                    onClick={async () => {
+                      // Whole-day mark available across business hours for selected date
+                      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                      const anchors = getAnchorTimes();
+                      const subslots = anchors.flatMap(getSubslotTimesForAnchor);
+                      const { data, error } = await supabase
+                        .from('staff_availability')
+                        .update({ available: true })
+                        .eq('staff_profile_id', staff.id)
+                        .eq('date', dateStr)
+                        .in('time_slot', subslots)
+                        .select('id');
+                      if (error) {
+                        console.error('[ADMIN_AVAILABILITY] day-available error', error);
+                        toast.error('Erro ao marcar dia disponível');
+                      } else {
+                        const affected = data?.length || 0;
+                        toast.success(`Dia marcado disponível (${affected} horários).`);
+                        fetchAvailabilityForDate(selectedDate);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    Marcar dia todo Disponível
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-red-500 hover:bg-red-600"
+                    onClick={async () => {
+                      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                      const anchors = getAnchorTimes();
+                      const subslots = anchors.flatMap(getSubslotTimesForAnchor);
+                      const { data, error } = await supabase
+                        .from('staff_availability')
+                        .update({ available: false })
+                        .eq('staff_profile_id', staff.id)
+                        .eq('date', dateStr)
+                        .in('time_slot', subslots)
+                        .select('id');
+                      if (error) {
+                        console.error('[ADMIN_AVAILABILITY] day-unavailable error', error);
+                        toast.error('Erro ao marcar dia indisponível');
+                      } else {
+                        const affected = data?.length || 0;
+                        toast.success(`Dia marcado indisponível (${affected} horários).`);
+                        fetchAvailabilityForDate(selectedDate);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    Marcar dia todo Indisponível
+                  </Button>
+                </div>
               </div>
             ))}
           </CardContent>
@@ -262,6 +427,17 @@ const AdminAvailabilityManager = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Legend */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-sm bg-green-500" />
+                <span className="text-xs text-gray-600">Disponível</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-sm bg-red-500" />
+                <span className="text-xs text-gray-600">Indisponível</span>
+              </div>
+            </div>
             {isLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map(i => (
@@ -288,23 +464,24 @@ const AdminAvailabilityManager = () => {
                         </Badge>
                       </div>
                       <div className="grid grid-cols-4 gap-1">
-                        {slots.slice(0, 20).map((slot) => (
-                          <Button
-                            key={slot.id}
-                            size="sm"
-                            variant={slot.available ? "default" : "secondary"}
-                            onClick={() => toggleSlotAvailability(slot.id, slot.available)}
-                            className="h-8 text-xs"
-                          >
-                            {slot.time_slot.substring(0, 5)}
-                          </Button>
-                        ))}
+                        {getAnchorTimes().map((anchor) => {
+                          const subslots = getSubslotTimesForAnchor(anchor);
+                          const subslotStates = subslots.map((t) => slots.find((s) => s.time_slot === t));
+                          const allPresent = subslotStates.every(Boolean);
+                          const allAvailable = allPresent && subslotStates.every((s) => (s as AvailabilitySlot).available);
+                          const anchorLabel = anchor.substring(0, 5);
+                          return (
+                            <Button
+                              key={`${staffId}-${anchor}`}
+                              size="sm"
+                              className={allAvailable ? "h-8 text-xs bg-green-500 hover:bg-green-600 text-white" : "h-8 text-xs bg-red-500 hover:bg-red-600 text-white"}
+                              onClick={() => toggleAnchorAvailability(staffId, anchor, allAvailable)}
+                            >
+                              {anchorLabel}
+                            </Button>
+                          );
+                        })}
                       </div>
-                      {slots.length > 20 && (
-                        <p className="text-xs text-muted-foreground">
-                          ... e mais {slots.length - 20} horários
-                        </p>
-                      )}
                     </div>
                   );
                 })}

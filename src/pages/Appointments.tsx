@@ -133,6 +133,31 @@ const Appointments = () => {
     };
     
     fetchAppointments();
+    // Optional realtime subscription: refetch on service status changes
+    const channel = supabase
+      .channel('client-appointments-service-status')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'appointment_events',
+        filter: "event_type=eq.service_status_changed"
+      }, () => {
+        if (user) {
+          // Reuse effect body by calling fetchAppointments-like logic
+          // Simpler: trigger a refresh by toggling setIsLoading and reusing the same fetch
+          (async () => {
+            try {
+              // Minimal refetch using existing refresh function
+              await refreshAppointments();
+            } catch {}
+          })();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      try { supabase.removeChannel(channel); } catch {}
+    };
   }, [user]);
   
   const refreshAppointments = async () => {

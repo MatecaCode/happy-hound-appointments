@@ -359,6 +359,8 @@ const AdminPets = () => {
     }
   };
 
+  const formatPt = (d?: string | Date) => (d ? new Date(d).toLocaleDateString('pt-BR') : 'N/A');
+
      const getAgeDisplay = (age: string, birth_date?: string) => {
      if (birth_date) {
        try {
@@ -602,46 +604,39 @@ const AdminPets = () => {
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <CardTitle className="text-lg">{pet.name}</CardTitle>
-                                                                     <CardDescription className="flex items-center gap-1 mt-1">
-                          {getBreedIcon(pet.breed)}
-                          {pet.breed || 'Raça não informada'}
-                                                     {pet.size && (
-                             <Badge variant="outline" className="ml-2 text-xs">
-                               {getSizeDisplay(pet.size)}
-                             </Badge>
-                           )}
-                        </CardDescription>
+                      <CardTitle className="text-lg leading-tight mb-1">{pet.name}</CardTitle>
                     </div>
-                    <Badge variant="secondary" className="flex items-center gap-1">
-                      <User className="h-3 w-3" />
+                    <div className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-slate-100 text-slate-700 ring-1 ring-slate-200">
+                      <User className="h-3 w-3 mr-1" />
                       {pet.client_name}
-                    </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                                     {(pet.age || pet.birth_date) && (
-                     <div className="flex items-center gap-2 text-sm text-gray-600">
-                       <Cake className="h-4 w-4" />
-                       Idade: {getAgeDisplay(pet.age, pet.birth_date)}
-                     </div>
-                   )}
-                   {pet.birth_date && (
-                     <div className="flex items-center gap-2 text-sm text-gray-600">
-                       <Calendar className="h-4 w-4" />
-                       Nascimento: {formatDate(pet.birth_date)}
-                     </div>
-                   )}
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <User className="h-4 w-4" />
-                    {pet.client_name}
-                    {pet.client_email && (
-                      <span className="text-xs text-gray-500">({pet.client_email})</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Calendar className="h-4 w-4" />
-                    Criado em {formatDate(pet.created_at)}
+                  <div className="grid grid-cols-[auto,1fr] gap-x-2 gap-y-1.5 items-start text-sm text-gray-600">
+                    <span>🐶</span>
+                    <span className="text-slate-700">{pet.breed || 'Sem Raça Definida'}</span>
+
+                    <span>📏</span>
+                    <span className="text-slate-700">{getSizeDisplay(pet.size || '')}</span>
+
+                    <span>⏳</span>
+                    <span className="text-slate-700">{getAgeDisplay(pet.age, pet.birth_date)}</span>
+
+                    <span>🎂</span>
+                    <span className="text-slate-700">Nascimento: {pet.birth_date ? formatPt(pet.birth_date) : 'N/A'}</span>
+
+                    <span>👤</span>
+                    <span className="text-slate-700">{pet.client_name}</span>
+
+                    <span>✉️</span>
+                    <a
+                      href={pet.client_email ? `mailto:${pet.client_email}` : undefined}
+                      className="truncate text-slate-700 max-w-[19rem] md:max-w-[26rem]"
+                      title={pet.client_email || ''}
+                    >
+                      {pet.client_email || 'N/A'}
+                    </a>
                   </div>
                   {pet.notes && (
                     <div className="flex items-start gap-2 text-sm text-gray-600">

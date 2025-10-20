@@ -149,6 +149,23 @@ ________________________________________
 
 Canonical Snapshot:
 [LOG_UPDATE]
+date: 2025-10-17
+by: GPT-5 in Cursor
+area: Admin Calendar — Weekly View V2
+change_summary:
+- Added new schedule components: WeekLoadBar, WeekGrid, DayColumn, StaffLane, Chip.
+- Integrated Week view into `AdminAgendaHoje` with fast overview and toggles (Group by Staff label placeholder, Compact mode).
+- Utilization bar uses booked_minutes/staffed_minutes with thresholds (≤50% neutral, 50–80% warn, >80% alert).
+- Week grid renders seven day columns with staff lanes; absolute positioning uses the same scaling as Daily (30min=60px).
+- Navigation and fetch reuse existing per-day appointment data; no schema changes; respects LOG invariants: staff_profiles.id everywhere; appointment_staff role remains set; availability is per-staff.
+rationale:
+- Provide admins with an at-a-glance weekly overview and maintain Daily intact.
+- Keep minimal diffs and avoid RPC/schema churn; leverage existing joins on appointments and appointment_staff.
+tests:
+- Manual: week switches instantly; cards open the existing details modal; counts in load bar match visible items.
+- Visual: sticky hour rail and day headers; compact chips reduce density when enabled.
+status: staging outcome: pass
+[/LOG_UPDATE]
 date: 2025-08-21
 by: system
 area: Canonical Snapshot (Architecture & Rules)

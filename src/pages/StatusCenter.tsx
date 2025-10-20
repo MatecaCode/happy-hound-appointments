@@ -28,6 +28,22 @@ const StatusCenter: React.FC = () => {
 
   useEffect(() => {
     fetchAppointments();
+    // Optional realtime subscription: service_status_changed events
+    const channel = supabase
+      .channel('statuscenter-service-status')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'appointment_events',
+        filter: "event_type=eq.service_status_changed"
+      }, () => {
+        fetchAppointments();
+      })
+      .subscribe();
+
+    return () => {
+      try { supabase.removeChannel(channel); } catch {}
+    };
   }, []);
 
   const fetchAppointments = async () => {

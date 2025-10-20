@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import PhoneInputBR from '@/components/inputs/PhoneInputBR';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Chip } from '@/components/ui/Chip';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
@@ -25,7 +26,8 @@ import {
   Eye, 
   PawPrint,
   Building,
-  Calendar,
+    Calendar,
+    Cake,
   Phone,
   Mail,
   MapPin,
@@ -1044,6 +1046,8 @@ const AdminClients = () => {
     }
   };
 
+  const fmtDatePt = (d?: string | Date) => (d ? new Date(d).toLocaleDateString('pt-BR') : 'N/A');
+
   if (!user) {
     return <div>Carregando...</div>;
   }
@@ -1397,77 +1401,85 @@ const AdminClients = () => {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-            {filteredClients.map((client) => (
-              <Card key={client.id} className="hover:shadow-lg transition-shadow h-full flex flex-col">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg">{client.name}</CardTitle>
-                      <CardDescription className="flex items-center gap-1 mt-1">
-                        <Mail className="h-3 w-3" />
-                        {client.email && client.email.trim() !== '' ? client.email : 'Email faltando'}
-                      </CardDescription>
+            {filteredClients.map((client) => {
+              const linked = !!client.claimed_at
+              const invited = !linked && !!client.claim_invited_at
+              const status = linked ? 'linked' : invited ? 'invited' : 'pending'
+
+              return (
+                <Card key={client.id} className="hover:shadow-lg transition-shadow h-full flex flex-col relative rounded-2xl border bg-white overflow-visible">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 pr-24 pt-2">
+                        <CardTitle className="text-lg">{client.name}</CardTitle>
+                      </div>
+                      <div className="absolute top-3 right-3 flex flex-col items-end gap-1 z-10">
+                        <Chip className="cursor-pointer" onClick={() => openPetsModal(client)}>
+                          <PawPrint className="mr-1 h-3 w-3" />
+                          {client.pet_count ?? 0}
+                        </Chip>
+                        {status === 'linked' && (
+                          <Chip tone="success">
+                            <CheckCircle className="mr-1 h-3 w-3" />
+                            Conta Vinculada
+                          </Chip>
+                        )}
+                        {status === 'invited' && (
+                          <Chip tone="warning">
+                            <Send className="mr-1 h-3 w-3" />
+                            Convite Enviado
+                          </Chip>
+                        )}
+                        {status === 'pending' && (
+                          <Chip tone="danger">Pendente Registro</Chip>
+                        )}
+                      </div>
                     </div>
-                                         <div className="flex flex-col gap-1">
-                       <Badge 
-                         variant="secondary" 
-                         className="flex items-center gap-1 cursor-pointer hover:bg-gray-200 transition-colors"
-                         onClick={() => openPetsModal(client)}
-                       >
-                         <PawPrint className="h-3 w-3" />
-                         {client.pet_count || 0}
-                       </Badge>
-                      {(() => { const s = getClaimStatusForClient(client); if (claimUiDebug) { console.info('[CLAIM_UI]', client.id, s); } return s; })() &&
-                       ((getClaimStatusForClient(client).linked || getClaimStatusForClient(client).verified)) && (
-                        <Badge variant="default" className="text-xs bg-green-600">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Conta Vinculada
-                        </Badge>
-                      )}
-                      {(() => { const s = getClaimStatusForClient(client); return (!s.linked && !s.verified && s.invited); })() && (
-                        <Badge variant="secondary" className="text-xs bg-yellow-100 text-yellow-800">
-                          <Send className="h-3 w-3 mr-1" />
-                          Convite Enviado
-                        </Badge>
-                      )}
-                      {(() => { const s = getClaimStatusForClient(client); return (!s.linked && !s.verified && !s.invited); })() && (
-                        <Badge variant="destructive" className="text-xs">
-                          Pendente Registro
-                        </Badge>
-                      )}
-                     </div>
+                  </CardHeader>
+                <CardContent className="flex-1 flex flex-col">
+                  <div className="grid grid-cols-[auto,1fr] gap-x-2 gap-y-1.5 text-sm text-gray-600">
+                    <Mail className="h-4 w-4 mt-0.5 text-slate-500" />
+                    <span
+                      className="text-slate-700 truncate max-w-[19rem] md:max-w-[26rem]"
+                      title={client.email || ''}
+                    >
+                      {client.email && client.email.trim() !== '' ? client.email : 'Email faltando'}
+                    </span>
+
+                    {client.phone && (
+                      <>
+                        <Phone className="h-4 w-4 mt-0.5 text-slate-500" />
+                        <span className="text-slate-700">{client.phone}</span>
+                      </>
+                    )}
+
+                    {client.address && (
+                      <>
+                        <MapPin className="h-4 w-4 mt-0.5 text-slate-500" />
+                        <span className="text-slate-700 truncate max-w-[19rem] md:max-w-[26rem]">{client.address}</span>
+                      </>
+                    )}
+
+                    {client.location_name && (
+                      <>
+                        <Building className="h-4 w-4 mt-0.5 text-slate-500" />
+                        <span className="text-slate-700">{client.location_name}</span>
+                      </>
+                    )}
+
+                    <Cake className="h-4 w-4 mt-0.5 text-slate-500" />
+                    <span className="text-slate-700">
+                      Aniversário do tutor: {fmtDatePt(client.birth_date)}
+                    </span>
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-3 flex-1 flex flex-col">
-                  {client.phone && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Phone className="h-4 w-4" />
-                      {client.phone}
-                    </div>
-                  )}
-                  {client.address && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <MapPin className="h-4 w-4" />
-                      <span className="truncate">{client.address}</span>
-                    </div>
-                  )}
-                  {client.location_name && (
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <Building className="h-4 w-4" />
-                      {client.location_name}
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <Calendar className="h-4 w-4" />
-                    Criado em {formatDate(client.created_at)}
-                  </div>
+
                   {client.notes && (
-                    <div className="flex items-start gap-2 text-sm text-gray-600">
+                    <div className="flex items-start gap-2 text-sm text-gray-600 mt-3">
                       <FileText className="h-4 w-4 mt-0.5" />
                       <span className="line-clamp-2">{client.notes}</span>
                     </div>
                   )}
-                  
+
                   <div className="flex gap-2 pt-2 mt-auto">
                     <Button
                       variant="outline"
@@ -1520,7 +1532,8 @@ const AdminClients = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
 

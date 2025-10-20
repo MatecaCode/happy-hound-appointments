@@ -89,13 +89,24 @@ const GroomerCalendar = () => {
 
   const updateAppointmentStatus = async (appointmentId: string, newStatus: string) => {
     try {
-      const { error } = await supabase
-        .from('appointments')
-        .update({ status: newStatus })
-        .eq('id', appointmentId);
+      // Keep lifecycle status writes as-is for booking lifecycle statuses only
+      if (newStatus === 'cancelled' || newStatus === 'confirmed' || newStatus === 'pending' || newStatus === 'completed') {
+        const { error } = await supabase
+          .from('appointments')
+          .update({ status: newStatus })
+          .eq('id', appointmentId);
 
-      if (error) throw error;
-      
+        if (error) throw error;
+      } else {
+        // For service flow, route via RPC (not_started/in_progress/completed)
+        const { error } = await supabase.rpc('appointment_set_service_status', {
+          p_appointment_id: appointmentId,
+          p_new_status: newStatus,
+          p_note: null
+        });
+        if (error) throw error;
+      }
+
       setAppointments(prev => 
         prev.map(apt => 
           apt.id === appointmentId 

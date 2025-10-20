@@ -45,6 +45,7 @@ import AdminBookingSuccess from "./pages/AdminBookingSuccess";
 import AdminAgendaHoje from "./pages/AdminAgendaHoje";
 import AdminStaffAvailability from "./pages/AdminStaffAvailability";
 import EditServicePricing from "./pages/EditServicePricing";
+import AdminPricing from "./pages/AdminPricing";
 import { AuthProvider } from "./hooks/useAuth";
 import TestDataPage from "./pages/TestDataPage";
 import GroomerAvailability from './pages/GroomerAvailability';
@@ -186,9 +187,13 @@ function App() {
               <Route path="/admin/manual-booking" element={<AdminManualBooking />} />
               <Route path="/admin/booking-success" element={<AdminBookingSuccess />} />
               <Route path="/admin/settings" element={<AdminSettings />} />
+              <Route path="/admin/pricing" element={<AdminPricing />} />
+              {/* Redirect legacy path for pricing under settings to new route */}
+              <Route path="/admin/settings/pricing" element={<AdminPricing />} />
               <Route path="/admin/services/:serviceId/edit-pricing" element={<EditServicePricing />} />
-              <Route path="/admin/staff/:id/availability" element={<AdminStaffAvailability />} />
-              <Route path="/admin/staff-availability" element={<AdminStaffAvailability />} />
+              {/* Remove redundant Staff Availability page; keep safe redirect */}
+              <Route path="/admin/staff/:id/availability" element={<AdminAvailabilityManager />} />
+              <Route path="/admin/staff-availability" element={<AdminAvailabilityManager />} />
               <Route path="/admin/clients" element={<AdminClients />} />
               <Route path="/admin/pets" element={<AdminPets />} />
               <Route path="/admin/logs" element={<AdminLogs />} />

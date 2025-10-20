@@ -93,53 +93,71 @@ const AdminBookingSuccess: React.FC = () => {
       const { data, error } = await supabase
         .from('appointments')
         .select(`
-          id, date, time, total_price, notes, duration,
-          client:clients!inner(id, name, user_id),
-          pet:pets!inner(name),
-          service:services!inner(name),
-          appointment_services(service_order, service_id, price, duration, services(name)),
-          appointment_staff(service_id, staff_profile:staff_profiles!inner(name))
+          id,
+          date,
+          time,
+          duration,
+          total_price,
+          extra_fee,
+          notes,
+          status,
+          pets:pet_id(name),
+          clients:client_id(name),
+          appointment_services(
+            service_id,
+            service_order,
+            duration,
+            price,
+            services:service_id(name, default_duration),
+            appointment_staff(
+              staff_profile_id,
+              role,
+              staff_profiles:staff_profile_id(name)
+            )
+          )
         `)
         .eq('id', appointmentId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       
-      // Create service-staff assignments
-      const serviceAssignments: ServiceStaffAssignment[] = [];
+      // Handle case where appointment is not found
+      if (!data) {
+        toast({
+          title: "Erro",
+          description: "Agendamento não encontrado",
+          variant: "destructive",
+        });
+        navigate('/admin/manual-booking');
+        return;
+      }
       
-      // Build mappings using service_id as join key
-      const services = (data as any)?.appointment_services ?? [];
-      const staff = (data as any)?.appointment_staff ?? [];
-
-      const staffByServiceId = new Map(
-        staff.map((ast: any) => [ast.service_id, ast?.staff_profile?.name || 'Não atribuído'])
-      );
-
-      const primaryServiceId = services.find((s: any) => s.service_order === 1)?.service_id;
-      const secondaryServiceId = services.find((s: any) => s.service_order === 2)?.service_id;
-
-      const primaryName = primaryServiceId ? (staffByServiceId.get(primaryServiceId) ?? 'Não atribuído') : 'Não atribuído';
-      const secondaryName = secondaryServiceId ? (staffByServiceId.get(secondaryServiceId) ?? 'Não atribuído') : 'Não atribuído';
+      // Create service-staff assignments from appointment_services
+      const serviceAssignments: ServiceStaffAssignment[] = [];
+      const appointmentServices = (data as any)?.appointment_services ?? [];
 
       console.table({
         appointmentId,
-        primaryServiceId, 
-        secondaryServiceId,
-        primaryName, 
-        secondaryName,
-        staffRecords: staff.length, 
-        serviceRows: services.length,
+        appointmentServicesCount: appointmentServices.length,
+        appointmentData: data
       });
 
-      if (services.length > 0) {
-        // For each service, find the assigned staff using the Map
-        services.forEach((aps: any) => {
-          const serviceName = aps.services?.name || 'Serviço';
-          const serviceDuration = aps.duration || 60;
-          const servicePrice = aps.price || 0;
-          const serviceOrder = aps.service_order || 1;
-          const staffName = staffByServiceId.get(aps.service_id) as string || 'Não atribuído';
+      if (appointmentServices.length > 0) {
+        // Process each service and its staff assignments
+        appointmentServices.forEach((service: any) => {
+          const serviceName = service.services?.name || 'Serviço';
+          const serviceDuration = service.duration || service.services?.default_duration || 60;
+          const servicePrice = service.price || 0;
+          const serviceOrder = service.service_order || 1;
+          
+          // Get staff for this service (there should be one staff per service)
+          const serviceStaff = service.appointment_staff || [];
+          let staffName = 'Não atribuído';
+          
+          if (serviceStaff.length > 0) {
+            // Use the first staff member for this service
+            staffName = serviceStaff[0]?.staff_profiles?.name || 'Não atribuído';
+          }
           
           serviceAssignments.push({
             service_name: serviceName,
@@ -151,16 +169,14 @@ const AdminBookingSuccess: React.FC = () => {
         });
       }
       
-      // If no service assignments, create fallback
+      // If no service assignments found, create a fallback (shouldn't happen with unified RPC)
       if (serviceAssignments.length === 0) {
-        const primaryServiceName = (data as any).service?.name || 'Serviço';
-        const primaryStaffName = staff[0]?.staff_profile?.name || 'Não atribuído';
-        
+        console.warn('No appointment_services found, creating fallback');
         serviceAssignments.push({
-          service_name: primaryServiceName,
-          staff_name: primaryStaffName,
-          duration: (data as any).duration || 60,
-          price: (data as any).total_price || 0,
+          service_name: 'Serviço',
+          staff_name: 'Não atribuído',
+          duration: data.duration || 60,
+          price: data.total_price || 0,
           service_order: 1
         });
       }
@@ -173,8 +189,11 @@ const AdminBookingSuccess: React.FC = () => {
         },
         client: {
           user: {
-            full_name: (data as any).client?.name || 'Cliente não encontrado'
+            full_name: (data as any).clients?.name || 'Cliente não encontrado'
           }
+        },
+        pet: {
+          name: (data as any).pets?.name || 'Pet não encontrado'
         },
         service_assignments: serviceAssignments
       };
