@@ -704,7 +704,7 @@ const AdminSettings = () => {
 
         {/* Settings Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="staff" className="flex items-center gap-2">
               <Users className="h-4 w-4" />
               Staff
