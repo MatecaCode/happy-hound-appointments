@@ -24,3 +24,4 @@ Flags
 - WEEK_V2 is implicit and on by default. Toggle compact/grouping is handled in `AdminAgendaHoje`.
 
 
+

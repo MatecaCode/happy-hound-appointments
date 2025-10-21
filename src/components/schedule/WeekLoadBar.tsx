@@ -46,3 +46,4 @@ export const WeekLoadBar: React.FC<{ data: LoadDatum[]; onClickDay?: (dateISO: s
 export default WeekLoadBar;
 
 
+
