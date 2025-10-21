@@ -51,6 +51,7 @@ import TestDataPage from "./pages/TestDataPage";
 import GroomerAvailability from './pages/GroomerAvailability';
 import Claim from "./pages/Claim";
 import StaffClaim from "./pages/StaffClaim";
+import FloatingWhatsappCTA from "@/components/cta/FloatingWhatsappCTA";
 
 // Lazy load heavy components for better performance on low-spec PCs
 const Profile = lazy(() => import("./pages/Profile"));
@@ -123,6 +124,7 @@ function App() {
           <AuthProvider>
             <ScrollToTop />
             <GlobalTokenCatcher />
+            <FloatingWhatsappCTA />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/about" element={<About />} />
