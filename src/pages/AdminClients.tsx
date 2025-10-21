@@ -43,6 +43,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format, differenceInYears, differenceInMonths } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface Client {
   id: string;
@@ -769,34 +770,25 @@ const AdminClients = () => {
     }
 
     try {
-      // Use Edge Function to send invite
-      const { data: inviteResult, error: inviteError } = await supabase.functions.invoke(
-        'send-client-invite',
-        {
-          body: {
-            email: client.email,
-            client_id: client.id
-          }
-        }
-      );
+      const { data, error } = await supabase.functions.invoke('send-client-invite', {
+        body: { clientId: client.id },
+      });
 
-      if (inviteError) {
-        console.error('❌ [ADMIN_CLIENTS] Invite error:', inviteError);
-        toast.error('Erro ao enviar convite: ' + inviteError.message);
+      if (error) {
+        const reason = (error as any)?.context?.response?.reason ?? error.message;
+        console.error('❌ [ADMIN_CLIENTS] Invite error:', error);
+        toast.error(`Convite não enviado: ${reason}`);
         return;
       }
 
-      if (inviteResult?.status === 'invited') {
-        toast.success(`Convite enviado para ${client.email}`);
-        // Optimistically mark invited in RPC map, and refetch clients/status
-        setClaimStatusMap((prev) => ({
-          ...prev,
-          [client.id]: { ...(prev[client.id] || { linked: !!client.user_id, verified: false, invited: false, can_invite: !!!client.user_id }), invited: true }
-        }));
-        fetchClients();
+      if (data?.skipped) {
+        toast.info('Convite duplicado ignorado.');
       } else {
-        toast.error('Erro inesperado ao enviar convite');
+        toast.success('Convite enviado.');
       }
+
+      // Refresh to reflect invited state
+      fetchClients();
     } catch (error) {
       console.error('❌ [ADMIN_CLIENTS] Error sending claim email:', error);
       toast.error('Erro ao enviar convite');
@@ -824,18 +816,12 @@ const AdminClients = () => {
     // Process each client individually using the same Edge Function
     for (const client of eligibleClients) {
       try {
-        const { data: inviteResult, error: inviteError } = await supabase.functions.invoke(
-          'send-client-invite',
-          {
-            body: {
-              email: client.email,
-              client_id: client.id
-            }
-          }
-        );
+        const { data, error } = await supabase.functions.invoke('send-client-invite', {
+          body: { clientId: client.id },
+        });
 
-        if (inviteError || inviteResult?.status !== 'invited') {
-          console.error(`❌ [ADMIN_CLIENTS] Bulk invite error for ${client.email}:`, inviteError);
+        if (error || (!data?.ok && !data?.status)) {
+          console.error(`❌ [ADMIN_CLIENTS] Bulk invite error for ${client.email}:`, error);
           errorCount++;
         } else {
           successCount++;
@@ -1047,6 +1033,20 @@ const AdminClients = () => {
   };
 
   const fmtDatePt = (d?: string | Date) => (d ? new Date(d).toLocaleDateString('pt-BR') : 'N/A');
+
+  const handleResendVerification = async (client: Client) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('admin_resend_verification', {
+        method: 'POST',
+        body: { email: client.email }
+      });
+      if (error) throw error;
+      toast.success('E-mail de verificação reenviado.');
+    } catch (e: any) {
+      console.error('[ADMIN_CLIENTS] resend verification error', e);
+      toast.error('Falha ao reenviar verificação.');
+    }
+  };
 
   if (!user) {
     return <div>Carregando...</div>;
@@ -1400,43 +1400,46 @@ const AdminClients = () => {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
+          <div className="grid auto-rows-[1fr] grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredClients.map((client) => {
-              const linked = !!client.claimed_at
-              const invited = !linked && !!client.claim_invited_at
-              const status = linked ? 'linked' : invited ? 'invited' : 'pending'
+              // Use RPC-driven claim status as source of truth
+              const s = getClaimStatusForClient(client);
+              const isLinkedAndVerified = s?.linked === true && s?.verified === true;
+              const invited = s?.invited === true;
+              const status: 'linked' | 'invited' | 'pending' = isLinkedAndVerified ? 'linked' : (invited ? 'invited' : 'pending');
 
               return (
-                <Card key={client.id} className="hover:shadow-lg transition-shadow h-full flex flex-col relative rounded-2xl border bg-white overflow-visible">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 pr-24 pt-2">
-                        <CardTitle className="text-lg">{client.name}</CardTitle>
-                      </div>
-                      <div className="absolute top-3 right-3 flex flex-col items-end gap-1 z-10">
-                        <Chip className="cursor-pointer" onClick={() => openPetsModal(client)}>
-                          <PawPrint className="mr-1 h-3 w-3" />
-                          {client.pet_count ?? 0}
-                        </Chip>
-                        {status === 'linked' && (
-                          <Chip tone="success">
-                            <CheckCircle className="mr-1 h-3 w-3" />
-                            Conta Vinculada
+                <Card key={client.id} className="h-full rounded-2xl border bg-white transition-shadow hover:shadow-lg">
+                  <div className="flex h-full flex-col p-0">
+                    <CardHeader className="pb-3">
+                      <div className="relative">
+                        <div className="pr-28">
+                          <CardTitle className="truncate text-lg">{client.name}</CardTitle>
+                        </div>
+                        <div className="absolute right-0 top-0 z-10 flex flex-col items-end gap-1">
+                          <Chip className="cursor-pointer" onClick={() => openPetsModal(client)}>
+                            <PawPrint className="mr-1 h-3 w-3" />
+                            {client.pet_count ?? 0}
                           </Chip>
-                        )}
-                        {status === 'invited' && (
-                          <Chip tone="warning">
-                            <Send className="mr-1 h-3 w-3" />
-                            Convite Enviado
-                          </Chip>
-                        )}
-                        {status === 'pending' && (
-                          <Chip tone="danger">Pendente Registro</Chip>
-                        )}
+                          {status === 'linked' && (
+                            <Chip tone="success">
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              Conta Vinculada
+                            </Chip>
+                          )}
+                          {status === 'invited' && (
+                            <Chip tone="warning">
+                              <Send className="mr-1 h-3 w-3" />
+                              Convite Enviado
+                            </Chip>
+                          )}
+                          {status === 'pending' && (
+                            <Chip tone="danger">Pendente Registro</Chip>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
+                    </CardHeader>
+                <CardContent className="flex flex-1 flex-col">
                   <div className="grid grid-cols-[auto,1fr] gap-x-2 gap-y-1.5 text-sm text-gray-600">
                     <Mail className="h-4 w-4 mt-0.5 text-slate-500" />
                     <span
@@ -1480,33 +1483,79 @@ const AdminClients = () => {
                     </div>
                   )}
 
-                  <div className="flex gap-2 pt-2 mt-auto">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditModal(client)}
-                      className="flex-1"
-                    >
-                      <Edit className="h-3 w-3 mr-1" />
-                      Editar
-                    </Button>
+                  <div className="mt-auto pt-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditModal(client)}
+                        className="flex-1 min-w-[140px]"
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Editar
+                      </Button>
                     
-                    {getClaimStatusForClient(client).can_invite && (
+                    {/* Resend verification when linked && !verified */}
+                    {(() => { const s = getClaimStatusForClient(client); return s?.linked === true && s?.verified === false; })() && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleResendVerification(client)}
+                        className="flex-1 min-w-[180px] text-amber-700 border-amber-200 hover:text-amber-800 hover:border-amber-300"
+                        title="Conta criada. Usuário ainda não confirmou o e-mail."
+                      >
+                        <Send className="h-3 w-3 mr-1" />
+                        Reenviar Verificação
+                      </Button>
+                    )}
+
+                    {getClaimStatusForClient(client).can_invite === true ? (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleSendClaimEmail(client)}
-                        className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300"
+                        className="flex-1 min-w-[160px] text-blue-700 border-blue-200 hover:text-blue-800 hover:border-blue-300"
                         title={getClaimStatusForClient(client).invited ? 'Reenviar convite' : 'Enviar convite'}
                       >
                         <Send className="h-3 w-3 mr-1" />
                         {getClaimStatusForClient(client).invited ? 'Reenviar Convite' : 'Enviar Convite'}
                       </Button>
+                    ) : (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="flex-1 min-w-[160px]">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled
+                                className="w-full"
+                              >
+                                <Send className="h-3 w-3 mr-1" />
+                                Enviar Convite
+                              </Button>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {(() => {
+                              const s = getClaimStatusForClient(client);
+                              const cooldownMs = 24 * 60 * 60 * 1000;
+                              const now = Date.now();
+                              const inviteAt = client.claim_invited_at ? new Date(client.claim_invited_at).getTime() : 0;
+                              const withinCooldown = !!client.claim_invited_at && (now - inviteAt) < cooldownMs;
+                              if (!client.email || client.email.trim() === '') return 'Sem e-mail cadastrado';
+                              if (withinCooldown) return 'Aguarde 24h para reenviar';
+                              if (s?.linked || s?.verified) return 'Conta criada; aguarde verificação do e-mail';
+                              return 'Convite indisponível para este registro';
+                            })()}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                     
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                        <Button variant="outline" size="sm" className="min-w-[44px] px-3 text-red-600 hover:text-red-700">
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </AlertDialogTrigger>
@@ -1529,9 +1578,11 @@ const AdminClients = () => {
                         </AlertDialogFooter>
                       </AlertDialogContent>
                     </AlertDialog>
+                    </div>
                   </div>
                 </CardContent>
-              </Card>
+                  </div>
+                </Card>
               );
             })}
           </div>

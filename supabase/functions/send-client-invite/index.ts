@@ -1,6 +1,7 @@
 // deno-lint-ignore-file no-explicit-any
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders as makeCors } from "../_shared/cors.ts";
 
 const url = Deno.env.get("SUPABASE_URL")!;
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -8,30 +9,61 @@ const CLAIM_REDIRECT = Deno.env.get("CLAIM_REDIRECT") ?? "https://vettale.shop/c
 
 const admin = createClient(url, serviceKey, { auth: { persistSession: false }});
 
-// CORS configuration
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',  // Allow all origins for now, can be restricted later
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+// Token bucket and dedupe (in-memory)
+const tokens: Record<string, { t: number[] }> = {};
+function allowAdminRate(userId: string, now = Date.now()) {
+  const windowMs = 60_000;
+  const limit = 10;
+  const bucket = tokens[userId] ?? { t: [] };
+  bucket.t = bucket.t.filter((ts) => now - ts < windowMs);
+  if (bucket.t.length >= limit) return false;
+  bucket.t.push(now);
+  tokens[userId] = bucket;
+  return true;
+}
+
+const dedupe = new Map<string, number>();
+function notDuplicate(key: string, now = Date.now()) {
+  const windowMs = 30_000;
+  const last = dedupe.get(key) ?? 0;
+  if (now - last < windowMs) return false;
+  dedupe.set(key, now);
+  return true;
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const h = makeCors(req.headers.get("origin"));
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders,
-    });
+    const preflight = { ...h, 'Access-Control-Max-Age': '86400', 'Access-Control-Allow-Credentials': 'true', 'Access-Control-Allow-Origin': '*' };
+    return new Response(null, { status: 204, headers: preflight });
   }
 
   try {
+    // Auth after preflight
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const authHeader = req.headers.get("authorization") ?? "";
+    const authClient = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } });
+    const { data: { user }, error: uerr } = await authClient.auth.getUser();
+    if (uerr || !user) {
+      return new Response(JSON.stringify({ ok:false, code:"UNAUTHORIZED", reason:"Missing or invalid session" }), { status: 401, headers: { ...h, "content-type":"application/json" } });
+    }
+
+    if (!allowAdminRate(user.id)) {
+      return new Response(JSON.stringify({ ok:false, code:"RATE_LIMIT", reason:"Too many requests, slow down" }), { status: 429, headers: { ...h, "content-type":"application/json" } });
+    }
+
     const body = await req.json();
     const { email, client_id, checkOnly } = body;
+
+    const key = `${user.id}:${JSON.stringify({ email, client_id, checkOnly })}`;
+    if (!notDuplicate(key)) {
+      return new Response(JSON.stringify({ ok:true, skipped:true, code:"DEDUPE", reason:"Duplicate within 30s" }), { status: 200, headers: { ...h, "content-type":"application/json" } });
+    }
     
     if (!email) {
-      return new Response("email required", { 
+      return new Response(JSON.stringify({ ok:false, error: 'email required' }), { 
         status: 400, 
-        headers: { ...corsHeaders, "content-type": "application/json" }
+        headers: { ...h, "content-type": "application/json" }
       });
     }
 
@@ -39,19 +71,19 @@ serve(async (req) => {
     if (checkOnly) {
       // Check if email exists in Auth
       try {
-        const { data: authUser, error: authError } = await admin.auth.admin.getUserByEmail(email);
+        const { data: authUser } = await admin.auth.admin.getUserByEmail(email);
         if (authUser?.user) {
           return new Response(JSON.stringify({ 
+            ok:false,
             available: false, 
             reason: "already_registered" 
           }), { 
             status: 409,
-            headers: { ...corsHeaders, "content-type": "application/json" }
+            headers: { ...h, "content-type": "application/json" }
           });
         }
-      } catch (authError) {
-        // getUserByEmail throws if user not found, which is what we want
-        console.log('Email not found in auth (expected for availability check)');
+      } catch (_err) {
+        // user not found → available to invite
       }
 
       // Check if email exists in clients table (case-insensitive)
@@ -62,90 +94,80 @@ serve(async (req) => {
         .limit(1);
       
       if (clientCheckError) {
-        console.error('Error checking existing clients:', clientCheckError);
         return new Response(JSON.stringify({ 
+          ok:false,
           available: false, 
           reason: "check_error" 
         }), { 
           status: 500,
-          headers: { ...corsHeaders, "content-type": "application/json" }
+          headers: { ...h, "content-type": "application/json" }
         });
       }
 
       if (existingClients && existingClients.length > 0) {
         return new Response(JSON.stringify({ 
+          ok:false,
           available: false, 
           reason: "already_registered" 
         }), { 
           status: 409,
-          headers: { ...corsHeaders, "content-type": "application/json" }
+          headers: { ...h, "content-type": "application/json" }
         });
       }
 
-      return new Response(JSON.stringify({ available: true }), { 
+      return new Response(JSON.stringify({ ok:true, available: true }), { 
         status: 200,
-        headers: { ...corsHeaders, "content-type": "application/json" }
+        headers: { ...h, "content-type": "application/json" }
       });
     }
 
     // Normal invite mode - requires client_id
     if (!client_id) {
-      return new Response("client_id required for invite", { 
+      return new Response(JSON.stringify({ ok:false, code:'NO_CLIENT', reason:'client_id required for invite' }), { 
         status: 400, 
-        headers: { ...corsHeaders, "content-type": "application/json" }
+        headers: { ...h, "content-type": "application/json" }
       });
     }
 
-    // Check if email already exists in Auth before proceeding
-    try {
-      const { data: authUser, error: authError } = await admin.auth.admin.getUserByEmail(email);
-      if (authUser?.user) {
-        return new Response(JSON.stringify({ 
-          available: false, 
-          reason: "already_registered" 
-        }), { 
-          status: 409,
-          headers: { ...corsHeaders, "content-type": "application/json" }
-        });
-      }
-    } catch (authError) {
-      // getUserByEmail throws if user not found, which is expected
-      console.log('Email not found in auth, proceeding with invite');
+    // Policy via RPC (single source of truth)
+    const { data: statusRows, error: rerr } = await admin.rpc("admin_get_client_claim_status", { _client_ids: [client_id] });
+    if (rerr) throw rerr;
+    const s = statusRows?.[0];
+    if (!s) return new Response(JSON.stringify({ ok:false, code:"NOT_FOUND", reason:"Client not found" }), { status: 404, headers: { ...h, "content-type":"application/json" } });
+    if (s.linked && !s.verified) {
+      return new Response(JSON.stringify({ ok:false, code:"ALREADY_LINKED_UNVERIFIED", reason:"User exists. Use resend verification." }), { status: 409, headers: { ...h, "content-type":"application/json" } });
+    }
+    if (s.linked && s.verified) {
+      return new Response(JSON.stringify({ ok:false, code:"ALREADY_LINKED", reason:"Client already linked" }), { status: 409, headers: { ...h, "content-type":"application/json" } });
+    }
+    if (!s.can_invite) {
+      return new Response(JSON.stringify({ ok:false, code:"INVITE_BLOCKED", reason:"Invite not allowed by policy" }), { status: 409, headers: { ...h, "content-type":"application/json" } });
     }
 
-    // ensure eligible (admin_created & unclaimed)
-    const { data: rows, error: selErr } = await admin
-      .from("clients")
-      .select("id, email, admin_created, user_id, claim_invited_at")
-      .eq("id", client_id).eq("email", email).limit(1);
-    if (selErr) throw selErr;
-    const c = rows?.[0];
-    if (!c) return new Response("client not found or email mismatch", { 
-      status: 404, 
-      headers: { ...corsHeaders, "content-type": "application/json" }
-    });
-    if (!c.admin_created || c.user_id) return new Response("client not eligible for invite", { 
-      status: 409, 
-      headers: { ...corsHeaders, "content-type": "application/json" }
-    });
+    // Fetch client email (authoritative)
+    const { data: clientRow } = await admin.from("clients").select("email").eq("id", client_id).single();
+    const emailForInvite = clientRow?.email ?? email;
+    if (!emailForInvite) return new Response(JSON.stringify({ ok:false, code:"NO_EMAIL", reason:"Client has no email" }), { status: 400, headers: { ...h, "content-type":"application/json" } });
 
     // send invite using Supabase Auth (uses your Invite template)
-    const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(email, {
+    const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(emailForInvite, {
       redirectTo: CLAIM_REDIRECT,
       data: { preclient_id: client_id }
     });
     if (inviteErr) throw inviteErr;
 
-    // stamp invited time (optional column; safe if it exists)
+    // stamp invited time (optional)
     await admin.from("clients").update({ claim_invited_at: new Date().toISOString() }).eq("id", client_id);
 
-    return new Response(JSON.stringify({ status: "invited" }), { 
-      headers: { ...corsHeaders, "content-type": "application/json" }
+    return new Response(JSON.stringify({ ok:true, status: "invited" }), { 
+      status: 200,
+      headers: { ...h, "content-type": "application/json" }
     });
-  } catch (e) {
-    return new Response(String(e?.message ?? e), { 
+  } catch (e: any) {
+    const body = JSON.stringify({ ok:false, code:"ERROR", reason: String(e?.message ?? e) });
+    return new Response(body, { 
       status: 500, 
-      headers: { ...corsHeaders, "content-type": "application/json" }
+      headers: { ...h, "content-type": "application/json" }
     });
   }
 });
