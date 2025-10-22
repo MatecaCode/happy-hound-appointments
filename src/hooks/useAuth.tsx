@@ -129,6 +129,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  // Ensure a clients row exists for the signed-in user (self-registration fallback)
+  const ensureClientRow = async (currentUser: User) => {
+    try {
+      // Check if a client record already exists
+      const { data: existing } = await supabase
+        .from('clients')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+
+      if (existing) return; // nothing to do
+
+      const displayName = (currentUser.user_metadata?.name || '').toString() || null;
+      const email = currentUser.email || null;
+
+      const { error: insertError } = await supabase
+        .from('clients')
+        .insert({
+          user_id: currentUser.id,
+          name: displayName,
+          email,
+          admin_created: false,
+        })
+        .select()
+        .maybeSingle();
+
+      if (insertError && (insertError as any).code !== '23505') {
+        console.warn('[CLIENT_PROFILE] ensureClientRow insert failed', insertError);
+      }
+    } catch (e) {
+      console.warn('[CLIENT_PROFILE] ensureClientRow error', e);
+    }
+  };
+
   useEffect(() => {
     let mounted = true;
     let authTimeout: NodeJS.Timeout;
@@ -171,6 +205,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (initialSession?.user && mounted) {
           setSession(initialSession);
           setUser(initialSession.user);
+          // Frontend safety net: ensure client row exists after we have a session
+          ensureClientRow(initialSession.user);
           
           // Fetch roles with error handling and retry logic
           const fetchRolesWithRetry = async (attempt: number = 1): Promise<string[]> => {
@@ -239,6 +275,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setSession(session);
           setUser(session.user);
           setAuthError(null); // Clear any previous errors
+          // Ensure client row exists on successful sign-in
+          if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+            ensureClientRow(session.user);
+          }
           
           // Fetch roles in background with timeout and retry
           setTimeout(async () => {
