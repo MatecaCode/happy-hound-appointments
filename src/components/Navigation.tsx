@@ -115,7 +115,7 @@ const Navigation = () => {
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
       
       // Only proceed with staff profile check if user is actually staff
       if (userRoles?.data?.role === 'staff') {
@@ -123,7 +123,7 @@ const Navigation = () => {
           .from('staff_profiles')
           .select('id, photo_url')
           .eq('user_id', user.id)
-          .single();
+          .maybeSingle();
           
         if (profile) {
           setStaffPhotoUrl(profile.photo_url);

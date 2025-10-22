@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import { fetchClientByUserId, fetchStaffProfileId } from '@/utils/profileFetchers';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -318,13 +319,8 @@ const Profile = () => {
       setRoleLoading(true);
       
       // Check if user has a staff profile
-      const { data: staffData } = await supabase
-        .from('staff_profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (staffData) {
+      const staffId = await fetchStaffProfileId(supabase, user.id);
+      if (staffId) {
         setIsStaff(true);
         setRoleLoading(false);
         return;
@@ -356,18 +352,7 @@ const Profile = () => {
 
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error) {
-        log.error('Error fetching client data:', error);
-        toast.error('Erro ao carregar dados do perfil');
-        return;
-      }
-
+      const data = await fetchClientByUserId(supabase, user.id);
       setClientData(data);
       
       // Set form data for editing

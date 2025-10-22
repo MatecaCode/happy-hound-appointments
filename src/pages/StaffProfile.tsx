@@ -71,9 +71,9 @@ const StaffProfile = () => {
         .from('staff_profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (error) {
+      if (error && (error as any).code !== 'PGRST116') {
         console.error('Error fetching staff profile:', error);
         toast.error('Erro ao carregar perfil');
         return;
