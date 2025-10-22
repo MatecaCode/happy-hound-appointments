@@ -66,6 +66,15 @@ const queryClient = new QueryClient();
 console.log("[ENV] URL:", import.meta.env.VITE_SUPABASE_URL);
 console.log("[ENV] Anon present:", !!import.meta.env.VITE_SUPABASE_ANON_KEY);
 
+// Early redirect for Supabase auth errors present in URL hash (avoid homepage flicker)
+if (typeof window !== 'undefined') {
+  const errorHash = window.location.hash || '';
+  if (errorHash && /(error_code=otp_expired|error_description=.*expired|error=access_denied)/i.test(errorHash)) {
+    console.warn('[GLOBAL_TOKEN_CATCHER] Expired/invalid auth link detected in URL hash; redirecting to /login');
+    window.history.replaceState({}, document.title, '/login');
+  }
+}
+
 // Loading skeleton for lazy components
 const LoadingSkeleton = () => (
   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#E7F0FF] via-white to-[#F1F5F9]">
@@ -94,6 +103,13 @@ function GlobalTokenCatcher() {
     const processAuthFromUrl = async () => {
       try {
         const { search, hash, pathname } = window.location;
+
+        // Hash-based error from Supabase (expired/invalid link)
+        if (hash && /(error_code=otp_expired|error_description=.*expired|error=access_denied)/i.test(hash)) {
+          console.warn('[GLOBAL_TOKEN_CATCHER] Hash error detected; redirecting to /login');
+          window.history.replaceState({}, document.title, '/login');
+          return;
+        }
 
         // v2 OAuth code flow in query string
         const hasOAuthQuery = !!search && /[?&](code|state)=/.test(search);
