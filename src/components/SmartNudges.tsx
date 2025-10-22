@@ -144,11 +144,15 @@ const SmartNudgesBanner: React.FC<SmartNudgesBannerProps> = ({
                   variant="default"
                   className="w-full sm:w-auto bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
                   onClick={() => {
-                    // Scroll to the editable sections or trigger edit mode
-                    const editButton = document.querySelector('[data-action="edit-profile"]') as HTMLButtonElement;
-                    if (editButton) {
-                      editButton.click();
+                    // Prefer opening the completion modal if available in the page
+                    const openModalBtn = document.querySelector('[data-action="open-complete-profile-modal"]') as HTMLButtonElement;
+                    if (openModalBtn) {
+                      openModalBtn.click();
+                      return;
                     }
+                    // Fallback: trigger inline edit
+                    const editButton = document.querySelector('[data-action="edit-profile"]') as HTMLButtonElement;
+                    editButton?.click();
                   }}
                 >
                   <User className="w-4 h-4 mr-1" />

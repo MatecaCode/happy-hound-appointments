@@ -270,7 +270,7 @@ const Profile = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // First-visit redirect to "Complete Profile" (edit mode) once per session
+  // First-visit: open completion modal once per session when profile is incomplete
   useEffect(() => {
     if (!user) return;
     // Only run after we have server-side progress loaded at least once
@@ -278,14 +278,11 @@ const Profile = () => {
     const alreadyPrompted = sessionStorage.getItem(promptedKey) === '1';
     if (alreadyPrompted) return;
 
-    // If progress < 100, redirect to edit mode once
+    // If progress < 100, open modal once
     if (profileProgress.percent_complete > 0 && profileProgress.percent_complete < 100) {
       sessionStorage.setItem(promptedKey, '1');
-      // Enter edit mode locally and ensure UX matches
-      setIsEditing(true);
+      setShowMicroWizard(true);
       setShowNudgeBanner(false);
-      // Keep route the same but could navigate to a dedicated path if exists
-      // navigate('/profile?mode=edit'); // no dedicated route today, enable inline
     }
   }, [user?.id, profileProgress.percent_complete]);
 
@@ -355,6 +352,18 @@ const Profile = () => {
       const data = await fetchClientByUserId(supabase, user.id);
       setClientData(data);
       
+      if (!data) {
+        console.warn('[CLIENT_PROFILE] No client row for user', user.id);
+        // Session-gated auto-open when there is no client yet
+        const promptedKey = `profile_completion_prompted:${user.id}`;
+        if (sessionStorage.getItem(promptedKey) !== '1') {
+          sessionStorage.setItem(promptedKey, '1');
+          setShowMicroWizard(true);
+          setShowNudgeBanner(false);
+        }
+        return; // Avoid accessing fields on null
+      }
+      
       // Set form data for editing
       setFormData({
         name: data.name || '',
@@ -388,8 +397,7 @@ const Profile = () => {
       // await loadProfileProgress(); // This line is now handled by the client-side progress calculator
       
     } catch (error) {
-      log.error('Error in fetchClientData:', error);
-      toast.error('Erro ao carregar dados do perfil');
+      console.error('[CLIENT_PROFILE] Error in fetchClientData', error);
     } finally {
       setIsLoading(false);
     }
@@ -592,9 +600,9 @@ const Profile = () => {
   };
 
   const handleCompletarAgora = () => {
-    setIsEditing(true);
-    setShowNudgeBanner(false); // Hide banner when entering edit mode
-    toast.success('Edição habilitada — complete seu perfil.');
+    setShowMicroWizard(true);
+    setShowNudgeBanner(false);
+    toast.success('Vamos completar seu perfil.');
     
     // Focus the first missing field (typically phone)
     setTimeout(() => {
@@ -1155,6 +1163,8 @@ const Profile = () => {
 
               {/* Action Buttons */}
               <div className="flex justify-end space-x-2">
+                {/* Hidden action hook for opening the completion modal from other components */}
+                <button type="button" data-action="open-complete-profile-modal" className="hidden" onClick={() => setShowMicroWizard(true)} />
                 {!isEditing ? (
                   <Button
                     onClick={() => setIsEditing(true)}
