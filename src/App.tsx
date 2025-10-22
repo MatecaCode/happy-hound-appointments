@@ -19,6 +19,7 @@ import Shop from "./pages/Shop";
 import Cart from "./pages/Cart";
 import About from "./pages/About";
 import AuthCallback from "./pages/AuthCallback";
+import AuthExpired from "./pages/AuthExpired";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import GroomerDashboard from "./pages/GroomerDashboard";
@@ -101,6 +102,13 @@ function GlobalTokenCatcher() {
           const { error } = await (supabase.auth as any).exchangeCodeForSession(search);
           if (error) {
             console.warn('⚠️ [GLOBAL_TOKEN_CATCHER] exchangeCodeForSession error', error);
+            const msg = String(error?.message || '').toLowerCase();
+            if (msg.includes('expired') || msg.includes('invalid') || msg.includes('invalid_grant')) {
+              // Clean URL and route to expired page
+              window.history.replaceState({}, document.title, pathname);
+              window.location.assign('/auth/expired');
+              return;
+            }
           } else {
             console.log('✅ [GLOBAL_TOKEN_CATCHER] Session established via exchangeCodeForSession');
           }
@@ -179,6 +187,7 @@ function App() {
               <Route path="/claim" element={<Claim />} />
               <Route path="/staff/claim" element={<StaffClaim />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/auth/expired" element={<AuthExpired />} />
               <Route path="/groomer-dashboard" element={<GroomerDashboard />} />
               <Route path="/groomer-calendar" element={<GroomerCalendar />} />
               <Route path="/groomer-schedule" element={<GroomerSchedule />} />

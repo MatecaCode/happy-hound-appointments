@@ -428,6 +428,9 @@ const Register = () => {
           // Don't throw here - user was created successfully, just admin processing failed
         }
       }
+
+      // Offer resend option inline
+      toast.message('Verifique seu e-mail para confirmar sua conta.');
       
       // For staff accounts: Process immediately after signup
       if (accountType === 'staff' && authData.user) {

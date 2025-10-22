@@ -8,12 +8,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useAuth } from '@/hooks/useAuth';
 import Layout from '@/components/Layout';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { resendConfirmation } from '@/integrations/supabase/resendConfirmation';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cooldown, setCooldown] = useState(0);
   const { signIn, user } = useAuth();
   
   const navigate = useNavigate();
@@ -39,6 +41,24 @@ const Login = () => {
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setInterval(() => setCooldown((c) => (c > 0 ? c - 1 : 0)), 1000);
+    return () => clearInterval(t);
+  }, [cooldown]);
+
+  const showResend = (error || '').toLowerCase().includes('confirm') || (error || '').toLowerCase().includes('not confirmed');
+
+  const handleResend = async () => {
+    if (!email || cooldown > 0) return;
+    try {
+      await resendConfirmation(email);
+      setCooldown(30);
+    } catch (err: any) {
+      console.error('[RESEND]', err);
+    }
+  };
   
   return (
     <Layout>
@@ -55,6 +75,18 @@ const Login = () => {
               <Alert variant="destructive" className="mb-4">
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
+            )}
+            {showResend && (
+              <div className="mb-4 text-sm">
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={!email || cooldown > 0}
+                  className="text-primary hover:underline disabled:opacity-50"
+                >
+                  {cooldown > 0 ? `Reenviar em ${cooldown}s` : 'Reenviar e-mail de confirmação'}
+                </button>
+              </div>
             )}
             
             {suggestGroomerRole && (
