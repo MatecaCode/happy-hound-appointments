@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -69,6 +69,7 @@ interface ProfileProgress {
 
 const Profile = () => {
   const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isStaff, setIsStaff] = useState(false);
   const [roleLoading, setRoleLoading] = useState(true);
@@ -267,6 +268,25 @@ const Profile = () => {
     const timer = setTimeout(() => setIsVisible(true), 100);
     return () => clearTimeout(timer);
   }, []);
+
+  // First-visit redirect to "Complete Profile" (edit mode) once per session
+  useEffect(() => {
+    if (!user) return;
+    // Only run after we have server-side progress loaded at least once
+    const promptedKey = `profile_completion_prompted:${user.id}`;
+    const alreadyPrompted = sessionStorage.getItem(promptedKey) === '1';
+    if (alreadyPrompted) return;
+
+    // If progress < 100, redirect to edit mode once
+    if (profileProgress.percent_complete > 0 && profileProgress.percent_complete < 100) {
+      sessionStorage.setItem(promptedKey, '1');
+      // Enter edit mode locally and ensure UX matches
+      setIsEditing(true);
+      setShowNudgeBanner(false);
+      // Keep route the same but could navigate to a dedicated path if exists
+      // navigate('/profile?mode=edit'); // no dedicated route today, enable inline
+    }
+  }, [user?.id, profileProgress.percent_complete]);
 
   // Add keyboard handler for escape key to close micro-wizard
   useEffect(() => {

@@ -90,26 +90,42 @@ function ScrollToTop() {
 // Global token catcher for auth invite links
 function GlobalTokenCatcher() {
   useEffect(() => {
-    const handleAuthTokens = async () => {
-      // Check if URL contains auth tokens (access_token, type=, etc.)
-      if (location.hash && (location.hash.includes('access_token') || location.hash.includes('type='))) {
-        console.log('🔗 [GLOBAL_TOKEN_CATCHER] Auth tokens detected in URL hash');
-        
-        try {
-          // Process the session from URL
-          await supabase.auth.getSessionFromUrl({ storeSession: true });
-          console.log('✅ [GLOBAL_TOKEN_CATCHER] Session processed successfully');
-          
-          // Clean up the URL hash
-          window.history.replaceState(null, '', location.pathname + location.search);
-          console.log('🧹 [GLOBAL_TOKEN_CATCHER] URL hash cleared');
-        } catch (error) {
-          console.error('❌ [GLOBAL_TOKEN_CATCHER] Error processing auth tokens:', error);
+    const processAuthFromUrl = async () => {
+      try {
+        const { search, hash, pathname } = window.location;
+
+        // v2 OAuth code flow in query string
+        const hasOAuthQuery = !!search && /[?&](code|state)=/.test(search);
+        if (hasOAuthQuery && typeof (supabase.auth as any).exchangeCodeForSession === 'function') {
+          console.log('🔗 [GLOBAL_TOKEN_CATCHER] OAuth code/state detected in URL search');
+          const { error } = await (supabase.auth as any).exchangeCodeForSession(search);
+          if (error) {
+            console.warn('⚠️ [GLOBAL_TOKEN_CATCHER] exchangeCodeForSession error', error);
+          } else {
+            console.log('✅ [GLOBAL_TOKEN_CATCHER] Session established via exchangeCodeForSession');
+          }
+          // Clean query params (keep path only)
+          window.history.replaceState({}, document.title, pathname);
+          return;
         }
+
+        // Legacy hash tokens (email links, older flows). Do not call removed v1 helper.
+        const hasHashTokens = !!hash && /(access_token=|type=)/.test(hash);
+        if (hasHashTokens) {
+          console.log('🔗 [GLOBAL_TOKEN_CATCHER] Auth tokens detected in URL hash');
+          // Let onAuthStateChange pick up the session; just clean hash asap
+          setTimeout(() => {
+            window.history.replaceState({}, document.title, pathname + search);
+            console.log('🧹 [GLOBAL_TOKEN_CATCHER] URL hash cleared');
+          }, 0);
+          return;
+        }
+      } catch (e) {
+        console.error('[GLOBAL_TOKEN_CATCHER] processAuthFromUrl failed', e);
       }
     };
 
-    handleAuthTokens();
+    processAuthFromUrl();
   }, []);
 
   return null;
