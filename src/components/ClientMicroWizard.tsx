@@ -135,17 +135,18 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
       // Prepare profile update data
       const profileUpdates: Record<string, unknown> = {};
       
-             if (wizardData.phone) profileUpdates.p_phone = wizardData.phone;
-       if (wizardData.is_whatsapp !== undefined) profileUpdates.p_is_whatsapp = wizardData.is_whatsapp;
-       // Always include preferred_channel_code (default to 'telefone')
-       profileUpdates.p_preferred_channel_code = wizardData.preferred_channel_code || 'telefone';
-       if (wizardData.marketing_source_code) profileUpdates.p_marketing_source_code = wizardData.marketing_source_code;
-       if (wizardData.marketing_source_other) profileUpdates.p_marketing_source_other = wizardData.marketing_source_other;
-       if (wizardData.birth_date) profileUpdates.p_birth_date = wizardData.birth_date;
-       if (wizardData.emergency_contact_name) profileUpdates.p_emergency_contact_name = wizardData.emergency_contact_name;
-       if (wizardData.emergency_contact_phone) profileUpdates.p_emergency_contact_phone = wizardData.emergency_contact_phone;
-       if (wizardData.preferred_staff_profile_id) profileUpdates.p_preferred_staff_profile_id = wizardData.preferred_staff_profile_id;
-       if (wizardData.accessibility_notes) profileUpdates.p_accessibility_notes = wizardData.accessibility_notes;
+      if (wizardData.phone) profileUpdates.p_phone = wizardData.phone;
+      if (wizardData.is_whatsapp !== undefined) profileUpdates.p_is_whatsapp = wizardData.is_whatsapp;
+      // Always include preferred_channel_code (default to 'telefone')
+      profileUpdates.p_preferred_channel_code = wizardData.preferred_channel_code || 'telefone';
+      if (wizardData.marketing_source_code) profileUpdates.p_marketing_source_code = wizardData.marketing_source_code;
+      if (wizardData.marketing_source_other) profileUpdates.p_marketing_source_other = wizardData.marketing_source_other;
+      // Critical: always include p_birth_date to disambiguate RPC overloads
+      profileUpdates.p_birth_date = wizardData.birth_date || null;
+      if (wizardData.emergency_contact_name) profileUpdates.p_emergency_contact_name = wizardData.emergency_contact_name;
+      if (wizardData.emergency_contact_phone) profileUpdates.p_emergency_contact_phone = wizardData.emergency_contact_phone;
+      if (wizardData.preferred_staff_profile_id) profileUpdates.p_preferred_staff_profile_id = wizardData.preferred_staff_profile_id;
+      if (wizardData.accessibility_notes) profileUpdates.p_accessibility_notes = wizardData.accessibility_notes;
       
       // Update profile if we have data
       if (Object.keys(profileUpdates).length > 0) {
