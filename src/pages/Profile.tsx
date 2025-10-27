@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
 import ClientMicroWizard from '@/components/ClientMicroWizard';
+import { hasRunOnboarding, setOnboardingDone } from '@/utils/onboarding';
 import SmartNudgesBanner from '@/components/SmartNudges';
 import PhoneInputBR from '@/components/inputs/PhoneInputBR';
 import { DateInputBR } from '@/components/inputs/DateInputBR';
@@ -273,18 +274,22 @@ const Profile = () => {
   // First-visit: open completion modal once per session when profile is incomplete
   useEffect(() => {
     if (!user) return;
+    if (hasRunOnboarding(user.id)) return; // never auto-open again after first completion/snooze
     // Only run after we have server-side progress loaded at least once
     const promptedKey = `profile_completion_prompted:${user.id}`;
     const alreadyPrompted = sessionStorage.getItem(promptedKey) === '1';
     if (alreadyPrompted) return;
 
-    // If progress < 100, open modal once
-    if (profileProgress.percent_complete > 0 && profileProgress.percent_complete < 100) {
+    const missing = profileProgress.missing_fields || [];
+    const onlyEmergencyMissing = missing.length > 0 && missing.every(f => ['emergency_contact_name','emergency_contact_phone'].includes(f));
+
+    // If progress < 100 and not just emergency fields, open modal once
+    if (profileProgress.percent_complete > 0 && profileProgress.percent_complete < 100 && !onlyEmergencyMissing) {
       sessionStorage.setItem(promptedKey, '1');
       setShowMicroWizard(true);
       setShowNudgeBanner(false);
     }
-  }, [user?.id, profileProgress.percent_complete]);
+  }, [user?.id, profileProgress.percent_complete, profileProgress.missing_fields]);
 
   // Add keyboard handler for escape key to close micro-wizard
   useEffect(() => {
@@ -635,6 +640,8 @@ const Profile = () => {
     await loadConsentSnapshot(); // Refresh consent snapshot
     await loadProfileProgress(); // Refresh progress
     toast.success('Configuração inicial concluída!');
+    // Mark onboarding completed to avoid auto-open in the future
+    setOnboardingDone(user?.id);
   };
 
   const handleMicroWizardClose = () => {
@@ -1209,10 +1216,24 @@ const Profile = () => {
 
         {/* Micro-Wizard Modal */}
         <ClientMicroWizard
+          key={user.id}
           isOpen={showMicroWizard}
           onClose={handleMicroWizardClose}
           onComplete={handleMicroWizardComplete}
           currentUserName={clientData?.name || ''}
+          startAt={(profileProgress.missing_fields && profileProgress.missing_fields.some(f => ['emergency_contact_name','emergency_contact_phone'].includes(f))) ? 'emergency' : 'contact'}
+          initialValues={{
+            phone: clientData?.phone || '',
+            is_whatsapp: clientData?.is_whatsapp || false,
+            preferred_channel_code: formData.preferred_channel_code || 'telefone',
+            marketing_source_code: formData.marketing_source_code || undefined,
+            marketing_source_other: formData.marketing_source_other || undefined,
+            birth_date: birthDate ? format(birthDate, 'yyyy-MM-dd') : undefined,
+            emergency_contact_name: clientData?.emergency_contact_name || undefined,
+            emergency_contact_phone: clientData?.emergency_contact_phone || undefined,
+            preferred_staff_profile_id: clientData?.preferred_staff_profile_id || undefined,
+            accessibility_notes: clientData?.accessibility_notes || undefined
+          }}
         />
       </div>
     </Layout>

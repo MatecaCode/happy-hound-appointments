@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { hasRunOnboarding, setOnboardingDone } from '@/utils/onboarding';
 
 interface ProfileProgress {
   percent_complete: number;
@@ -120,6 +121,9 @@ const SmartNudgesBanner: React.FC<SmartNudgesBannerProps> = ({
 
   if (!isVisible) return null;
 
+  const pending = profileProgress.missing_fields || [];
+  const onlyEmergencyMissing = pending.length > 0 && pending.every(f => ['emergency_contact_name','emergency_contact_phone'].includes(f));
+
   const Icon = getNudgeIcon();
   const missingFieldsText = getMissingFieldsMessage();
 
@@ -131,11 +135,14 @@ const SmartNudgesBanner: React.FC<SmartNudgesBannerProps> = ({
             <Icon className="w-5 h-5 mt-0.5 text-gray-600 flex-shrink-0" />
             <div className="flex-1 min-w-0">
               <h4 className="font-semibold text-gray-800 mb-1">
-                {getNudgeTitle()}
+                {onlyEmergencyMissing ? 'Só falta o contato de emergência' : getNudgeTitle()}
               </h4>
               <p className="text-sm text-gray-600 mb-3">
-                Seu perfil está {profileProgress.percent_complete}% completo. 
-                {missingFieldsText && ` Complete: ${missingFieldsText}.`}
+                {onlyEmergencyMissing
+                  ? 'Adicione apenas o contato de emergência para completar seu perfil (opcional).'
+                  : (<>
+                      Seu perfil está {profileProgress.percent_complete}% completo. {missingFieldsText && ` Complete: ${missingFieldsText}.`}
+                    </>)}
               </p>
               
               <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
@@ -156,7 +163,7 @@ const SmartNudgesBanner: React.FC<SmartNudgesBannerProps> = ({
                   }}
                 >
                   <User className="w-4 h-4 mr-1" />
-                  Completar Agora
+                  {onlyEmergencyMissing ? 'Adicionar agora' : 'Completar Agora'}
                 </Button>
                 
                 <Button

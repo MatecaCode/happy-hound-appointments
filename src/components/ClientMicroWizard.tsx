@@ -68,18 +68,24 @@ interface WizardData {
   accessibility_notes?: string;
 }
 
+type WizardStepId = 'contact' | 'reminders' | 'emergency' | 'preferences';
+
 interface ClientMicroWizardProps {
   isOpen: boolean;
   onClose: () => void;
   onComplete: () => void;
   currentUserName?: string;
+  startAt?: WizardStepId; // optional starting step
+  initialValues?: Partial<WizardData>; // prefill values
 }
 
 const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
   isOpen,
   onClose,
   onComplete,
-  currentUserName = ''
+  currentUserName = '',
+  startAt,
+  initialValues
 }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [wizardData, setWizardData] = useState<WizardData>({
@@ -93,6 +99,26 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
   const [contactChannels, setContactChannels] = useState<ContactChannel[]>([]);
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
   
+  // Seed from initialValues only once on open
+  useEffect(() => {
+    if (isOpen) {
+      if (initialValues) {
+        setWizardData(prev => ({ ...prev, ...initialValues }));
+      }
+      if (startAt) {
+        const map: Record<WizardStepId, number> = {
+          contact: 1,
+          reminders: 2,
+          emergency: 3,
+          preferences: 4
+        };
+        setCurrentStep(map[startAt] || 1);
+      }
+    }
+    // do not reset when props change, only on open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
+
   // Load lookup data
   useEffect(() => {
     if (isOpen) {
@@ -219,6 +245,11 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
   };
 
   const handleSkip = async () => {
+    // Step 2 is mandatory: cannot skip without accepting all consents
+    if (currentStep === 2) {
+      toast.error('Para continuar, aceite os termos de uso, a política de privacidade e os lembretes.');
+      return;
+    }
     try {
       // Save any filled data before skipping
       if (hasStepData()) {
@@ -684,7 +715,8 @@ const ClientMicroWizard: React.FC<ClientMicroWizardProps> = ({
               variant="ghost"
               size="sm"
               onClick={handleSkip}
-              disabled={saving}
+              disabled={saving || currentStep === 2}
+              title={currentStep === 2 ? 'Obrigatório aceitar para continuar' : undefined}
             >
               <X className="w-4 h-4 mr-1" />
               Pular
