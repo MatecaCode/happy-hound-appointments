@@ -28,7 +28,8 @@ export function buildWhatsMessage(params: { name: string; phone: string; reason:
 export function buildWhatsLink(payload: { name: string; phone: string; reason: string }): string {
   const text = encodeURIComponent(buildWhatsMessage(payload));
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const base = isMobile ? "whatsapp://send" : "https://web.whatsapp.com/send";
+  // On desktop, use api.whatsapp.com so the pre-filled text is preserved
+  const base = isMobile ? "whatsapp://send" : "https://api.whatsapp.com/send";
   return `${base}?phone=${CLINIC_WHATS_E164}&text=${text}`;
 }
 
