@@ -635,3 +635,21 @@ Avaliar nomes alternativos de pacotes (ex.: Essencial Cuidado, Clássico Estilo,
 End of document.
 
 
+
+[LOG_UPDATE]
+date: 2025-10-27
+by: GPT-5 in Cursor
+area: Website CTA / WhatsApp deeplink
+change_summary:
+- Desktop WhatsApp target switched from `web.whatsapp.com` to `api.whatsapp.com` so the pre-filled message is preserved when opening WhatsApp Web or the Windows app.
+- Mobile path unchanged: uses `whatsapp://send`.
+- Message still built with `encodeURIComponent`; phone kept in E.164 without "+".
+rationale:
+- `web.whatsapp.com` can drop the `text` payload when the native Windows app takes over. `api.whatsapp.com` reliably forwards the pre-typed message to Web or app.
+touch_points:
+- code: `src/utils/whatsapp.ts` → `buildWhatsLink()` desktop base URL.
+tests:
+- Desktop (Windows): chat opens with message pre-typed.
+- Mobile (Android/iOS): deep link opens WhatsApp with the same pre-typed text.
+status: production  outcome: pass
+[/LOG_UPDATE]

@@ -107,8 +107,10 @@ const PetFormPage = () => {
       newErrors.breed_id = 'Raça é obrigatória';
     }
 
-    // Birth date validation (optional)
-    if (birthDate && birthDate > new Date()) {
+    // Birth date validation
+    if (!isEditing && !birthDate) {
+      newErrors.birth_date = 'Data de nascimento é obrigatória';
+    } else if (birthDate && birthDate > new Date()) {
       newErrors.birth_date = 'Data de nascimento não pode ser no futuro';
     }
 
@@ -294,9 +296,9 @@ const PetFormPage = () => {
                  )}
                </div>
 
-                               {/* Birth Date */}
+                {/* Birth Date */}
                 <div className="space-y-2">
-                  <Label className="text-base font-normal text-gray-700">Data de Nascimento (opcional)</Label>
+                  <Label className="text-base font-normal text-gray-700">{isEditing ? 'Data de Nascimento' : 'Data de Nascimento *'}</Label>
                  <PetDobPicker
                    value={birthDate}
                    onChange={(date) => {

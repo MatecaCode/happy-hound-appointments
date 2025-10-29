@@ -61,6 +61,11 @@ const SmartNudgesBanner: React.FC<SmartNudgesBannerProps> = ({
       }
       
       setIsVisible(false);
+      // Persist onboarding done on "Lembrar depois" to stop auto-opening the wizard in future visits
+      try {
+        const { data } = await supabase.auth.getUser();
+        setOnboardingDone(data.user?.id);
+      } catch {}
       toast.success('Lembrete dispensado por 24h');
       
       // Refresh progress to update dismiss timestamp
