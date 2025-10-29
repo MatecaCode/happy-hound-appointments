@@ -999,7 +999,7 @@ const AdminManualBooking = () => {
                     setSelectedClient(client);
                     setBookingData(prev => ({ 
                       ...prev, 
-                      clientUserId: client.user_id, 
+                    clientUserId: client.user_id ?? null, 
                       petId: null // Reset pet when client changes
                     }));
                   }}
@@ -1017,11 +1017,11 @@ const AdminManualBooking = () => {
                     setSelectedPet(pet || null);
                     setBookingData(prev => ({ ...prev, petId: value }));
                   }}
-                  disabled={!bookingData.clientUserId || isLoadingPets}
+                  disabled={!selectedClient?.id || isLoadingPets}
                 >
                   <SelectTrigger id="pet-select">
                     <SelectValue placeholder={
-                      !bookingData.clientUserId ? "Selecione um cliente primeiro" :
+                      !selectedClient?.id ? "Selecione um cliente primeiro" :
                       isLoadingPets ? "Carregando..." : "Selecione um pet"
                     } />
                   </SelectTrigger>
