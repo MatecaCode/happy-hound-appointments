@@ -454,3 +454,46 @@ const { data } = await supabase
   - Two services, two staff rows (one per service)
   - Sequential blocking: Amanda for primary, then Matheus for secondary
 
+## 🔄 Update - 2025-10-30: Admin Step-1 Claim-Gating Fix
+
+### Problem
+- In Admin → Novo Agendamento → Passo 1, the Pet Select and "Próximo" button were implicitly gated by `bookingData.clientUserId`.
+- For admin-created, unclaimed clients (`clients.user_id IS NULL`), `clientUserId` remains null, which caused:
+  - Pet Select previously disabled (fixed in UI gating change)
+  - Step-1 progression ("Próximo") still blocked due to validation tied to `clientUserId`.
+
+### Solution (UI-only)
+- Introduced `bookingData.clientId` to represent the selected client regardless of claim status.
+- Updated Step-1 gating and validation to rely on client identity (`clientId`) instead of claim identity (`clientUserId`).
+- Kept booking payload branching invariant from the unified RPC contract:
+  - Claimed clients → send `_client_user_id`
+  - Admin-created unclaimed clients → send `_client_id`
+
+### Concrete Changes
+- Add `clientId` to `BookingData` and set it on client selection.
+- Client selection:
+  - `clientUserId = client.user_id ?? null`
+  - `clientId = client.id`
+- Pet Select gating (previous fix):
+  - `disabled` now uses `selectedClient?.id` (no claim dependency).
+- Step-1 progression:
+  - `canProceedToStep2` uses `bookingData.clientId && bookingData.petId && bookingData.primaryServiceId`.
+- Create payload guard now accepts either claimed or unclaimed:
+  - Valid if `(bookingData.clientUserId || bookingData.clientId)`.
+- Payload builder branches correctly:
+  - Claimed: `_client_user_id = bookingData.clientUserId`, `_client_id = null`
+  - Unclaimed: `_client_user_id = null`, `_client_id = bookingData.clientId`
+
+### Code References
+- `src/pages/AdminManualBooking.tsx`
+  - BookingData type: add `clientId?: string | null`.
+  - ClientCombobox onSelect: set `clientUserId` and `clientId`; reset `petId`.
+  - Pet Select disabled/placeholder: use `selectedClient?.id` (previous fix).
+  - Step-1 flow control: `canProceedToStep2` checks `bookingData.clientId`.
+  - `createBooking` client resolution: find by `user_id` if claimed else by `id`.
+  - Payload guard: allow claimed/unclaimed; payload sets either `_client_user_id` or `_client_id` accordingly.
+
+### Result
+- Admins can proceed to Step-2 for both claimed and admin-created unclaimed clients once a client and pet are selected.
+- No server/RPC changes required; unified booking invariants preserved.
+
