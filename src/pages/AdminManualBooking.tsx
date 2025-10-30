@@ -85,6 +85,7 @@ interface TimeSlot {
 
 type BookingData = {
   clientUserId: string | null;   // claimed client only (guardrail)
+  clientId?: string | null;      // always set when a client is selected (claimed or unclaimed)
   petId: string | null;
 
   date: string | null;           // 'YYYY-MM-DD'
@@ -173,6 +174,7 @@ const AdminManualBooking = () => {
   // Booking form data
   const [bookingData, setBookingData] = useState<BookingData>({
     clientUserId: null,
+    clientId: null,
     petId: null,
 
     date: null,           // 'YYYY-MM-DD'
@@ -649,7 +651,7 @@ const AdminManualBooking = () => {
     
     console.log('🔧 [ADMIN_MANUAL_BOOKING] Validation check:', {
       user: !!user?.id,
-      clientId: bookingData.clientUserId,
+      clientId: bookingData.clientId,
       petId: bookingData.petId,
       primaryServiceId: bookingData.primaryServiceId,
       secondaryServiceId: bookingData.secondaryServiceId,
@@ -659,7 +661,7 @@ const AdminManualBooking = () => {
     });
     
     const missingUser = !user?.id;
-    const missingClientId = !bookingData.clientUserId;     // claimed client only
+    const missingClientId = !bookingData.clientId;         // allow claimed or unclaimed (clientId always set)
     const missingPetId = !bookingData.petId;
     const missingServiceId = !bookingData.primaryServiceId;
     const missingDate = !bookingData.selectedDateISO;
@@ -679,7 +681,9 @@ const AdminManualBooking = () => {
     setIsLoading(true);
 
     try {
-      const client = clients.find(c => c.user_id === bookingData.clientUserId);
+      const client = bookingData.clientUserId
+        ? clients.find(c => c.user_id === bookingData.clientUserId)
+        : clients.find(c => c.id === bookingData.clientId);
       if (!client) {
         throw new Error('Cliente não encontrado');
       }
@@ -694,12 +698,13 @@ const AdminManualBooking = () => {
 
       // 🧠 DETERMINISTIC payload builder with single source of truth
       function buildCreatePayload(): Record<string, any> | null {
-        // Validate required fields using new state structure
-        if (!bookingData.clientUserId || !bookingData.petId || !bookingData.primary?.service_id || 
+        // Validate required fields using new state structure (allow claimed or unclaimed)
+        if (!(bookingData.clientUserId || bookingData.clientId) || !bookingData.petId || !bookingData.primary?.service_id || 
             !bookingData.date || !bookingData.time || !user?.id) {
           console.error('❌ [ADMIN_MANUAL_BOOKING] Missing required fields for payload');
           console.error('Missing fields:', {
             clientUserId: !bookingData.clientUserId,
+            clientId: !bookingData.clientId,
             petId: !bookingData.petId,
             primaryService: !bookingData.primary?.service_id,
             primaryStaff: !bookingData.primary?.staff_id,
@@ -709,6 +714,9 @@ const AdminManualBooking = () => {
           });
           return null;
         }
+
+        // Determine claimed vs unclaimed for client routing
+        const isClaimed = !!bookingData.clientUserId;
 
         // Build payload for unified RPC (required params first, then optional with defaults)
         const payload = {
@@ -723,8 +731,8 @@ const AdminManualBooking = () => {
           ].filter(Boolean),
           _created_by: user.id,
           // Optional parameters (with defaults)
-          _client_user_id: bookingData.clientUserId,
-          _client_id: null, // Not used in this flow
+          _client_user_id: isClaimed ? bookingData.clientUserId : null,
+          _client_id: isClaimed ? null : (bookingData.clientId ?? null),
           _secondary_service_id: bookingData.secondary?.service_id ?? null,
           _notes: bookingData.notes ?? null,
           _extra_fee: bookingData.extraFee ?? 0,
@@ -868,7 +876,7 @@ const AdminManualBooking = () => {
     setShowConflictModal(false);
   };
 
-  const canProceedToStep2 = bookingData.clientUserId && bookingData.petId && bookingData.primaryServiceId;
+  const canProceedToStep2 = bookingData.clientId && bookingData.petId && bookingData.primaryServiceId;
   const canProceedToStep3 = canProceedToStep2 && Object.keys(bookingData.staffByRole).length > 0;
   const canSubmit = canProceedToStep3 && bookingData.selectedDateISO && bookingData.selectedTimeHHMM;
 
@@ -1000,6 +1008,7 @@ const AdminManualBooking = () => {
                     setBookingData(prev => ({ 
                       ...prev, 
                     clientUserId: client.user_id ?? null, 
+                    clientId: client.id,
                       petId: null // Reset pet when client changes
                     }));
                   }}
