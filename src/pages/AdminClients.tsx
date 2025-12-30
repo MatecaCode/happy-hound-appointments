@@ -224,9 +224,29 @@ const AdminClients = () => {
         throw error;
       }
 
-      // Get pet counts for each client
+      // Restrict to true clients only:
+      // - admin-created records (no user_id yet)
+      // - users whose role includes 'client' in public.user_roles
+      let filteredForClientsOnly = data || [];
+      try {
+        const { data: roleRows, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('role', 'client');
+        
+        if (rolesError) {
+          console.warn('⚠️ [ADMIN_CLIENTS] Could not load user_roles; showing unfiltered client list', rolesError);
+        } else {
+          const clientRoleUserIds = new Set((roleRows || []).map((r: any) => r.user_id));
+          filteredForClientsOnly = (data || []).filter((c: any) => !c.user_id || clientRoleUserIds.has(c.user_id));
+        }
+      } catch (e) {
+        console.warn('⚠️ [ADMIN_CLIENTS] user_roles filtering failed; proceeding without role filter', e);
+      }
+
+      // Get pet counts for each (filtered) client
       const clientsWithPetCounts = await Promise.all(
-        data?.map(async (client) => {
+        filteredForClientsOnly?.map(async (client) => {
           const { count: petCount } = await supabase
             .from('pets')
             .select('*', { count: 'exact', head: true })
@@ -768,16 +788,37 @@ const AdminClients = () => {
       toast.error('Este cliente não é elegível para reivindicação de conta');
       return;
     }
+    // Hard guard: require email before invoking function
+    if (!client.email || client.email.trim() === '') {
+      toast.error('Cliente sem email. Adicione o email antes de enviar o convite.');
+      return;
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke('send-client-invite', {
-        body: { clientId: client.id },
+        body: { client_id: client.id, email: client.email },
       });
 
       if (error) {
-        const reason = (error as any)?.context?.response?.reason ?? error.message;
         console.error('❌ [ADMIN_CLIENTS] Invite error:', error);
-        toast.error(`Convite não enviado: ${reason}`);
+        // Try to extract HTTP status and body text when available
+        const ctx: any = (error as any)?.context;
+        const httpStatus = ctx?.response?.status;
+        let detailedMsg = '';
+        try {
+          const raw = await ctx?.response?.text?.();
+          if (raw) {
+            try {
+              const j = JSON.parse(raw);
+              detailedMsg = j?.error || j?.reason || raw;
+            } catch {
+              detailedMsg = raw;
+            }
+          }
+        } catch {
+          // ignore
+        }
+        toast.error(`Falha ao enviar convite (HTTP ${httpStatus ?? 'n/a'}). ${detailedMsg}`);
         return;
       }
 
@@ -812,16 +853,42 @@ const AdminClients = () => {
 
     let successCount = 0;
     let errorCount = 0;
+    let skippedNoEmail = 0;
+    let firstErrorDetail: string | null = null;
 
     // Process each client individually using the same Edge Function
     for (const client of eligibleClients) {
+      if (!client.email || client.email.trim() === '') {
+        skippedNoEmail++;
+        continue;
+      }
       try {
         const { data, error } = await supabase.functions.invoke('send-client-invite', {
-          body: { clientId: client.id },
+          body: { client_id: client.id, email: client.email },
         });
 
         if (error || (!data?.ok && !data?.status)) {
           console.error(`❌ [ADMIN_CLIENTS] Bulk invite error for ${client.email}:`, error);
+          if (!firstErrorDetail && error) {
+            try {
+              const ctx: any = (error as any)?.context;
+              const status = ctx?.response?.status;
+              let text: string | undefined;
+              try { text = await ctx?.response?.text?.(); } catch {}
+              if (text) {
+                try {
+                  const j = JSON.parse(text);
+                  firstErrorDetail = `HTTP ${status}: ${j?.error || j?.reason || text}`;
+                } catch {
+                  firstErrorDetail = `HTTP ${status}: ${text}`;
+                }
+              } else {
+                firstErrorDetail = `HTTP ${status ?? 'n/a'}: ${String((error as any)?.message || 'unknown')}`;
+              }
+            } catch {
+              firstErrorDetail = String((error as any)?.message || 'unknown');
+            }
+          }
           errorCount++;
         } else {
           successCount++;
@@ -832,11 +899,12 @@ const AdminClients = () => {
       }
     }
 
-    if (successCount > 0) {
-      toast.success(`${successCount} convites enviados com sucesso`);
-    }
-    if (errorCount > 0) {
-      toast.error(`${errorCount} convites falharam`);
+    // Summary toast
+    const summary = `Enviados: ${successCount} • Skippados (sem email): ${skippedNoEmail} • Falhas: ${errorCount}${firstErrorDetail ? ` — Ex.: ${firstErrorDetail}` : ''}`;
+    if (errorCount === 0) {
+      toast.success(summary);
+    } else {
+      toast.error(summary);
     }
 
     // Refresh client list to show updated invite statuses
@@ -1509,7 +1577,7 @@ const AdminClients = () => {
                       </Button>
                     )}
 
-                    {getClaimStatusForClient(client).can_invite === true ? (
+                  {getClaimStatusForClient(client).can_invite === true && !!client.email && client.email.trim() !== '' ? (
                       <Button
                         variant="outline"
                         size="sm"
