@@ -181,7 +181,7 @@ const Claim = () => {
           console.log('[CLAIM] attempting getSessionFromUrl');
           hasProcessedSessionRef.current = true;
 
-          const res = await supabase.auth.getSessionFromUrl();
+          const res = await supabase.auth.getSessionFromUrl({ storeSession: true });
           console.log('[CLAIM] getSessionFromUrl result', res);
           const { data, error } = res || {};
 
