@@ -315,6 +315,83 @@ const Claim = () => {
           }
         });
       } else {
+        // 2) Try preclient_id from user metadata (preferred path for invites)
+        const preclientId =
+          (user as any)?.user_metadata?.preclient_id ||
+          (user as any)?.app_metadata?.preclient_id ||
+          null;
+
+        if (preclientId) {
+          console.log('🔎 [CLAIM] preclient_id found in metadata:', preclientId);
+          const { data: preClient, error: preErr } = await supabase
+            .from('clients')
+            .select('id, name, email, user_id, admin_created')
+            .eq('id', preclientId)
+            .single();
+          
+          if (!preErr && preClient) {
+            if (preClient.user_id && preClient.user_id !== user.id) {
+              // Already linked to a different user
+              setClaimStatus({
+                status: 'error',
+                message: 'Conta já vinculada a outro usuário. Entre em contato com o suporte.'
+              });
+              return;
+            }
+
+            if (!preClient.user_id && preClient.admin_created) {
+              // Attempt direct link (idempotent)
+              let directLinkOk = false;
+              try {
+                const { error: linkUpdateErr } = await supabase
+                  .from('clients')
+                  .update({ user_id: user.id, claimed_at: new Date().toISOString() })
+                  .eq('id', preclientId)
+                  .is('user_id', null)
+                  .eq('admin_created', true);
+                if (!linkUpdateErr) {
+                  directLinkOk = true;
+                } else {
+                  console.warn('⚠️ [CLAIM] Direct link failed; will try RPC fallback:', linkUpdateErr);
+                }
+              } catch (e) {
+                console.warn('⚠️ [CLAIM] Direct link threw; will try RPC fallback:', e);
+              }
+
+              if (!directLinkOk) {
+                // Fallback to RPC by email (existing route)
+                const { data: linkResult, error: linkError } = await supabase
+                  .rpc('link_client_to_auth', {
+                    _email: user.email!,
+                    _auth_user_id: user.id
+                  });
+                if (linkError || !linkResult?.success) {
+                  console.error('❌ [CLAIM] Link by RPC failed:', linkError || linkResult?.error);
+                  throw linkError || new Error(linkResult?.error || 'Falha na vinculação por RPC');
+                }
+              }
+
+              // Proceed to password setup with preClient data
+              try {
+                localStorage.setItem('claim_in_progress','1');
+                claimDiag.log('claim gate SET (preclient link)');
+              } catch {}
+              setClaimStatus({
+                status: 'password_setup',
+                message: 'Configure sua senha para finalizar',
+                clientData: {
+                  name: preClient.name,
+                  email: preClient.email,
+                  id: preClient.id
+                }
+              });
+              return;
+            }
+          } else if (preErr && preErr.code !== 'PGRST116') {
+            console.warn('⚠️ [CLAIM] Could not load client by preclient_id:', preErr);
+          }
+        }
+
         // Check if there's an unlinked admin-created client
         const { data: unlinkedClient, error: unlinkedError } = await supabase
           .from('clients')
