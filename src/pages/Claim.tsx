@@ -72,7 +72,7 @@ const Claim = () => {
     }
   }, [navigate, TARGET]);
 
-  // MOUNT + Process session from URL hash once only
+  // MOUNT + Process session from URL (PKCE query or hash) once only
   useEffect(() => {
     // Log mount info
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
@@ -124,8 +124,36 @@ const Claim = () => {
         claimDiag.log('session already processed, skipping');
         return;
       }
-      
+
       try {
+        // 1) PKCE flow in URL query (?code=...&type=invite|recovery|signup|magiclink)
+        const { search, pathname } = window.location;
+        const hasOAuthQuery = !!search && /[?&](code|state)=/.test(search);
+        if (hasOAuthQuery && typeof (supabase.auth as any).exchangeCodeForSession === 'function') {
+          try {
+            // Set claim gate immediately to suppress premature redirects
+            localStorage.setItem('claim_in_progress','1');
+            claimDiag.log('claim gate SET (mount/query)');
+          } catch {}
+
+          claimDiag.log('processing session from URL query (PKCE)');
+          hasProcessedSessionRef.current = true;
+
+          const { error } = await (supabase.auth as any).exchangeCodeForSession(search);
+          claimDiag.log('exchangeCodeForSession result:', { ok: !error, error });
+          (window as any).CLAIM_DIAG?.push({
+            step: 'session_set',
+            ok: !error,
+            userId: undefined,
+            error: error?.message
+          });
+
+          // Clean query immediately after processing
+          window.history.replaceState({}, document.title, pathname);
+          return;
+        }
+
+        // 2) Legacy hash tokens (implicit flow)
         if (hash && (hash.includes('access_token') || hash.includes('type='))) {
           // Set claim gate immediately to suppress premature redirects
           try {
@@ -135,9 +163,9 @@ const Claim = () => {
 
           claimDiag.log('processing session from URL hash');
           hasProcessedSessionRef.current = true;
-          
+
           const { data, error } = await supabase.auth.getSessionFromUrl();
-          
+
           claimDiag.log('getSessionFromUrl result:', { ok: !error, userId: data?.user?.id, error });
           (window as any).CLAIM_DIAG?.push({
             step: 'session_set',
@@ -145,7 +173,7 @@ const Claim = () => {
             userId: data?.user?.id,
             error: error?.message
           });
-          
+
           // Clean hash immediately after processing
           claimDiag.log('cleaning hash after session processing');
           (window as any).CLAIM_DIAG?.push({ step: 'hash_cleaned', when: 'after_session' });
@@ -158,6 +186,33 @@ const Claim = () => {
     };
     processFromUrl();
   }, []);
+
+  // Fail-safe: break infinite spinner if no session after a short delay
+  useEffect(() => {
+    const t = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) console.error('[CLAIM] getSession error', error);
+        if (data?.session) {
+          // If still loading, let checkClaimStatus proceed when user becomes available
+          if (claimStatus.status === 'loading' && user) {
+            checkClaimStatus();
+          }
+        } else {
+          // No session after timeout => stop spinner with friendly message
+          if (claimStatus.status === 'loading') {
+            setClaimStatus({
+              status: 'error',
+              message: 'Não foi possível autenticar. Tente clicar no link do email novamente.'
+            });
+          }
+        }
+      } catch (e) {
+        console.error('[CLAIM] fail-safe error', e);
+      }
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [claimStatus.status, user]);
 
   // Listen for auth state changes and redirect (respect claim gate)
   useEffect(() => {
