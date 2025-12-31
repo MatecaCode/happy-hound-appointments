@@ -76,6 +76,12 @@ const Claim = () => {
   useEffect(() => {
     // Log mount info
     const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    try {
+      console.log('[CLAIM] href', window.location.href);
+      console.log('[CLAIM] origin', window.location.origin);
+      console.log('[CLAIM] search', window.location.search);
+      console.log('[CLAIM] hash', window.location.hash);
+    } catch {}
     const hasTokens = hash.includes('access_token') || hash.includes('refresh_token');
     const looksLikeInvite = hash.includes('type=invite') || hash.includes('type=recovery') || hasTokens;
     
@@ -137,9 +143,12 @@ const Claim = () => {
           } catch {}
 
           claimDiag.log('processing session from URL query (PKCE)');
+          console.log('[CLAIM] attempting exchangeCodeForSession', { search });
           hasProcessedSessionRef.current = true;
 
-          const { error } = await (supabase.auth as any).exchangeCodeForSession(search);
+          const res = await (supabase.auth as any).exchangeCodeForSession(search);
+          console.log('[CLAIM] exchangeCodeForSession result', res);
+          const { error } = res || {};
           claimDiag.log('exchangeCodeForSession result:', { ok: !error, error });
           (window as any).CLAIM_DIAG?.push({
             step: 'session_set',
@@ -147,6 +156,13 @@ const Claim = () => {
             userId: undefined,
             error: error?.message
           });
+
+          try {
+            const sess = await supabase.auth.getSession();
+            console.log('[CLAIM] getSession after PKCE processing', sess);
+          } catch (e) {
+            console.log('[CLAIM] getSession after PKCE processing threw', e);
+          }
 
           // Clean query immediately after processing
           window.history.replaceState({}, document.title, pathname);
@@ -162,9 +178,12 @@ const Claim = () => {
           } catch {}
 
           claimDiag.log('processing session from URL hash');
+          console.log('[CLAIM] attempting getSessionFromUrl');
           hasProcessedSessionRef.current = true;
 
-          const { data, error } = await supabase.auth.getSessionFromUrl();
+          const res = await supabase.auth.getSessionFromUrl();
+          console.log('[CLAIM] getSessionFromUrl result', res);
+          const { data, error } = res || {};
 
           claimDiag.log('getSessionFromUrl result:', { ok: !error, userId: data?.user?.id, error });
           (window as any).CLAIM_DIAG?.push({
@@ -173,6 +192,13 @@ const Claim = () => {
             userId: data?.user?.id,
             error: error?.message
           });
+
+          try {
+            const sess = await supabase.auth.getSession();
+            console.log('[CLAIM] getSession after hash processing', sess);
+          } catch (e) {
+            console.log('[CLAIM] getSession after hash processing threw', e);
+          }
 
           // Clean hash immediately after processing
           claimDiag.log('cleaning hash after session processing');
@@ -220,6 +246,9 @@ const Claim = () => {
     
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       claimDiag.log('auth event:', event, 'userId:', session?.user?.id);
+      try {
+        console.log('[CLAIM] onAuthStateChange', { event, hasSession: !!session, userId: session?.user?.id });
+      } catch {}
       (window as any).CLAIM_DIAG?.push({
         step: 'auth_event',
         event,
