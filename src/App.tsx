@@ -137,7 +137,13 @@ function GlobalTokenCatcher() {
         const hasHashTokens = !!hash && /(access_token=|type=)/.test(hash);
         if (hasHashTokens) {
           console.log('🔗 [GLOBAL_TOKEN_CATCHER] Auth tokens detected in URL hash');
-          // Let onAuthStateChange pick up the session; just clean hash asap
+          // Avoid racing with the Claim page token handler; let /claim own the flow
+          const onClaimRoute = pathname.startsWith('/claim');
+          if (onClaimRoute) {
+            console.log('⏩ [GLOBAL_TOKEN_CATCHER] On /claim — delegating token processing to Claim.tsx');
+            return;
+          }
+          // For non-claim routes, clean hash to avoid leaking tokens in URL
           setTimeout(() => {
             window.history.replaceState({}, document.title, pathname + search);
             console.log('🧹 [GLOBAL_TOKEN_CATCHER] URL hash cleared');
