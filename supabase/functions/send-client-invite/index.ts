@@ -48,6 +48,12 @@ serve(async (req) => {
       return new Response(JSON.stringify({ ok:false, code:"UNAUTHORIZED", reason:"Missing or invalid session" }), { status: 401, headers: { ...h, "content-type":"application/json" } });
     }
 
+    // TEMP DEBUG
+    console.log("[INVITE] start", {
+      user_id: user.id,
+      claim_redirect: CLAIM_REDIRECT
+    });
+
     if (!allowAdminRate(user.id)) {
       return new Response(JSON.stringify({ ok:false, code:"RATE_LIMIT", reason:"Too many requests, slow down" }), { status: 429, headers: { ...h, "content-type":"application/json" } });
     }
@@ -55,7 +61,8 @@ serve(async (req) => {
     const body = await req.json();
     const { email, client_id, checkOnly } = body;
 
-    const key = `${user.id}:${JSON.stringify({ email, client_id, checkOnly })}`;
+    // Dedupe by user+client+mode (ignore email to prevent duplicates when UI passes same client)
+    const key = `${user.id}:${client_id}:${checkOnly ? 'check' : 'invite'}`;
     if (!notDuplicate(key)) {
       return new Response(JSON.stringify({ ok:true, skipped:true, code:"DEDUPE", reason:"Duplicate within 30s" }), { status: 200, headers: { ...h, "content-type":"application/json" } });
     }
@@ -129,10 +136,12 @@ serve(async (req) => {
       });
     }
 
-    // Policy via RPC (single source of truth)
-    const { data: statusRows, error: rerr } = await admin.rpc("admin_get_client_claim_status", { _client_ids: [client_id] });
+    // Policy via RPC (single source of truth) — must execute with user auth context
+    console.log("[INVITE] rpc call admin_get_client_claim_status", { client_id });
+    const { data: statusRows, error: rerr } = await authClient.rpc("admin_get_client_claim_status", { _client_ids: [client_id] });
     if (rerr) throw rerr;
     const s = statusRows?.[0];
+    console.log("[INVITE] rpc result", s);
     if (!s) return new Response(JSON.stringify({ ok:false, code:"NOT_FOUND", reason:"Client not found" }), { status: 404, headers: { ...h, "content-type":"application/json" } });
     if (s.linked && !s.verified) {
       return new Response(JSON.stringify({ ok:false, code:"ALREADY_LINKED_UNVERIFIED", reason:"User exists. Use resend verification." }), { status: 409, headers: { ...h, "content-type":"application/json" } });
@@ -150,20 +159,24 @@ serve(async (req) => {
     if (!emailForInvite) return new Response(JSON.stringify({ ok:false, code:"NO_EMAIL", reason:"Client has no email" }), { status: 400, headers: { ...h, "content-type":"application/json" } });
 
     // send invite using Supabase Auth (uses your Invite template)
+    console.log("[INVITE] inviteUserByEmail START", { emailForInvite, redirect: CLAIM_REDIRECT });
     const { error: inviteErr } = await admin.auth.admin.inviteUserByEmail(emailForInvite, {
       redirectTo: CLAIM_REDIRECT,
       data: { preclient_id: client_id }
     });
     if (inviteErr) throw inviteErr;
+    console.log("[INVITE] inviteUserByEmail OK");
 
     // stamp invited time (optional)
     await admin.from("clients").update({ claim_invited_at: new Date().toISOString() }).eq("id", client_id);
+    console.log("[INVITE] updated clients.claim_invited_at", { client_id });
 
     return new Response(JSON.stringify({ ok:true, status: "invited" }), { 
       status: 200,
       headers: { ...h, "content-type": "application/json" }
     });
   } catch (e: any) {
+    console.error("[INVITE][ERROR]", { message: e?.message ?? String(e), details: e });
     const body = JSON.stringify({ ok:false, code:"ERROR", reason: String(e?.message ?? e) });
     return new Response(body, { 
       status: 500, 

@@ -108,7 +108,7 @@ interface Breed {
 }
 
 const AdminClients = () => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
@@ -164,6 +164,12 @@ const AdminClients = () => {
   const [claimStatusMap, setClaimStatusMap] = useState<Record<string, ClaimStatus>>({});
   const claimUiDebug = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('claim_ui_debug') === '1';
   const loadingClaimRef = useRef(false);
+  // Timer to refresh cooldown labels periodically
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(Date.now()), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   // Load clients, locations and breeds
   useEffect(() => {
@@ -542,15 +548,30 @@ const AdminClients = () => {
     return !!s.can_invite && !s.invited;
   }).length;
 
+  // Cooldown helpers (5 minutes)
+  const COOLDOWN_MS = 5 * 60 * 1000;
+  const getInviteCooldown = (client: Client) => {
+    const lastInvite = client.claim_invited_at ? new Date(client.claim_invited_at).getTime() : null;
+    if (!lastInvite) return { inCooldown: false, remainingMs: 0, text: '' };
+    const remainingMs = Math.max(0, COOLDOWN_MS - (nowTick - lastInvite));
+    const inCooldown = remainingMs > 0;
+    const remainingMin = Math.ceil(remainingMs / 60000);
+    return { inCooldown, remainingMs, text: `Aguarde ${remainingMin} min` };
+  };
+
   const checkEmailAvailability = async (email: string): Promise<boolean> => {
     try {
+      // Use a fresh access token for the auth gate on the Edge Function
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess?.session?.access_token;
       const { data: checkResult, error: checkError } = await supabase.functions.invoke(
         'send-client-invite',
         {
           body: {
             email: email,
             checkOnly: true
-          }
+          },
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined
         }
       );
 
@@ -633,24 +654,63 @@ const AdminClients = () => {
 
       // Send invitation email using Edge Function
       try {
+        // Use a fresh access token
+        const { data: sess } = await supabase.auth.getSession();
+        const token = sess?.session?.access_token;
         const { data: inviteResult, error: inviteError } = await supabase.functions.invoke(
           'send-client-invite',
           {
             body: {
               email: clientData.email,
               client_id: clientData.id
-            }
+            },
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined
           }
         );
 
         if (inviteError) {
-          console.error('❌ [ADMIN_CLIENTS] Invite error:', inviteError);
-          toast.error('Cliente criado, mas falha ao enviar convite.', {
-            action: {
-              label: 'Reenviar convite',
-              onClick: () => handleSendClaimEmail(clientData)
+          // Soft-handle 409 responses with code semantics
+          const ctx: any = (inviteError as any)?.context;
+          const status = ctx?.response?.status;
+          let bodyCode: string | undefined;
+          let bodyMsg: string | undefined;
+          try {
+            const raw = await ctx?.response?.text?.();
+            if (raw) {
+              const j = JSON.parse(raw);
+              bodyCode = j?.code;
+              bodyMsg = j?.error || j?.reason;
             }
-          });
+          } catch {}
+          if (status === 409) {
+            if (bodyCode === 'ALREADY_LINKED') {
+              toast.info('Cliente já vinculado.');
+            } else if (bodyCode === 'ALREADY_LINKED_UNVERIFIED') {
+              toast.info('Usuário já existe. Reenviando verificação...');
+              await handleResendVerification(clientData as any);
+            } else if (bodyCode === 'INVITE_BLOCKED') {
+              toast.warning('Convite bloqueado por política.');
+            } else {
+              toast.info('Convite já enviado recentemente.');
+            }
+          } else if (status === 400) {
+            // Show specific guidance for bad-request cases
+            if (bodyCode === 'NO_CLIENT') {
+              toast.error('Erro: client_id ausente para convite.');
+            } else if (bodyCode === 'NO_EMAIL' || /email required/i.test(bodyMsg || '')) {
+              toast.error('Erro: cliente sem e-mail. Adicione um e-mail e tente novamente.');
+            } else {
+              toast.error('Convite não enviado (400). ' + (bodyMsg || 'Verifique os dados.'));
+            }
+          } else {
+            console.error('❌ [ADMIN_CLIENTS] Invite error:', inviteError);
+            toast.error('Cliente criado, mas falha ao enviar convite.', {
+              action: {
+                label: 'Reenviar convite',
+                onClick: () => handleSendClaimEmail(clientData)
+              }
+            });
+          }
         } else if (inviteResult?.status === 'invited') {
           toast.success('Cliente criado com sucesso! Convite enviado para ' + clientData.email);
         } else {
@@ -725,6 +785,9 @@ const AdminClients = () => {
   const handleDeleteClient = async (clientId: string) => {
     try {
       console.log('🗑️ [ADMIN_CLIENTS] Starting comprehensive client deletion:', clientId);
+      // Snapshot email before deletion (for fallback auth cleanup when user_id is NULL)
+      const clientBefore = clients.find(c => c.id === clientId);
+      const clientEmailBefore = clientBefore?.email?.trim() || null;
       
       // Use the comprehensive deletion function to clean up all related data
       const { data: deletionResult, error: rpcError } = await supabase
@@ -743,11 +806,11 @@ const AdminClients = () => {
       }
 
       // Handle auth.users deletion if needed (requires service role)
-      if (deletionResult.user_id) {
+      if (deletionResult.user_id || clientEmailBefore) {
         try {
-          console.log('🗑️ [ADMIN_CLIENTS] Deleting auth user:', deletionResult.user_id);
+          console.log('🗑️ [ADMIN_CLIENTS] Deleting auth user:', deletionResult.user_id || clientEmailBefore);
           const { error: authError } = await supabase.functions.invoke('delete-staff-user', {
-            body: { user_id: deletionResult.user_id }
+            body: deletionResult.user_id ? { user_id: deletionResult.user_id } : { email: clientEmailBefore }
           });
           if (authError) {
             console.error('❌ [ADMIN_CLIENTS] Auth delete error:', authError);
@@ -793,10 +856,28 @@ const AdminClients = () => {
       toast.error('Cliente sem email. Adicione o email antes de enviar o convite.');
       return;
     }
+    // Cooldown guard (5 min)
+    const { inCooldown, text } = getInviteCooldown(client);
+    if (inCooldown) {
+      toast.info(text);
+      return;
+    }
+    // Ensure we have a valid session token for Authorization header
+    // Fetch a fresh token in case the in-memory one is stale
+    let accessToken = session?.access_token;
+    if (!accessToken) {
+      const { data: fresh } = await supabase.auth.getSession();
+      accessToken = fresh?.session?.access_token ?? null as any;
+    }
+    if (!accessToken) {
+      toast.error('Sessão expirada. Faça login novamente e tente enviar o convite.');
+      return;
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke('send-client-invite', {
         body: { client_id: client.id, email: client.email },
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
 
       if (error) {
@@ -817,6 +898,27 @@ const AdminClients = () => {
           }
         } catch {
           // ignore
+        }
+        // Auto-fallback: if the auth user already exists, try resend verification flow
+        const alreadyExists =
+          /already\s*registered/i.test(detailedMsg) ||
+          /already\s*exists/i.test(detailedMsg) ||
+          /user.*exists/i.test(detailedMsg);
+        if (alreadyExists) {
+          try {
+            const { error: resendErr } = await supabase.functions.invoke('admin_resend_verification', {
+              method: 'POST',
+              body: { email: client.email },
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (!resendErr) {
+              toast.success('Usuário já existe. Reenvio de verificação enviado.');
+              fetchClients();
+              return;
+            }
+          } catch {
+            // fall through to generic error toast
+          }
         }
         toast.error(`Falha ao enviar convite (HTTP ${httpStatus ?? 'n/a'}). ${detailedMsg}`);
         return;
@@ -844,6 +946,16 @@ const AdminClients = () => {
       toast.error('Nenhum cliente elegível para reivindicação de conta (sem convites pendentes)');
       return;
     }
+    // Refresh token for bulk as well
+    let accessToken = session?.access_token;
+    if (!accessToken) {
+      const { data: fresh } = await supabase.auth.getSession();
+      accessToken = fresh?.session?.access_token ?? null as any;
+    }
+    if (!accessToken) {
+      toast.error('Sessão expirada. Faça login novamente e tente o envio em lote.');
+      return;
+    }
 
     const confirmed = window.confirm(
       `Enviar convites para ${eligibleClients.length} clientes? Esta ação será feita um por vez.`
@@ -853,11 +965,17 @@ const AdminClients = () => {
 
     let successCount = 0;
     let errorCount = 0;
+    let skippedCooldown = 0;
     let skippedNoEmail = 0;
     let firstErrorDetail: string | null = null;
 
     // Process each client individually using the same Edge Function
     for (const client of eligibleClients) {
+      // Skip by cooldown
+      if (getInviteCooldown(client).inCooldown) {
+        skippedCooldown++;
+        continue;
+      }
       if (!client.email || client.email.trim() === '') {
         skippedNoEmail++;
         continue;
@@ -865,6 +983,7 @@ const AdminClients = () => {
       try {
         const { data, error } = await supabase.functions.invoke('send-client-invite', {
           body: { client_id: client.id, email: client.email },
+          headers: { Authorization: `Bearer ${accessToken}` },
         });
 
         if (error || (!data?.ok && !data?.status)) {
@@ -879,6 +998,24 @@ const AdminClients = () => {
                 try {
                   const j = JSON.parse(text);
                   firstErrorDetail = `HTTP ${status}: ${j?.error || j?.reason || text}`;
+                  // Fallback to resend verification automatically for "already exists/registered"
+                  const alreadyExists =
+                    /already\s*registered/i.test(j?.error || j?.reason || '') ||
+                    /already\s*exists/i.test(j?.error || j?.reason || '') ||
+                    /user.*exists/i.test(j?.error || j?.reason || '');
+                  if (alreadyExists) {
+                    try {
+                      const { error: resendErr } = await supabase.functions.invoke('admin_resend_verification', {
+                        method: 'POST',
+                        body: { email: client.email },
+                        headers: { Authorization: `Bearer ${accessToken}` },
+                      });
+                      if (!resendErr) {
+                        successCount++; // treat resend as success
+                        errorCount--;
+                      }
+                    } catch {}
+                  }
                 } catch {
                   firstErrorDetail = `HTTP ${status}: ${text}`;
                 }
@@ -900,7 +1037,7 @@ const AdminClients = () => {
     }
 
     // Summary toast
-    const summary = `Enviados: ${successCount} • Skippados (sem email): ${skippedNoEmail} • Falhas: ${errorCount}${firstErrorDetail ? ` — Ex.: ${firstErrorDetail}` : ''}`;
+    const summary = `Enviados: ${successCount} • Skippados (sem email): ${skippedNoEmail} • Skippados (cooldown): ${skippedCooldown} • Falhas: ${errorCount}${firstErrorDetail ? ` — Ex.: ${firstErrorDetail}` : ''}`;
     if (errorCount === 0) {
       toast.success(summary);
     } else {
@@ -1577,49 +1714,55 @@ const AdminClients = () => {
                       </Button>
                     )}
 
-                  {getClaimStatusForClient(client).can_invite === true && !!client.email && client.email.trim() !== '' ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSendClaimEmail(client)}
-                        className="flex-1 min-w-[160px] text-blue-700 border-blue-200 hover:text-blue-800 hover:border-blue-300"
-                        title={getClaimStatusForClient(client).invited ? 'Reenviar convite' : 'Enviar convite'}
-                      >
-                        <Send className="h-3 w-3 mr-1" />
-                        {getClaimStatusForClient(client).invited ? 'Reenviar Convite' : 'Enviar Convite'}
-                      </Button>
-                    ) : (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="flex-1 min-w-[160px]">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                disabled
-                                className="w-full"
-                              >
-                                <Send className="h-3 w-3 mr-1" />
-                                Enviar Convite
-                              </Button>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {(() => {
-                              const s = getClaimStatusForClient(client);
-                              const cooldownMs = 24 * 60 * 60 * 1000;
-                              const now = Date.now();
-                              const inviteAt = client.claim_invited_at ? new Date(client.claim_invited_at).getTime() : 0;
-                              const withinCooldown = !!client.claim_invited_at && (now - inviteAt) < cooldownMs;
-                              if (!client.email || client.email.trim() === '') return 'Sem e-mail cadastrado';
-                              if (withinCooldown) return 'Aguarde 24h para reenviar';
-                              if (s?.linked || s?.verified) return 'Conta criada; aguarde verificação do e-mail';
-                              return 'Convite indisponível para este registro';
-                            })()}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
+                    {(() => {
+                      const s2 = getClaimStatusForClient(client);
+                      const can = s2?.can_invite === true;
+                      const hasEmail = !!client.email && client.email.trim() !== '';
+                      const cd = getInviteCooldown(client);
+                      if (can && hasEmail) {
+                        return (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSendClaimEmail(client)}
+                            disabled={cd.inCooldown}
+                            className="flex-1 min-w-[180px] text-blue-700 border-blue-200 hover:text-blue-800 hover:border-blue-300 disabled:opacity-70"
+                            title={cd.inCooldown ? cd.text : (s2?.invited ? 'Reenviar convite' : 'Enviar convite')}
+                          >
+                            <Send className="h-3 w-3 mr-1" />
+                            {cd.inCooldown ? cd.text : (s2?.invited ? 'Reenviar Convite' : 'Enviar Convite')}
+                          </Button>
+                        );
+                      }
+                      return (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="flex-1 min-w-[160px]">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled
+                                  className="w-full"
+                                >
+                                  <Send className="h-3 w-3 mr-1" />
+                                  {!hasEmail ? 'Email faltando' : 'Enviar Convite'}
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {(() => {
+                                const cd2 = getInviteCooldown(client);
+                                if (!hasEmail) return 'Sem e-mail cadastrado';
+                                if (cd2.inCooldown) return cd2.text;
+                                if (s2?.linked || s2?.verified) return 'Conta criada; aguarde verificação do e-mail';
+                                return 'Convite indisponível para este registro';
+                              })()}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      );
+                    })()}
                     
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
