@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -30,11 +30,39 @@ interface AppointmentWithDetails {
   total_price?: number;
 }
 
+type ReviewableItem = {
+  appointment_id: string;
+  appointment_date: string | Date;
+  appointment_time: string;
+  service_id: string;
+  service_name: string;
+  staff_profile_id: string;
+  staff_name: string;
+  role: string;
+};
+
 const Appointments = () => {
   const { user, loading: authLoading } = useAuth();
   const [appointments, setAppointments] = useState<AppointmentWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+
+  // Reviews state
+  const [reviewables, setReviewables] = useState<ReviewableItem[]>([]);
+  const reviewablesByAppointment = useMemo(() => {
+    const map = new Map<string, ReviewableItem[]>();
+    for (const r of reviewables) {
+      const arr = map.get(r.appointment_id) || [];
+      arr.push(r);
+      map.set(r.appointment_id, arr);
+    }
+    return map;
+  }, [reviewables]);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [selectedReview, setSelectedReview] = useState<ReviewableItem | null>(null);
+  const [rating, setRating] = useState<number>(5);
+  const [comment, setComment] = useState<string>('');
+  const [submittingReview, setSubmittingReview] = useState(false);
   
   // Load user's appointments from the database with detailed information
   useEffect(() => {
@@ -133,6 +161,16 @@ const Appointments = () => {
     };
     
     fetchAppointments();
+    // Also fetch reviewable items on page load
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_reviewable_service_assignments_for_client');
+        if (error) throw error;
+        setReviewables((data || []) as ReviewableItem[]);
+      } catch (e) {
+        // non-blocking
+      }
+    })();
     // Optional realtime subscription: refetch on service status changes
     const channel = supabase
       .channel('client-appointments-service-status')
@@ -149,6 +187,11 @@ const Appointments = () => {
             try {
               // Minimal refetch using existing refresh function
               await refreshAppointments();
+              // Refresh reviewables as well
+              try {
+                const { data, error } = await supabase.rpc('get_reviewable_service_assignments_for_client');
+                if (!error) setReviewables((data || []) as ReviewableItem[]);
+              } catch {}
             } catch {}
           })();
         }
@@ -249,6 +292,44 @@ const Appointments = () => {
       toast.error('Erro ao atualizar os agendamentos');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const openReviewModal = (item: ReviewableItem) => {
+    setSelectedReview(item);
+    setRating(5);
+    setComment('');
+    setReviewModalOpen(true);
+  };
+
+  const submitReview = async () => {
+    if (!selectedReview) return;
+    setSubmittingReview(true);
+    try {
+      const { error } = await supabase.rpc('create_staff_review', {
+        _appointment_id: selectedReview.appointment_id,
+        _service_id: selectedReview.service_id,
+        _staff_profile_id: selectedReview.staff_profile_id,
+        _rating: rating,
+        _comment: comment || null
+      });
+      if (error) throw error;
+      toast.success('Avaliação enviada com sucesso!');
+      setReviewModalOpen(false);
+      setSelectedReview(null);
+      // Refetch reviewables so the CTA disappears
+      const { data, error: rerr } = await supabase.rpc('get_reviewable_service_assignments_for_client');
+      if (!rerr) setReviewables((data || []) as ReviewableItem[]);
+    } catch (e: any) {
+      const msg = e?.message || '';
+      if (msg.includes('already_reviewed')) toast.error('Você já avaliou este serviço.');
+      else if (msg.includes('service_not_completed')) toast.error('Este serviço ainda não está concluído.');
+      else if (msg.includes('staff_not_assigned')) toast.error('Profissional não associado a este serviço.');
+      else if (msg.includes('not_owner')) toast.error('Somente o dono do agendamento pode avaliar.');
+      else if (msg.includes('comment_too_long')) toast.error('Comentário excede 1000 caracteres.');
+      else toast.error('Falha ao enviar avaliação.');
+    } finally {
+      setSubmittingReview(false);
     }
   };
 
@@ -437,6 +518,24 @@ const Appointments = () => {
               <div className="flex justify-between">
                 <span className="text-sm font-medium">Valor:</span>
                 <span className="text-sm text-green-600 font-medium">R$ {appointment.total_price.toFixed(2)}</span>
+              </div>
+            )}
+
+            {/* Review CTAs based only on RPC results */}
+            {reviewablesByAppointment.get(appointment.id) && reviewablesByAppointment.get(appointment.id)!.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <span className="text-sm font-semibold text-[#1A4670]">Avaliações pendentes:</span>
+                <div className="flex flex-col gap-2">
+                  {reviewablesByAppointment.get(appointment.id)!.map(r => (
+                    <Button
+                      key={`${r.appointment_id}-${r.service_id}-${r.staff_profile_id}`}
+                      variant="secondary"
+                      onClick={() => openReviewModal(r)}
+                    >
+                      Avaliar {r.service_name} — {r.staff_name} ({r.role})
+                    </Button>
+                  ))}
+                </div>
               </div>
             )}
             {appointment.notes && (
@@ -642,6 +741,51 @@ const Appointments = () => {
           <div className="h-16"></div>
         </div>
       </div>
+
+      {/* Review Modal */}
+      <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Avaliar serviço</DialogTitle>
+          </DialogHeader>
+          {selectedReview && (
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                {selectedReview.service_name} — {selectedReview.staff_name} ({selectedReview.role})
+              </div>
+              <div className="flex items-center gap-2">
+                {[1,2,3,4,5].map(n => (
+                  <Button
+                    key={n}
+                    type="button"
+                    variant={rating >= n ? 'default' : 'outline'}
+                    onClick={() => setRating(n)}
+                    className="h-8 px-3"
+                  >
+                    {n}★
+                  </Button>
+                ))}
+              </div>
+              <div>
+                <textarea
+                  value={comment}
+                  onChange={(e) => {
+                    if (e.target.value.length <= 1000) setComment(e.target.value);
+                  }}
+                  className="w-full border rounded p-2 text-sm"
+                  placeholder="Comentário (opcional, até 1000 caracteres)"
+                  rows={4}
+                />
+                <div className="text-xs text-muted-foreground text-right">{comment.length}/1000</div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setReviewModalOpen(false)} disabled={submittingReview}>Cancelar</Button>
+                <Button onClick={submitReview} disabled={submittingReview}>{submittingReview ? 'Enviando...' : 'Enviar avaliação'}</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 };
