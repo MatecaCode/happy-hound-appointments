@@ -4,6 +4,7 @@ import { Clock, AlertCircle, Calendar, Phone, MessageCircle, Sparkles, Heart, Sh
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import AppointmentForm from '@/components/AppointmentForm';
 
 // Extend Window interface for gtag
 declare global {
@@ -15,6 +16,23 @@ declare global {
 const Book = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [iconRotation, setIconRotation] = useState(0);
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [isTestMode, setIsTestMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('bookingTestMode') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const enableTestMode = () => {
+    try {
+      localStorage.setItem('bookingTestMode', '1');
+    } catch {
+      // ignore storage failures in temporary test button
+    }
+    setIsTestMode(true);
+  };
 
   useEffect(() => {
     setIsVisible(true);
@@ -54,112 +72,192 @@ const Book = () => {
       <section className="pt-0 pb-0 md:py-12 relative bg-white min-h-screen flex items-center">
         <div className="max-w-7xl mx-auto px-6">
           <div className="relative">
-            {/* Enhanced Blurred Background Content */}
-            <div className="filter blur-md opacity-20 pointer-events-none scale-95">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Left Panel - Basic Information */}
-                <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
-                  <h3 className="text-2xl font-bold text-gray-800 mb-6">
-                    1. Informações Básicas
-                  </h3>
-                  <p className="text-gray-600 mb-8 text-lg">
-                    Selecione seu pet e o serviço desejado
-                  </p>
-                  
-                  <div className="space-y-6">
-                    <div>
-                      <label className="block text-lg font-semibold text-gray-700 mb-3">
-                        Selecione seu Pet
-                      </label>
-                      <div className="relative">
-                        <select className="w-full p-4 border-2 border-gray-200 rounded-xl bg-white text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300">
-                          <option>Escolha um pet</option>
-                        </select>
-                      </div>
-                    </div>
+            {/* When in test mode, render the real booking form; otherwise render the demo layout */}
+            {isTestMode ? (
+              <div className="max-w-7xl mx-auto px-6">
+                {/* Subtle badge */}
+                <div className="mb-6 text-xs text-slate-500 text-center">
+                  Modo de teste habilitado
+                </div>
+                <div className={`${currentStep === 1 ? 'grid grid-cols-1 lg:grid-cols-2' : 'grid grid-cols-1'} gap-8`}>
+                  {/* Left: Real self-service form */}
+                  <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 border border-gray-100">
+                    <AppointmentForm serviceType="grooming" onStepChange={(s) => setCurrentStep(s)} />
+                  </div>
+
+                  {/* Right: Informational card preserved from preview */}
+                  {currentStep === 1 && (
+                  <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-6">
+                      Informações de Agendamento
+                    </h3>
                     
-                    <div>
-                      <label className="block text-lg font-semibold text-gray-700 mb-3">
-                        Selecione o Serviço
-                      </label>
-                      <div className="relative">
-                        <select className="w-full p-4 border-2 border-gray-200 rounded-xl bg-white text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300">
-                          <option>Escolha um serviço</option>
-                        </select>
+                    <div className="space-y-8">
+                      <div>
+                        <h4 className="font-bold text-gray-800 mb-4 text-lg">Horário de Funcionamento</h4>
+                        <div className="space-y-3 text-lg text-gray-600">
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-5 w-5 text-blue-500" />
+                            <span>Segunda - Sexta: 9:00 - 17:00</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-5 w-5 text-blue-500" />
+                            <span>Sábado: 9:00 - 15:00</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-5 w-5 text-red-500" />
+                            <span>Domingo: Fechado</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-bold text-gray-800 mb-4 text-lg">Contato</h4>
+                        <p className="text-lg text-gray-600 mb-4">
+                          Tem dúvidas sobre nossos serviços?
+                        </p>
+                        <div className="space-y-3 text-lg text-gray-600">
+                          <div className="flex items-center gap-3">
+                            <Phone className="h-5 w-5 text-green-500" />
+                            <span>Telefone: (11) 2427-2827</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <MessageCircle className="h-5 w-5 text-green-500" />
+                            <span>WhatsApp: (11) 99637-8518</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-bold text-gray-800 mb-4 text-lg">Observações para Agendamento</h4>
+                        <ul className="space-y-3 text-lg text-gray-600">
+                          <li className="flex items-start gap-3">
+                            <span className="text-blue-500 mt-1">•</span>
+                            <span>Por favor chegue 15 minutos antes do horário marcado</span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="text-blue-500 mt-1">•</span>
+                            <span>Certifique-se de que seu cachorro fez suas necessidades antes da consulta</span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="text-blue-500 mt-1">•</span>
+                            <span>Traga a carteira de vacinação atualizada</span>
+                          </li>
+                        </ul>
                       </div>
                     </div>
                   </div>
-                  
-                  <button className="w-full mt-8 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition-all duration-300 shadow-lg">
-                    Continuar
-                  </button>
+                  )}
                 </div>
+              </div>
+            ) : (
+              <div className="filter blur-md opacity-20 pointer-events-none scale-95">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Left Panel - Basic Information (static preview) */}
+                  <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-6">
+                      1. Informações Básicas
+                    </h3>
+                    <p className="text-gray-600 mb-8 text-lg">
+                      Selecione seu pet e o serviço desejado
+                    </p>
+                    
+                    <div className="space-y-6">
+                      <div>
+                        <label className="block text-lg font-semibold text-gray-700 mb-3">
+                          Selecione seu Pet
+                        </label>
+                        <div className="relative">
+                          <select className="w-full p-4 border-2 border-gray-200 rounded-xl bg-white text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300">
+                            <option>Escolha um pet</option>
+                          </select>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-lg font-semibold text-gray-700 mb-3">
+                          Selecione o Serviço
+                        </label>
+                        <div className="relative">
+                          <select className="w-full p-4 border-2 border-gray-200 rounded-xl bg-white text-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-300">
+                            <option>Escolha um serviço</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button className="w-full mt-8 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-xl text-lg font-semibold hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition-all duration-300 shadow-lg">
+                      Continuar
+                    </button>
+                  </div>
 
-                {/* Right Panel - Appointment Information */}
-                <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
-                  <h3 className="text-2xl font-bold text-gray-800 mb-6">
-                    Informações de Agendamento
-                  </h3>
-                  
-                  <div className="space-y-8">
-                    <div>
-                      <h4 className="font-bold text-gray-800 mb-4 text-lg">Horário de Funcionamento</h4>
-                      <div className="space-y-3 text-lg text-gray-600">
-                        <div className="flex items-center gap-3">
-                          <Calendar className="h-5 w-5 text-blue-500" />
-                          <span>Segunda - Sexta: 9:00 - 17:00</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Calendar className="h-5 w-5 text-blue-500" />
-                          <span>Sábado: 9:00 - 15:00</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <Calendar className="h-5 w-5 text-red-500" />
-                          <span>Domingo: Fechado</span>
+                  {/* Right Panel - Appointment Information */}
+                  <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
+                    <h3 className="text-2xl font-bold text-gray-800 mb-6">
+                      Informações de Agendamento
+                    </h3>
+                    
+                    <div className="space-y-8">
+                      <div>
+                        <h4 className="font-bold text-gray-800 mb-4 text-lg">Horário de Funcionamento</h4>
+                        <div className="space-y-3 text-lg text-gray-600">
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-5 w-5 text-blue-500" />
+                            <span>Segunda - Sexta: 9:00 - 17:00</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-5 w-5 text-blue-500" />
+                            <span>Sábado: 9:00 - 15:00</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Calendar className="h-5 w-5 text-red-500" />
+                            <span>Domingo: Fechado</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-bold text-gray-800 mb-4 text-lg">Contato</h4>
-                      <p className="text-lg text-gray-600 mb-4">
-                        Tem dúvidas sobre nossos serviços?
-                      </p>
-                      <div className="space-y-3 text-lg text-gray-600">
-                        <div className="flex items-center gap-3">
-                          <Phone className="h-5 w-5 text-green-500" />
-                          <span>Telefone: (11) 2427-2827</span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <MessageCircle className="h-5 w-5 text-green-500" />
-                          <span>WhatsApp: (11) 99637-8518</span>
+                      
+                      <div>
+                        <h4 className="font-bold text-gray-800 mb-4 text-lg">Contato</h4>
+                        <p className="text-lg text-gray-600 mb-4">
+                          Tem dúvidas sobre nossos serviços?
+                        </p>
+                        <div className="space-y-3 text-lg text-gray-600">
+                          <div className="flex items-center gap-3">
+                            <Phone className="h-5 w-5 text-green-500" />
+                            <span>Telefone: (11) 2427-2827</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <MessageCircle className="h-5 w-5 text-green-500" />
+                            <span>WhatsApp: (11) 99637-8518</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div>
-                      <h4 className="font-bold text-gray-800 mb-4 text-lg">Observações para Agendamento</h4>
-                      <ul className="space-y-3 text-lg text-gray-600">
-                        <li className="flex items-start gap-3">
-                          <span className="text-blue-500 mt-1">•</span>
-                          <span>Por favor chegue 15 minutos antes do horário marcado</span>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="text-blue-500 mt-1">•</span>
-                          <span>Certifique-se de que seu cachorro fez suas necessidades antes da consulta</span>
-                        </li>
-                        <li className="flex items-start gap-3">
-                          <span className="text-blue-500 mt-1">•</span>
-                          <span>Traga a carteira de vacinação atualizada</span>
-                        </li>
-                      </ul>
+                      
+                      <div>
+                        <h4 className="font-bold text-gray-800 mb-4 text-lg">Observações para Agendamento</h4>
+                        <ul className="space-y-3 text-lg text-gray-600">
+                          <li className="flex items-start gap-3">
+                            <span className="text-blue-500 mt-1">•</span>
+                            <span>Por favor chegue 15 minutos antes do horário marcado</span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="text-blue-500 mt-1">•</span>
+                            <span>Certifique-se de que seu cachorro fez suas necessidades antes da consulta</span>
+                          </li>
+                          <li className="flex items-start gap-3">
+                            <span className="text-blue-500 mt-1">•</span>
+                            <span>Traga a carteira de vacinação atualizada</span>
+                          </li>
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Enhanced Coming Soon Overlay */}
+            {!isTestMode && (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className={`transition-all duration-1000 delay-300 ${isVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'}`}>
                                  <div className="bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 p-10 max-w-2xl mx-4 relative overflow-hidden">
@@ -263,7 +361,7 @@ const Book = () => {
                     </div>
 
                     {/* Call to Action */}
-                    <div>
+                    <div className="flex items-center justify-center gap-3">
                       <Button asChild size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6 py-2 rounded-xl font-semibold transform hover:scale-105 transition-all duration-300 shadow-lg">
                         <Link to="/services">Conhecer Nossos Serviços</Link>
                       </Button>
@@ -272,6 +370,7 @@ const Book = () => {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
       </section>

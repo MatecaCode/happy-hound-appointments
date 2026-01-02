@@ -5,6 +5,7 @@ import { Service, Provider } from './useAppointmentForm';
 
 interface StaffFilteringParams {
   service: Service | null;
+  requirementsOverride?: ServiceRequirements | null;
 }
 
 export interface StaffByRole {
@@ -19,7 +20,7 @@ export interface ServiceRequirements {
   requiresVet: boolean;
 }
 
-export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
+export const useStaffFiltering = ({ service, requirementsOverride = null }: StaffFilteringParams) => {
   const [staffByRole, setStaffByRole] = useState<StaffByRole>({
     bathers: [],
     groomers: [],
@@ -46,23 +47,36 @@ export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
     setError(null);
 
     try {
-      // Set service requirements
-      const requirements = {
-        requiresBath: service.requires_bath || false,
-        requiresGrooming: service.requires_grooming || false,
-        requiresVet: service.requires_vet || false
+      // Determine requirements from override or the provided service
+      const requirements: ServiceRequirements = requirementsOverride ?? {
+        requiresBath: !!service.requires_bath,
+        requiresGrooming: !!service.requires_grooming,
+        requiresVet: !!service.requires_vet
       };
       setServiceRequirements(requirements);
 
       // Service requirements loaded
 
-      // Fetch all available staff (excludes admins)
-      const { data: allStaff, error: staffError } = await supabase
-        .from('available_staff')
-        .select('id, name, can_groom, can_vet, can_bathe, bio, photo_url, hourly_rate');
+      // Fetch all available staff via SECURITY DEFINER RPC (bypasses RLS safely)
+      let allStaff: any[] | null = null;
+      let staffError: any = null;
+      try {
+        const rpcRes = await supabase.rpc('get_available_staff_public');
+        allStaff = rpcRes.data as any[] | null;
+        staffError = rpcRes.error;
+      } catch (e) {
+        staffError = e;
+      }
 
       if (staffError) {
-        console.error('❌ [STAFF_FILTERING] Error fetching staff:', staffError);
+        // Log full PostgREST error detail if present
+        console.error('❌ [STAFF_FILTERING] Error fetching staff:', {
+          message: (staffError as any)?.message,
+          code: (staffError as any)?.code,
+          details: (staffError as any)?.details,
+          hint: (staffError as any)?.hint,
+          status: (staffError as any)?.status
+        });
         throw staffError;
       }
 
@@ -79,17 +93,17 @@ export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
 
       allStaff.forEach(staff => {
         const staffProvider: Provider = {
-          id: staff.id,
+          id: staff.staff_profile_id || staff.id,
           name: staff.name,
           role: 'staff', // Will be updated based on primary capability
           rating: 4.5, // Default rating
-          about: staff.bio || '',
-          profile_image: staff.photo_url || undefined,
+          about: '',
+          profile_image: undefined,
           specialty: ''
         };
 
         // Add to bathers if can bathe and service requires bath
-        if (staff.can_bathe && requirements.requiresBath) {
+        if (requirements.requiresBath && staff.can_bathe === true) {
           bathers.push({
             ...staffProvider,
             role: 'bather',
@@ -98,7 +112,7 @@ export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
         }
 
         // Add to groomers if can groom and service requires grooming
-        if (staff.can_groom && requirements.requiresGrooming) {
+        if (requirements.requiresGrooming && staff.can_groom === true) {
           groomers.push({
             ...staffProvider,
             role: 'groomer',
@@ -107,7 +121,7 @@ export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
         }
 
         // Add to vets if can vet and service requires vet
-        if (staff.can_vet && requirements.requiresVet) {
+        if (requirements.requiresVet && staff.can_vet === true) {
           vets.push({
             ...staffProvider,
             role: 'vet',
@@ -141,7 +155,7 @@ export const useStaffFiltering = ({ service }: StaffFilteringParams) => {
     } finally {
       setIsLoading(false);
     }
-  }, [service]);
+  }, [service, requirementsOverride]);
 
   useEffect(() => {
     fetchStaffByRole();

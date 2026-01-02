@@ -14,9 +14,10 @@ interface SelectedStaff {
 
 interface AppointmentFormProps {
   serviceType: 'grooming' | 'veterinary';
+  onStepChange?: (step: number) => void;
 }
 
-const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'grooming' }) => {
+const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'grooming', onStepChange }) => {
   const {
     date,
     setDate,
@@ -26,6 +27,9 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
     setSelectedPet,
     selectedService,
     setSelectedService,
+    selectedSecondaryService,
+    setSelectedSecondaryService,
+    secondaryOptions,
     notes,
     setNotes,
     timeSlots,
@@ -51,17 +55,49 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
   // Use the staff filtering hook
   const {
     staffByRole,
-    serviceRequirements,
     isLoading: staffLoading,
     error: staffError
   } = useStaffFiltering({
-    service: selectedService
+    service: selectedService,
+    requirementsOverride: React.useMemo(() => {
+      const req = {
+        requiresBath: !!selectedService?.requires_bath,
+        requiresGrooming: !!selectedService?.requires_grooming,
+        requiresVet: !!selectedService?.requires_vet,
+      };
+      if (selectedSecondaryService) {
+        return {
+          requiresBath: req.requiresBath || !!selectedSecondaryService?.requires_bath,
+          requiresGrooming: req.requiresGrooming || !!selectedSecondaryService?.requires_grooming,
+          requiresVet: req.requiresVet || !!selectedSecondaryService?.requires_vet,
+        };
+      }
+      return req;
+    }, [selectedService, selectedSecondaryService])
   });
+
+  // Compute combined requirements for UI gating
+  const combinedRequirements = React.useMemo(() => {
+    const req = {
+      requiresBath: !!selectedService?.requires_bath,
+      requiresGrooming: !!selectedService?.requires_grooming,
+      requiresVet: !!selectedService?.requires_vet,
+    };
+    if (selectedSecondaryService) {
+      return {
+        requiresBath: req.requiresBath || !!selectedSecondaryService?.requires_bath,
+        requiresGrooming: req.requiresGrooming || !!selectedSecondaryService?.requires_grooming,
+        requiresVet: req.requiresVet || !!selectedSecondaryService?.requires_vet,
+      };
+    }
+    return req;
+  }, [selectedService, selectedSecondaryService]);
 
   // Fetch appropriate services when service type changes
   React.useEffect(() => {
-    fetchServices(serviceType);
-  }, [fetchServices, serviceType]);
+    // For client booking we want all active services; filtering by type is done in UI logic
+    fetchServices(undefined);
+  }, [fetchServices]);
 
   // Reset selected staff when service changes
   React.useEffect(() => {
@@ -69,6 +105,11 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
       setSelectedStaff({});
     }
   }, [selectedService, setSelectedStaff]);
+
+  // Notify parent about step changes
+  React.useEffect(() => {
+    if (onStepChange) onStepChange(formStep);
+  }, [formStep, onStepChange]);
 
   const handleStaffSelect = (role: 'bather' | 'groomer' | 'vet', staffId: string) => {
     setSelectedStaff(prev => {
@@ -161,6 +202,9 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
           setSelectedPet={setSelectedPet}
           selectedService={selectedService}
           setSelectedService={setSelectedService}
+          selectedSecondaryService={selectedSecondaryService}
+          setSelectedSecondaryService={setSelectedSecondaryService}
+          secondaryOptions={secondaryOptions}
           onNext={() => handleNextStep(1)}
           serviceType={serviceType}
         />
@@ -170,7 +214,7 @@ const AppointmentForm: React.FC<AppointmentFormProps> = ({ serviceType = 'groomi
       {formStep === 2 && serviceRequiresStaff && (
         <StaffSelectionForm
           staffByRole={staffByRole}
-          serviceRequirements={serviceRequirements}
+          serviceRequirements={combinedRequirements}
           selectedStaff={selectedStaff}
           onStaffSelect={handleStaffSelect}
           onNext={() => handleNextStep(2)}

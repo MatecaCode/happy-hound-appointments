@@ -50,18 +50,24 @@ Deno.serve(async (req) => {
 
     console.log(`📋 Found ${staffProfiles?.length || 0} active staff members`)
 
-    // Step 3: Generate time slots from 09:00 to 16:30 (every 30 minutes)
-    const timeSlots = []
-    for (let hour = 9; hour <= 17; hour++) {
-      timeSlots.push(`${hour.toString().padStart(2, '0')}:00:00`)
-      if (hour < 17) { // Don't add 17:30 since we stop at 17:00
-        timeSlots.push(`${hour.toString().padStart(2, '0')}:30:00`)
+    // Step 3: Generate time slots at 10‑minute granularity (Admin parity)
+    // Business hours: Weekdays 09:00→16:00 (exclusive), Saturdays 09:00→12:00 (exclusive)
+    const timeSlots: string[] = []
+    const targetLocal = new Date()
+    targetLocal.setDate(targetLocal.getDate() + 90)
+    const isSaturday = targetLocal.getDay() === 6
+    const endHour = isSaturday ? 12 : 16
+
+    for (let hour = 9; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += 10) {
+        const hh = hour.toString().padStart(2, '0')
+        const mm = minute.toString().padStart(2, '0')
+        timeSlots.push(`${hh}:${mm}:00`)
       }
     }
 
     // Calculate target date (today + 90 days for rolling window)
-    const targetDate = new Date()
-    targetDate.setDate(targetDate.getDate() + 90)
+    const targetDate = targetLocal
     const targetDateString = targetDate.toISOString().split('T')[0]
 
     console.log(`📅 Generating availability for ${targetDateString} with ${timeSlots.length} time slots`)

@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { 
@@ -16,6 +16,7 @@ interface UseStaffAvailabilityParams {
 export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseStaffAvailabilityParams) => {
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
+  const lastKeyRef = useRef<string>('');
 
   // Memoize the unique staff IDs to prevent infinite loops
   const uniqueStaffIds = useMemo(() => {
@@ -156,6 +157,12 @@ export const useStaffAvailability = ({ selectedStaffIds, serviceDuration }: UseS
       return;
     }
     
+    const newKey = `${staffIdsKey}|${serviceDuration}`;
+    if (lastKeyRef.current === newKey) {
+      // No-op: already fetched for this key; prevents StrictMode double-invoke
+      return;
+    }
+    lastKeyRef.current = newKey;
     updateAvailableDates();
   }, [staffIdsKey, serviceDuration, updateAvailableDates]);
 

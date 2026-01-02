@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -61,6 +61,9 @@ export const useAppointmentData = () => {
   const [userPets, setUserPets] = useState<Pet[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [groomers, setGroomers] = useState<Provider[]>([]);
+  // Lightweight in-memory cache to reduce flicker between quick changes
+  const slotCacheRef = useRef<Map<string, TimeSlot[]>>(new Map());
+  const latestRequestIdRef = useRef<number>(0);
 
   const fetchServices = useCallback(async (serviceType?: 'grooming' | 'veterinary') => {
     try {
@@ -181,7 +184,8 @@ export const useAppointmentData = () => {
     date: Date,
     staffIds: string[],
     setIsLoading: (loading: boolean) => void,
-    selectedService: Service | null
+    selectedService: Service | null,
+    secondaryService: Service | null = null
   ) => {
     // Prevent unnecessary fetches
     if (!selectedService || !date) {
@@ -212,11 +216,23 @@ export const useAppointmentData = () => {
     // Deduplicate staff IDs
     const uniqueStaffIds = [...new Set(staffIds)];
     
-    const dateForQuery = format(date, 'yyyy-MM-dd');
-    const serviceDuration = selectedService.default_duration || 60;
+    const dateForQuery = format(date, 'yyyy-MM-dd'); // local date key (parity with admin)
+    const primaryDuration = selectedService.default_duration || 60;
+    const secondaryDuration = secondaryService?.default_duration || 0;
     const isSaturday = date.getDay() === 6; // 6 = Saturday
 
     setIsLoading(true);
+
+    // Serve cached value immediately (if present) to avoid clearing UI
+    const cacheKey = `${dateForQuery}|${uniqueStaffIds.sort().join(',')}|${selectedService.id}|${primaryDuration}+${secondaryDuration}`;
+    const cached = slotCacheRef.current.get(cacheKey);
+    if (cached) {
+      // Show cached while fetching fresh data
+      setTimeSlots(cached);
+    }
+
+    // Track the latest request to ignore stale responses
+    const requestId = ++latestRequestIdRef.current;
 
     try {
       // Fetch staff availability from database
@@ -225,6 +241,10 @@ export const useAppointmentData = () => {
         .select('staff_profile_id, time_slot, available')
         .in('staff_profile_id', uniqueStaffIds)
         .eq('date', dateForQuery);
+
+      // Debug (ONE line) parity check for date/time keys
+      // eslint-disable-next-line no-console
+      console.debug('[CLIENT_AVAIL] dateKey:', dateForQuery, 'staff:', uniqueStaffIds.join('|'), 'rows:', rawAvailabilityData?.length ?? 0);
 
       if (error) {
         console.error('Error fetching staff availability:', error);
@@ -248,6 +268,10 @@ export const useAppointmentData = () => {
           all10MinSlots.push(timeString);
         }
       }
+      // Debug compare (first 5) – DB vs generated ids
+      // eslint-disable-next-line no-console
+      console.debug('[CLIENT_AVAIL] sample db slots:', (rawAvailabilityData ?? []).slice(0,5).map(r => r.time_slot),
+                    'sample gen:', all10MinSlots.slice(0,5));
 
       const availabilityMatrix: Record<string, Record<string, boolean>> = {};
       
@@ -271,25 +295,32 @@ export const useAppointmentData = () => {
       const availableSlots: TimeSlot[] = [];
 
       for (const clientSlot of clientSlots) {
+        // Sequential availability: primary staff for primary duration, then optional secondary for secondary duration
         let isSlotAvailable = true;
 
-        // Get all required slots for the full service duration
-        const requiredSlots = getRequiredBackendSlots(clientSlot, serviceDuration, isSaturday);
-        
-        // Check if ALL selected staff are available for ALL required slots
-        for (const staffId of uniqueStaffIds) {
-          let staffAvailable = true;
-          
-          for (const requiredSlot of requiredSlots) {
-            if (!availabilityMatrix[requiredSlot] || availabilityMatrix[requiredSlot][staffId] !== true) {
-              staffAvailable = false;
-              break;
-            }
-          }
-          
-          if (!staffAvailable) {
+        // Primary segment
+        const primaryStaffId = uniqueStaffIds[0];
+        const requiredPrimary = getRequiredBackendSlots(clientSlot, primaryDuration, isSaturday);
+        for (const t of requiredPrimary) {
+          if (!availabilityMatrix[t] || availabilityMatrix[t][primaryStaffId] !== true) {
             isSlotAvailable = false;
             break;
+          }
+        }
+
+        // Secondary segment (if exists)
+        if (isSlotAvailable && secondaryDuration > 0 && uniqueStaffIds.length >= 2) {
+          const secondaryStaffId = uniqueStaffIds[1];
+          // secondary starts after primary ends
+          const secondaryStart = requiredPrimary.length > 0 ? requiredPrimary[requiredPrimary.length - 1] : clientSlot;
+          // compute actual start time as clientSlot + primaryDuration
+          const requiredSecondary = getRequiredBackendSlots(clientSlot, primaryDuration + secondaryDuration, isSaturday)
+            .slice(requiredPrimary.length);
+          for (const t of requiredSecondary) {
+            if (!availabilityMatrix[t] || availabilityMatrix[t][secondaryStaffId] !== true) {
+              isSlotAvailable = false;
+              break;
+            }
           }
         }
 
@@ -300,12 +331,16 @@ export const useAppointmentData = () => {
         });
       }
 
-      setTimeSlots(availableSlots);
+      // Only update if this is the latest request
+      if (latestRequestIdRef.current === requestId) {
+        setTimeSlots(availableSlots);
+        slotCacheRef.current.set(cacheKey, availableSlots);
+      }
 
     } catch (error) {
       console.error('❌ Pipeline error:', error);
       toast.error('Erro inesperado ao buscar horários');
-      setTimeSlots([]);
+      // keep previous slots to avoid flicker on transient errors
     } finally {
       setIsLoading(false);
     }

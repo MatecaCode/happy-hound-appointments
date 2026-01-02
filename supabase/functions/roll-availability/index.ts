@@ -49,12 +49,20 @@ serve(async (req) => {
 
     console.log(`👥 Found ${staffProfiles?.length || 0} active staff members`);
 
-    // Generate time slots (09:00-17:00 every 30 minutes)
-    const timeSlots = [];
-    for (let hour = 9; hour <= 17; hour++) {
-      timeSlots.push(`${hour.toString().padStart(2, '0')}:00:00`);
-      if (hour < 17) {
-        timeSlots.push(`${hour.toString().padStart(2, '0')}:30:00`);
+    // Generate time slots at 10‑minute granularity (Admin parity)
+    // Business hours parity:
+    // - Weekdays: 09:00 → 16:00 (exclusive for 10-min grid, i.e., last slot 15:50)
+    // - Saturdays: 09:00 → 12:00 (exclusive, last slot 11:50)
+    const targetLocal = new Date(dateString + 'T00:00:00');
+    const isSaturday = targetLocal.getDay() === 6;
+    const endHour = isSaturday ? 12 : 16;
+
+    const timeSlots: string[] = [];
+    for (let hour = 9; hour < endHour; hour++) {
+      for (let minute = 0; minute < 60; minute += 10) {
+        const hh = hour.toString().padStart(2, '0');
+        const mm = minute.toString().padStart(2, '0');
+        timeSlots.push(`${hh}:${mm}:00`);
       }
     }
 

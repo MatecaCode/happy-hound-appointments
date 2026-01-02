@@ -9,6 +9,7 @@ import { usePricing } from '@/hooks/usePricing';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Link } from 'react-router-dom';
 import { PlusCircle, AlertCircle } from 'lucide-react';
+import { getServiceCategory } from '@/utils/serviceCategory';
 
 interface BasicInfoFormProps {
   userPets: Pet[];
@@ -17,6 +18,9 @@ interface BasicInfoFormProps {
   setSelectedPet: (pet: Pet | null) => void;
   selectedService: Service | null;
   setSelectedService: (service: Service | null) => void;
+  selectedSecondaryService: Service | null;
+  setSelectedSecondaryService: (service: Service | null) => void;
+  secondaryOptions: Service[];
   onNext: () => void;
   serviceType: 'grooming' | 'veterinary';
 }
@@ -28,6 +32,9 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   setSelectedPet,
   selectedService,
   setSelectedService,
+  selectedSecondaryService,
+  setSelectedSecondaryService,
+  secondaryOptions,
   onNext,
   serviceType
 }) => {
@@ -39,6 +46,14 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
   } : null;
 
   const { pricing, isLoading: pricingLoading } = usePricing(pricingParams);
+
+  // Secondary pricing when applicable
+  const secondaryPricingParams = selectedPet && selectedSecondaryService ? {
+    serviceId: selectedSecondaryService.id,
+    breedId: selectedPet.breed,
+    size: selectedPet.size
+  } : null;
+  const { pricing: secondaryPricing, isLoading: secondaryPricingLoading } = usePricing(secondaryPricingParams);
 
   const handleNext = () => {
     if (selectedPet && selectedService) {
@@ -168,37 +183,97 @@ const BasicInfoForm: React.FC<BasicInfoFormProps> = ({
           )}
         </div>
 
-        {/* Dynamic Pricing Display */}
+        {/* Secondary service - only when allowed */}
+        {secondaryOptions.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="secondary-service-select">Selecione o Segundo Serviço (Tosa)</Label>
+            <Select
+              value={selectedSecondaryService?.id || ''}
+              onValueChange={(value) => {
+                const service = secondaryOptions.find(s => s.id === value);
+                setSelectedSecondaryService(service || null);
+              }}
+            >
+              <SelectTrigger id="secondary-service-select">
+                <SelectValue placeholder="Opcional: escolha um serviço de tosa" />
+              </SelectTrigger>
+              <SelectContent>
+                {secondaryOptions.map((service) => (
+                  <SelectItem key={service.id} value={service.id}>
+                    <div className="flex flex-col items-start">
+                      <span>{service.name}</span>
+                      {service.base_price && (
+                        <span className="text-xs font-medium text-green-600">
+                          A partir de R$ {service.base_price}
+                        </span>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              O segundo serviço aparece quando o principal é de Banho.
+            </p>
+          </div>
+        )}
+
+        {/* Dynamic Pricing Display (supports optional secondary) */}
         {selectedService && selectedPet && (
           <div className="p-4 bg-muted rounded-lg">
-            <h4 className="font-medium mb-2">{selectedService.name}</h4>
-            <div className="text-sm space-y-1">
-              <p>Pet: {selectedPet.name}</p>
-              {selectedPet.size && <p>Porte: {formatSizeLabel(selectedPet.size)}</p>}
-              {selectedPet.breed && <p>Raça: {selectedPet.breed}</p>}
-              
-              {pricingLoading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
-                  <span>Calculando preço...</span>
-                </div>
-              ) : pricing ? (
-                <div className="space-y-1">
-                  <p className="font-medium text-green-600">
-                    Preço: R$ {pricing.price.toFixed(2)}
-                  </p>
-                  <p>Duração estimada: {pricing.duration} minutos</p>
-                  {pricing.priceSource !== 'exact_match' && (
-                    <p className="text-xs text-muted-foreground">
-                      {pricing.priceSource === 'service_size_fallback' && 'Preço baseado no porte do pet'}
-                      {pricing.priceSource === 'service_default' && 'Preço padrão do serviço'}
-                    </p>
+            <h4 className="font-medium mb-2">Resumo</h4>
+            <div className="text-sm space-y-2">
+              <div>
+                <p className="font-medium">{selectedService.name}</p>
+                {pricingLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                    <span>Calculando preço...</span>
+                  </div>
+                ) : pricing ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-700 font-medium">R$ {pricing.price.toFixed(2)}</span>
+                    <span className="text-muted-foreground">• {pricing.duration} min</span>
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Preço não disponível</span>
+                )}
+              </div>
+
+              {selectedSecondaryService && (
+                <div>
+                  <p className="font-medium">{selectedSecondaryService.name}</p>
+                  {secondaryPricingLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                      <span>Calculando preço...</span>
+                    </div>
+                  ) : secondaryPricing ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-700 font-medium">R$ {secondaryPricing.price.toFixed(2)}</span>
+                      <span className="text-muted-foreground">• {secondaryPricing.duration} min</span>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">Preço não disponível</span>
                   )}
                 </div>
-              ) : (
-                <p className="text-muted-foreground">Preço não disponível</p>
               )}
-            </div>
+
+              {/* Total when secondary is present and allowed */}
+              {selectedSecondaryService && (
+                <div className="pt-2 border-t mt-2 text-sm">
+                  <p className="font-semibold">
+                    Total:{' '}
+                    <span className="text-green-700">
+                      R$ {((pricing?.price || 0) + (secondaryPricing?.price || 0)).toFixed(2)}
+                    </span>{' '}
+                    <span className="text-muted-foreground">
+                      • {((pricing?.duration || 0) + (secondaryPricing?.duration || 0))} min
+                    </span>
+                  </p>
+                </div>
+              )}
+            </div>            
           </div>
         )}
 

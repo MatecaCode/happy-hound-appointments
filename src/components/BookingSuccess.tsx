@@ -63,6 +63,7 @@ const BookingSuccess: React.FC = () => {
               staff_profiles (name)
             ),
             appointment_services (
+              service_id,
               service_order,
               price,
               duration,

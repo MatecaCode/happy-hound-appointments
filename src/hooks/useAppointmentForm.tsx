@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { useAppointmentData } from './useAppointmentData';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +8,8 @@ import { usePricing } from './usePricing';
 import { debugAppointmentStatus, debugServiceStatus } from '@/utils/debugAppointmentStatus';
 import { useNavigate } from 'react-router-dom';
 import { getRequiredBackendSlots } from '@/utils/timeSlotHelpers';
+import { getServiceCategory, ServiceCategory } from '@/utils/serviceCategory';
+import { PricingService } from '@/services/pricingService';
 
 export interface Pet {
   id: string;
@@ -63,6 +65,7 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
   const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string | null>(null);
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [selectedSecondaryService, setSelectedSecondaryService] = useState<Service | null>(null);
   const [notes, setNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'calendar' | 'next-available'>('calendar');
@@ -112,10 +115,23 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       const requiresStaff = selectedService.requires_grooming || selectedService.requires_vet || selectedService.requires_bath;
       setServiceRequiresStaff(requiresStaff);
       setServiceRequirementsLoaded(true);
+
+      // Clear secondary when primary isn't BATH
+      const primaryCategory = getServiceCategory(selectedService as any);
+      if (primaryCategory !== 'BATH' && selectedSecondaryService) {
+        setSelectedSecondaryService(null);
+      }
     } else {
       setServiceRequirementsLoaded(false);
     }
-  }, [selectedService]);
+  }, [selectedService, selectedSecondaryService]);
+
+  // Compute secondary options based on primary category
+  const secondaryOptions = useMemo(() => {
+    const primaryCategory: ServiceCategory = getServiceCategory(selectedService as any);
+    if (primaryCategory !== 'BATH') return [];
+    return (services || []).filter(s => getServiceCategory(s as any) === 'GROOM');
+  }, [selectedService, services]);
 
   // Fetch user pets when user changes
   useEffect(() => {
@@ -148,7 +164,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     return getSelectedStaffIds.sort().join(',');
   }, [getSelectedStaffIds]);
 
-  // Only fetch time slots when we have ALL required data
+  // Only fetch time slots when we have ALL required data (debounced to reduce flicker)
+  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     // Only fetch on step 3 (date/time selection) and when we have ALL required data
     if (formStep !== 3 || !date || !selectedService) {
@@ -160,10 +177,19 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       return;
     }
 
-    // Now we have all required data - fetch time slots
-    const staffIds = serviceRequiresStaff ? getSelectedStaffIds : [];
-    fetchTimeSlots(date, staffIds, setIsLoading, selectedService);
-  }, [date, staffIdsKey, selectedService, serviceRequiresStaff, fetchTimeSlots, formStep]);
+    if (fetchDebounceRef.current) {
+      clearTimeout(fetchDebounceRef.current);
+    }
+
+    fetchDebounceRef.current = setTimeout(() => {
+      const staffIds = serviceRequiresStaff ? getSelectedStaffIds : [];
+      fetchTimeSlots(date, staffIds, setIsLoading, selectedService, selectedSecondaryService || null);
+    }, 300); // debounce to avoid flicker and duplicate calls
+
+    return () => {
+      if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
+    };
+  }, [date, staffIdsKey, selectedService, selectedSecondaryService, serviceRequiresStaff, fetchTimeSlots, formStep, getSelectedStaffIds]);
 
   const handleNextAvailableSelect = useCallback(() => {
     if (nextAvailable) {
@@ -183,6 +209,17 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       return;
     }
 
+    // Runtime checks for category behavior
+    const primaryCategory = getServiceCategory(selectedService as any);
+    if (primaryCategory === 'BATH') {
+      console.log('[CLIENT_BOOKING] Primary=BATH → secondary options should be GROOM only:', secondaryOptions.map(s => s.name));
+    } else {
+      if (selectedSecondaryService) {
+        console.warn('[CLIENT_BOOKING] Secondary service should be cleared when primary is not BATH. Clearing now.');
+        setSelectedSecondaryService(null);
+      }
+    }
+
     // Get staff IDs - use parameter if provided, otherwise get from state
     const rawStaffIds = selectedStaffIds || getSelectedStaffIds;
     // Deduplicate staff IDs at the very start of booking
@@ -194,9 +231,11 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       // Start minimum loading time (1.5 seconds)
       const minimumLoadingTime = new Promise(resolve => setTimeout(resolve, 1500));
       
-      // Debug status values first
-      await debugAppointmentStatus();
-      await debugServiceStatus();
+      // Optional debug (DEV only)
+      if (import.meta.env && import.meta.env.DEV) {
+        await debugAppointmentStatus();
+        await debugServiceStatus();
+      }
       
       // Preparing booking details
 
@@ -212,7 +251,22 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
       }
 
       const dateStr = date.toISOString().split('T')[0];
-      const serviceDuration = pricing?.duration || selectedService.default_duration || 60;
+      const primaryDuration = pricing?.duration || selectedService.default_duration || 60;
+
+      // If secondary service is selected and allowed, calculate combined price/duration
+      let calculatedPrice = pricing?.price || selectedService.base_price || 0;
+      let calculatedDuration = primaryDuration;
+
+      const primaryCategory = getServiceCategory(selectedService as any);
+      if (primaryCategory === 'BATH' && selectedSecondaryService) {
+        const sec = await PricingService.calculatePricing({
+          serviceId: selectedSecondaryService.id,
+          breedId: selectedPet.breed_id,
+          size: selectedPet.size || undefined
+        });
+        calculatedPrice = calculatedPrice + (sec?.price || 0);
+        calculatedDuration = calculatedDuration + (sec?.duration || 0);
+      }
       
       const appointmentData = {
         client_id: clientData.id,
@@ -223,8 +277,8 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
         notes: notes || null,
         status: 'pending', // Always start as pending for admin approval
         service_status: 'not_started',
-        duration: serviceDuration,
-        total_price: pricing?.price || selectedService.base_price || 0
+        duration: calculatedDuration,
+        total_price: calculatedPrice
       };
 
       // Creating appointment
@@ -235,12 +289,13 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
           _client_user_id: user.id,
           _pet_id: selectedPet.id,
           _service_id: selectedService.id,
+          _secondary_service_id: selectedSecondaryService?.id || null,
           _provider_ids: uniqueStaffIds,
           _booking_date: dateStr,
           _time_slot: selectedTimeSlotId,
           _notes: notes || null,
-          _calculated_price: pricing?.price || selectedService.base_price || 0,
-          _calculated_duration: pricing?.duration || selectedService.default_duration || 60
+          _calculated_price: calculatedPrice,
+          _calculated_duration: calculatedDuration
         });
 
         if (atomicError || !appointmentId) {
@@ -321,6 +376,9 @@ export const useAppointmentForm = (serviceType: 'grooming' | 'veterinary') => {
     setSelectedPet,
     selectedService,
     setSelectedService,
+    selectedSecondaryService,
+    setSelectedSecondaryService,
+    secondaryOptions,
     notes,
     setNotes,
     timeSlots,

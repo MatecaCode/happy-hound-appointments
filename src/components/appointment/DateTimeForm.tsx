@@ -68,16 +68,47 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 }) => {
   const canSubmit = date && selectedTimeSlotId && !isLoading;
 
-  const uniqueSelectedStaff = React.useMemo(() => {
-    const unique = [...new Set(selectedStaff)];
-    return unique;
+  // Stable, memoized staff selection to avoid effect loops
+  const selectedStaffKey = React.useMemo(() => {
+    return [...selectedStaff].sort().join('|');
   }, [selectedStaff]);
-  
-  console.log('[AVAILABILITY HOOK INIT] uniqueSelectedStaff:', uniqueSelectedStaff);
-  const { isDateDisabled, isLoading: availabilityLoading, availableDates } = useStaffAvailability({
+
+  const uniqueSelectedStaff = React.useMemo(() => {
+    const ids = Array.from(new Set(selectedStaff));
+    ids.sort();
+    return ids;
+  }, [selectedStaffKey]);
+
+  // Memoize params to keep identity stable
+  const availabilityParams = React.useMemo(() => ({
     selectedStaffIds: uniqueSelectedStaff,
     serviceDuration: serviceDuration
-  });
+  }), [selectedStaffKey, serviceDuration]);
+
+  const { isDateDisabled, isLoading: availabilityLoading, availableDates } = useStaffAvailability(availabilityParams);
+
+  // Stable logging: once per key change only (use local date key, not UTC)
+  const dateKey = React.useMemo(() => (date ? format(date, 'yyyy-MM-dd') : null), [date]);
+  React.useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.debug('[AVAILABILITY INIT]', { staffKey: selectedStaffKey, dateKey, duration: serviceDuration });
+  }, [selectedStaffKey, dateKey, serviceDuration]);
+
+  // Initialize date to next business day if undefined to prevent fetch loops
+  React.useEffect(() => {
+    if (!date) {
+      const d = new Date();
+      // next day
+      d.setDate(d.getDate() + 1);
+      // skip Sunday
+      if (d.getDay() === 0) {
+        d.setDate(d.getDate() + 1);
+      }
+      setDate(d);
+    }
+  // run only once on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Remove hard-coded date range limitations - let the calendar navigate freely
   const calendarDateRange = React.useMemo(() => {
@@ -91,17 +122,13 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
     };
   }, []);
 
-  // CRITICAL: Log prop received by DateTimeForm
+  // Minimal logging only when core inputs change
   React.useEffect(() => {
-    console.log('\n🔥 ===== DateTimeForm PROP RECEIVED =====');
-    console.log('🔥 timeSlots prop:', timeSlots);
-    console.log('🔥 timeSlots.length:', timeSlots?.length || 0);
-    console.log('🔥 Available slots in prop:', timeSlots?.filter(s => s.available)?.length || 0);
-    console.log('🔥 Full timeSlots array:', JSON.stringify(timeSlots, null, 2));
-    console.log('🔥 selectedStaff:', selectedStaff);
-    console.log('🔥 serviceDuration:', serviceDuration);
-    console.log('🔥 date:', date?.toISOString());
-  }, [timeSlots, selectedStaff, serviceDuration, date]);
+    if (!date) return;
+    const dateKey = date.toISOString().slice(0, 10);
+    const availableCount = timeSlots?.filter(s => s.available)?.length || 0;
+    console.debug('[DateTimeForm] slots:', timeSlots?.length || 0, 'available:', availableCount, 'date:', dateKey);
+  }, [timeSlots, date]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,19 +144,11 @@ const DateTimeForm: React.FC<DateTimeFormProps> = ({
 
   // Render available time slot buttons
   const renderTimeSlots = () => {
-    console.log('\n🔥 ===== renderTimeSlots CALLED =====');
-    console.log('🔥 timeSlots in render:', timeSlots);
-    
     if (!timeSlots || timeSlots.length === 0) {
-      console.log('❌ No timeSlots to render - array is empty or null');
       return null;
     }
 
-    const availableSlots = timeSlots.filter(slot => slot.available);
-    console.log('🔥 Available slots for rendering:', availableSlots);
-
-    return timeSlots.map((slot, index) => {
-      console.log(`🔥 Rendering button ${index}:`, slot);
+    return timeSlots.map((slot) => {
       return (
         <Button
           key={slot.id}
