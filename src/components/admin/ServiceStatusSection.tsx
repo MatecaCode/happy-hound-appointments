@@ -83,13 +83,24 @@ const ServiceStatusSection = () => {
     setUpdatingIds(prev => new Set(prev).add(appointmentId));
     
     try {
-      const { error } = await supabase.rpc('appointment_set_service_status', {
-        p_appointment_id: appointmentId,
-        p_new_status: newStatus,
-        p_note: null
-      });
-
-      if (error) throw error;
+      // Fetch service rows and update each via service-level RPC
+      const { data: svcRows, error: svcErr } = await supabase
+        .from('appointment_services')
+        .select('service_id')
+        .eq('appointment_id', appointmentId);
+      if (svcErr) throw svcErr;
+      if (!svcRows || svcRows.length === 0) {
+        throw new Error('No services found for this appointment');
+      }
+      for (const row of svcRows) {
+        const { error: mErr } = await supabase.rpc('mark_appointment_service_status', {
+          _appointment_id: appointmentId,
+          _service_id: row.service_id,
+          _status: newStatus,
+          _force: false
+        });
+        if (mErr) throw mErr;
+      }
 
       // Update local state
       setConfirmedAppointments(prev => 

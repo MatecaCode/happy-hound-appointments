@@ -44,12 +44,28 @@ export function ServiceStatusDropdown({
   async function confirmChange(next: ServiceStatus) {
     try {
       setLoading(true);
-      const { error } = await supabase.rpc('appointment_set_service_status', {
-        p_appointment_id: appointmentId,
-        p_new_status: next,
-        p_note: null,
-      });
-      if (error) throw error;
+
+      // Fetch all service rows for this appointment and update each one
+      const { data: svcRows, error: svcErr } = await supabase
+        .from('appointment_services')
+        .select('service_id')
+        .eq('appointment_id', appointmentId);
+      if (svcErr) throw svcErr;
+
+      if (!svcRows || svcRows.length === 0) {
+        throw new Error('No services found for this appointment');
+      }
+
+      for (const row of svcRows) {
+        const { error: mErr } = await supabase.rpc('mark_appointment_service_status', {
+          _appointment_id: appointmentId,
+          _service_id: row.service_id,
+          _status: next,
+          _force: false,
+        });
+        if (mErr) throw mErr;
+      }
+
       setStatus(next);
       if (refetchAppointments) await Promise.resolve(refetchAppointments());
       toast.success('Status do serviço atualizado');
