@@ -40,6 +40,7 @@ export interface Provider {
   name: string;
   role: string;
   rating: number;
+  reviewCount?: number;
   about: string;
   profile_image?: string;
   specialty?: string;

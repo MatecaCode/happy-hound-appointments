@@ -96,7 +96,8 @@ export const useStaffFiltering = ({ service, requirementsOverride = null }: Staf
           id: staff.staff_profile_id || staff.id,
           name: staff.name,
           role: 'staff', // Will be updated based on primary capability
-          rating: 4.5, // Default rating
+          rating: typeof staff.avg_rating === 'number' ? staff.avg_rating : (staff.avg_rating ? Number(staff.avg_rating) : 0),
+          reviewCount: typeof staff.review_count === 'number' ? staff.review_count : (staff.review_count ? Number(staff.review_count) : 0),
           about: '',
           profile_image: undefined,
           specialty: ''

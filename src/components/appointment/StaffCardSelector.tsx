@@ -191,23 +191,25 @@ const StaffCardSelector: React.FC<StaffCardSelectorProps> = ({
                       {getRoleLabel(member.role)}
                     </Badge>
                     
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="flex items-center gap-1">
-                        {renderStars(member.rating, hoveredStaff === member.id)}
+                    {member.reviewCount && member.reviewCount > 0 ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center gap-1">
+                          {renderStars(member.rating, hoveredStaff === member.id)}
+                        </div>
+                        <span 
+                          className={`text-lg font-bold text-primary transition-all duration-1000 ease-out ${hoveredStaff === member.id ? 'drop-shadow-lg' : ''}`}
+                          style={hoveredStaff === member.id ? {
+                            animationDelay: '1.5s',
+                            filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.8))',
+                            transition: 'filter 0.5s ease-out'
+                          } : {}}
+                        >
+                          {member.rating.toFixed(1)} ({member.reviewCount})
+                        </span>
                       </div>
-                      <span 
-                        className={`text-lg font-bold text-primary transition-all duration-1000 ease-out ${
-                          hoveredStaff === member.id ? 'drop-shadow-lg' : ''
-                        }`}
-                        style={hoveredStaff === member.id ? {
-                          animationDelay: '1.5s',
-                          filter: 'drop-shadow(0 0 8px rgba(59, 130, 246, 0.8))',
-                          transition: 'filter 0.5s ease-out'
-                        } : {}}
-                      >
-                        {member.rating.toFixed(1)}
-                      </span>
-                    </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">Sem avaliações</div>
+                    )}
                   </div>
 
                   {/* Specialty - Smaller */}
