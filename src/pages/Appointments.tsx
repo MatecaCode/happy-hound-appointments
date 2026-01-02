@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dog, Clock, CheckCircle, XCircle, Play, AlertCircle, Calendar, User, CalendarDays, Sparkles, Loader2, PawPrint, Heart } from 'lucide-react';
+import { Dog, Clock, CheckCircle, XCircle, Play, AlertCircle, Calendar, User, CalendarDays, Sparkles, Loader2, PawPrint, Heart, Star } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -63,6 +63,7 @@ const Appointments = () => {
   const [rating, setRating] = useState<number>(5);
   const [comment, setComment] = useState<string>('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState(false);
   
   // Load user's appointments from the database with detailed information
   useEffect(() => {
@@ -315,8 +316,13 @@ const Appointments = () => {
       });
       if (error) throw error;
       toast.success('Avaliação enviada com sucesso!');
-      setReviewModalOpen(false);
-      setSelectedReview(null);
+      // Premium feedback and smooth transition
+      setReviewSuccess(true);
+      setTimeout(() => {
+        setReviewModalOpen(false);
+        setSelectedReview(null);
+        setReviewSuccess(false);
+      }, 900);
       // Refetch reviewables so the CTA disappears
       const { data, error: rerr } = await supabase.rpc('get_reviewable_service_assignments_for_client');
       if (!rerr) setReviewables((data || []) as ReviewableItem[]);
@@ -404,7 +410,7 @@ const Appointments = () => {
     <Dialog>
       <DialogTrigger asChild>
                  <Card 
-           className={`group hover:shadow-xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm shadow-lg transform hover:scale-105 cursor-pointer h-[420px] w-full ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
+          className={`group hover:shadow-xl transition-all duration-300 border-0 bg-white/80 backdrop-blur-sm shadow-lg transform hover:scale-105 cursor-pointer h-[460px] w-full ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'}`}
            style={{ transitionDelay: `${500 + index * 100}ms` }}
          >
                      <CardHeader className="pb-4 h-24">
@@ -418,9 +424,9 @@ const Appointments = () => {
                    <CardDescription className="text-[#334155] text-sm leading-tight line-clamp-2">{appointment.service_name}</CardDescription>
                  </div>
                </div>
-               <div className="flex-shrink-0 ml-3">
-                 {getStatusBadge(appointment.status, appointment.service_status)}
-               </div>
+              <div className="flex-shrink-0 ml-3 flex items-center gap-2">
+                {getStatusBadge(appointment.status, appointment.service_status)}
+              </div>
              </div>
            </CardHeader>
           
@@ -452,7 +458,7 @@ const Appointments = () => {
                  </div>
                )}
                
-               {appointment.total_price && appointment.total_price > 0 && (
+              {appointment.total_price && appointment.total_price > 0 && (
                  <div className="flex items-start space-x-3 h-12">
                    <div className="h-5 w-5 flex items-center justify-center mt-0.5 flex-shrink-0">
                      <span className="text-[#10B981] font-bold text-lg">R$</span>
@@ -463,6 +469,25 @@ const Appointments = () => {
                    </div>
                  </div>
                )}
+
+              {/* Review prompt strip inside card (contained, premium) */}
+              {reviewablesByAppointment.get(appointment.id) && reviewablesByAppointment.get(appointment.id)!.length > 0 && (
+                <div className="mt-4 border-t pt-3 bg-white/70 rounded-b-md">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-[#1A4670]">Avalie nossos profissionais</div>
+                      <div className="text-xs text-[#475569]">
+                        {reviewablesByAppointment.get(appointment.id)!.length > 1
+                          ? `${reviewablesByAppointment.get(appointment.id)!.length} profissionais para avaliar`
+                          : 'Sua opinião ajuda a melhorar cada atendimento.'}
+                      </div>
+                    </div>
+                    <Button size="sm" variant="secondary" className="shrink-0">
+                      Avaliar
+                    </Button>
+                  </div>
+                </div>
+              )}
              </div>
 
                          {appointment.status === 'pending' && (
@@ -573,8 +598,12 @@ const Appointments = () => {
     appointmentDate.setHours(0, 0, 0, 0); // Reset time for comparison
     
     // Upcoming: future dates OR today with pending/confirmed status
-    return (appointmentDate >= today && (apt.status === 'pending' || apt.status === 'confirmed')) ||
-           (appointmentDate.getTime() === today.getTime() && (apt.status === 'pending' || apt.status === 'confirmed'));
+    // Exclude if service was already completed regardless of date
+    const isUpcomingByTimeAndLifecycle =
+      (appointmentDate >= today && (apt.status === 'pending' || apt.status === 'confirmed')) ||
+      (appointmentDate.getTime() === today.getTime() && (apt.status === 'pending' || apt.status === 'confirmed'));
+
+    return isUpcomingByTimeAndLifecycle && apt.service_status !== 'completed';
   });
   
   const pastAppointments = appointments.filter(apt => {
@@ -582,7 +611,11 @@ const Appointments = () => {
     appointmentDate.setHours(0, 0, 0, 0); // Reset time for comparison
     
     // Past: past dates OR completed/cancelled appointments
-    return appointmentDate < today || apt.status === 'completed' || apt.status === 'cancelled';
+    // Include if service was completed, even if scheduled for the future
+    return appointmentDate < today ||
+           apt.status === 'completed' ||
+           apt.status === 'cancelled' ||
+           apt.service_status === 'completed';
   });
 
   if (authLoading) {
@@ -753,18 +786,37 @@ const Appointments = () => {
               <div className="text-sm text-muted-foreground">
                 {selectedReview.service_name} — {selectedReview.staff_name} ({selectedReview.role})
               </div>
-              <div className="flex items-center gap-2">
-                {[1,2,3,4,5].map(n => (
-                  <Button
-                    key={n}
-                    type="button"
-                    variant={rating >= n ? 'default' : 'outline'}
-                    onClick={() => setRating(n)}
-                    className="h-8 px-3"
-                  >
-                    {n}★
-                  </Button>
-                ))}
+              {/* Accessible star rating */}
+              <div
+                role="radiogroup"
+                aria-label="Nota"
+                className="flex items-center gap-2"
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setRating((r) => Math.min(5, r + 1));
+                  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setRating((r) => Math.max(1, r - 1));
+                  }
+                }}
+              >
+                {[1,2,3,4,5].map((n) => {
+                  const selected = rating >= n;
+                  return (
+                    <button
+                      key={n}
+                      role="radio"
+                      aria-checked={selected}
+                      aria-label={`${n} de 5`}
+                      className={`h-9 w-9 rounded-full flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-[#2B70B2] ${selected ? 'bg-[#2B70B2] text-white' : 'bg-white border border-gray-300 text-[#2B70B2]'}`}
+                      onClick={() => setRating(n)}
+                    >
+                      <Star className={`h-5 w-5 ${selected ? 'fill-current text-white' : 'text-[#2B70B2]'}`} />
+                    </button>
+                  );
+                })}
+                <span className="ml-2 text-sm text-muted-foreground">{rating}/5</span>
               </div>
               <div>
                 <textarea
@@ -778,10 +830,16 @@ const Appointments = () => {
                 />
                 <div className="text-xs text-muted-foreground text-right">{comment.length}/1000</div>
               </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setReviewModalOpen(false)} disabled={submittingReview}>Cancelar</Button>
-                <Button onClick={submitReview} disabled={submittingReview}>{submittingReview ? 'Enviando...' : 'Enviar avaliação'}</Button>
-              </div>
+              {reviewSuccess ? (
+                <div className="flex items-center gap-2 text-green-700 font-medium">
+                  <CheckCircle className="h-5 w-5" /> Avaliação enviada. Obrigado!
+                </div>
+              ) : (
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setReviewModalOpen(false)} disabled={submittingReview}>Cancelar</Button>
+                  <Button onClick={submitReview} disabled={submittingReview}>{submittingReview ? 'Enviando...' : 'Enviar avaliação'}</Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
