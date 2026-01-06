@@ -66,6 +66,40 @@ const queryClient = new QueryClient();
 console.log("[ENV] URL:", import.meta.env.VITE_SUPABASE_URL);
 console.log("[ENV] Anon present:", !!import.meta.env.VITE_SUPABASE_ANON_KEY);
 
+// Catch chunk-load failures (e.g., stale cache referencing a deleted hashed file)
+function ChunkErrorCatcher() {
+  useEffect(() => {
+    const isChunkError = (reason: any) => {
+      const msg = String(reason?.message || reason || '');
+      return /Failed to fetch dynamically imported module|Importing a module script failed|module script: Expected a JavaScript module script but the server responded with a MIME type of "text\/html"/i.test(msg);
+    };
+
+    const onUnhandledRejection = (ev: PromiseRejectionEvent) => {
+      if (isChunkError(ev?.reason)) {
+        try { ev.preventDefault?.(); } catch {}
+        console.warn('[CHUNK_RECOVERY] Detected chunk load failure. Reloading to refresh asset map.');
+        // Hard refresh to fetch the latest index and chunk map
+        window.location.reload();
+      }
+    };
+
+    const onWindowError = (ev: ErrorEvent) => {
+      if (isChunkError(ev?.error)) {
+        console.warn('[CHUNK_RECOVERY] Detected chunk load failure via window error. Reloading.');
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('unhandledrejection', onUnhandledRejection as any);
+    window.addEventListener('error', onWindowError);
+    return () => {
+      window.removeEventListener('unhandledrejection', onUnhandledRejection as any);
+      window.removeEventListener('error', onWindowError);
+    };
+  }, []);
+  return null;
+}
+
 // Early redirect for Supabase auth errors present in URL hash (avoid homepage flicker)
 if (typeof window !== 'undefined') {
   const errorHash = window.location.hash || '';
@@ -169,6 +203,7 @@ function App() {
         <BrowserRouter>
           <AuthProvider>
             <ScrollToTop />
+            <ChunkErrorCatcher />
             <GlobalTokenCatcher />
             <FloatingWhatsappCTA />
             <Routes>
