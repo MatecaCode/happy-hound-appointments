@@ -95,6 +95,30 @@ const AdminPets = () => {
     fetchBreeds();
   }, []);
 
+  // Deep link support: ?edit=<petId> opens edit modal for that pet
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const petId = params.get('edit');
+    if (!petId) return;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('pets')
+          .select(`
+            id, name, breed, breed_id, size, age, birth_date, notes, created_at, updated_at, client_id
+          `)
+          .eq('id', petId)
+          .single();
+        if (error || !data) return;
+        setTimeout(() => {
+          (openEditModal as any)(data);
+        }, 0);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
+
   const fetchPets = async () => {
     if (!user) return;
     

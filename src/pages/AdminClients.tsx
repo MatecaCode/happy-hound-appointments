@@ -114,6 +114,10 @@ const AdminClients = () => {
   const [staffProfiles, setStaffProfiles] = useState<StaffProfile[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50); // guardrail: never auto-fetch >100
+  const [totalCount, setTotalCount] = useState<number | null>(null);
   const [locationFilter, setLocationFilter] = useState<string>('all');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -154,6 +158,35 @@ const AdminClients = () => {
     notes: '',
     birth_date: ''
   });
+
+  // Deep link support: ?highlight=<clientId> opens edit modal for that client
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const highlightId = params.get('highlight');
+    if (!highlightId) return;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('clients')
+          .select(`
+            id, user_id, name, phone, email, address, notes, location_id,
+            admin_created, created_by, needs_registration,
+            is_whatsapp, preferred_channel, emergency_contact_name, emergency_contact_phone,
+            preferred_staff_profile_id, accessibility_notes, general_notes,
+            marketing_source_code, marketing_source_other, birth_date, created_at, updated_at
+          `)
+          .eq('id', highlightId)
+          .single();
+        if (error || !data) return;
+        setTimeout(() => {
+          // Open after initial data loads
+          (openEditModal as any)(data);
+        }, 0);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
   const [petBirthDate, setPetBirthDate] = useState<Date | undefined>(undefined);
   const [selectedBreed, setSelectedBreed] = useState<Breed | undefined>(undefined);
 
@@ -173,11 +206,26 @@ const AdminClients = () => {
 
   // Load clients, locations and breeds
   useEffect(() => {
-    fetchClients();
+    // Initial load: fetch first page only (50 max), never the full table.
     fetchLocations();
     fetchBreeds();
     checkDataIntegrity();
+    void fetchClientsPage(0, true);
   }, []);
+
+  // Debounce search input (300–500ms window)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+
+  // Fire a new search when debounced term or location changes
+  useEffect(() => {
+    // Reset page and fetch first page
+    setPage(0);
+    void fetchClientsPage(0, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, locationFilter]);
 
   // Load staff profiles when modals open or location changes
   useEffect(() => {
@@ -186,14 +234,21 @@ const AdminClients = () => {
     }
   }, [formData.location_id, isCreateModalOpen, isEditModalOpen]);
 
-  const fetchClients = async () => {
+  // Server-side paginated fetch
+  const fetchClientsPage = async (targetPage = page, replace = false) => {
     if (!user) return;
-    
     setIsLoading(true);
     try {
-      console.log('🔍 [ADMIN_CLIENTS] Fetching clients with pet counts');
-      
-                   const { data, error } = await supabase
+      console.log('🔍 [ADMIN_CLIENTS] Fetching clients (paginated)');
+
+      const limit = Math.min(pageSize, 100); // hard ceiling
+      const from = targetPage * limit;
+      const to = from + limit - 1;
+
+      const term = debouncedSearch;
+      const digits = term.replace(/\D/g, '');
+
+      let query = supabase
         .from('clients')
         .select(`
           id,
@@ -222,17 +277,38 @@ const AdminClients = () => {
           marketing_source_other,
           birth_date,
           locations:location_id (name)
-        `)
-        .order('created_at', { ascending: false });
+        `, { count: 'exact' })
+        .order('updated_at', { ascending: false })
+        .range(from, to);
+
+      // Filters: location
+      if (locationFilter !== 'all') {
+        query = query.eq('location_id', locationFilter);
+      }
+
+      // Filters: server-side search
+      if (term) {
+        // Build OR clause: name ILIKE, email ILIKE, phone ILIKE digits
+        const orParts = [
+          `name.ilike.%${term}%`,
+          `email.ilike.%${term}%`,
+        ];
+        if (digits.length >= 3) {
+          // Best-effort: phone ilike digits (works for many formats)
+          orParts.push(`phone.ilike.%${digits}%`);
+        }
+        query = query.or(orParts.join(','));
+      }
+
+      const { data, error, count } = await query;
 
       if (error) {
         console.error('❌ [ADMIN_CLIENTS] Supabase error:', error);
         throw error;
       }
 
-      // Restrict to true clients only:
-      // - admin-created records (no user_id yet)
-      // - users whose role includes 'client' in public.user_roles
+      // Restrict to true clients only (keep existing gate):
+      // - admin-created records (no user_id yet) OR user has 'client' role
       let filteredForClientsOnly = data || [];
       try {
         const { data: roleRows, error: rolesError } = await supabase
@@ -250,23 +326,23 @@ const AdminClients = () => {
         console.warn('⚠️ [ADMIN_CLIENTS] user_roles filtering failed; proceeding without role filter', e);
       }
 
-      // Get pet counts for each (filtered) client
-      const clientsWithPetCounts = await Promise.all(
-        filteredForClientsOnly?.map(async (client) => {
-          const { count: petCount } = await supabase
-            .from('pets')
-            .select('*', { count: 'exact', head: true })
-            .eq('client_id', client.id);
+      // Get pet counts for the current page only (acceptable, limited to 50)
+      const clientsWithPetCounts = await Promise.all((filteredForClientsOnly || []).map(async (client) => {
+        const { count: petCount } = await supabase
+          .from('pets')
+          .select('*', { count: 'exact', head: true })
+          .eq('client_id', client.id);
+        return {
+          ...client,
+          location_name: (client as any).locations?.name,
+          pet_count: petCount || 0
+        };
+      }));
 
-          return {
-            ...client,
-            location_name: client.locations?.name,
-            pet_count: petCount || 0
-          };
-        }) || []
-      );
+      setTotalCount(typeof count === 'number' ? count : null);
+      setClients(replace ? clientsWithPetCounts : [...clients, ...clientsWithPetCounts]);
+      setPage(targetPage);
 
-      setClients(clientsWithPetCounts);
       // After clients load, fetch claim status via admin RPC
       const clientIds = (clientsWithPetCounts || []).map((c) => c.id);
       if (clientIds.length === 0) { setClaimStatusMap({}); return; }
@@ -301,7 +377,7 @@ const AdminClients = () => {
       } finally {
         loadingClaimRef.current = false;
       }
-      console.log('📊 [ADMIN_CLIENTS] Clients loaded:', clientsWithPetCounts);
+      console.log('📊 [ADMIN_CLIENTS] Clients page loaded:', { page: targetPage, count: clientsWithPetCounts.length, total: count ?? null });
     } catch (error) {
       console.error('❌ [ADMIN_CLIENTS] Error fetching clients:', error);
       toast.error('Erro ao carregar clientes');
@@ -518,16 +594,8 @@ const AdminClients = () => {
     }
   };
 
-  const filteredClients = clients.filter(client => {
-    const matchesSearch = 
-      client.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      client.phone?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesLocation = locationFilter === 'all' || client.location_id === locationFilter;
-    
-    return matchesSearch && matchesLocation;
-  });
+  // NOTE: Results are server-side filtered and paginated; do not re-filter on client
+  const filteredClients = clients;
 
   // Defensive helper: compute UI status with fallback when RPC is missing/empty
   const getClaimStatusForClient = (client: Client) => {
@@ -1588,15 +1656,15 @@ const AdminClients = () => {
             <CardContent className="text-center py-8">
               <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {searchTerm || locationFilter !== 'all' ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'}
+                {debouncedSearch || locationFilter !== 'all' ? 'Nenhum cliente encontrado' : 'Digite para buscar por nome, email ou telefone'}
               </h3>
               <p className="text-gray-600 mb-4">
-                {searchTerm || locationFilter !== 'all' 
+                {debouncedSearch || locationFilter !== 'all' 
                   ? 'Tente ajustar os filtros de busca' 
-                  : 'Comece criando o primeiro cliente do sistema'
+                  : 'Não carregamos todos os clientes automaticamente para manter a performance.'
                 }
               </p>
-              {!searchTerm && locationFilter === 'all' && (
+              {!debouncedSearch && locationFilter === 'all' && (
                 <Button onClick={() => setIsCreateModalOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Criar Primeiro Cliente
@@ -1605,6 +1673,7 @@ const AdminClients = () => {
             </CardContent>
           </Card>
         ) : (
+          <>
           <div className="grid auto-rows-[1fr] grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredClients.map((client) => {
               // Use RPC-driven claim status as source of truth
@@ -1797,6 +1866,27 @@ const AdminClients = () => {
               );
             })}
           </div>
+          {/* Pagination / Load More */}
+          <div className="flex items-center justify-center gap-4 mt-6">
+            <Button
+              variant="outline"
+              disabled={isLoading || page === 0}
+              onClick={() => fetchClientsPage(Math.max(0, page - 1), true)}
+            >
+              Anterior
+            </Button>
+            <span className="text-sm text-gray-600">
+              Página {page + 1}{totalCount ? ` • Mostrando ${clients.length} de ${totalCount}` : ''}
+            </span>
+            <Button
+              variant="outline"
+              disabled={isLoading || (totalCount !== null && (page + 1) * pageSize >= totalCount)}
+              onClick={() => fetchClientsPage(page + 1, true)}
+            >
+              Próxima
+            </Button>
+          </div>
+          </>
         )}
 
         {/* Edit Modal */}

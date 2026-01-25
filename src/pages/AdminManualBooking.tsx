@@ -40,6 +40,7 @@ interface Client {
   name: string;
   email: string | null;
   user_id: string;
+  phone?: string | null;
 }
 
 interface Pet {
@@ -142,6 +143,8 @@ const AdminManualBooking = () => {
   const [showSecondaryServiceDropdown, setShowSecondaryServiceDropdown] = useState(false);
   const [selectedPet, setSelectedPet] = useState<Pet | null>(null);
   const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
+  const [clientNeedsUpdate, setClientNeedsUpdate] = useState(false);
+  const [petNeedsUpdate, setPetNeedsUpdate] = useState(false);
 
   // Handle month change from calendar
   const handleMonthChange = (newMonth: Date) => {
@@ -320,7 +323,7 @@ const AdminManualBooking = () => {
       console.log('Loading clients...');
       const { data, error } = await supabase
         .from('clients')
-        .select('id, name, email, user_id')
+        .select('id, name, email, user_id, phone')
         .order('name');
 
       if (error) {
@@ -346,7 +349,7 @@ const AdminManualBooking = () => {
       console.log('Loading pets for client:', clientId);
       const { data, error } = await supabase
         .from('pets')
-        .select('id, name, breed, size, client_id, breed_id')
+        .select('id, name, breed, size, client_id, breed_id, birth_date')
         .eq('client_id', clientId)
         .order('name');
 
@@ -363,6 +366,39 @@ const AdminManualBooking = () => {
     } finally {
       setIsLoadingPets(false);
     }
+  };
+
+  // Simple BR phone validator: 10-11 digits after stripping non-digits
+  const isValidPhoneBR = (phone?: string | null) => {
+    if (!phone) return false;
+    const digits = phone.replace(/\D/g, '');
+    return digits.length === 10 || digits.length === 11;
+  };
+
+  const promptEditClient = (clientId: string) => {
+    const url = `${window.location.origin}/admin/clients?highlight=${encodeURIComponent(clientId)}`;
+    window.open(url, '_blank', 'noopener');
+  };
+
+  const promptEditPet = (petId: string) => {
+    const url = `${window.location.origin}/admin/pets?edit=${encodeURIComponent(petId)}`;
+    window.open(url, '_blank', 'noopener');
+  };
+
+  const validateSelectedClient = (client?: Client | null) => {
+    if (!client) return;
+    const needsEmail = !client.email || client.email.trim() === '';
+    const phoneOk = isValidPhoneBR(client.phone);
+    setClientNeedsUpdate(needsEmail || !phoneOk);
+  };
+
+  const validateSelectedPet = (pet?: Pet | null) => {
+    if (!pet) return;
+    const missingBreed = !(pet.breed_id || (pet.breed && pet.breed.trim() !== ''));
+    const missingSize = !(pet.size && pet.size.trim() !== '');
+    // @ts-ignore (we added birth_date to select above; keep optional)
+    const missingBirth = !(pet as any).birth_date;
+    setPetNeedsUpdate(missingBreed || missingSize || missingBirth);
   };
 
   const loadServices = async () => {
@@ -1005,6 +1041,7 @@ const AdminManualBooking = () => {
                   clients={clients ?? []}
                   onSelect={(client) => {
                     setSelectedClient(client);
+                    validateSelectedClient(client);
                     setBookingData(prev => ({ 
                       ...prev, 
                     clientUserId: client.user_id ?? null, 
@@ -1014,6 +1051,17 @@ const AdminManualBooking = () => {
                   }}
                   selectedClient={selectedClient}
                 />
+                {clientNeedsUpdate && selectedClient && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="flex items-center justify-between">
+                      <span>Perfil do cliente incompleto (telefone/formato ou email).</span>
+                      <Button variant="outline" size="sm" onClick={() => promptEditClient(selectedClient.id)}>
+                        Abrir cliente
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               {/* Pet Selection */}
@@ -1024,6 +1072,7 @@ const AdminManualBooking = () => {
                   onValueChange={(value) => {
                     const pet = pets.find(p => p.id === value);
                     setSelectedPet(pet || null);
+                    validateSelectedPet(pet || null);
                     setBookingData(prev => ({ ...prev, petId: value }));
                   }}
                   disabled={!selectedClient?.id || isLoadingPets}
@@ -1060,6 +1109,17 @@ const AdminManualBooking = () => {
                     )}
                   </SelectContent>
                 </Select>
+                {petNeedsUpdate && selectedPet && (
+                  <Alert>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="flex items-center justify-between">
+                      <span>Dados do pet incompletos (raça, tamanho ou nascimento).</span>
+                      <Button variant="outline" size="sm" onClick={() => promptEditPet(selectedPet.id)}>
+                        Abrir pet
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
 
               {/* Service Selection */}
