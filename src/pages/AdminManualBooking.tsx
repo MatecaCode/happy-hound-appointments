@@ -8,11 +8,13 @@ import { ClientCombobox } from '@/components/ClientCombobox';
 import { ServiceCombobox } from '@/components/ServiceCombobox';
 import { BookingCalendar } from '@/components/calendars/admin/BookingCalendar';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -33,6 +35,9 @@ import AdminLayout from '@/components/AdminLayout';
 import { usePricing } from '@/hooks/usePricing';
 import { useAdminAvailability } from '@/hooks/useAdminAvailability';
 import { toHHMM, toHHMMSS, toLocalISO } from '@/utils/time';
+import { BreedCombobox } from '@/components/BreedCombobox';
+import { PetDobPicker } from '@/components/calendars/pet/PetDobPicker';
+import { PREFERRED_CONTACT_OPTIONS, MARKETING_SOURCE_OPTIONS } from '@/constants/profile';
 
 
 interface Client {
@@ -145,6 +150,31 @@ const AdminManualBooking = () => {
   const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
   const [clientNeedsUpdate, setClientNeedsUpdate] = useState(false);
   const [petNeedsUpdate, setPetNeedsUpdate] = useState(false);
+  // Inline edit dialogs
+  const [isClientEditOpen, setIsClientEditOpen] = useState(false);
+  const [clientEdit, setClientEdit] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address?: string;
+    location_id?: string | null;
+    is_whatsapp?: boolean;
+    preferred_channel?: string;
+    emergency_contact_name?: string;
+    emergency_contact_phone?: string;
+    preferred_staff_profile_id?: string | null;
+    accessibility_notes?: string;
+    general_notes?: string;
+    marketing_source_code?: string | null;
+    marketing_source_other?: string | null;
+    birth_date?: Date | undefined;
+    notes?: string | null;
+  }>({ id: '', name: '', email: '', phone: '' });
+  const [locations, setLocations] = useState<Array<{ id: string; name: string }>>([]);
+  const [isPetEditOpen, setIsPetEditOpen] = useState(false);
+  const [petEdit, setPetEdit] = useState<{ id: string; name: string; age?: string; client_id?: string; notes?: string; breed_id: string | null; breed: string; size: string; birth_date: Date | undefined }>({ id: '', name: '', age: '', client_id: undefined, notes: '', breed_id: null, breed: '', size: '', birth_date: undefined });
+  const [breedOptions, setBreedOptions] = useState<Array<{ id: string; name: string }>>([]);
 
   // Handle month change from calendar
   const handleMonthChange = (newMonth: Date) => {
@@ -375,14 +405,152 @@ const AdminManualBooking = () => {
     return digits.length === 10 || digits.length === 11;
   };
 
-  const promptEditClient = (clientId: string) => {
-    const url = `${window.location.origin}/admin/clients?highlight=${encodeURIComponent(clientId)}`;
-    window.open(url, '_blank', 'noopener');
+  const openClientEditor = async (clientId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('id, name, email, phone, address, notes, location_id, is_whatsapp, preferred_channel, emergency_contact_name, emergency_contact_phone, preferred_staff_profile_id, accessibility_notes, general_notes, marketing_source_code, marketing_source_other, birth_date')
+        .eq('id', clientId)
+        .single();
+      if (error || !data) {
+        toast.error('Não foi possível carregar dados do cliente');
+        return;
+      }
+      setClientEdit({
+        id: data.id,
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        address: data.address || '',
+        notes: data.notes || '',
+        location_id: data.location_id || null,
+        is_whatsapp: !!data.is_whatsapp,
+        preferred_channel: data.preferred_channel || 'telefone',
+        emergency_contact_name: data.emergency_contact_name || '',
+        emergency_contact_phone: data.emergency_contact_phone || '',
+        preferred_staff_profile_id: data.preferred_staff_profile_id || null,
+        accessibility_notes: data.accessibility_notes || '',
+        general_notes: data.general_notes || '',
+        marketing_source_code: data.marketing_source_code || null,
+        marketing_source_other: data.marketing_source_other || '',
+        birth_date: data.birth_date ? new Date(data.birth_date) : undefined,
+      });
+      // ensure locations loaded
+      if (locations.length === 0) {
+        const { data: locs } = await supabase.from('locations').select('id, name').eq('active', true).order('name');
+        setLocations((locs || []).map((l: any) => ({ id: l.id, name: l.name })));
+      }
+      setIsClientEditOpen(true);
+    } catch (e) {
+      toast.error('Erro ao carregar cliente');
+    }
   };
 
-  const promptEditPet = (petId: string) => {
-    const url = `${window.location.origin}/admin/pets?edit=${encodeURIComponent(petId)}`;
-    window.open(url, '_blank', 'noopener');
+  const saveClientEdit = async () => {
+    try {
+      const { error } = await supabase.from('clients').update({
+        name: clientEdit.name,
+        email: clientEdit.email || null,
+        phone: clientEdit.phone || null,
+        address: clientEdit.address || null,
+        notes: clientEdit.notes || null,
+        location_id: clientEdit.location_id || null,
+        is_whatsapp: !!clientEdit.is_whatsapp,
+        preferred_channel: clientEdit.preferred_channel || 'telefone',
+        emergency_contact_name: clientEdit.emergency_contact_name || null,
+        emergency_contact_phone: clientEdit.emergency_contact_phone || null,
+        preferred_staff_profile_id: clientEdit.preferred_staff_profile_id || null,
+        accessibility_notes: clientEdit.accessibility_notes || null,
+        general_notes: clientEdit.general_notes || null,
+        marketing_source_code: clientEdit.marketing_source_code || null,
+        marketing_source_other: clientEdit.marketing_source_other || null,
+        birth_date: clientEdit.birth_date ? format(clientEdit.birth_date, 'yyyy-MM-dd') : null,
+      }).eq('id', clientEdit.id);
+      if (error) throw error;
+      // Update local state
+      setClients(prev => prev.map(c => c.id === clientEdit.id ? { ...c, name: clientEdit.name, email: clientEdit.email, phone: clientEdit.phone } as any : c));
+      if (selectedClient?.id === clientEdit.id) {
+        const updated = { ...selectedClient, name: clientEdit.name, email: clientEdit.email, user_id: selectedClient.user_id } as any;
+        setSelectedClient(updated);
+        validateSelectedClient(updated);
+      }
+      toast.success('Cliente atualizado');
+      setIsClientEditOpen(false);
+    } catch {
+      toast.error('Falha ao atualizar cliente');
+    }
+  };
+
+  const ensureBreedsLoaded = async () => {
+    if (breedOptions.length > 0) return;
+    try {
+      const { data, error } = await supabase.from('breeds').select('id, name').eq('status', ''); // placeholder to avoid TS error
+    } catch {}
+    try {
+      const { data } = await supabase.from('breeds').select('id, name, active').eq('active', true).order('name');
+      setBreedOptions((data || []).map((b: any) => ({ id: b.id, name: b.name, active: true })));
+    } catch {
+      // ignore
+    }
+  };
+
+  const openPetEditor = async (petId: string) => {
+    try {
+      await ensureBreedsLoaded();
+      const { data, error } = await supabase.from('pets').select('id, name, age, notes, client_id, breed, breed_id, size, birth_date').eq('id', petId).single();
+      if (error || !data) {
+        toast.error('Não foi possível carregar dados do pet');
+        return;
+      }
+      setPetEdit({
+        id: data.id,
+        name: data.name || '',
+        age: data.age || '',
+        client_id: data.client_id || undefined,
+        notes: data.notes || '',
+        breed_id: data.breed_id || null,
+        breed: data.breed || '',
+        size: data.size || '',
+        birth_date: data.birth_date ? new Date(data.birth_date) : undefined
+      });
+      setIsPetEditOpen(true);
+    } catch (e) {
+      toast.error('Erro ao carregar pet');
+    }
+  };
+
+  const savePetEdit = async () => {
+    try {
+      const payload: any = {
+        name: petEdit.name,
+        age: petEdit.age || null,
+        client_id: petEdit.client_id || null,
+        notes: petEdit.notes || null,
+        size: petEdit.size || null,
+        birth_date: petEdit.birth_date ? format(petEdit.birth_date, 'yyyy-MM-dd') : null,
+        breed_id: petEdit.breed_id,
+        // keep text fallback for display if no id chosen
+        breed: petEdit.breed_id ? (breedOptions.find(b => b.id === petEdit.breed_id)?.name || petEdit.breed) : (petEdit.breed || null),
+      };
+      const { error } = await supabase.from('pets').update(payload).eq('id', petEdit.id);
+      if (error) throw error;
+      // Refresh local list for current client
+      if (selectedClient) {
+        await loadPets(selectedClient.id);
+        const updated = (await supabase.from('pets').select('id, name, breed, size, client_id, breed_id, birth_date').eq('id', petEdit.id).single()).data;
+        if (updated) {
+          const newSelected = { ...updated } as any;
+          if (selectedPet && selectedPet.id === petEdit.id) {
+            setSelectedPet({ ...selectedPet, ...newSelected });
+            validateSelectedPet({ ...selectedPet, ...newSelected });
+          }
+        }
+      }
+      toast.success('Pet atualizado');
+      setIsPetEditOpen(false);
+    } catch {
+      toast.error('Falha ao atualizar pet');
+    }
   };
 
   const validateSelectedClient = (client?: Client | null) => {
@@ -1056,7 +1224,7 @@ const AdminManualBooking = () => {
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription className="flex items-center justify-between">
                       <span>Perfil do cliente incompleto (telefone/formato ou email).</span>
-                      <Button variant="outline" size="sm" onClick={() => promptEditClient(selectedClient.id)}>
+                      <Button variant="outline" size="sm" onClick={() => openClientEditor(selectedClient.id)}>
                         Abrir cliente
                       </Button>
                     </AlertDescription>
@@ -1114,7 +1282,7 @@ const AdminManualBooking = () => {
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription className="flex items-center justify-between">
                       <span>Dados do pet incompletos (raça, tamanho ou nascimento).</span>
-                      <Button variant="outline" size="sm" onClick={() => promptEditPet(selectedPet.id)}>
+                      <Button variant="outline" size="sm" onClick={() => openPetEditor(selectedPet.id)}>
                         Abrir pet
                       </Button>
                     </AlertDescription>
@@ -1539,6 +1707,169 @@ const AdminManualBooking = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Inline Client Edit Modal */}
+        <Dialog open={isClientEditOpen} onOpenChange={setIsClientEditOpen}>
+          <DialogContent className="max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Cliente</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="client-name">Nome</Label>
+                <Input id="client-name" value={clientEdit.name} onChange={(e) => setClientEdit({ ...clientEdit, name: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor="client-phone">Telefone</Label>
+                <Input id="client-phone" value={clientEdit.phone} onChange={(e) => setClientEdit({ ...clientEdit, phone: e.target.value })} placeholder="(11) 99999-9999" />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox id="client_whatsapp" checked={!!clientEdit.is_whatsapp} onCheckedChange={(c) => setClientEdit({ ...clientEdit, is_whatsapp: !!c })} />
+                <Label htmlFor="client_whatsapp" className="text-sm">Este número é WhatsApp</Label>
+              </div>
+              <div>
+                <Label htmlFor="client-email">Email</Label>
+                <Input id="client-email" type="email" value={clientEdit.email} onChange={(e) => setClientEdit({ ...clientEdit, email: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor="client-address">Endereço</Label>
+                <Input id="client-address" value={clientEdit.address || ''} onChange={(e) => setClientEdit({ ...clientEdit, address: e.target.value })} />
+              </div>
+              <div>
+                <Label>Local</Label>
+                <Select value={clientEdit.location_id || ''} onValueChange={(v) => setClientEdit({ ...clientEdit, location_id: v || null })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione um local" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((l) => (<SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Canal de contato preferido</Label>
+                <Select value={clientEdit.preferred_channel || 'telefone'} onValueChange={(v) => setClientEdit({ ...clientEdit, preferred_channel: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o canal preferido" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PREFERRED_CONTACT_OPTIONS.map((opt) => (<SelectItem key={opt.code} value={opt.code}>{opt.label}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="emergency-name">Contato de emergência</Label>
+                <Input id="emergency-name" value={clientEdit.emergency_contact_name || ''} onChange={(e) => setClientEdit({ ...clientEdit, emergency_contact_name: e.target.value })} />
+              </div>
+              <div>
+                <Label htmlFor="emergency-phone">Telefone do contato de emergência</Label>
+                <Input id="emergency-phone" value={clientEdit.emergency_contact_phone || ''} onChange={(e) => setClientEdit({ ...clientEdit, emergency_contact_phone: e.target.value })} />
+              </div>
+              <div>
+                <Label>Data de nascimento</Label>
+                <PetDobPicker value={clientEdit.birth_date} onChange={(d) => setClientEdit({ ...clientEdit, birth_date: d || undefined })} />
+              </div>
+              <div>
+                <Label htmlFor="client-notes">Observações</Label>
+                <Textarea id="client-notes" value={clientEdit.notes || ''} onChange={(e) => setClientEdit({ ...clientEdit, notes: e.target.value })} rows={2} />
+              </div>
+              <div>
+                <Label htmlFor="client-access">Necessidades especiais</Label>
+                <Textarea id="client-access" value={clientEdit.accessibility_notes || ''} onChange={(e) => setClientEdit({ ...clientEdit, accessibility_notes: e.target.value })} rows={2} />
+              </div>
+              <div>
+                <Label htmlFor="client-general">Observações gerais</Label>
+                <Textarea id="client-general" value={clientEdit.general_notes || ''} onChange={(e) => setClientEdit({ ...clientEdit, general_notes: e.target.value })} rows={2} />
+              </div>
+              <div>
+                <Label>Como nos conheceu?</Label>
+                <Select value={clientEdit.marketing_source_code || ''} onValueChange={(v) => setClientEdit({ ...clientEdit, marketing_source_code: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a origem" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MARKETING_SOURCE_OPTIONS.map((opt) => (<SelectItem key={opt.code} value={opt.code}>{opt.label}</SelectItem>))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {clientEdit.marketing_source_code === 'outro' && (
+                <div>
+                  <Label htmlFor="client-marketing-other">Especificar</Label>
+                  <Input id="client-marketing-other" value={clientEdit.marketing_source_other || ''} onChange={(e) => setClientEdit({ ...clientEdit, marketing_source_other: e.target.value })} />
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsClientEditOpen(false)}>Cancelar</Button>
+              <Button onClick={saveClientEdit}>Salvar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Inline Pet Edit Modal */}
+        <Dialog open={isPetEditOpen} onOpenChange={setIsPetEditOpen}>
+          <DialogContent className="max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Pet</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="pet-name">Nome</Label>
+                <Input id="pet-name" value={petEdit.name} onChange={(e) => setPetEdit({ ...petEdit, name: e.target.value })} />
+            </div>
+              <div>
+                <Label htmlFor="pet-age">Idade</Label>
+                <Input id="pet-age" value={petEdit.age || ''} onChange={(e) => setPetEdit({ ...petEdit, age: e.target.value })} placeholder="Ex: 3 anos" />
+              </div>
+              <div>
+                <Label>Raça</Label>
+                <BreedCombobox
+                  breeds={breedOptions as any}
+                  selectedBreed={petEdit.breed_id ? { id: petEdit.breed_id, name: petEdit.breed } as any : undefined}
+                  onSelect={(b) => setPetEdit({ ...petEdit, breed_id: (b as any).id || null, breed: (b as any).name || '' })}
+                  isLoading={false}
+                  disabled={false}
+                />
+              </div>
+              <div>
+                <Label htmlFor="pet-size">Tamanho</Label>
+                <Select value={petEdit.size || ''} onValueChange={(v) => setPetEdit({ ...petEdit, size: v })}>
+                  <SelectTrigger id="pet-size">
+                    <SelectValue placeholder="Selecione o tamanho" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="small">Pequeno</SelectItem>
+                    <SelectItem value="medium">Médio</SelectItem>
+                    <SelectItem value="large">Grande</SelectItem>
+                    <SelectItem value="extra_large">Extra Grande</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Dono</Label>
+                <ClientCombobox
+                  clients={clients}
+                  selectedClient={clients.find(c => c.id === petEdit.client_id)}
+                  onSelect={(client) => setPetEdit({ ...petEdit, client_id: client.id })}
+                  disabled={false}
+                  isLoading={isLoadingClients}
+                />
+              </div>
+              <div>
+                <Label>Data de Nascimento</Label>
+                <PetDobPicker value={petEdit.birth_date} onChange={(d) => setPetEdit({ ...petEdit, birth_date: d || undefined })} />
+              </div>
+              <div>
+                <Label htmlFor="pet-notes">Notas</Label>
+                <Textarea id="pet-notes" rows={2} value={petEdit.notes || ''} onChange={(e) => setPetEdit({ ...petEdit, notes: e.target.value })} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPetEditOpen(false)}>Cancelar</Button>
+              <Button onClick={savePetEdit}>Salvar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Conflict Modal */}
         <Dialog open={showConflictModal} onOpenChange={(open) => {
